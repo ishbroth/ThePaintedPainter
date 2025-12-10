@@ -1,14 +1,17 @@
 @import "tailwindcss";
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Lato:wght@100;300;400;700;900&family=Cabin:wght@700&display=swap');
 
 @theme {
-  --color-primary: #1a365d;
-  --color-primary-light: #2c5282;
-  --color-primary-dark: #0d1b2a;
+  --color-primary: #0a0a0a;
+  --color-primary-light: #1a1a1a;
+  --color-primary-dark: #000000;
   --color-secondary: #c9a227;
   --color-secondary-light: #d4b84a;
   --color-secondary-dark: #a68b1f;
-  --color-accent: #e53e3e;
+  --color-accent: #c9a227;
+  --color-dark-bg: #0a0a0a;
+  --color-dark-section: #111111;
+  --color-dark-card: #1a1a1a;
 }
 
 * {
@@ -22,33 +25,36 @@ html {
 }
 
 body {
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Lato', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background-color: #0a0a0a;
+  color: #ffffff;
 }
 
 h1, h2, h3, h4, h5, h6 {
-  font-family: 'Playfair Display', serif;
+  font-family: 'Cabin', sans-serif;
+  font-weight: 700;
 }
 
 .btn-primary {
-  @apply bg-primary text-white px-6 py-3 rounded-lg font-semibold hover:bg-primary-light transition-colors duration-200;
+  @apply bg-transparent text-white px-6 py-3 border border-white rounded-none font-semibold hover:bg-white hover:text-black transition-colors duration-200;
 }
 
 .btn-secondary {
-  @apply bg-secondary text-white px-6 py-3 rounded-lg font-semibold hover:bg-secondary-dark transition-colors duration-200;
+  @apply bg-transparent text-white px-6 py-3 border border-secondary text-secondary rounded-none font-semibold hover:bg-secondary hover:text-black transition-colors duration-200;
 }
 
 .btn-outline {
-  @apply border-2 border-primary text-primary px-6 py-3 rounded-lg font-semibold hover:bg-primary hover:text-white transition-colors duration-200;
+  @apply border border-white text-white px-6 py-3 rounded-none font-semibold hover:bg-white hover:text-black transition-colors duration-200;
 }
 
 .input-field {
-  @apply w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-200;
+  @apply w-full px-4 py-3 bg-white text-black border-0 rounded-none focus:ring-2 focus:ring-secondary focus:border-transparent outline-none transition-all duration-200;
 }
 
 .card {
-  @apply bg-white rounded-xl shadow-lg overflow-hidden;
+  @apply bg-dark-card rounded-none overflow-hidden;
 }
 
 .section-padding {
@@ -56,5 +62,20 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .container-custom {
-  @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  @apply max-w-6xl mx-auto px-4 sm:px-6 lg:px-8;
+}
+
+/* Gold divider line */
+.gold-divider {
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #c9a227, transparent);
+}
+
+/* Dark sections */
+.dark-section {
+  background-color: #0a0a0a;
+}
+
+.dark-section-alt {
+  background-color: #111111;
 }
