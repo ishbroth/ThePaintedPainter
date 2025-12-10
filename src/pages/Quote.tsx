@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { ArrowRight, ArrowLeft, MapPin, Home, Building, Check } from 'lucide-react';
+import { ArrowRight, ArrowLeft, MapPin, Home, Building, Check, Loader2 } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 
 type QuoteStep = 'address' | 'property-type' | 'project-type' | 'interior' | 'exterior' | 'details' | 'contact' | 'result';
 
@@ -38,6 +39,8 @@ interface QuoteData {
 
 const Quote = () => {
   const [step, setStep] = useState<QuoteStep>('address');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [data, setData] = useState<QuoteData>({
     address: '',
     zipCode: '',
@@ -117,6 +120,53 @@ const Quote = () => {
     if (highCostZips.includes(zipPrefix)) total *= 1.2;
 
     return Math.round(total);
+  };
+
+  const submitQuote = async () => {
+    setIsSubmitting(true);
+    setSubmitError(null);
+
+    const estimate = calculateEstimate();
+
+    // Prepare surfaces array
+    const surfaces: string[] = [];
+    if (data.walls) surfaces.push('walls');
+    if (data.ceilings) surfaces.push('ceilings');
+    if (data.trim) surfaces.push('trim');
+    if (data.doors) surfaces.push('doors');
+    if (data.cabinets) surfaces.push('cabinets');
+    if (data.exteriorTrim) surfaces.push('exterior_trim');
+    if (data.deck) surfaces.push('deck');
+    if (data.fence) surfaces.push('fence');
+    if (data.garageDoor) surfaces.push('garage_door');
+
+    try {
+      const { error } = await supabase.from('quotes').insert({
+        address: `${data.address}, ${data.zipCode}`,
+        property_type: data.propertyType === 'commercial' ? `commercial_${data.commercialType}` : data.propertyType,
+        project_type: data.projectType,
+        rooms: data.rooms,
+        surfaces: surfaces,
+        square_feet: parseInt(data.squareFootage) || null,
+        condition: data.condition,
+        timeline: data.timeline,
+        name: data.name,
+        email: data.email,
+        phone: data.phone,
+        notes: data.notes || null,
+        estimated_price: estimate,
+        status: 'new',
+      });
+
+      if (error) throw error;
+
+      setStep('result');
+    } catch (err) {
+      console.error('Error submitting quote:', err);
+      setSubmitError('Failed to submit quote. Please try again or call us directly.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const nextStep = () => {
@@ -608,31 +658,49 @@ const Quote = () => {
 
             {/* Navigation Buttons */}
             {step !== 'result' && (
-              <div className="flex justify-between mt-8 pt-6 border-t">
-                {step !== 'address' ? (
-                  <button
-                    onClick={prevStep}
-                    className="flex items-center gap-2 text-gray-600 hover:text-primary transition-colors"
-                  >
-                    <ArrowLeft size={20} />
-                    Back
-                  </button>
-                ) : (
-                  <div />
+              <div className="flex flex-col gap-4 mt-8 pt-6 border-t">
+                {submitError && (
+                  <div className="bg-red-50 text-red-700 p-3 rounded-lg text-sm">
+                    {submitError}
+                  </div>
                 )}
-                <button
-                  onClick={nextStep}
-                  className="btn-secondary inline-flex items-center gap-2"
-                  disabled={
-                    (step === 'address' && (!data.address || !data.zipCode)) ||
-                    (step === 'property-type' && !data.propertyType) ||
-                    (step === 'project-type' && !data.projectType) ||
-                    (step === 'contact' && (!data.name || !data.email || !data.phone))
-                  }
-                >
-                  {step === 'contact' ? 'Get My Quote' : 'Continue'}
-                  <ArrowRight size={20} />
-                </button>
+                <div className="flex justify-between">
+                  {step !== 'address' ? (
+                    <button
+                      onClick={prevStep}
+                      className="flex items-center gap-2 text-gray-600 hover:text-primary transition-colors"
+                      disabled={isSubmitting}
+                    >
+                      <ArrowLeft size={20} />
+                      Back
+                    </button>
+                  ) : (
+                    <div />
+                  )}
+                  <button
+                    onClick={step === 'contact' ? submitQuote : nextStep}
+                    className="btn-secondary inline-flex items-center gap-2"
+                    disabled={
+                      isSubmitting ||
+                      (step === 'address' && (!data.address || !data.zipCode)) ||
+                      (step === 'property-type' && !data.propertyType) ||
+                      (step === 'project-type' && !data.projectType) ||
+                      (step === 'contact' && (!data.name || !data.email || !data.phone))
+                    }
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 size={20} className="animate-spin" />
+                        Submitting...
+                      </>
+                    ) : (
+                      <>
+                        {step === 'contact' ? 'Get My Quote' : 'Continue'}
+                        <ArrowRight size={20} />
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             )}
           </div>
