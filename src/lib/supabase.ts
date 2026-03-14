@@ -5,25 +5,7 @@ const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYm
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// Types for database tables
-export interface QuoteSubmission {
-  id?: string;
-  created_at?: string;
-  address: string;
-  property_type: string;
-  project_type: string;
-  rooms?: string[];
-  surfaces?: string[];
-  square_feet?: number;
-  condition: string;
-  timeline: string;
-  name: string;
-  email: string;
-  phone: string;
-  notes?: string;
-  estimated_price: number;
-  status?: string;
-}
+// Types are in src/lib/types.ts (ExpandedQuoteSubmission)
 
 export interface ContactSubmission {
   id?: string;
