@@ -8,6 +8,7 @@ import Services from './pages/Services';
 import Gallery from './pages/Gallery';
 import Contact from './pages/Contact';
 import PaintersMap from './pages/PaintersMap';
+import PainterSignup from './pages/PainterSignup';
 import './index.css';
 
 const queryClient = new QueryClient();
@@ -27,6 +28,7 @@ function App() {
               <Route path="/gallery" element={<Gallery />} />
               <Route path="/contact" element={<Contact />} />
               <Route path="/painters-map" element={<PaintersMap />} />
+              <Route path="/painter-signup" element={<PainterSignup />} />
             </Routes>
           </main>
           <Footer />

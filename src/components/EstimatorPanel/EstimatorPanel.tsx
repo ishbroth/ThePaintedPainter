@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import type { ConversationState, EstimateBreakdown } from '../../lib/types';
 import {
   initializeConversation,
@@ -10,12 +10,19 @@ import {
 } from '../../lib/conversationEngine';
 import { calculateEstimate, getRunningEstimate, formatCurrency } from '../../lib/estimateEngine';
 import { buildJobSummary } from '../../lib/jobSummaryBuilder';
+import {
+  generatePainterMatches,
+  calculateGuaranteedPrice,
+  type PainterProfile,
+  type PainterMatch,
+} from '../../lib/painterPricingEngine';
 import { supabase } from '../../lib/supabase';
 import PanelHeader from './PanelHeader';
 import ProgressBar from './ProgressBar';
 import QuestionCard from './QuestionCard';
 import EstimateSummary from './EstimateSummary';
 import JobSummary from './JobSummary';
+import PainterMarketplace from './PainterMarketplace';
 
 const EstimatorPanel = () => {
   const [state, setState] = useState<ConversationState>(initializeConversation);
@@ -24,6 +31,10 @@ const EstimatorPanel = () => {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [estimate, setEstimate] = useState<EstimateBreakdown | null>(null);
   const [showJobSummary, setShowJobSummary] = useState(false);
+  const [painterMatches, setPainterMatches] = useState<PainterMatch[]>([]);
+  const [guaranteedPrice, setGuaranteedPrice] = useState<number>(0);
+  const [eligiblePainterCount, setEligiblePainterCount] = useState<number>(0);
+  const [paintersLoading, setPaintersLoading] = useState(false);
 
   const handleAnswer = useCallback(
     (answer: string | string[]) => {
@@ -60,6 +71,9 @@ const EstimatorPanel = () => {
     setValidationError(null);
     setSaveError(null);
     setShowJobSummary(false);
+    setPainterMatches([]);
+    setGuaranteedPrice(0);
+    setEligiblePainterCount(0);
   }, []);
 
   const saveToSupabase = async (s: ConversationState, est: EstimateBreakdown) => {
@@ -137,6 +151,131 @@ const EstimatorPanel = () => {
     }
   };
 
+  // Fetch painters and calculate matches when estimate is ready
+  useEffect(() => {
+    if (!estimate || !state.isComplete) return;
+
+    const fetchPainters = async () => {
+      setPaintersLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('painters')
+          .select('*')
+          .eq('verified', true)
+          .eq('status', 'approved');
+
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+          const profiles: PainterProfile[] = data.map((p) => ({
+            id: p.id,
+            companyName: p.company_name,
+            ownerName: p.owner_name,
+            city: p.city,
+            state: p.state,
+            zipCode: p.zip_code,
+            phone: p.phone,
+            email: p.email,
+            website: p.website || '',
+            yearsInBusiness: p.years_in_business || 0,
+            crewSize: p.crew_size || 1,
+            hasLicense: p.has_license || false,
+            licenseNumber: p.license_number || '',
+            isInsured: p.is_insured || false,
+            isBonded: p.is_bonded || false,
+            certifications: p.certifications || [],
+            serviceTypes: p.service_types || [],
+            offersWarranty: p.offers_warranty || false,
+            warrantyLength: p.warranty_length || '',
+            offersEstimates: p.offers_estimates ?? true,
+            baseline: {
+              price1BRRental: Number(p.price_1br_rental) || 0,
+              price3BRWalls: Number(p.price_3br_walls) || 0,
+              priceKitchenCabinets: Number(p.price_kitchen_cabinets) || 0,
+              priceExterior1500: Number(p.price_exterior_1500) || 0,
+              priceExterior3500: Number(p.price_exterior_3500) || 0,
+            },
+          }));
+
+          const matches = generatePainterMatches(profiles, state.context, estimate);
+          setPainterMatches(matches);
+
+          const gp = calculateGuaranteedPrice(matches, estimate);
+          setGuaranteedPrice(gp.guaranteedPrice);
+          setEligiblePainterCount(gp.eligiblePainterCount);
+        } else {
+          // No painters yet — still show guaranteed price from AI estimate
+          setGuaranteedPrice(Math.round(estimate.total * 0.93));
+          setEligiblePainterCount(0);
+          setPainterMatches([]);
+        }
+      } catch (err) {
+        console.error('Error fetching painters:', err);
+        setGuaranteedPrice(Math.round(estimate.total * 0.93));
+        setEligiblePainterCount(0);
+        setPainterMatches([]);
+      } finally {
+        setPaintersLoading(false);
+      }
+    };
+
+    fetchPainters();
+  }, [estimate, state.isComplete, state.context]);
+
+  // Handle user selecting the guaranteed price
+  const handleSelectGuaranteed = useCallback(async () => {
+    if (!estimate) return;
+    const ctx = state.context;
+    const jobDetails = buildJobSummary(
+      ctx,
+      `${formatCurrency(estimate.lowRange)} - ${formatCurrency(estimate.highRange)}`
+    );
+
+    // Save the selection to Supabase
+    try {
+      await supabase.from('quote_selections').insert({
+        quote_zip: ctx.zipCode,
+        customer_name: ctx.contactName,
+        customer_email: ctx.contactEmail,
+        customer_phone: ctx.contactPhone,
+        selection_type: 'guaranteed',
+        guaranteed_price: guaranteedPrice,
+        project_summary: JSON.stringify(jobDetails),
+        notified_painters: painterMatches
+          .filter((m) => guaranteedPrice >= m.priceRange.low && guaranteedPrice <= m.priceRange.high * 1.1)
+          .map((m) => m.painter.id),
+      });
+    } catch (err) {
+      console.error('Error saving selection:', err);
+    }
+  }, [estimate, state.context, guaranteedPrice, painterMatches]);
+
+  // Handle user selecting a specific painter
+  const handleSelectPainter = useCallback(async (painterId: string) => {
+    if (!estimate) return;
+    const ctx = state.context;
+    const match = painterMatches.find((m) => m.painter.id === painterId);
+    const jobDetails = buildJobSummary(
+      ctx,
+      `${formatCurrency(estimate.lowRange)} - ${formatCurrency(estimate.highRange)}`
+    );
+
+    try {
+      await supabase.from('quote_selections').insert({
+        quote_zip: ctx.zipCode,
+        customer_name: ctx.contactName,
+        customer_email: ctx.contactEmail,
+        customer_phone: ctx.contactPhone,
+        selection_type: 'specific_painter',
+        selected_painter_id: painterId,
+        selected_painter_price: match?.estimatedPrice || 0,
+        project_summary: JSON.stringify(jobDetails),
+      });
+    } catch (err) {
+      console.error('Error saving selection:', err);
+    }
+  }, [estimate, state.context, painterMatches]);
+
   const currentNode = getCurrentNode(state);
   const progress = getProgress(state);
   const runningEstimate = getRunningEstimate(state.context);
@@ -186,6 +325,23 @@ const EstimatorPanel = () => {
                 </button>
                 {showJobSummary && <JobSummary summary={jobSummary} />}
               </div>
+            )}
+
+            {/* Painter Marketplace */}
+            {paintersLoading ? (
+              <div style={{ textAlign: 'center', padding: 30, color: '#888' }}>
+                Finding painters in your area...
+              </div>
+            ) : estimate && (
+              <PainterMarketplace
+                aiEstimate={estimate}
+                guaranteedPrice={guaranteedPrice}
+                eligiblePainterCount={eligiblePainterCount}
+                painterMatches={painterMatches}
+                context={state.context}
+                onSelectGuaranteed={handleSelectGuaranteed}
+                onSelectPainter={handleSelectPainter}
+              />
             )}
           </>
         ) : currentNode ? (

@@ -26,6 +26,9 @@ const Header = () => {
             <Link to="/contact" onClick={() => setIsMenuOpen(false)}>
               Book Now!
             </Link>
+            <Link to="/painter-signup" onClick={() => setIsMenuOpen(false)}>
+              For Painters
+            </Link>
           </nav>
           <button className="mobile-menu" onClick={toggleNav} aria-label="Toggle navigation">
             &#9776;
