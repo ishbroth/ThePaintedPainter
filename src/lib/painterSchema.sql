@@ -43,11 +43,12 @@ CREATE TABLE painters (
   warranty_length TEXT,
 
   -- Pricing Baseline
-  price_1br_rental NUMERIC,
+  price_1br_full NUMERIC,
   price_3br_walls NUMERIC,
-  price_kitchen_cabinets NUMERIC,
-  price_exterior_1500 NUMERIC,
-  price_exterior_3500 NUMERIC,
+  price_3br_trim_doors NUMERIC,
+  price_3br_ceilings NUMERIC,
+  price_5br_full NUMERIC,
+  price_5br_cabinets NUMERIC,
 
   -- Status
   status TEXT DEFAULT 'pending',

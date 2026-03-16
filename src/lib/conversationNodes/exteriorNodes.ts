@@ -28,12 +28,32 @@ export const exteriorNodes: Record<string, ConversationNode> = {
       { label: 'Hardie Board / Fiber Cement', value: 'hardie' },
       { label: 'Brick', value: 'brick' },
       { label: 'Stone', value: 'stone' },
+      { label: 'Aluminum', value: 'aluminum' },
       { label: 'Mixed Materials', value: 'mixed' },
     ],
-    nextNodeId: 'exterior_trim',
+    nextNodeId: 'exterior_stucco_condition',
     category: 'exterior',
     skipWhen: (ctx) => ctx.projectType === 'interior',
     onAnswer: (_ctx, value) => ({ sidingType: v(value) }),
+  },
+
+  // Smart follow-up: stucco-specific condition (only if stucco or mixed)
+  exterior_stucco_condition: {
+    id: 'exterior_stucco_condition',
+    question: 'What is the condition of the stucco?',
+    subtext: 'New stucco needs to cure before painting. Damaged stucco needs patching first.',
+    inputType: 'select',
+    options: [
+      { label: 'Existing - Good (minor hairline cracks at most)', value: 'good' },
+      { label: 'New Stucco (recently applied, needs primer)', value: 'new_stucco' },
+      { label: 'Needs Repair (cracks, chips, patches needed)', value: 'needs_repair' },
+    ],
+    nextNodeId: 'exterior_trim',
+    category: 'exterior',
+    skipWhen: (ctx) =>
+      ctx.projectType === 'interior' ||
+      (ctx.sidingType !== 'stucco' && ctx.sidingType !== 'mixed'),
+    onAnswer: (_ctx, value) => ({ stuccoCondition: v(value) }),
   },
 
   exterior_trim: {
@@ -148,10 +168,31 @@ export const exteriorNodes: Record<string, ConversationNode> = {
       { label: 'Railings with Spindles/Balusters', value: 'spindles' },
       { label: 'Both Types', value: 'both' },
     ],
-    nextNodeId: 'exterior_balconies',
+    nextNodeId: 'exterior_railing_material',
     category: 'exterior',
     skipWhen: (ctx) => ctx.projectType === 'interior' || ctx.railings === 'none',
     onAnswer: (_ctx, value) => ({ railingType: v(value) }),
+  },
+
+  // Smart follow-up: railing material (metal needs rust treatment, wood needs sand/prime)
+  exterior_railing_material: {
+    id: 'exterior_railing_material',
+    question: 'What material are the exterior railings?',
+    subtext: 'Metal railings may need rust treatment and special primer.',
+    inputType: 'select',
+    options: [
+      { label: 'Wood', value: 'wood' },
+      { label: 'Metal / Iron', value: 'metal' },
+      { label: 'Aluminum', value: 'aluminum' },
+      { label: 'Cable / Modern', value: 'cable' },
+      { label: 'Composite / Vinyl', value: 'composite' },
+    ],
+    nextNodeId: 'exterior_balconies',
+    category: 'exterior',
+    skipWhen: (ctx) =>
+      ctx.projectType === 'interior' ||
+      ctx.railings === 'none',
+    onAnswer: (_ctx, value) => ({ exteriorRailingMaterial: v(value) }),
   },
 
   exterior_balconies: {
@@ -366,9 +407,21 @@ export const exteriorNodes: Record<string, ConversationNode> = {
       { label: 'Fair - Some peeling/cracking', value: 'fair' },
       { label: 'Poor - Extensive peeling/damage', value: 'poor' },
     ],
-    nextNodeId: 'prep_overview',
+    nextNodeId: 'additional_details',
     category: 'exterior',
     skipWhen: (ctx) => ctx.projectType === 'interior',
     onAnswer: (_ctx, value) => ({ exteriorCondition: v(value) }),
+  },
+
+  // Open-ended: let users mention anything unusual before we get into prep details
+  additional_details: {
+    id: 'additional_details',
+    question: 'Anything else we should know about the property or project?',
+    subtext: 'Optional — mention anything unusual: water damage, high ceilings in specific rooms, areas of concern, tight timeline, etc.',
+    inputType: 'text',
+    placeholder: 'e.g., "Water stain on master bath ceiling" or "Need a specific shade of blue"',
+    nextNodeId: 'prep_overview',
+    category: 'exterior',
+    onAnswer: (_ctx, value) => ({ additionalDetails: v(value).trim() }),
   },
 };

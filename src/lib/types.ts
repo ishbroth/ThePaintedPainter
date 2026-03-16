@@ -111,6 +111,35 @@ export interface EstimatorContext {
   contactEmail: string;
   contactNotes: string;
 
+  // Smart Qualifiers
+  projectCondition: string; // repaint, new_construction, renovation
+  hasStainedWood: string; // yes, no
+  bedroomCount: number | null;
+
+  // Surface Detail
+  trimCondition: string; // new, existing_good, existing_fair
+  wallTexture: string; // smooth, textured, heavy_texture
+  doorMaterial: string; // wood, metal, fiberglass, vinyl, mixed
+  cabinetScope: string; // fronts_only, inside_too
+  closetShelving: string; // none, wire, built_in, extensive
+  stuccoCondition: string; // good, new_stucco, needs_repair
+  exteriorRailingMaterial: string; // wood, metal, cable, composite
+  interiorRailingMaterial: string; // wood, metal, wrought_iron
+  additionalDetails: string;
+
+  // Specialty Services
+  specialtyServices: string[]; // fireplace, beams, built_ins, epoxy, furniture, brick
+  fireplaceType: string; // brick_paint, brick_whitewash, stone, mantel_only, full
+  fireplaceCount: number | null;
+  beamLinearFeet: number | null;
+  beamLocation: string; // standard, vaulted
+  builtInCount: number | null;
+  epoxyGarageSqft: number | null;
+  epoxyType: string; // basic, full_system
+  furnitureItems: string[];
+  brickSqft: number | null;
+  brickTreatment: string; // paint, whitewash
+
   // Tracking
   answeredQuestions: number;
   responseStyle: UserResponseStyle;

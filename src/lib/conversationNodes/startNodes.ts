@@ -98,10 +98,64 @@ export const startNodes: Record<string, ConversationNode> = {
       { label: 'Exterior Only', value: 'exterior' },
       { label: 'Both Interior & Exterior', value: 'both' },
     ],
-    nextNodeId: 'interior_scope',
+    nextNodeId: 'project_condition',
     category: 'start',
     onAnswer: (_ctx, value) => ({
       projectType: Array.isArray(value) ? value[0] : value,
+    }),
+  },
+
+  project_condition: {
+    id: 'project_condition',
+    question: 'What best describes this project?',
+    subtext: 'This helps us estimate prep work and materials.',
+    inputType: 'select',
+    options: [
+      { label: 'Repaint — previously painted surfaces', value: 'repaint' },
+      { label: 'New Construction — fresh drywall/surfaces', value: 'new_construction' },
+      { label: 'Renovation — mix of old and new surfaces', value: 'renovation' },
+    ],
+    nextNodeId: 'stained_wood',
+    category: 'start',
+    onAnswer: (_ctx, value) => ({
+      projectCondition: Array.isArray(value) ? value[0] : value,
+    }),
+  },
+
+  stained_wood: {
+    id: 'stained_wood',
+    question: 'Are there currently stained wood surfaces (trim, doors, cabinets) that need to be painted over?',
+    subtext: 'Stained wood requires extra prep (deglossing & priming) before painting.',
+    inputType: 'select',
+    options: [
+      { label: 'Yes — stained wood to paint over', value: 'yes' },
+      { label: 'No — all surfaces are already painted or new', value: 'no' },
+    ],
+    nextNodeId: 'bedroom_count',
+    category: 'start',
+    skipWhen: (ctx) => ctx.projectCondition === 'new_construction',
+    onAnswer: (_ctx, value) => ({
+      hasStainedWood: Array.isArray(value) ? value[0] : value,
+    }),
+  },
+
+  bedroom_count: {
+    id: 'bedroom_count',
+    question: 'How many bedrooms does the property have?',
+    subtext: 'Helps us estimate room count and layout.',
+    inputType: 'select',
+    options: [
+      { label: '1 Bedroom', value: '1' },
+      { label: '2 Bedrooms', value: '2' },
+      { label: '3 Bedrooms', value: '3' },
+      { label: '4 Bedrooms', value: '4' },
+      { label: '5+ Bedrooms', value: '5' },
+    ],
+    nextNodeId: 'interior_scope',
+    category: 'start',
+    skipWhen: (ctx) => ctx.projectType === 'exterior',
+    onAnswer: (_ctx, value) => ({
+      bedroomCount: parseInt(Array.isArray(value) ? value[0] : value, 10),
     }),
   },
 };

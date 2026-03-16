@@ -56,10 +56,30 @@ export const interiorNodes: Record<string, ConversationNode> = {
       { label: 'Yes', value: 'yes' },
       { label: 'No', value: 'no' },
     ],
-    nextNodeId: 'interior_accent_walls',
+    nextNodeId: 'interior_wall_texture',
     category: 'interior',
     skipWhen: (ctx) => ctx.projectType === 'exterior',
     onAnswer: (_ctx, value) => ({ interiorWalls: v(value) }),
+  },
+
+  // Smart follow-up: wall texture affects paint consumption and labor
+  interior_wall_texture: {
+    id: 'interior_wall_texture',
+    question: 'What is the wall texture?',
+    subtext: 'Textured surfaces use more paint and take longer to coat evenly.',
+    inputType: 'select',
+    options: [
+      { label: 'Smooth / Flat', value: 'smooth' },
+      { label: 'Light Texture (orange peel, eggshell)', value: 'textured' },
+      { label: 'Heavy Texture (knockdown, skip trowel, Santa Fe)', value: 'heavy_texture' },
+    ],
+    nextNodeId: 'interior_accent_walls',
+    category: 'interior',
+    skipWhen: (ctx) =>
+      ctx.projectType === 'exterior' ||
+      ctx.interiorWalls === 'no' ||
+      ctx.responseStyle === 'terse',
+    onAnswer: (_ctx, value) => ({ wallTexture: v(value) }),
   },
 
   interior_accent_walls: {
@@ -118,7 +138,7 @@ export const interiorNodes: Record<string, ConversationNode> = {
       { label: 'Baseboards Only', value: 'baseboards_only' },
       { label: 'No', value: 'no' },
     ],
-    nextNodeId: 'interior_crown_molding',
+    nextNodeId: 'interior_trim_condition',
     category: 'interior',
     skipWhen: (ctx) => ctx.projectType === 'exterior',
     onAnswer: (_ctx, value) => {
@@ -128,6 +148,27 @@ export const interiorNodes: Record<string, ConversationNode> = {
         baseboards: val === 'yes' || val === 'baseboards_only' ? 'yes' : 'no',
       };
     },
+  },
+
+  // Smart follow-up: trim condition drives caulking/nail hole/sanding prep costs
+  interior_trim_condition: {
+    id: 'interior_trim_condition',
+    question: 'What is the condition of the trim?',
+    subtext: 'New trim needs caulking and nail holes filled before painting. Existing trim may need sanding or deglossing.',
+    inputType: 'select',
+    options: [
+      { label: 'New / Unfinished (needs caulk, fill, prime)', value: 'new' },
+      { label: 'Existing - Good Condition (light scuff sand)', value: 'existing_good' },
+      { label: 'Existing - Fair/Rough (needs sanding, possible repairs)', value: 'existing_fair' },
+      { label: 'Mix of New and Existing', value: 'mixed' },
+    ],
+    nextNodeId: 'interior_crown_molding',
+    category: 'interior',
+    skipWhen: (ctx) =>
+      ctx.projectType === 'exterior' ||
+      ctx.interiorTrim === 'no' ||
+      ctx.projectCondition === 'new_construction', // Auto-infer new trim
+    onAnswer: (_ctx, value) => ({ trimCondition: v(value) }),
   },
 
   interior_crown_molding: {
@@ -205,7 +246,7 @@ export const interiorNodes: Record<string, ConversationNode> = {
       { label: 'Closet Doors', value: 'closet' },
       { label: 'Pocket Doors', value: 'pocket' },
     ],
-    nextNodeId: 'interior_door_frames',
+    nextNodeId: 'interior_door_material',
     category: 'interior',
     skipWhen: (ctx) =>
       ctx.projectType === 'exterior' ||
@@ -214,6 +255,27 @@ export const interiorNodes: Record<string, ConversationNode> = {
     onAnswer: (_ctx, value) => ({
       doorTypes: Array.isArray(value) ? value : [value],
     }),
+  },
+
+  // Smart follow-up: door material affects prep and application
+  interior_door_material: {
+    id: 'interior_door_material',
+    question: 'What material are the doors?',
+    subtext: 'Metal and fiberglass doors prep differently than wood.',
+    inputType: 'select',
+    options: [
+      { label: 'Wood (solid or hollow-core)', value: 'wood' },
+      { label: 'Metal / Steel', value: 'metal' },
+      { label: 'Fiberglass', value: 'fiberglass' },
+      { label: 'Mix of Materials', value: 'mixed' },
+    ],
+    nextNodeId: 'interior_door_frames',
+    category: 'interior',
+    skipWhen: (ctx) =>
+      ctx.projectType === 'exterior' ||
+      ctx.interiorDoors === 'none' ||
+      ctx.responseStyle === 'terse',
+    onAnswer: (_ctx, value) => ({ doorMaterial: v(value) }),
   },
 
   interior_door_frames: {
@@ -307,12 +369,30 @@ export const interiorNodes: Record<string, ConversationNode> = {
       { label: 'Bathroom Cabinets', value: 'bathroom' },
       { label: 'Laundry Cabinets', value: 'laundry' },
     ],
-    nextNodeId: 'interior_closets',
+    nextNodeId: 'interior_cabinet_scope',
     category: 'interior',
     skipWhen: (ctx) => ctx.projectType === 'exterior' || ctx.cabinets === 'none',
     onAnswer: (_ctx, value) => ({
       cabinetLocations: Array.isArray(value) ? value : [value],
     }),
+  },
+
+  // Smart follow-up: cabinet painting scope
+  interior_cabinet_scope: {
+    id: 'interior_cabinet_scope',
+    question: 'How much of the cabinets need painting?',
+    subtext: 'Painting inside cabinets adds significant time — typically 40-60% more than fronts only.',
+    inputType: 'select',
+    options: [
+      { label: 'Fronts & Visible Frame Only (standard)', value: 'fronts_only' },
+      { label: 'Inside of Cabinets Too (full)', value: 'inside_too' },
+    ],
+    nextNodeId: 'interior_closets',
+    category: 'interior',
+    skipWhen: (ctx) =>
+      ctx.projectType === 'exterior' ||
+      ctx.cabinets === 'none',
+    onAnswer: (_ctx, value) => ({ cabinetScope: v(value) }),
   },
 
   interior_closets: {
@@ -338,7 +418,7 @@ export const interiorNodes: Record<string, ConversationNode> = {
     question: 'How many closets?',
     inputType: 'number',
     placeholder: '3',
-    nextNodeId: 'interior_stairways',
+    nextNodeId: 'interior_closet_shelving',
     category: 'interior',
     skipWhen: (ctx) =>
       ctx.projectType === 'exterior' ||
@@ -350,6 +430,26 @@ export const interiorNodes: Record<string, ConversationNode> = {
       return null;
     },
     onAnswer: (_ctx, value) => ({ closetCount: parseInt(v(value), 10) }),
+  },
+
+  // Smart follow-up: closet shelving affects masking and painting scope
+  interior_closet_shelving: {
+    id: 'interior_closet_shelving',
+    question: 'Do the closets have built-in shelving that needs painting?',
+    subtext: 'Wire shelving just needs masking. Built-in wood shelving adds painting scope.',
+    inputType: 'select',
+    options: [
+      { label: 'No Shelving / Wire Only', value: 'none' },
+      { label: 'Basic Shelving (1-2 shelves)', value: 'wire' },
+      { label: 'Built-in Wood Shelving', value: 'built_in' },
+      { label: 'Extensive Custom Closet System', value: 'extensive' },
+    ],
+    nextNodeId: 'interior_stairways',
+    category: 'interior',
+    skipWhen: (ctx) =>
+      ctx.projectType === 'exterior' ||
+      ctx.closets === 'none',
+    onAnswer: (_ctx, value) => ({ closetShelving: v(value) }),
   },
 
   interior_stairways: {
@@ -388,13 +488,213 @@ export const interiorNodes: Record<string, ConversationNode> = {
     inputType: 'select',
     options: [
       { label: 'Stairway Walls Only', value: 'walls_only' },
-      { label: 'Walls & Railings', value: 'walls_and_railings' },
-      { label: 'Everything (Walls, Railings, Spindles, Treads)', value: 'full' },
+      { label: 'Walls & Railings/Banisters', value: 'walls_and_railings' },
+      { label: 'Everything (Walls, Railings, Spindles, Risers)', value: 'full' },
     ],
-    nextNodeId: 'interior_shutters',
+    nextNodeId: 'interior_railing_material',
     category: 'interior',
     skipWhen: (ctx) => ctx.projectType === 'exterior' || ctx.stairways === 'none',
     onAnswer: (_ctx, value) => ({ stairwayDetails: v(value) }),
+  },
+
+  // Smart follow-up: railing material matters for prep and pricing
+  interior_railing_material: {
+    id: 'interior_railing_material',
+    question: 'What material are the stair railings/banisters?',
+    subtext: 'Wood and metal prep very differently. Wrought iron detailing is labor-intensive.',
+    inputType: 'select',
+    options: [
+      { label: 'Wood', value: 'wood' },
+      { label: 'Metal / Wrought Iron', value: 'wrought_iron' },
+      { label: 'Metal (simple/modern)', value: 'metal' },
+    ],
+    nextNodeId: 'interior_specialty',
+    category: 'interior',
+    skipWhen: (ctx) =>
+      ctx.projectType === 'exterior' ||
+      ctx.stairways === 'none' ||
+      ctx.stairwayDetails === 'walls_only', // Only ask if painting railings
+    onAnswer: (_ctx, value) => ({ interiorRailingMaterial: v(value) }),
+  },
+
+  // ===== Specialty Services =====
+
+  interior_specialty: {
+    id: 'interior_specialty',
+    question: 'Does this project include any specialty painting?',
+    subtext: 'Select all that apply, or skip if none.',
+    inputType: 'multiselect',
+    options: [
+      { label: 'Fireplace / Mantel', value: 'fireplace' },
+      { label: 'Exposed Beams', value: 'beams' },
+      { label: 'Built-in Shelving / Bookcases', value: 'built_ins' },
+      { label: 'Epoxy Garage Floor', value: 'epoxy' },
+      { label: 'Furniture Painting', value: 'furniture' },
+      { label: 'Brick or Stone (interior)', value: 'brick' },
+      { label: 'None / Skip', value: 'none' },
+    ],
+    nextNodeId: 'interior_fireplace_type',
+    category: 'interior',
+    skipWhen: (ctx) =>
+      ctx.projectType === 'exterior' ||
+      ctx.responseStyle === 'terse',
+    onAnswer: (_ctx, value) => {
+      const selected = Array.isArray(value) ? value : [value];
+      if (selected.includes('none')) return { specialtyServices: [] };
+      return { specialtyServices: selected };
+    },
+  },
+
+  interior_fireplace_type: {
+    id: 'interior_fireplace_type',
+    question: 'What type of fireplace work?',
+    inputType: 'select',
+    options: [
+      { label: 'Paint Brick Surround', value: 'brick_paint' },
+      { label: 'Whitewash / Limewash Brick', value: 'brick_whitewash' },
+      { label: 'Paint Stone Surround', value: 'stone' },
+      { label: 'Mantel Only', value: 'mantel_only' },
+      { label: 'Full Fireplace (surround + mantel + hearth)', value: 'full' },
+    ],
+    nextNodeId: 'interior_beam_length',
+    category: 'interior',
+    skipWhen: (ctx) =>
+      ctx.projectType === 'exterior' ||
+      !ctx.specialtyServices.includes('fireplace'),
+    onAnswer: (_ctx, value) => ({ fireplaceType: v(value) }),
+  },
+
+  interior_beam_length: {
+    id: 'interior_beam_length',
+    question: 'Approximately how many total linear feet of exposed beams?',
+    subtext: 'Estimate total length of all beams combined.',
+    inputType: 'number',
+    placeholder: '40',
+    nextNodeId: 'interior_beam_location',
+    category: 'interior',
+    skipWhen: (ctx) =>
+      ctx.projectType === 'exterior' ||
+      !ctx.specialtyServices.includes('beams'),
+    validate: (value) => {
+      const n = parseInt(v(value), 10);
+      if (isNaN(n) || n < 1 || n > 500) return 'Please enter a number between 1 and 500';
+      return null;
+    },
+    onAnswer: (_ctx, value) => ({ beamLinearFeet: parseInt(v(value), 10) }),
+  },
+
+  interior_beam_location: {
+    id: 'interior_beam_location',
+    question: 'Where are the exposed beams?',
+    inputType: 'select',
+    options: [
+      { label: 'Standard Height (accessible)', value: 'standard' },
+      { label: 'Vaulted / High Ceiling (needs scaffolding)', value: 'vaulted' },
+    ],
+    nextNodeId: 'interior_builtin_count',
+    category: 'interior',
+    skipWhen: (ctx) =>
+      ctx.projectType === 'exterior' ||
+      !ctx.specialtyServices.includes('beams'),
+    onAnswer: (_ctx, value) => ({ beamLocation: v(value) }),
+  },
+
+  interior_builtin_count: {
+    id: 'interior_builtin_count',
+    question: 'How many built-in units need painting?',
+    subtext: 'Bookcases, shelving, entertainment centers, etc.',
+    inputType: 'number',
+    placeholder: '2',
+    nextNodeId: 'interior_epoxy_type',
+    category: 'interior',
+    skipWhen: (ctx) =>
+      ctx.projectType === 'exterior' ||
+      !ctx.specialtyServices.includes('built_ins'),
+    validate: (value) => {
+      const n = parseInt(v(value), 10);
+      if (isNaN(n) || n < 1 || n > 20) return 'Please enter a number between 1 and 20';
+      return null;
+    },
+    onAnswer: (_ctx, value) => ({ builtInCount: parseInt(v(value), 10) }),
+  },
+
+  interior_epoxy_type: {
+    id: 'interior_epoxy_type',
+    question: 'What type of epoxy floor coating?',
+    inputType: 'select',
+    options: [
+      { label: 'Basic Solid Color', value: 'basic' },
+      { label: 'Full System (flake + clear topcoat)', value: 'full_system' },
+    ],
+    nextNodeId: 'interior_furniture',
+    category: 'interior',
+    skipWhen: (ctx) =>
+      ctx.projectType === 'exterior' ||
+      !ctx.specialtyServices.includes('epoxy'),
+    onAnswer: (ctx, value) => ({
+      epoxyType: v(value),
+      epoxyGarageSqft: Math.round((ctx.squareFeet || 1500) * 0.15),
+    }),
+  },
+
+  interior_furniture: {
+    id: 'interior_furniture',
+    question: 'What furniture pieces need painting?',
+    subtext: 'Select all that apply.',
+    inputType: 'multiselect',
+    options: [
+      { label: 'Dresser', value: 'dresser' },
+      { label: 'Dining Table', value: 'table_dining' },
+      { label: 'End/Side Table', value: 'table_end' },
+      { label: 'Chairs', value: 'chair' },
+      { label: 'Bookcase', value: 'bookcase' },
+      { label: 'Desk', value: 'desk' },
+      { label: 'Nightstand', value: 'nightstand' },
+      { label: 'Cabinet/Hutch', value: 'cabinet' },
+    ],
+    nextNodeId: 'interior_brick_treatment',
+    category: 'interior',
+    skipWhen: (ctx) =>
+      ctx.projectType === 'exterior' ||
+      !ctx.specialtyServices.includes('furniture'),
+    onAnswer: (_ctx, value) => ({
+      furnitureItems: Array.isArray(value) ? value : [value],
+    }),
+  },
+
+  interior_brick_treatment: {
+    id: 'interior_brick_treatment',
+    question: 'How should the brick/stone be treated?',
+    inputType: 'select',
+    options: [
+      { label: 'Paint (solid color)', value: 'paint' },
+      { label: 'Whitewash / German Smear / Limewash', value: 'whitewash' },
+    ],
+    nextNodeId: 'interior_brick_sqft',
+    category: 'interior',
+    skipWhen: (ctx) =>
+      ctx.projectType === 'exterior' ||
+      !ctx.specialtyServices.includes('brick'),
+    onAnswer: (_ctx, value) => ({ brickTreatment: v(value) }),
+  },
+
+  interior_brick_sqft: {
+    id: 'interior_brick_sqft',
+    question: 'Approximately how many square feet of brick/stone?',
+    subtext: 'A typical accent wall is about 80-120 sqft.',
+    inputType: 'number',
+    placeholder: '100',
+    nextNodeId: 'interior_shutters',
+    category: 'interior',
+    skipWhen: (ctx) =>
+      ctx.projectType === 'exterior' ||
+      !ctx.specialtyServices.includes('brick'),
+    validate: (value) => {
+      const n = parseInt(v(value), 10);
+      if (isNaN(n) || n < 10 || n > 2000) return 'Please enter a number between 10 and 2000';
+      return null;
+    },
+    onAnswer: (_ctx, value) => ({ brickSqft: parseInt(v(value), 10) }),
   },
 
   interior_shutters: {
@@ -425,7 +725,9 @@ export const interiorNodes: Record<string, ConversationNode> = {
     ],
     nextNodeId: 'exterior_scope',
     category: 'interior',
-    skipWhen: (ctx) => ctx.projectType === 'exterior',
+    skipWhen: (ctx) =>
+      ctx.projectType === 'exterior' ||
+      ctx.projectCondition === 'new_construction',
     onAnswer: (_ctx, value) => ({ interiorColorChange: v(value) }),
   },
 };

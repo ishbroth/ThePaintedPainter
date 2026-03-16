@@ -3,11 +3,12 @@ import type { EstimatorContext, EstimateBreakdown } from './types';
 // ===== Painter Baseline Prices =====
 
 export interface PainterBaseline {
-  price1BRRental: number;      // Empty 1BR: ceilings, walls, trim, doors
-  price3BRWalls: number;       // 3BR home: walls only
-  priceKitchenCabinets: number; // Kitchen cabinets, large home
-  priceExterior1500: number;    // Exterior 1,500 sqft: siding, trim, doors
-  priceExterior3500: number;    // Exterior 3,500 sqft: with repairs
+  price1BRFull: number;       // Empty 1BR: walls, ceilings, trim, doors + kitchen cabinets
+  price3BRWalls: number;      // 3BR home: walls only
+  price3BRTrimDoors: number;  // 3BR home: trim & doors only
+  price3BRCeilings: number;   // 3BR home: ceilings only
+  price5BRFull: number;       // 5BR 3,500 sqft: walls, ceilings, trim, doors
+  price5BRCabinets: number;   // 5BR 3,500 sqft: kitchen cabinets only
 }
 
 export interface PainterProfile {
@@ -34,20 +35,13 @@ export interface PainterProfile {
   baseline: PainterBaseline;
 }
 
-// ===== Reference Project Specs =====
-// These define what the 5 baseline scenarios represent in terms of estimator units
+// ===== Reference Specs =====
+// 1BR ~ 600 sqft, 3BR ~ 1,500 sqft, 5BR ~ 3,500 sqft
 
-const REFERENCE_PROJECTS = {
-  // 1BR rental: ~600 sqft, full interior (walls, ceilings, trim, doors ~5 doors)
-  oneBR: { sqft: 600, interiorFraction: 1.0, hasCeilings: true, hasTrim: true, doorCount: 5, isExterior: false },
-  // 3BR walls only: ~1500 sqft, walls only
-  threeBR: { sqft: 1500, interiorFraction: 1.0, hasCeilings: false, hasTrim: false, doorCount: 0, isExterior: false },
-  // Kitchen cabinets (large): standalone cabinet job
-  cabinets: { isCabinetJob: true },
-  // Exterior 1500 sqft: siding, trim, doors
-  ext1500: { sqft: 1500, isExterior: true, hasRepairs: false },
-  // Exterior 3500 sqft: with repairs
-  ext3500: { sqft: 3500, isExterior: true, hasRepairs: true },
+const REF_SQFT = {
+  oneBR: 600,
+  threeBR: 1500,
+  fiveBR: 3500,
 };
 
 // ===== Estimate Painter Price for a Given Project =====
@@ -55,43 +49,28 @@ const REFERENCE_PROJECTS = {
 export function estimatePainterPrice(
   painter: PainterProfile,
   ctx: EstimatorContext,
-  aiEstimate: EstimateBreakdown
+  _aiEstimate: EstimateBreakdown
 ): number {
-  const baseline = painter.baseline;
-
-  // Calculate the AI's own estimate for each reference project to get painter-to-AI ratios
-  const painterRatios = calculatePainterRatios(baseline);
-
-  // Determine the most relevant reference projects based on the user's actual project
-  const projectType = ctx.projectType;
+  const b = painter.baseline;
   const sqft = ctx.squareFeet || 1500;
 
   let estimatedPrice = 0;
 
-  if (projectType === 'interior' || projectType === 'both') {
-    estimatedPrice += interpolateInteriorPrice(baseline, painterRatios, ctx, sqft);
+  if (ctx.projectType === 'interior' || ctx.projectType === 'both') {
+    estimatedPrice += interpolateInteriorPrice(b, ctx, sqft);
   }
 
-  if (projectType === 'exterior' || projectType === 'both') {
-    estimatedPrice += interpolateExteriorPrice(baseline, painterRatios, ctx, sqft);
+  if (ctx.projectType === 'exterior' || ctx.projectType === 'both') {
+    estimatedPrice += interpolateExteriorPrice(b, ctx, sqft);
   }
 
-  // Cabinet add-on
+  // Cabinet add-on (separate from walls/ceilings/trim)
   if (ctx.cabinets !== 'none' && ctx.cabinetLocations.length > 0) {
-    const cabinetRatio = painterRatios.cabinetRatio;
-    // Scale from kitchen cabinets baseline based on which cabinets
-    let cabinetFactor = 0;
-    for (const loc of ctx.cabinetLocations) {
-      if (loc === 'kitchen') cabinetFactor += 1.0;
-      if (loc === 'bathroom') cabinetFactor += 0.5;
-      if (loc === 'laundry') cabinetFactor += 0.4;
-    }
-    estimatedPrice += baseline.priceKitchenCabinets * cabinetFactor * cabinetRatio;
+    estimatedPrice += interpolateCabinetPrice(b, ctx, sqft);
   }
 
-  // Apply condition/complexity multipliers (same factors the AI uses)
+  // Condition/complexity multipliers
   let multiplier = 1.0;
-
   if (ctx.occupancy === 'furnished' || ctx.occupancy === 'occupied') {
     multiplier *= 1.03;
   }
@@ -103,132 +82,171 @@ export function estimatePainterPrice(
   if (ctx.interiorColorChange === 'dramatic') {
     multiplier *= 1.05;
   }
-  if ((ctx.stories || 1) > 1 && (projectType === 'exterior' || projectType === 'both')) {
+  if ((ctx.stories || 1) > 1 && (ctx.projectType === 'exterior' || ctx.projectType === 'both')) {
     multiplier *= 1 + ((ctx.stories || 1) - 1) * 0.12;
   }
 
   return Math.round(estimatedPrice * multiplier);
 }
 
-// ===== Painter-to-AI Ratios =====
-// Compares what the painter charges for reference projects vs. what the AI would charge
-
-function calculatePainterRatios(baseline: PainterBaseline) {
-  // AI reference prices for the 5 scenarios (based on PRICING config)
-  // These are approximate AI prices for each reference scenario
-  const aiRef = {
-    oneBR: 600 * 2.25 + 600 * 0.45 + 600 * 0.27 + 5 * 175, // walls + ceilings + trim + doors = ~2,657
-    threeBR: 1500 * 2.25, // walls only = 3,375
-    cabinets: 2250, // kitchen cabinets fixed price
-    ext1500: 1500 * 2.70 + 1500 * 0.36 + 225, // body + trim + entry door = 4,815
-    ext3500: 3500 * 2.70 + 3500 * 0.36 + 225 + 3500 * 2.70 * 0.25, // + 25% repair surcharge = 12,540 approx
-  };
-
-  return {
-    interiorFullRatio: baseline.price1BRRental / aiRef.oneBR,
-    interiorWallsRatio: baseline.price3BRWalls / aiRef.threeBR,
-    cabinetRatio: baseline.priceKitchenCabinets / aiRef.cabinets,
-    exteriorRatio: baseline.priceExterior1500 / aiRef.ext1500,
-    exteriorRepairRatio: baseline.priceExterior3500 / aiRef.ext3500,
-  };
-}
-
 // ===== Interior Price Interpolation =====
+// We now have component-level pricing from the 3BR baseline:
+//   walls, trim/doors, ceilings each separately, plus a full-scope 1BR and 5BR.
 
 function interpolateInteriorPrice(
-  baseline: PainterBaseline,
-  ratios: ReturnType<typeof calculatePainterRatios>,
+  b: PainterBaseline,
   ctx: EstimatorContext,
   sqft: number
 ): number {
-  // Determine if project is more like "full interior" or "walls only"
-  const hasFullScope =
-    ctx.interiorCeilings === 'yes' ||
-    ctx.interiorTrim === 'yes' ||
-    ctx.interiorDoors !== 'none';
+  // Derive the painter's per-sqft rates from their 3BR answers (1500 sqft reference)
+  const wallsPerSqft = b.price3BRWalls / REF_SQFT.threeBR;
+  const trimDoorsPerSqft = b.price3BRTrimDoors / REF_SQFT.threeBR;
+  const ceilingsPerSqft = b.price3BRCeilings / REF_SQFT.threeBR;
 
-  // Base ratio: blend between full-interior and walls-only ratios
-  const ratio = hasFullScope
-    ? ratios.interiorFullRatio * 0.7 + ratios.interiorWallsRatio * 0.3
-    : ratios.interiorWallsRatio * 0.8 + ratios.interiorFullRatio * 0.2;
+  // For scaling validation, we also have the full 5BR rate
+  // 5BR full = walls + ceilings + trim + doors at 3500 sqft
+  const fiveFullPerSqft = b.price5BRFull / REF_SQFT.fiveBR;
+  // Derived sum of components at 3BR scale
+  const threeFullPerSqft = wallsPerSqft + trimDoorsPerSqft + ceilingsPerSqft;
 
-  // Scale by square footage relative to reference
-  // 1BR = 600 sqft, 3BR = 1500 sqft
-  const refSqft = hasFullScope ? 600 : 1500;
-  const sqftScale = sqft / refSqft;
+  // Scale factor: how much cheaper per-sqft does the painter get on larger homes?
+  // Compare their 5BR full rate vs. the sum of 3BR components
+  const efficiencyRatio = threeFullPerSqft > 0
+    ? fiveFullPerSqft / threeFullPerSqft
+    : 0.85; // default: ~15% cheaper per sqft on large homes
 
-  // Base price from the most relevant reference
-  const refPrice = hasFullScope ? baseline.price1BRRental : baseline.price3BRWalls;
+  // Determine which components the customer needs
+  const hasWalls = ctx.interiorWalls !== 'no';
+  const hasCeilings = ctx.interiorCeilings === 'yes';
+  const hasTrim = ctx.interiorTrim === 'yes' || ctx.interiorDoors !== 'none';
 
-  // Scale non-linearly (larger spaces are more efficient per sqft)
-  const scaleFactor = sqftScale < 1
-    ? sqftScale
-    : 1 + (sqftScale - 1) * 0.85; // diminishing returns on larger spaces
+  // Build component price at 3BR (1500 sqft) reference rate
+  let componentRate = 0;
+  if (hasWalls) componentRate += wallsPerSqft;
+  if (hasCeilings) componentRate += ceilingsPerSqft;
+  if (hasTrim) componentRate += trimDoorsPerSqft;
 
-  let price = refPrice * scaleFactor;
+  // Scale for actual sqft with efficiency curve
+  let scaledRate = componentRate;
+  if (sqft > REF_SQFT.threeBR) {
+    // Blend toward the large-home efficiency ratio as sqft increases
+    const t = Math.min((sqft - REF_SQFT.threeBR) / (REF_SQFT.fiveBR - REF_SQFT.threeBR), 1);
+    const blendedEfficiency = 1 + t * (efficiencyRatio - 1);
+    scaledRate = componentRate * blendedEfficiency;
+  } else if (sqft < REF_SQFT.threeBR) {
+    // Smaller homes: slightly higher per-sqft (less efficient)
+    // Cross-reference with 1BR full price for validation
+    // 1BR full includes walls + ceilings + trim + doors + cabinets
+    // Subtract cabinet value to get just painting components
+    const oneBRPaintOnly = b.price1BRFull - b.price5BRCabinets * 0.7; // small kitchen ~70% of large
+    const oneBRPerSqft = oneBRPaintOnly / REF_SQFT.oneBR;
+    const threePerSqft = threeFullPerSqft;
 
-  // Adjust for room fraction (specific rooms vs whole house)
+    // Small-home premium ratio
+    const smallPremium = threePerSqft > 0 ? oneBRPerSqft / threePerSqft : 1.15;
+    const t = Math.min((REF_SQFT.threeBR - sqft) / (REF_SQFT.threeBR - REF_SQFT.oneBR), 1);
+    const blendedPremium = 1 + t * (smallPremium - 1);
+    scaledRate = componentRate * blendedPremium;
+  }
+
+  let price = scaledRate * sqft;
+
+  // Adjust for room fraction
   if (ctx.interiorScope === 'specific_rooms' && ctx.selectedRooms.length > 0) {
-    const roomFraction = Math.min(ctx.selectedRooms.length / 8, 1); // rough fraction
+    const roomFraction = Math.min(ctx.selectedRooms.length / 8, 1);
     price *= roomFraction;
   }
 
-  // Add extras not captured in base (stairways, closets, etc.)
+  // Add extras (stairways, closets) using the painter's general rate level
+  const generalRate = threeFullPerSqft > 0
+    ? (wallsPerSqft + trimDoorsPerSqft + ceilingsPerSqft) / threeFullPerSqft
+    : 1;
+
   if (ctx.stairways === 'yes') {
-    price += (ctx.stairwayCount || 1) * 400 * ratio;
+    price += (ctx.stairwayCount || 1) * 400 * generalRate;
   }
   if (ctx.closets !== 'none') {
-    price += (ctx.closetCount || 2) * 250 * ratio;
+    price += (ctx.closetCount || 2) * 250 * generalRate;
   }
 
   return price;
 }
 
-// ===== Exterior Price Interpolation =====
+// ===== Cabinet Price Interpolation =====
 
-function interpolateExteriorPrice(
-  baseline: PainterBaseline,
-  ratios: ReturnType<typeof calculatePainterRatios>,
+function interpolateCabinetPrice(
+  b: PainterBaseline,
   ctx: EstimatorContext,
   sqft: number
 ): number {
-  // Determine if project needs repairs
-  const needsRepairs =
-    ctx.prepWork.includes('wood_rot') ||
-    ctx.prepWork.includes('drywall_repair') ||
-    ctx.exteriorCondition === 'poor';
+  // We have two cabinet data points: 1BR (small kitchen bundled) and 5BR (large kitchen standalone)
+  // Use 5BR cabinets as the primary reference for a kitchen cabinet job
+  const largeCabinetPrice = b.price5BRCabinets;
 
-  // Use repair or standard ratio
-  const ratio = needsRepairs
-    ? ratios.exteriorRepairRatio * 0.6 + ratios.exteriorRatio * 0.4
-    : ratios.exteriorRatio;
+  // Derive small kitchen price from 1BR full minus painting components
+  const oneBRPaintOnly = Math.max(
+    b.price1BRFull - largeCabinetPrice * 0.7,
+    b.price1BRFull * 0.6
+  );
+  const smallCabinetPrice = b.price1BRFull - oneBRPaintOnly;
 
-  // Interpolate between 1500 and 3500 sqft reference points
-  let price: number;
-  if (sqft <= 1500) {
-    price = baseline.priceExterior1500 * (sqft / 1500);
-  } else if (sqft >= 3500) {
-    price = baseline.priceExterior3500 * (sqft / 3500) * (needsRepairs ? 1.0 : 0.8);
-  } else {
-    // Linear interpolation between the two reference points
-    const t = (sqft - 1500) / (3500 - 1500);
-    const refLow = needsRepairs ? baseline.priceExterior1500 * 1.15 : baseline.priceExterior1500;
-    const refHigh = needsRepairs ? baseline.priceExterior3500 : baseline.priceExterior3500 * 0.85;
-    price = refLow + t * (refHigh - refLow);
+  let total = 0;
+  for (const loc of ctx.cabinetLocations) {
+    if (loc === 'kitchen') {
+      // Interpolate between small and large kitchen based on home size
+      const t = Math.min(Math.max((sqft - REF_SQFT.oneBR) / (REF_SQFT.fiveBR - REF_SQFT.oneBR), 0), 1);
+      total += smallCabinetPrice + t * (largeCabinetPrice - smallCabinetPrice);
+    } else if (loc === 'bathroom') {
+      total += largeCabinetPrice * 0.45;
+    } else if (loc === 'laundry') {
+      total += largeCabinetPrice * 0.35;
+    }
   }
+
+  return total;
+}
+
+// ===== Exterior Price Interpolation =====
+// We no longer have direct exterior baselines, so we extrapolate from
+// interior rates with a standard interior-to-exterior ratio.
+
+function interpolateExteriorPrice(
+  b: PainterBaseline,
+  ctx: EstimatorContext,
+  sqft: number
+): number {
+  // Derive exterior rate from interior data using industry ratio:
+  // Exterior typically costs ~1.2x the walls-only interior rate
+  const interiorWallRate = b.price3BRWalls / REF_SQFT.threeBR;
+  const exteriorBaseRate = interiorWallRate * 1.2;
+
+  // Trim adds ~15% on exterior
+  const hasTrim = ctx.exteriorTrim === 'yes';
+  const rate = hasTrim ? exteriorBaseRate * 1.15 : exteriorBaseRate;
+
+  let price = rate * sqft;
 
   // Partial exterior
   if (ctx.exteriorScope === 'partial') {
     price *= 0.55;
   }
 
-  // Add extras
+  // Repairs surcharge
+  const needsRepairs =
+    ctx.prepWork.includes('wood_rot') ||
+    ctx.prepWork.includes('drywall_repair') ||
+    ctx.exteriorCondition === 'poor';
+  if (needsRepairs) {
+    price *= 1.25;
+  }
+
+  // Extras
   if (ctx.fence === 'yes') {
     const fenceFt = ctx.fenceLinearFeet || 100;
-    price += fenceFt * 4.5 * ratio;
+    price += fenceFt * 4.5 * (interiorWallRate / (b.price3BRWalls / REF_SQFT.threeBR));
   }
   if (ctx.deck === 'yes') {
-    price += 700 * ratio;
+    price += 700 * (interiorWallRate / (b.price3BRWalls / REF_SQFT.threeBR));
   }
 
   return price;
@@ -240,7 +258,7 @@ export interface PainterMatch {
   painter: PainterProfile;
   estimatedPrice: number;
   priceRange: { low: number; high: number };
-  matchScore: number; // 0-100, how well this painter fits the project
+  matchScore: number;
 }
 
 export function generatePainterMatches(
@@ -252,10 +270,8 @@ export function generatePainterMatches(
     .map((painter) => {
       const price = estimatePainterPrice(painter, ctx, aiEstimate);
 
-      // Match score based on: location proximity, service coverage, experience
-      let score = 50; // base
+      let score = 50;
 
-      // ZIP code match
       if (painter.zipCode.substring(0, 3) === ctx.zipCode.substring(0, 3)) {
         score += 20;
       }
@@ -271,11 +287,9 @@ export function generatePainterMatches(
         score += 15;
       }
 
-      // Experience bonus
       if (painter.yearsInBusiness >= 10) score += 10;
       else if (painter.yearsInBusiness >= 5) score += 5;
 
-      // Credentials bonus
       if (painter.hasLicense) score += 5;
       if (painter.isInsured) score += 5;
       if (painter.isBonded) score += 3;
@@ -297,7 +311,6 @@ export function generatePainterMatches(
 }
 
 // ===== Guaranteed Price Calculation =====
-// The "Hotwire" price: lowest price at which at least one painter would likely accept
 
 export function calculateGuaranteedPrice(
   matches: PainterMatch[],
@@ -307,24 +320,17 @@ export function calculateGuaranteedPrice(
     return { guaranteedPrice: aiEstimate.total, eligiblePainterCount: 0 };
   }
 
-  // Find the price at which multiple painters fall within range
-  // Use the AI estimate as the anchor, then find painters near or below it
   const prices = matches.map((m) => m.estimatedPrice).sort((a, b) => a - b);
-
-  // Guaranteed price = slightly below the median painter price to ensure competition
   const medianIdx = Math.floor(prices.length / 2);
   const medianPrice = prices[medianIdx];
-
-  // Set guaranteed price at 95% of median (incentive to accept)
   const guaranteedPrice = Math.round(medianPrice * 0.95);
 
-  // Count how many painters' ranges include this price
   const eligible = matches.filter(
     (m) => guaranteedPrice >= m.priceRange.low && guaranteedPrice <= m.priceRange.high * 1.1
   ).length;
 
   return {
-    guaranteedPrice: Math.max(guaranteedPrice, aiEstimate.lowRange), // don't go below AI low range
+    guaranteedPrice: Math.max(guaranteedPrice, aiEstimate.lowRange),
     eligiblePainterCount: Math.max(eligible, 1),
   };
 }

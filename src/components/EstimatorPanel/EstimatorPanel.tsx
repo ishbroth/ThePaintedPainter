@@ -189,11 +189,12 @@ const EstimatorPanel = () => {
             warrantyLength: p.warranty_length || '',
             offersEstimates: p.offers_estimates ?? true,
             baseline: {
-              price1BRRental: Number(p.price_1br_rental) || 0,
+              price1BRFull: Number(p.price_1br_full) || 0,
               price3BRWalls: Number(p.price_3br_walls) || 0,
-              priceKitchenCabinets: Number(p.price_kitchen_cabinets) || 0,
-              priceExterior1500: Number(p.price_exterior_1500) || 0,
-              priceExterior3500: Number(p.price_exterior_3500) || 0,
+              price3BRTrimDoors: Number(p.price_3br_trim_doors) || 0,
+              price3BRCeilings: Number(p.price_3br_ceilings) || 0,
+              price5BRFull: Number(p.price_5br_full) || 0,
+              price5BRCabinets: Number(p.price_5br_cabinets) || 0,
             },
           }));
 

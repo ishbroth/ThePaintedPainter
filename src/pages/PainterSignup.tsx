@@ -46,11 +46,12 @@ interface PainterFormData {
   warrantyLength: string;
 
   // Step 4
-  price1BRRental: number | null;
+  price1BRFull: number | null;
   price3BRWalls: number | null;
-  priceKitchenCabinets: number | null;
-  priceExterior1500: number | null;
-  priceExterior3500: number | null;
+  price3BRTrimDoors: number | null;
+  price3BRCeilings: number | null;
+  price5BRFull: number | null;
+  price5BRCabinets: number | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -148,40 +149,46 @@ const STEP_LABELS = [
 const PRICING_SCENARIOS: {
   key: keyof Pick<
     PainterFormData,
-    'price1BRRental' | 'price3BRWalls' | 'priceKitchenCabinets' | 'priceExterior1500' | 'priceExterior3500'
+    'price1BRFull' | 'price3BRWalls' | 'price3BRTrimDoors' | 'price3BRCeilings' | 'price5BRFull' | 'price5BRCabinets'
   >;
   label: string;
   description: string;
 }[] = [
   {
-    key: 'price1BRRental',
-    label: '1BR Rental - Full Interior',
+    key: 'price1BRFull',
+    label: '1BR Rental - Full Interior + Cabinets',
     description:
-      'An empty 1-bedroom rental property \u2014 ceilings, walls, trim, and doors.',
+      'An empty 1-bedroom rental property \u2014 ceilings, walls, trim, doors, and kitchen cabinets.',
   },
   {
     key: 'price3BRWalls',
     label: '3BR Home - Walls Only',
     description:
-      'A standard 3-bedroom home \u2014 walls only, no trim or ceilings.',
+      'A standard 3-bedroom home \u2014 walls only, no trim, doors, or ceilings.',
   },
   {
-    key: 'priceKitchenCabinets',
-    label: 'Kitchen Cabinets - Large Home',
+    key: 'price3BRTrimDoors',
+    label: '3BR Home - Trim & Doors Only',
     description:
-      'The kitchen cabinets in the largest house you can imagine.',
+      'The same standard 3-bedroom home \u2014 all trim and doors only, no walls or ceilings.',
   },
   {
-    key: 'priceExterior1500',
-    label: 'Exterior - 1,500 sqft',
+    key: 'price3BRCeilings',
+    label: '3BR Home - Ceilings Only',
     description:
-      'The exterior of a 1,500 sq ft house \u2014 siding, trim, and doors.',
+      'The same standard 3-bedroom home \u2014 all ceilings only, no walls, trim, or doors.',
   },
   {
-    key: 'priceExterior3500',
-    label: 'Exterior - 3,500 sqft w/ Repairs',
+    key: 'price5BRFull',
+    label: '5BR Large Home - Full Interior',
     description:
-      'The exterior of a 3,500 sq ft home \u2014 including any wood replacement or siding/stucco repair necessary.',
+      'A large 5-bedroom, 3,500 sq ft home \u2014 walls, ceilings, trim, and doors.',
+  },
+  {
+    key: 'price5BRCabinets',
+    label: '5BR Large Home - Kitchen Cabinets Only',
+    description:
+      'The kitchen cabinets in that same large 5-bedroom, 3,500 sq ft home.',
   },
 ];
 
@@ -226,11 +233,12 @@ const initialFormData: PainterFormData = {
   offersWarranty: false,
   warrantyLength: '',
 
-  price1BRRental: null,
+  price1BRFull: null,
   price3BRWalls: null,
-  priceKitchenCabinets: null,
-  priceExterior1500: null,
-  priceExterior3500: null,
+  price3BRTrimDoors: null,
+  price3BRCeilings: null,
+  price5BRFull: null,
+  price5BRCabinets: null,
 };
 
 // ---------------------------------------------------------------------------
@@ -272,7 +280,7 @@ const styles = {
     marginBottom: '6px',
     fontSize: '0.85rem',
     fontWeight: 600,
-    color: '#ccc',
+    color: '#333',
     letterSpacing: '0.3px',
   } as React.CSSProperties,
   sectionTitle: {
@@ -286,7 +294,7 @@ const styles = {
   } as React.CSSProperties,
   helperText: {
     fontSize: '0.78rem',
-    color: '#888',
+    color: '#666',
     marginTop: '4px',
     lineHeight: 1.4,
   } as React.CSSProperties,
@@ -306,16 +314,16 @@ const styles = {
   } as React.CSSProperties,
   toggleLabel: {
     fontSize: '0.9rem',
-    color: '#ddd',
+    color: '#333',
     fontWeight: 500,
   } as React.CSSProperties,
   toggleButton: (active: boolean): React.CSSProperties => ({
     padding: '6px 18px',
     fontSize: '0.8rem',
     fontWeight: 600,
-    border: active ? '1px solid #74b9ff' : '1px solid #555',
-    background: active ? '#74b9ff' : 'transparent',
-    color: active ? '#000' : '#aaa',
+    border: active ? '1px solid #74b9ff' : '1px solid #999',
+    background: active ? '#74b9ff' : '#f0f0f0',
+    color: active ? '#000' : '#444',
     cursor: 'pointer',
     transition: 'all 0.2s',
     fontFamily: 'inherit',
@@ -329,7 +337,7 @@ const styles = {
   } as React.CSSProperties,
   checkboxLabel: {
     fontSize: '0.88rem',
-    color: '#ccc',
+    color: '#333',
     cursor: 'pointer',
     userSelect: 'none' as const,
   } as React.CSSProperties,
@@ -532,11 +540,12 @@ const PainterSignup = () => {
         offers_warranty: formData.offersWarranty,
         warranty_length: formData.warrantyLength.trim() || null,
 
-        price_1br_rental: formData.price1BRRental,
+        price_1br_full: formData.price1BRFull,
         price_3br_walls: formData.price3BRWalls,
-        price_kitchen_cabinets: formData.priceKitchenCabinets,
-        price_exterior_1500: formData.priceExterior1500,
-        price_exterior_3500: formData.priceExterior3500,
+        price_3br_trim_doors: formData.price3BRTrimDoors,
+        price_3br_ceilings: formData.price3BRCeilings,
+        price_5br_full: formData.price5BRFull,
+        price_5br_cabinets: formData.price5BRCabinets,
       });
 
       if (error) throw error;
@@ -553,6 +562,19 @@ const PainterSignup = () => {
 
   // ---- render helpers ----
 
+  // Format a number as $1,234,567
+  const formatCurrencyDisplay = (val: string | number | null | undefined): string => {
+    if (val === null || val === undefined || val === '') return '';
+    const num = typeof val === 'string' ? Number(val.replace(/[^0-9]/g, '')) : val;
+    if (isNaN(num) || num === 0) return '';
+    return '$' + num.toLocaleString('en-US');
+  };
+
+  // Strip formatting to get raw number
+  const parseCurrencyInput = (raw: string): string => {
+    return raw.replace(/[^0-9]/g, '');
+  };
+
   const renderInput = (
     key: keyof PainterFormData,
     label: string,
@@ -561,12 +583,19 @@ const PainterSignup = () => {
       placeholder?: string;
       required?: boolean;
       helper?: string;
+      currency?: boolean;
     },
   ) => {
-    const { type = 'text', placeholder = '', required = false, helper } = opts || {};
+    const { type = 'text', placeholder = '', required = false, helper, currency = false } = opts || {};
     const value = formData[key];
-    const displayValue =
-      value === null || value === undefined ? '' : String(value);
+
+    let displayValue: string;
+    if (currency) {
+      displayValue = formatCurrencyDisplay(value);
+    } else {
+      displayValue = value === null || value === undefined ? '' : String(value);
+    }
+
     return (
       <div style={styles.formGroup}>
         <label style={styles.label}>
@@ -574,12 +603,20 @@ const PainterSignup = () => {
           {required && <span style={styles.requiredStar}>*</span>}
         </label>
         <input
-          type={type}
+          type={currency ? 'text' : type}
+          inputMode={currency || type === 'number' ? 'numeric' : undefined}
           placeholder={placeholder}
           value={displayValue}
           onChange={(e) => {
             const raw = e.target.value;
-            if (type === 'number') {
+            if (currency) {
+              const digits = parseCurrencyInput(raw);
+              if (type === 'number' || typeof value === 'number' || value === null) {
+                updateField(key, digits === '' ? null : (Number(digits) as never));
+              } else {
+                updateField(key, digits === '' ? ('' as never) : (digits as never));
+              }
+            } else if (type === 'number') {
               updateField(key, raw === '' ? null : (Number(raw) as never));
             } else {
               updateField(key, raw as never);
@@ -782,6 +819,7 @@ const PainterSignup = () => {
             {renderInput('bondAmount', 'Bond Amount', {
               required: true,
               placeholder: '$25,000',
+              currency: true,
             })}
           </div>
         </div>
@@ -809,6 +847,7 @@ const PainterSignup = () => {
             })}
           </div>
           {renderInput('coverageAmount', 'General Liability Coverage Amount', {
+            currency: true,
             required: true,
             placeholder: '$1,000,000',
           })}
@@ -944,8 +983,8 @@ const PainterSignup = () => {
       })}
 
       {/* Estimates & warranty */}
-      {renderToggle('offersEstimates', 'Do you offer free estimates?')}
-      {renderToggle('offersWarranty', 'Do you offer warranties?')}
+      {renderToggle('offersEstimates', 'Does your company provide your own written contract?')}
+      {renderToggle('offersWarranty', 'Do you offer warranties, or touch-up/call-back provisions?')}
       {formData.offersWarranty && (
         <div style={{ marginLeft: '24px' }}>
           {renderInput('warrantyLength', 'Warranty Length', {
@@ -975,7 +1014,6 @@ const PainterSignup = () => {
 
       {PRICING_SCENARIOS.map((scenario) => {
         const value = formData[scenario.key];
-        const displayValue = value === null ? '' : String(value);
         return (
           <div
             key={scenario.key}
@@ -988,37 +1026,24 @@ const PainterSignup = () => {
             <label style={{ ...styles.label, color: '#333', fontSize: '0.9rem' }}>
               {scenario.label}
             </label>
-            <p style={{ ...styles.helperText, color: '#888', marginBottom: '8px' }}>
+            <p style={{ ...styles.helperText, color: '#555', marginBottom: '8px' }}>
               {scenario.description}
             </p>
-            <div style={{ position: 'relative', maxWidth: '220px' }}>
-              <span
-                style={{
-                  position: 'absolute',
-                  left: '12px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  color: '#999',
-                  fontSize: '0.95rem',
-                  fontWeight: 600,
-                }}
-              >
-                $
-              </span>
+            <div style={{ maxWidth: '220px' }}>
               <input
-                type="number"
-                min={0}
-                placeholder="0"
-                value={displayValue}
-                onChange={(e) =>
+                type="text"
+                inputMode="numeric"
+                placeholder="$0"
+                value={formatCurrencyDisplay(value)}
+                onChange={(e) => {
+                  const digits = parseCurrencyInput(e.target.value);
                   updateField(
                     scenario.key,
-                    e.target.value === '' ? null : Number(e.target.value),
-                  )
-                }
+                    digits === '' ? null : Number(digits),
+                  );
+                }}
                 style={{
                   ...styles.input,
-                  paddingLeft: '28px',
                   maxWidth: '220px',
                 }}
                 onFocus={(e) => {
