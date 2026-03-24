@@ -18,7 +18,7 @@ const PainterMarketplace = ({
   guaranteedPrice,
   eligiblePainterCount,
   painterMatches,
-  context,
+  context: _context,
   onSelectGuaranteed,
   onSelectPainter,
 }: PainterMarketplaceProps) => {

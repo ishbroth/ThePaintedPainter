@@ -591,7 +591,7 @@ const PainterSignup = () => {
 
     let displayValue: string;
     if (currency) {
-      displayValue = formatCurrencyDisplay(value);
+      displayValue = formatCurrencyDisplay(value as string | number | null | undefined);
     } else {
       displayValue = value === null || value === undefined ? '' : String(value);
     }

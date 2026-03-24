@@ -26,7 +26,7 @@ export const startNodes: Record<string, ConversationNode> = {
       if (!getStateFromZip(v)) return 'We could not identify a state for that ZIP code';
       return null;
     },
-    onAnswer: (ctx, value) => {
+    onAnswer: (_ctx, value) => {
       const zip = Array.isArray(value) ? value[0] : value;
       const state = getStateFromZip(zip);
       return {

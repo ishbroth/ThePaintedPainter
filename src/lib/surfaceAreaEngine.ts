@@ -399,7 +399,7 @@ export interface ExteriorSurfaceArea {
 export function calculateExteriorSurface(
   sqft: number,
   stories: number = 1,
-  sidingType: string = 'stucco'
+  _sidingType: string = 'stucco'
 ): ExteriorSurfaceArea {
   // Footprint
   const footprint = sqft / Math.max(stories, 1);
