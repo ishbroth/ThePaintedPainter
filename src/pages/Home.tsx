@@ -139,13 +139,7 @@ const Home = () => {
       {/* Hero Collage */}
       <section className="hero-collage">
         <div className="collage-wrapper">
-          <img src="/thumbnail_IMG_3218.jpg" alt="Exterior painting" />
-          <img src="/thumbnail_IMG_3228.jpg" alt="House painting" />
-          <div className="collage-center">
-            <img src="/IMG_7201.PNG" alt="The Painted Painter Logo" />
-          </div>
-          <img src="/thumbnail_IMG_2300.jpg" alt="Interior work" />
-          <img src="/thumbnail_IMG_2303.jpg" alt="Painting project" />
+          <img src="/IMG_7201.PNG" alt="The Painted Painter Logo" />
         </div>
       </section>
 
