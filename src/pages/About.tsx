@@ -49,7 +49,7 @@ const About = () => {
       </section>
 
       {/* Process Section */}
-      <section className="py-12 bg-white text-[#333]">
+      <section className="py-12 bg-[#222] text-white">
         <div className="container-custom">
           <h2 className="text-2xl font-bold mb-8 text-center">Our Process</h2>
           <div className="grid md:grid-cols-5 gap-6 max-w-4xl mx-auto">
@@ -65,7 +65,7 @@ const About = () => {
                   {step.num}
                 </div>
                 <h4 className="font-bold mb-2">{step.title}</h4>
-                <p className="text-sm text-gray-600">{step.desc}</p>
+                <p className="text-sm text-gray-400">{step.desc}</p>
               </div>
             ))}
           </div>
@@ -96,7 +96,7 @@ const About = () => {
       </section>
 
       {/* Owner Section */}
-      <section className="py-12 bg-white text-[#333]">
+      <section className="py-12 bg-[#222] text-white">
         <div className="container-custom max-w-3xl">
           <h2 className="text-2xl font-bold mb-6 text-center">Meet Isaac</h2>
           <div className="grid md:grid-cols-3 gap-8 items-start">
@@ -104,16 +104,16 @@ const About = () => {
               <img src="/IMG_6989.PNG" alt="Isaac - Owner of The Painted Painter" className="w-full rounded-lg" />
             </div>
             <div className="md:col-span-2">
-              <p className="text-gray-600 mb-4 leading-relaxed">
+              <p className="text-gray-400 mb-4 leading-relaxed">
                 Isaac is a veteran who started painting while attending college on the G.I. Bill. What began as a way to earn money between classes grew into a passion for transforming spaces.
               </p>
-              <p className="text-gray-600 mb-4 leading-relaxed">
+              <p className="text-gray-400 mb-4 leading-relaxed">
                 He holds both a California contractor's license (Lic# 1019026) and a realtor's license, giving him unique insight into how paint can enhance property value.
               </p>
-              <p className="text-gray-600 mb-4 leading-relaxed">
+              <p className="text-gray-400 mb-4 leading-relaxed">
                 Over the years, Isaac has completed projects across San Diego neighborhoods including homes, restaurants, and churches. His attention to detail and commitment to quality has earned The Painted Painter a loyal following of repeat customers.
               </p>
-              <p className="text-gray-600 leading-relaxed">
+              <p className="text-gray-400 leading-relaxed">
                 Beyond house painting, Isaac is also an artist, creating custom murals and artwork. You can see some of his art pieces featured on our <Link to="/" className="text-[#74b9ff] hover:underline">homepage</Link>.
               </p>
             </div>

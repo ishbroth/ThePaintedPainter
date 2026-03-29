@@ -252,8 +252,8 @@ const styles = {
     border: '1px solid #ddd',
     fontSize: '0.9rem',
     fontFamily: 'inherit',
-    background: '#fff',
-    color: '#333',
+    background: '#333',
+    color: '#fff',
     borderRadius: '0',
     outline: 'none',
   } as React.CSSProperties,
@@ -266,11 +266,11 @@ const styles = {
   select: {
     width: '100%',
     padding: '12px 14px',
-    border: '1px solid #ddd',
+    border: '1px solid #555',
     fontSize: '0.9rem',
     fontFamily: 'inherit',
-    background: '#fff',
-    color: '#333',
+    background: '#333',
+    color: '#fff',
     borderRadius: '0',
     outline: 'none',
     appearance: 'auto' as const,
@@ -280,7 +280,7 @@ const styles = {
     marginBottom: '6px',
     fontSize: '0.85rem',
     fontWeight: 600,
-    color: '#333',
+    color: '#ccc',
     letterSpacing: '0.3px',
   } as React.CSSProperties,
   sectionTitle: {
@@ -314,7 +314,7 @@ const styles = {
   } as React.CSSProperties,
   toggleLabel: {
     fontSize: '0.9rem',
-    color: '#333',
+    color: '#ccc',
     fontWeight: 500,
   } as React.CSSProperties,
   toggleButton: (active: boolean): React.CSSProperties => ({
@@ -337,19 +337,19 @@ const styles = {
   } as React.CSSProperties,
   checkboxLabel: {
     fontSize: '0.88rem',
-    color: '#333',
+    color: '#ccc',
     cursor: 'pointer',
     userSelect: 'none' as const,
   } as React.CSSProperties,
   card: {
-    background: '#fff',
+    background: '#222',
     padding: '30px 28px',
     maxWidth: '700px',
     margin: '0 auto',
   } as React.CSSProperties,
   cardTitle: {
     fontFamily: "'Cabin', sans-serif",
-    color: '#333',
+    color: '#fff',
     fontSize: '1.05rem',
     marginBottom: '22px',
     fontWeight: 600,
@@ -1023,7 +1023,7 @@ const PainterSignup = () => {
               borderBottom: '1px solid #eee',
             }}
           >
-            <label style={{ ...styles.label, color: '#333', fontSize: '0.9rem' }}>
+            <label style={{ ...styles.label, color: '#ccc', fontSize: '0.9rem' }}>
               {scenario.label}
             </label>
             <p style={{ ...styles.helperText, color: '#555', marginBottom: '8px' }}>

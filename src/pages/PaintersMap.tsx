@@ -239,7 +239,7 @@ const PaintersMap = () => {
                 </div>
               ) : (
                 <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
-                  <h3 className="font-semibold text-gray-700 sticky top-0 bg-white py-2">
+                  <h3 className="font-semibold text-gray-300 sticky top-0 bg-[#1a1a1a] py-2">
                     {filteredPainters.length} Painters Found
                   </h3>
                   {filteredPainters.map((painter) => (

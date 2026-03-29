@@ -104,7 +104,9 @@ img {
 /* Hero Collage */
 .hero-collage {
   background: #1a1a1a;
-  padding: 0;
+  padding: 30px 20px;
+  max-width: 900px;
+  margin: 0 auto;
 }
 
 .collage-wrapper {
@@ -115,8 +117,9 @@ img {
 
 .collage-wrapper img {
   width: 100%;
+  max-width: 600px;
   height: auto;
-  display: block;
+  object-fit: contain;
 }
 
 /* Hero Info */
@@ -177,12 +180,12 @@ img {
 .quote-form {
   max-width: 550px;
   margin: 0 auto;
-  background: #fff;
+  background: #222;
   padding: 25px;
 }
 
 .quote-form h3 {
-  color: #333;
+  color: #fff;
   font-size: 1rem;
   margin-bottom: 18px;
   font-weight: 600;
@@ -196,7 +199,9 @@ img {
 .form-group textarea {
   width: 100%;
   padding: 12px 14px;
-  border: 1px solid #ddd;
+  border: 1px solid #555;
+  background: #333;
+  color: #fff;
   font-size: 0.9rem;
   font-family: inherit;
 }
@@ -216,12 +221,12 @@ img {
   justify-content: space-between;
   align-items: center;
   padding: 12px 14px;
-  border: 1px solid #ddd;
-  background: #fff;
+  border: 1px solid #555;
+  background: #333;
   cursor: pointer;
   margin-bottom: 12px;
   font-size: 0.9rem;
-  color: #333;
+  color: #fff;
 }
 
 .file-upload-btn .count {
@@ -257,8 +262,8 @@ img {
 .about-text {
   text-align: center;
   padding: 45px 20px;
-  background: #fff;
-  color: #333;
+  background: #1a1a1a;
+  color: #fff;
 }
 
 .about-text h2 {
@@ -431,11 +436,11 @@ img {
 }
 
 .review-card {
-  background: #fff;
+  background: #222;
   border-radius: 8px;
   padding: 18px;
   text-align: center;
-  color: #333;
+  color: #fff;
 }
 
 .review-stars {
@@ -454,14 +459,14 @@ img {
 
 .review-text {
   font-size: 0.8rem;
-  color: #555;
+  color: #ccc;
   margin-bottom: 12px;
   font-style: italic;
   line-height: 1.5;
 }
 
 .review-link {
-  color: #333;
+  color: #74b9ff;
   font-size: 0.75rem;
   font-weight: 600;
 }
@@ -662,11 +667,11 @@ img {
 .input-field {
   width: 100%;
   padding: 12px 14px;
-  border: 1px solid #ddd;
+  border: 1px solid #555;
   font-size: 0.9rem;
   font-family: inherit;
-  background: white;
-  color: #333;
+  background: #333;
+  color: #fff;
 }
 
 .input-field:focus {

@@ -82,17 +82,17 @@ const PortfolioCarousel = () => {
       {/* Navigation Buttons */}
       <button
         onClick={prev}
-        className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 z-10 bg-white shadow-lg rounded-full p-2 hover:bg-gray-100 transition-colors"
+        className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 z-10 bg-[#333] shadow-lg rounded-full p-2 hover:bg-[#444] transition-colors"
         aria-label="Previous"
       >
-        <ChevronLeft size={24} className="text-primary" />
+        <ChevronLeft size={24} className="text-white" />
       </button>
       <button
         onClick={next}
-        className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 z-10 bg-white shadow-lg rounded-full p-2 hover:bg-gray-100 transition-colors"
+        className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 z-10 bg-[#333] shadow-lg rounded-full p-2 hover:bg-[#444] transition-colors"
         aria-label="Next"
       >
-        <ChevronRight size={24} className="text-primary" />
+        <ChevronRight size={24} className="text-white" />
       </button>
 
       {/* Carousel Container */}
