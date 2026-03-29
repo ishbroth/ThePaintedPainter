@@ -36,19 +36,19 @@ const carousel4Triplets = [
 const reviews = [
   {
     image: '/thumbnail_IMG_8022.jpg',
-    text: '"Isaac was awesome! He painted our airbnb rental and it was from drab to published..."',
+    text: '"The Painted Painter was awesome! He painted our airbnb rental and it was from drab to published..."',
     link: 'https://www.yelp.com/biz/the-painted-painter-san-diego',
     source: 'From Yelp',
   },
   {
     image: '/thumbnail_IMG_8544.jpg',
-    text: '"The paint job looks amazing. Isaac is fast and efficient, his pricing can\'t be beat."',
+    text: '"The paint job looks amazing. The Painted Painter is fast and efficient, his pricing can\'t be beat."',
     link: '#',
     source: 'From Google',
   },
   {
     image: '/thumbnail_IMG_8560.jpg',
-    text: '"I hired Isaac from the Painted Painter when I did move-in... loved him! Great..."',
+    text: '"I hired The Painted Painter when I did move-in... loved them! Great..."',
     link: '#',
     source: 'From NextDoor',
   },
