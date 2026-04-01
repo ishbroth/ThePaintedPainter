@@ -1,290 +1,231 @@
-import { useState } from 'react';
-import { MapPin, Star, Phone, Mail } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Link } from 'react-router-dom';
+import { fakePainters } from '../lib/fakePainters';
 
-interface Painter {
-  id: number;
-  name: string;
-  location: string;
-  state: string;
-  rating: number;
-  reviews: number;
-  specialties: string[];
-  yearsExperience: number;
-  image: string;
-}
-
-const painters: Painter[] = [
-  {
-    id: 1,
-    name: 'Mike Johnson',
-    location: 'San Diego, CA',
-    state: 'CA',
-    rating: 4.9,
-    reviews: 127,
-    specialties: ['Interior', 'Exterior', 'Cabinets'],
-    yearsExperience: 15,
-    image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200',
-  },
-  {
-    id: 2,
-    name: 'Sarah Martinez',
-    location: 'Los Angeles, CA',
-    state: 'CA',
-    rating: 4.8,
-    reviews: 98,
-    specialties: ['Interior', 'Decorative'],
-    yearsExperience: 12,
-    image: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200',
-  },
-  {
-    id: 3,
-    name: 'David Chen',
-    location: 'Phoenix, AZ',
-    state: 'AZ',
-    rating: 4.9,
-    reviews: 156,
-    specialties: ['Exterior', 'Stucco', 'Commercial'],
-    yearsExperience: 20,
-    image: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200',
-  },
-  {
-    id: 4,
-    name: 'Emily Thompson',
-    location: 'Denver, CO',
-    state: 'CO',
-    rating: 4.7,
-    reviews: 84,
-    specialties: ['Interior', 'Cabinets'],
-    yearsExperience: 8,
-    image: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=200',
-  },
-  {
-    id: 5,
-    name: 'James Wilson',
-    location: 'Austin, TX',
-    state: 'TX',
-    rating: 4.8,
-    reviews: 112,
-    specialties: ['Interior', 'Exterior', 'Epoxy'],
-    yearsExperience: 18,
-    image: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200',
-  },
-  {
-    id: 6,
-    name: 'Maria Garcia',
-    location: 'Miami, FL',
-    state: 'FL',
-    rating: 4.9,
-    reviews: 143,
-    specialties: ['Exterior', 'Commercial', 'Waterproofing'],
-    yearsExperience: 14,
-    image: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200',
-  },
-  {
-    id: 7,
-    name: 'Robert Brown',
-    location: 'Seattle, WA',
-    state: 'WA',
-    rating: 4.7,
-    reviews: 76,
-    specialties: ['Interior', 'Exterior'],
-    yearsExperience: 10,
-    image: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=200',
-  },
-  {
-    id: 8,
-    name: 'Jennifer Lee',
-    location: 'Portland, OR',
-    state: 'OR',
-    rating: 4.8,
-    reviews: 91,
-    specialties: ['Interior', 'Decorative', 'Murals'],
-    yearsExperience: 11,
-    image: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
-  },
-];
-
-const states = ['All States', 'AZ', 'CA', 'CO', 'FL', 'OR', 'TX', 'WA'];
+const ALL_SERVICES = [
+  'Interior Painting',
+  'Exterior Painting',
+  'Cabinet Painting',
+  'Commercial Painting',
+  'Color Consultation',
+  'Deck Staining',
+  'Drywall Repair',
+  'Epoxy Flooring',
+  'Fence Painting',
+  'Popcorn Ceiling Removal',
+  'Pressure Washing',
+  'Wallpaper Removal',
+] as const;
 
 const PaintersMap = () => {
-  const [selectedState, setSelectedState] = useState('All States');
-  const [selectedPainter, setSelectedPainter] = useState<Painter | null>(null);
+  const [locationQuery, setLocationQuery] = useState('');
+  const [serviceFilter, setServiceFilter] = useState('');
 
-  const filteredPainters = selectedState === 'All States'
-    ? painters
-    : painters.filter(p => p.state === selectedState);
+  const filtered = useMemo(() => {
+    const q = locationQuery.trim().toLowerCase();
+    return fakePainters.filter((p) => {
+      if (q) {
+        const matchesLocation =
+          p.city.toLowerCase().includes(q) ||
+          p.state.toLowerCase().includes(q) ||
+          p.zip_code.includes(q);
+        if (!matchesLocation) return false;
+      }
+      if (serviceFilter) {
+        if (!p.services.includes(serviceFilter)) return false;
+      }
+      return true;
+    });
+  }, [locationQuery, serviceFilter]);
+
+  const clearFilters = () => {
+    setLocationQuery('');
+    setServiceFilter('');
+  };
+
+  const hasFilters = locationQuery !== '' || serviceFilter !== '';
 
   return (
-    <div>
+    <div className="min-h-screen bg-[#1a1a1a] text-white">
       {/* Hero */}
-      <section className="bg-primary text-white py-20">
-        <div className="container-custom">
-          <h1 className="text-4xl md:text-5xl font-bold mb-4">Painter's Map</h1>
-          <p className="text-xl text-gray-200 max-w-2xl">
-            Meet our network of trusted, vetted painters across the country. Quality work, wherever you are.
+      <section className="bg-[#111] border-b border-[#333] py-16 md:py-20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <h1 className="text-4xl md:text-5xl font-bold mb-3">
+            Find Painters <span className="text-[#f5a623]">Nationwide</span>
+          </h1>
+          <p className="text-lg text-gray-400 max-w-2xl">
+            Browse our network of 50 vetted, professional painters across the
+            country. Filter by location or service to find the right team for
+            your project.
           </p>
         </div>
       </section>
 
-      {/* Map Section */}
-      <section className="section-padding">
-        <div className="container-custom">
-          {/* Filter */}
-          <div className="mb-8 flex flex-wrap items-center gap-4">
-            <span className="font-medium text-gray-700">Filter by state:</span>
-            <div className="flex flex-wrap gap-2">
-              {states.map((state) => (
-                <button
-                  key={state}
-                  onClick={() => setSelectedState(state)}
-                  className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                    selectedState === state
-                      ? 'bg-primary text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
+      {/* Search / filter bar */}
+      <section className="border-b border-[#333] bg-[#1a1a1a] sticky top-0 z-20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-wrap items-center gap-3">
+          <input
+            type="text"
+            placeholder="City, state, or zip..."
+            value={locationQuery}
+            onChange={(e) => setLocationQuery(e.target.value)}
+            className="bg-[#222] border border-[#444] rounded-lg px-4 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-[#f5a623] w-full sm:w-64"
+          />
+
+          <select
+            value={serviceFilter}
+            onChange={(e) => setServiceFilter(e.target.value)}
+            className="bg-[#222] border border-[#444] rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-[#f5a623] w-full sm:w-auto"
+          >
+            <option value="">All Services</option>
+            {ALL_SERVICES.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+
+          {hasFilters && (
+            <button
+              onClick={clearFilters}
+              className="text-sm text-[#f5a623] hover:text-white transition-colors"
+            >
+              Clear filters
+            </button>
+          )}
+
+          <span className="ml-auto text-sm text-gray-400">
+            Showing {filtered.length} of {fakePainters.length} painters
+          </span>
+        </div>
+      </section>
+
+      {/* Results */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {filtered.length === 0 ? (
+          <div className="text-center py-24">
+            <p className="text-xl text-gray-400">
+              No painters found matching your filters.
+            </p>
+            <button
+              onClick={clearFilters}
+              className="mt-4 text-[#f5a623] hover:text-white text-sm transition-colors"
+            >
+              Clear filters
+            </button>
+          </div>
+        ) : (
+          <div className="grid lg:grid-cols-2 gap-8">
+            {/* Left — painter cards */}
+            <div className="space-y-4 max-h-[calc(100vh-220px)] overflow-y-auto pr-2 scrollbar-thin">
+              {filtered.map((p) => (
+                <div
+                  key={p.id}
+                  className="bg-[#222] border border-[#333] rounded-xl p-5 hover:border-[#f5a623] transition-colors"
                 >
-                  {state}
-                </button>
+                  {/* Company + location */}
+                  <div className="flex items-start justify-between gap-3 mb-2">
+                    <div>
+                      <Link
+                        to={`/painters/${p.id}`}
+                        className="text-lg font-semibold text-[#f5a623] hover:text-white transition-colors"
+                      >
+                        {p.company_name}
+                      </Link>
+                      <p className="text-sm text-gray-400">
+                        {p.city}, {p.state}
+                      </p>
+                    </div>
+
+                    {/* Rating */}
+                    <div className="flex items-center gap-1 shrink-0">
+                      <span className="text-yellow-400">&#9733;</span>
+                      <span className="font-semibold text-sm">
+                        {p.rating.toFixed(1)}
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        ({p.review_count})
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Meta row */}
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-400 mb-3">
+                    <span>{p.years_experience} yrs exp</span>
+                    <span>Crew of {p.crew_size}</span>
+
+                    {/* Badges */}
+                    <span className="flex items-center gap-1">
+                      <span
+                        className={`inline-block w-2 h-2 rounded-full ${
+                          p.is_licensed ? 'bg-green-500' : 'bg-gray-600'
+                        }`}
+                      />
+                      Licensed
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span
+                        className={`inline-block w-2 h-2 rounded-full ${
+                          p.is_insured ? 'bg-green-500' : 'bg-gray-600'
+                        }`}
+                      />
+                      Insured
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span
+                        className={`inline-block w-2 h-2 rounded-full ${
+                          p.is_bonded ? 'bg-green-500' : 'bg-gray-600'
+                        }`}
+                      />
+                      Bonded
+                    </span>
+                  </div>
+
+                  {/* Top 3 services */}
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {p.services.slice(0, 3).map((s) => (
+                      <span
+                        key={s}
+                        className="bg-[#2a2a2a] border border-[#444] rounded-full px-3 py-0.5 text-xs text-gray-300"
+                      >
+                        {s}
+                      </span>
+                    ))}
+                  </div>
+
+                  {/* Current deal */}
+                  {p.deals.length > 0 && (
+                    <div className="bg-[#2a2200] border border-[#f5a623]/30 rounded-lg px-3 py-2 text-sm">
+                      <span className="font-semibold text-[#f5a623]">
+                        {p.deals[0].title}
+                      </span>
+                      <span className="text-gray-400">
+                        {' '}
+                        &mdash; {p.deals[0].description} &middot;{' '}
+                        {p.deals[0].price}
+                      </span>
+                    </div>
+                  )}
+                </div>
               ))}
             </div>
-          </div>
 
-          <div className="grid lg:grid-cols-3 gap-8">
-            {/* Map Placeholder */}
-            <div className="lg:col-span-2">
-              <div className="bg-gray-100 rounded-xl h-[500px] relative overflow-hidden">
-                {/* Simplified US Map representation */}
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="text-center">
-                    <MapPin className="w-16 h-16 text-secondary mx-auto mb-4" />
-                    <h3 className="text-xl font-semibold text-gray-700 mb-2">Interactive Map Coming Soon</h3>
-                    <p className="text-gray-500 max-w-md">
-                      View our painters across the country. Currently serving {painters.length} locations nationwide.
-                    </p>
-                  </div>
-                </div>
-
-                {/* Painter markers (simplified positions) */}
-                <div className="absolute inset-0">
-                  {filteredPainters.map((painter, index) => (
-                    <button
-                      key={painter.id}
-                      className={`absolute transform -translate-x-1/2 -translate-y-1/2 transition-all ${
-                        selectedPainter?.id === painter.id ? 'scale-125 z-10' : ''
-                      }`}
-                      style={{
-                        left: `${20 + (index % 4) * 20}%`,
-                        top: `${25 + Math.floor(index / 4) * 35}%`,
-                      }}
-                      onClick={() => setSelectedPainter(painter)}
-                    >
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center shadow-lg ${
-                        selectedPainter?.id === painter.id ? 'bg-secondary' : 'bg-primary'
-                      }`}>
-                        <MapPin className="text-white" size={20} />
-                      </div>
-                    </button>
-                  ))}
-                </div>
+            {/* Right — map placeholder */}
+            <div className="hidden lg:block">
+              <div className="bg-[#222] border border-[#333] rounded-xl h-[calc(100vh-220px)] sticky top-[90px] flex flex-col items-center justify-center text-center px-6">
+                <div className="text-gray-500 text-5xl mb-4">&#128506;</div>
+                <p className="text-gray-400 text-lg font-medium mb-2">
+                  Map view &mdash; Google Maps API key required
+                </p>
+                <p className="text-gray-600 text-sm max-w-xs">
+                  Set <code className="text-gray-400">VITE_GOOGLE_MAPS_API_KEY</code>{' '}
+                  in your <code className="text-gray-400">.env</code> file to
+                  enable the interactive map.
+                </p>
               </div>
             </div>
-
-            {/* Painter Details / List */}
-            <div>
-              {selectedPainter ? (
-                <div className="card p-6">
-                  <button
-                    onClick={() => setSelectedPainter(null)}
-                    className="text-sm text-gray-500 hover:text-primary mb-4"
-                  >
-                    ← Back to list
-                  </button>
-                  <img
-                    src={selectedPainter.image}
-                    alt={selectedPainter.name}
-                    className="w-24 h-24 rounded-full object-cover mx-auto mb-4"
-                  />
-                  <h3 className="text-xl font-bold text-primary text-center mb-1">{selectedPainter.name}</h3>
-                  <p className="text-gray-500 text-center mb-4">{selectedPainter.location}</p>
-
-                  <div className="flex items-center justify-center gap-1 mb-4">
-                    <Star className="text-yellow-500 fill-yellow-500" size={18} />
-                    <span className="font-semibold">{selectedPainter.rating}</span>
-                    <span className="text-gray-500">({selectedPainter.reviews} reviews)</span>
-                  </div>
-
-                  <div className="space-y-3 mb-6">
-                    <div>
-                      <span className="text-sm font-medium text-gray-700">Experience:</span>
-                      <span className="ml-2 text-gray-600">{selectedPainter.yearsExperience} years</span>
-                    </div>
-                    <div>
-                      <span className="text-sm font-medium text-gray-700">Specialties:</span>
-                      <div className="flex flex-wrap gap-2 mt-1">
-                        {selectedPainter.specialties.map((s) => (
-                          <span key={s} className="px-2 py-1 bg-gray-100 rounded text-sm text-gray-600">
-                            {s}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <a href="tel:6197242702" className="btn-secondary w-full inline-flex items-center justify-center gap-2">
-                      <Phone size={18} />
-                      Request This Painter
-                    </a>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
-                  <h3 className="font-semibold text-gray-300 sticky top-0 bg-[#1a1a1a] py-2">
-                    {filteredPainters.length} Painters Found
-                  </h3>
-                  {filteredPainters.map((painter) => (
-                    <div
-                      key={painter.id}
-                      className="card p-4 cursor-pointer hover:shadow-lg transition-shadow"
-                      onClick={() => setSelectedPainter(painter)}
-                    >
-                      <div className="flex gap-4">
-                        <img
-                          src={painter.image}
-                          alt={painter.name}
-                          className="w-16 h-16 rounded-full object-cover"
-                        />
-                        <div className="flex-1">
-                          <h4 className="font-semibold text-primary">{painter.name}</h4>
-                          <p className="text-sm text-gray-500">{painter.location}</p>
-                          <div className="flex items-center gap-1 mt-1">
-                            <Star className="text-yellow-500 fill-yellow-500" size={14} />
-                            <span className="text-sm font-medium">{painter.rating}</span>
-                            <span className="text-xs text-gray-400">({painter.reviews})</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
           </div>
-        </div>
-      </section>
-
-      {/* Join Network CTA */}
-      <section className="bg-gray-50 py-16">
-        <div className="container-custom text-center">
-          <h2 className="text-3xl font-bold text-primary mb-4">Are You a Professional Painter?</h2>
-          <p className="text-gray-600 mb-8 max-w-xl mx-auto">
-            Join our network of trusted painters and get connected with customers in your area.
-          </p>
-          <a href="mailto:painters@thepaintedpainter.com" className="btn-secondary inline-flex items-center gap-2">
-            <Mail size={20} />
-            Apply to Join Our Network
-          </a>
-        </div>
+        )}
       </section>
     </div>
   );
