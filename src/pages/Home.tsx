@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { fakePainters } from '../lib/fakePainters';
+import { hapticLight, hapticMedium, hapticTick } from '../lib/haptics';
 
 // Carousel 1 (4 triplets)
 const carousel1Triplets = [
@@ -190,7 +191,7 @@ const DealsOfTheDay = () => {
             <span className="deal-rating">{'★'.repeat(Math.round(currentDeal.rating))} {currentDeal.rating.toFixed(1)}</span>
           </div>
           <p className="deal-price">{currentDeal.price}</p>
-          <span className="deal-cta">View Painter Profile →</span>
+          <span className="deal-cta" onClick={() => hapticMedium()}>View Painter Profile →</span>
         </div>
       </Link>
 
@@ -199,6 +200,7 @@ const DealsOfTheDay = () => {
           <span
             key={i}
             className={`deals-dot ${i === currentIndex % 10 ? 'active' : ''}`}
+            onClick={() => { setCurrentIndex(i); hapticTick(); }}
           />
         ))}
       </div>
@@ -231,7 +233,7 @@ const Home = () => {
         <div className="estimate-cta-card">
           <h2>Get a Free Painting Estimate</h2>
           <p>Answer a few quick questions and get an instant AI-powered estimate for your project.</p>
-          <Link to="/contact" className="estimate-cta-button">
+          <Link to="/contact" className="estimate-cta-button" onClick={() => hapticMedium()}>
             Get Your Estimate
           </Link>
         </div>
@@ -312,7 +314,7 @@ const Home = () => {
           <div className="home-map-placeholder">
             <p>Interactive Map</p>
             <p className="map-note">Google Maps integration coming soon</p>
-            <Link to="/painters-map" className="map-link-btn">
+            <Link to="/painters-map" className="map-link-btn" onClick={() => hapticMedium()}>
               View Full Painters Map →
             </Link>
           </div>

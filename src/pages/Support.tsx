@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { hapticLight } from '../lib/haptics';
 
 const faqs = [
   {
@@ -47,6 +48,7 @@ const Support = () => {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   const toggleFaq = (index: number) => {
+    hapticLight();
     setOpenIndex(openIndex === index ? null : index);
   };
 
