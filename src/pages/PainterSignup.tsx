@@ -1,5 +1,7 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../lib/auth';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -10,6 +12,8 @@ interface PainterFormData {
   companyName: string;
   ownerName: string;
   email: string;
+  password: string;
+  confirmPassword: string;
   phone: string;
   streetAddress: string;
   city: string;
@@ -200,6 +204,8 @@ const initialFormData: PainterFormData = {
   companyName: '',
   ownerName: '',
   email: '',
+  password: '',
+  confirmPassword: '',
   phone: '',
   streetAddress: '',
   city: '',
@@ -370,6 +376,8 @@ const styles = {
 // ---------------------------------------------------------------------------
 
 const PainterSignup = () => {
+  const { signUp } = useAuth();
+  const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<PainterFormData>(initialFormData);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -420,6 +428,12 @@ const PainterSignup = () => {
       if (!formData.email.trim()) newErrors.email = 'Required';
       else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email))
         newErrors.email = 'Enter a valid email';
+      if (!formData.password) newErrors.password = 'Required';
+      else if (formData.password.length < 8)
+        newErrors.password = 'Password must be at least 8 characters';
+      if (!formData.confirmPassword) newErrors.confirmPassword = 'Required';
+      else if (formData.confirmPassword !== formData.password)
+        newErrors.confirmPassword = 'Passwords do not match';
       if (!formData.phone.trim()) newErrors.phone = 'Required';
       if (!formData.streetAddress.trim()) newErrors.streetAddress = 'Required';
       if (!formData.city.trim()) newErrors.city = 'Required';
@@ -503,7 +517,20 @@ const PainterSignup = () => {
     setSubmitError('');
 
     try {
-      const { error } = await supabase.from('painters').insert({
+      // 1. Create Supabase auth account
+      const { error: authError, user: newUser } = await signUp(
+        formData.email.trim(),
+        formData.password,
+        'painter',
+        formData.ownerName.trim(),
+      );
+
+      if (authError) throw authError;
+      if (!newUser) throw new Error('Account creation failed. Please try again.');
+
+      // 2. Insert painter row linked to the new auth user
+      const { error: insertError } = await supabase.from('painters').insert({
+        user_id: newUser.id,
         company_name: formData.companyName.trim(),
         owner_name: formData.ownerName.trim(),
         email: formData.email.trim(),
@@ -548,9 +575,10 @@ const PainterSignup = () => {
         price_5br_cabinets: formData.price5BRCabinets,
       });
 
-      if (error) throw error;
-      setSubmitted(true);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      if (insertError) throw insertError;
+
+      // 3. Redirect to painter dashboard
+      navigate('/painter/dashboard');
     } catch (err: unknown) {
       const message =
         err instanceof Error ? err.message : 'Something went wrong. Please try again.';
@@ -691,6 +719,20 @@ const PainterSignup = () => {
           type: 'tel',
           required: true,
           placeholder: '(555) 123-4567',
+        })}
+      </div>
+
+      <div style={styles.grid2}>
+        {renderInput('password', 'Password', {
+          type: 'password',
+          required: true,
+          placeholder: 'Min 8 characters',
+          helper: 'You will use this to sign in to your dashboard',
+        })}
+        {renderInput('confirmPassword', 'Confirm Password', {
+          type: 'password',
+          required: true,
+          placeholder: 'Re-enter password',
         })}
       </div>
 
@@ -1065,67 +1107,9 @@ const PainterSignup = () => {
   // =========================================================================
 
   if (submitted) {
-    return (
-      <div className="bg-[#1a1a1a] text-white" style={{ minHeight: '100vh' }}>
-        {/* Hero */}
-        <section className="bg-[#111] text-white py-16 border-b border-[#333]">
-          <div className="container-custom text-center">
-            <h1
-              className="text-3xl md:text-4xl font-bold mb-3"
-              style={{ fontFamily: "'Cabin', sans-serif" }}
-            >
-              Join Our Network
-            </h1>
-            <p className="text-gray-400">Partner with The Painted Painter</p>
-          </div>
-        </section>
-
-        <section style={{ padding: '60px 20px', textAlign: 'center' }}>
-          <div
-            style={{
-              width: '72px',
-              height: '72px',
-              background: '#1a3a1a',
-              border: '2px solid #2d6b2d',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 20px',
-              color: '#4caf50',
-              fontSize: '2rem',
-              fontWeight: 700,
-            }}
-          >
-            &#10003;
-          </div>
-          <h2
-            style={{
-              fontFamily: "'Cabin', sans-serif",
-              fontSize: '1.6rem',
-              marginBottom: '12px',
-            }}
-          >
-            Application Submitted!
-          </h2>
-          <p
-            style={{
-              color: '#bbb',
-              fontSize: '0.95rem',
-              maxWidth: '500px',
-              margin: '0 auto 28px',
-              lineHeight: 1.7,
-            }}
-          >
-            Thank you for applying to join The Painted Painter network. We will
-            review your information and reach out within 2-3 business days.
-          </p>
-          <a href="/" className="cta-button">
-            Back to Home
-          </a>
-        </section>
-      </div>
-    );
+    // Redirect handled in handleSubmit via navigate(); this is a fallback
+    navigate('/painter/dashboard');
+    return null;
   }
 
   return (

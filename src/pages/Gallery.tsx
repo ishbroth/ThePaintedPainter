@@ -1,24 +1,80 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { X } from 'lucide-react';
+import { fakePainters } from '../lib/fakePainters';
+
+interface GalleryImage {
+  id: string;
+  image: string;
+  painterId: string;
+  companyName: string;
+  city: string;
+  state: string;
+  category: string;
+}
+
+// Build gallery from fake painters' portfolios
+function buildGallery(): GalleryImage[] {
+  const images: GalleryImage[] = [];
+
+  fakePainters.forEach((painter) => {
+    // Derive a category from painter services
+    const serviceCategories: Record<string, string> = {
+      'Interior Painting': 'interior',
+      'Exterior Painting': 'exterior',
+      'Cabinet Painting': 'cabinets',
+      'Cabinet Refinishing': 'cabinets',
+      'Epoxy Flooring': 'epoxy',
+      'Epoxy Garage Floor': 'epoxy',
+      'Commercial Painting': 'commercial',
+      'Deck Staining': 'exterior',
+      'Fence Staining': 'exterior',
+      'Drywall Repair': 'interior',
+      'Popcorn Ceiling Removal': 'interior',
+    };
+
+    painter.portfolio_images.forEach((img, idx) => {
+      // Try to match a category from painter services
+      let category = 'interior'; // default
+      for (const service of painter.services) {
+        for (const [key, cat] of Object.entries(serviceCategories)) {
+          if (service.toLowerCase().includes(key.toLowerCase())) {
+            category = cat;
+            break;
+          }
+        }
+      }
+      // Alternate categories for variety
+      if (idx % 3 === 1 && painter.services.some(s => s.toLowerCase().includes('exterior'))) category = 'exterior';
+      if (idx % 5 === 0 && painter.services.some(s => s.toLowerCase().includes('cabinet'))) category = 'cabinets';
+
+      images.push({
+        id: `${painter.id}-${idx}`,
+        image: img,
+        painterId: painter.id,
+        companyName: painter.company_name,
+        city: painter.city,
+        state: painter.state,
+        category,
+      });
+    });
+  });
+
+  // Shuffle for variety
+  for (let i = images.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [images[i], images[j]] = [images[j], images[i]];
+  }
+
+  return images;
+}
+
+const allImages = buildGallery();
 
 const Gallery = () => {
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [selectedImage, setSelectedImage] = useState<GalleryImage | null>(null);
   const [filter, setFilter] = useState('all');
-
-  const galleryItems = [
-    { id: 1, category: 'interior', title: 'Modern Living Room', image: 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=800' },
-    { id: 2, category: 'exterior', title: 'Craftsman Home', image: 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=800' },
-    { id: 3, category: 'cabinets', title: 'White Kitchen Cabinets', image: 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=800' },
-    { id: 4, category: 'interior', title: 'Master Bedroom', image: 'https://images.unsplash.com/photo-1616594039964-ae9021a400a0?w=800' },
-    { id: 5, category: 'epoxy', title: 'Garage Epoxy Floor', image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800' },
-    { id: 6, category: 'exterior', title: 'Victorian Home', image: 'https://images.unsplash.com/photo-1518780664697-55e3ad937233?w=800' },
-    { id: 7, category: 'interior', title: 'Home Office', image: 'https://images.unsplash.com/photo-1497366216548-37526070297c?w=800' },
-    { id: 8, category: 'cabinets', title: 'Navy Blue Cabinets', image: 'https://images.unsplash.com/photo-1556909114-44e3e70034e2?w=800' },
-    { id: 9, category: 'exterior', title: 'Modern Exterior', image: 'https://images.unsplash.com/photo-1570129477492-45c003edd2be?w=800' },
-    { id: 10, category: 'interior', title: 'Dining Room', image: 'https://images.unsplash.com/photo-1617806118233-18e1de247200?w=800' },
-    { id: 11, category: 'commercial', title: 'Restaurant Interior', image: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800' },
-    { id: 12, category: 'exterior', title: 'Beach House', image: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=800' },
-  ];
+  const [visibleCount, setVisibleCount] = useState(24);
 
   const categories = [
     { id: 'all', label: 'All Projects' },
@@ -29,63 +85,124 @@ const Gallery = () => {
     { id: 'commercial', label: 'Commercial' },
   ];
 
-  const filteredItems = filter === 'all'
-    ? galleryItems
-    : galleryItems.filter(item => item.category === filter);
+  const filteredImages = filter === 'all'
+    ? allImages
+    : allImages.filter(img => img.category === filter);
+
+  const visibleImages = filteredImages.slice(0, visibleCount);
 
   return (
-    <div>
+    <div className="bg-[#1a1a1a] text-white" style={{ minHeight: '100vh' }}>
       {/* Hero */}
-      <section className="bg-primary text-white py-20">
-        <div className="container-custom">
-          <h1 className="text-4xl md:text-5xl font-bold mb-4">Our Gallery</h1>
-          <p className="text-xl text-gray-200 max-w-2xl">
-            Browse our portfolio of completed painting projects.
+      <section className="bg-[#111] text-white py-16 border-b border-[#333]">
+        <div className="container-custom text-center">
+          <h1
+            className="text-3xl md:text-4xl font-bold mb-3"
+            style={{ fontFamily: "'Cabin', sans-serif" }}
+          >
+            Project Gallery
+          </h1>
+          <p className="text-gray-400 max-w-2xl mx-auto">
+            Browse real work from verified painters across the country.
           </p>
         </div>
       </section>
 
       {/* Gallery */}
-      <section className="section-padding">
+      <section style={{ padding: '40px 20px' }}>
         <div className="container-custom">
           {/* Filter Tabs */}
-          <div className="flex flex-wrap justify-center gap-3 mb-12">
+          <div className="flex flex-wrap justify-center gap-3 mb-10">
             {categories.map((cat) => (
               <button
                 key={cat.id}
-                onClick={() => setFilter(cat.id)}
-                className={`px-6 py-2 rounded-full font-medium transition-colors ${
-                  filter === cat.id
-                    ? 'bg-primary text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
+                onClick={() => { setFilter(cat.id); setVisibleCount(24); }}
+                style={{
+                  padding: '8px 20px',
+                  borderRadius: '20px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                  fontSize: '0.85rem',
+                  transition: 'all 0.2s',
+                  background: filter === cat.id ? '#f5a623' : '#333',
+                  color: filter === cat.id ? '#111' : '#ccc',
+                }}
               >
                 {cat.label}
               </button>
             ))}
           </div>
 
+          <p className="text-center text-gray-500 text-sm mb-6">
+            {filteredImages.length} project{filteredImages.length !== 1 ? 's' : ''} found
+          </p>
+
           {/* Gallery Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredItems.map((item) => (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+            {visibleImages.map((item) => (
               <div
                 key={item.id}
-                className="card cursor-pointer group"
-                onClick={() => setSelectedImage(item.image)}
+                className="group cursor-pointer"
+                style={{
+                  borderRadius: '10px',
+                  overflow: 'hidden',
+                  background: '#222',
+                }}
               >
-                <div className="relative h-64 overflow-hidden">
+                <div
+                  className="relative h-56 overflow-hidden"
+                  onClick={() => setSelectedImage(item)}
+                >
                   <img
                     src={item.image}
-                    alt={item.title}
+                    alt={`Work by ${item.companyName}`}
                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                    loading="lazy"
                   />
-                  <div className="absolute inset-0 bg-primary/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <span className="text-white font-semibold">{item.title}</span>
+                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <span className="text-white font-semibold text-sm">View</span>
                   </div>
                 </div>
+                <Link
+                  to={`/painters/${item.painterId}`}
+                  style={{
+                    display: 'block',
+                    padding: '10px 14px',
+                    textDecoration: 'none',
+                  }}
+                >
+                  <p style={{ color: '#fff', fontSize: '0.85rem', fontWeight: 600, margin: 0 }}>
+                    {item.companyName}
+                  </p>
+                  <p style={{ color: '#888', fontSize: '0.75rem', margin: '2px 0 0' }}>
+                    {item.city}, {item.state}
+                  </p>
+                </Link>
               </div>
             ))}
           </div>
+
+          {/* Load More */}
+          {visibleCount < filteredImages.length && (
+            <div className="text-center mt-10">
+              <button
+                onClick={() => setVisibleCount((c) => c + 24)}
+                style={{
+                  padding: '12px 32px',
+                  background: 'transparent',
+                  border: '2px solid #f5a623',
+                  color: '#f5a623',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                  fontSize: '0.9rem',
+                }}
+              >
+                Load More
+              </button>
+            </div>
+          )}
         </div>
       </section>
 
@@ -96,17 +213,29 @@ const Gallery = () => {
           onClick={() => setSelectedImage(null)}
         >
           <button
-            className="absolute top-4 right-4 text-white hover:text-secondary transition-colors"
+            className="absolute top-4 right-4 text-white hover:text-[#f5a623] transition-colors"
             onClick={() => setSelectedImage(null)}
           >
             <X size={32} />
           </button>
-          <img
-            src={selectedImage}
-            alt="Gallery preview"
-            className="max-w-full max-h-[90vh] object-contain"
-            onClick={(e) => e.stopPropagation()}
-          />
+          <div className="text-center" onClick={(e) => e.stopPropagation()}>
+            <img
+              src={selectedImage.image}
+              alt={`Work by ${selectedImage.companyName}`}
+              className="max-w-full max-h-[80vh] object-contain mx-auto"
+            />
+            <div className="mt-4">
+              <Link
+                to={`/painters/${selectedImage.painterId}`}
+                style={{ color: '#f5a623', fontWeight: 600, textDecoration: 'none', fontSize: '0.95rem' }}
+              >
+                {selectedImage.companyName}
+              </Link>
+              <p className="text-gray-400 text-sm mt-1">
+                {selectedImage.city}, {selectedImage.state}
+              </p>
+            </div>
+          </div>
         </div>
       )}
     </div>
