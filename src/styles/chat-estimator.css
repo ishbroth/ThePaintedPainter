@@ -1,0 +1,554 @@
+/* ============================================================================
+   Chat Estimator (homepage panel) + QuoteResults page
+   ============================================================================ */
+
+.chat-estimator-section {
+  padding: 40px 20px 20px;
+  background: #1a1a1a;
+}
+
+.chat-estimator-card {
+  max-width: 780px;
+  margin: 0 auto;
+  background: #22262a;
+  border: 1px solid #2e3338;
+  border-radius: 14px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-estimator-header {
+  padding: 22px 24px 16px;
+  border-bottom: 1px solid #2e3338;
+  background: linear-gradient(180deg, #262b30 0%, #22262a 100%);
+}
+
+.chat-estimator-header h2 {
+  font-family: 'Cabin', sans-serif;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #f3f4f5;
+  margin: 0 0 4px;
+  letter-spacing: 0.3px;
+}
+
+.chat-estimator-header p {
+  font-size: 0.9rem;
+  color: #a9b0b6;
+  margin: 0;
+}
+
+.chat-messages {
+  flex: 1 1 auto;
+  padding: 18px 20px;
+  max-height: 420px;
+  min-height: 240px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.chat-bubble {
+  max-width: 85%;
+  padding: 10px 14px;
+  border-radius: 14px;
+  font-size: 0.95rem;
+  line-height: 1.45;
+  animation: chatBubbleIn 0.22s ease-out;
+}
+
+@keyframes chatBubbleIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.chat-bubble-bot {
+  align-self: flex-start;
+  background: #2f353b;
+  color: #e7e9eb;
+  border-bottom-left-radius: 4px;
+}
+
+.chat-bubble-user {
+  align-self: flex-end;
+  background: #74b9ff;
+  color: #0b1620;
+  border-bottom-right-radius: 4px;
+  font-weight: 500;
+}
+
+.chat-bubble-text {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.chat-bubble-text strong {
+  color: #fff;
+}
+
+.chat-bubble-user .chat-bubble-text strong {
+  color: #0b1620;
+}
+
+.chat-ack-chips {
+  margin-top: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.chat-ack-chip {
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(11, 22, 32, 0.15);
+  color: #0b1620;
+  border: 1px solid rgba(11, 22, 32, 0.18);
+}
+
+.chat-loading {
+  color: #a9b0b6;
+  font-style: italic;
+}
+
+.chat-input-row {
+  display: flex;
+  gap: 10px;
+  padding: 12px 14px;
+  border-top: 1px solid #2e3338;
+  background: #1d2125;
+  align-items: flex-end;
+}
+
+.chat-input {
+  flex: 1 1 auto;
+  min-height: 44px;
+  max-height: 140px;
+  padding: 10px 12px;
+  font-family: 'Lato', sans-serif;
+  font-size: 0.98rem;
+  color: #f3f4f5;
+  background: #14171a;
+  border: 1px solid #3a4046;
+  border-radius: 10px;
+  resize: vertical;
+  outline: none;
+}
+
+.chat-input:focus {
+  border-color: #74b9ff;
+  box-shadow: 0 0 0 2px rgba(116, 185, 255, 0.18);
+}
+
+.chat-input::placeholder {
+  color: #6e7479;
+}
+
+.chat-send {
+  padding: 12px 18px;
+  font-family: 'Cabin', sans-serif;
+  font-weight: 700;
+  font-size: 0.85rem;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #0b1620;
+  background: #74b9ff;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.18s;
+}
+
+.chat-send:hover:not(:disabled) {
+  background: #92c9ff;
+}
+
+.chat-send:disabled {
+  background: #3a4046;
+  color: #6e7479;
+  cursor: not-allowed;
+}
+
+.chat-input-hint {
+  font-size: 0.72rem;
+  color: #6e7479;
+  text-align: center;
+  padding: 8px 16px 14px;
+  margin: 0;
+}
+
+/* ===== Quote Results Page ===== */
+
+.quote-results-page {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 40px 20px 80px;
+  color: #f3f4f5;
+}
+
+.price-hold-banner {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 20px;
+  border: 1px solid;
+  border-radius: 12px;
+  margin-bottom: 22px;
+}
+
+.price-hold-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+}
+
+.price-hold-timer {
+  font-family: 'Cabin', sans-serif;
+  font-size: 1.6rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 1px;
+}
+
+.price-hold-msg {
+  font-size: 0.88rem;
+  color: #c0c4c8;
+  text-align: right;
+}
+
+.price-hold-refresh {
+  background: transparent;
+  border: 1px solid #e74c3c;
+  color: #e74c3c;
+  padding: 7px 14px;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  cursor: pointer;
+}
+
+.price-hold-refresh:hover {
+  background: rgba(231, 76, 60, 0.12);
+}
+
+@media (max-width: 520px) {
+  .price-hold-banner {
+    grid-template-columns: 1fr auto;
+    gap: 8px 14px;
+  }
+  .price-hold-msg {
+    grid-column: 1 / -1;
+    text-align: left;
+    font-size: 0.82rem;
+  }
+}
+
+.quote-results-hero {
+  background: linear-gradient(180deg, #262b30 0%, #1d2125 100%);
+  border: 1px solid #2e3338;
+  border-radius: 14px;
+  padding: 28px;
+  margin-bottom: 28px;
+}
+
+.quote-results-hero h1 {
+  font-family: 'Cabin', sans-serif;
+  font-size: 1.6rem;
+  margin: 0 0 6px;
+  color: #fff;
+}
+
+.quote-results-price {
+  font-family: 'Cabin', sans-serif;
+  font-size: 2.4rem;
+  font-weight: 700;
+  color: #74b9ff;
+  margin: 14px 0 4px;
+}
+
+.quote-results-range {
+  color: #a9b0b6;
+  font-size: 0.95rem;
+}
+
+.quote-results-confidence {
+  display: inline-block;
+  margin-top: 14px;
+  padding: 4px 10px;
+  border-radius: 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  background: rgba(116, 185, 255, 0.15);
+  color: #74b9ff;
+  border: 1px solid rgba(116, 185, 255, 0.3);
+}
+
+.breakdown-toggle {
+  width: 100%;
+  padding: 14px 18px;
+  background: #22262a;
+  border: 1px solid #2e3338;
+  border-radius: 10px;
+  color: #e7e9eb;
+  font-family: 'Cabin', sans-serif;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  transition: background 0.15s;
+}
+
+.breakdown-toggle:hover {
+  background: #2a2f34;
+}
+
+.breakdown-caret {
+  transition: transform 0.2s;
+  font-size: 0.85rem;
+  color: #a9b0b6;
+}
+
+.breakdown-caret.open {
+  transform: rotate(90deg);
+}
+
+.breakdown-panel {
+  background: #1d2125;
+  border: 1px solid #2e3338;
+  border-radius: 10px;
+  padding: 20px;
+  margin-bottom: 28px;
+}
+
+.breakdown-section {
+  margin-bottom: 18px;
+}
+
+.breakdown-section:last-child {
+  margin-bottom: 0;
+}
+
+.breakdown-section h3 {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #a9b0b6;
+  margin: 0 0 8px;
+}
+
+.breakdown-line {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px dashed #2e3338;
+  font-size: 0.92rem;
+}
+
+.breakdown-line:last-child {
+  border-bottom: none;
+}
+
+.breakdown-line-desc {
+  color: #d0d4d8;
+}
+
+.breakdown-line-amt {
+  color: #f3f4f5;
+  font-variant-numeric: tabular-nums;
+}
+
+.breakdown-assumption {
+  padding: 8px 0;
+  font-size: 0.9rem;
+  color: #c0c4c8;
+}
+
+.breakdown-assumption-label {
+  color: #74b9ff;
+  font-weight: 600;
+  margin-right: 6px;
+}
+
+/* ===== Hotwire painter list ===== */
+
+.painter-list-header {
+  margin: 36px 0 16px;
+}
+
+.painter-list-header h2 {
+  font-family: 'Cabin', sans-serif;
+  font-size: 1.3rem;
+  margin: 0 0 4px;
+  color: #fff;
+}
+
+.painter-list-header p {
+  color: #a9b0b6;
+  font-size: 0.92rem;
+  margin: 0;
+}
+
+.painter-card {
+  background: #22262a;
+  border: 1px solid #2e3338;
+  border-radius: 12px;
+  padding: 18px;
+  margin-bottom: 12px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 14px;
+  align-items: center;
+  transition: border-color 0.15s, transform 0.12s;
+  cursor: pointer;
+}
+
+.painter-card:hover {
+  border-color: #74b9ff;
+  transform: translateY(-1px);
+}
+
+.painter-card-name {
+  font-family: 'Cabin', sans-serif;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #fff;
+  margin: 0 0 3px;
+}
+
+.painter-card-meta {
+  font-size: 0.82rem;
+  color: #a9b0b6;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.painter-card-rating {
+  color: #f5a623;
+}
+
+.painter-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.painter-card-tag {
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #2e3338;
+  color: #c0c4c8;
+}
+
+.painter-card-price {
+  font-family: 'Cabin', sans-serif;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #74b9ff;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.painter-card-cta {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #a9b0b6;
+  margin-top: 4px;
+}
+
+/* ===== Mystery painter card ===== */
+
+.mystery-painter-card {
+  background: linear-gradient(135deg, #1e2c3e 0%, #13293d 100%);
+  border: 2px solid #74b9ff;
+  border-radius: 14px;
+  padding: 22px;
+  margin-top: 20px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 16px;
+  align-items: center;
+}
+
+.mystery-painter-title {
+  font-family: 'Cabin', sans-serif;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #fff;
+  margin: 0 0 6px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mystery-badge {
+  background: #74b9ff;
+  color: #0b1620;
+  font-size: 0.65rem;
+  padding: 3px 8px;
+  border-radius: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-weight: 700;
+}
+
+.mystery-painter-desc {
+  color: #c0c4c8;
+  font-size: 0.9rem;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.mystery-painter-price {
+  text-align: right;
+}
+
+.mystery-painter-price-main {
+  font-family: 'Cabin', sans-serif;
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+
+.mystery-painter-price-save {
+  color: #74b9ff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+@media (max-width: 600px) {
+  .chat-messages {
+    max-height: 58vh;
+  }
+  .chat-estimator-header h2 {
+    font-size: 1.15rem;
+  }
+  .painter-card,
+  .mystery-painter-card {
+    grid-template-columns: 1fr;
+  }
+  .painter-card-price,
+  .mystery-painter-price {
+    text-align: left;
+  }
+  .quote-results-price {
+    font-size: 2rem;
+  }
+}

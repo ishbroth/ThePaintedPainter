@@ -382,7 +382,7 @@ const PainterSignup = () => {
   const [formData, setFormData] = useState<PainterFormData>(initialFormData);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
+  const [submitted] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [slideDirection, setSlideDirection] = useState<'left' | 'right'>('right');
 

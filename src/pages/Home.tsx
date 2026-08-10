@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { fakePainters } from '../lib/fakePainters';
-import { hapticLight, hapticMedium, hapticTick } from '../lib/haptics';
+import { hapticMedium, hapticTick } from '../lib/haptics';
+import ChatPanel from '../components/ChatEstimator/ChatPanel';
 
 // Carousel 1 (4 triplets)
 const carousel1Triplets = [
@@ -228,23 +229,15 @@ const Home = () => {
 
   return (
     <div>
-      {/* Estimate CTA — Above Hero */}
-      <section className="quote-section">
-        <div className="estimate-cta-card">
-          <h2>Get a Free Painting Estimate</h2>
-          <p>Answer a few quick questions and get an instant AI-powered estimate for your project.</p>
-          <Link to="/contact" className="estimate-cta-button" onClick={() => hapticMedium()}>
-            Get Your Estimate
-          </Link>
-        </div>
-      </section>
-
-      {/* Hero Collage */}
+      {/* Hero Collage — now above the estimator */}
       <section className="hero-collage">
         <div className="collage-wrapper">
           <img src="/IMG_7201.PNG" alt="The Painted Painter" />
         </div>
       </section>
+
+      {/* AI Chat Estimator — replaces the old "Get a Free Painting Estimate" CTA card */}
+      <ChatPanel />
 
       {/* Platform Description */}
       <section className="about-text fade-in">

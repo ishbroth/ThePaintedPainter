@@ -1,5 +1,6 @@
 import type { EstimatorContext, EstimateBreakdown, EstimateLineItem } from './types';
-import { BASE_RATES, getRegionalMultiplier } from './marketPricingData';
+import { getRegionalMultiplier } from './marketPricingData';
+import { RESOLVED_BASE_RATES as BASE_RATES } from './pricing/resolvedBaseRates';
 import {
   STANDARD_ROOMS,
   CEILING_HEIGHTS,

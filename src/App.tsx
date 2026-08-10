@@ -4,6 +4,7 @@ import { AuthProvider, ProtectedRoute } from './lib/auth/index.ts';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import Home from './pages/Home';
+import QuoteResults from './pages/QuoteResults';
 import About from './pages/About';
 import Services from './pages/Services';
 import Gallery from './pages/Gallery';
@@ -84,6 +85,7 @@ function App() {
               <Routes>
                 {/* Existing routes */}
                 <Route path="/" element={<Home />} />
+                <Route path="/quote-results" element={<QuoteResults />} />
                 <Route path="/about" element={<About />} />
                 <Route path="/services" element={<Services />} />
                 <Route path="/quote" element={<Navigate to="/contact" replace />} />
