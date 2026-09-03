@@ -135,7 +135,7 @@ export const TOPICS: Topic[] = [
       !c.squareFeet,
     alreadyAnswered: (c) => !!c.squareFeet || !!c.bedroomCount,
     ask: () =>
-      "About how big is the house? Square footage or bedroom count works — whatever you know.",
+      "About how big is the place? Square footage or bedroom count works — whatever you know.",
     clarify: () =>
       "I'll use it to estimate the total wall + ceiling area. You can say something like '1,800 square feet' or '3 bedroom 2 bath'.",
     example: () =>

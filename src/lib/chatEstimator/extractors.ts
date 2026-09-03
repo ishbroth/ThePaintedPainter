@@ -61,6 +61,9 @@ export function extractProjectType(text: string): 'interior' | 'exterior' | 'bot
   if (/\b(both\s+(?:interior|inside)\s+and\s+(?:exterior|outside))\b/.test(t)) return 'both';
   if (hasEx) return 'exterior';
   if (hasIn) return 'interior';
+  // "Rental unit", "apartment", "condo", etc. — landlords/property managers
+  // repainting a single dwelling unit overwhelmingly mean the interior.
+  if (extractUnitContext(text).impliesInterior) return 'interior';
   // Implicit: "paint my house" without qualifier usually means interior in DIY contexts, but don't assume.
   return null;
 }
@@ -124,11 +127,13 @@ export function extractColorChange(text: string): 'same' | 'different' | 'dramat
 
 export function extractSidingType(
   text: string,
-): 'stucco' | 'wood' | 'vinyl' | 'hardie' | 'brick' | 'stone' | null {
+): 'stucco' | 'wood' | 'vinyl' | 'hardie' | 'brick' | 'stone' | 'aluminum' | null {
   const t = text.toLowerCase();
   if (/\bstucco\b/.test(t)) return 'stucco';
   if (/\bhardi(?:e)?\s*board\b|\bhardiplank\b|\bfiber\s+cement\b/.test(t)) return 'hardie';
-  if (/\bwood\s+siding\b|\bclapboard\b|\bshingle/.test(t)) return 'wood';
+  if (/\baluminum\s+siding\b/.test(t)) return 'aluminum';
+  if (/\bconcrete\s+block\b|\bcinder\s*block\b|\bcmu\b|\bconcrete\s+masonry\b/.test(t)) return 'stucco';
+  if (/\bwood\s+siding\b|\bclapboard\b|\bshingle|\bshiplap\b|\bboard\s+and\s+batten\b/.test(t)) return 'wood';
   if (/\bvinyl\s+siding\b/.test(t)) return 'vinyl';
   if (/\bbrick\b/.test(t)) return 'brick';
   if (/\bstone\b/.test(t)) return 'stone';
@@ -173,6 +178,161 @@ export function extractAccessSignals(text: string): {
     vacant: /\b(vacant|empty|no one lives|not moved in|before we move)\b/.test(t),
     asap: /\b(asap|urgent|as soon as possible|this week|by (?:next )?weekend|rush)\b/.test(t),
   };
+}
+
+/**
+ * Exterior architectural features — garage doors, decks, fences, railings,
+ * shutters, gutters, foundation, balconies, overhangs/patio covers, soffits &
+ * eaves, and exterior window trim (including French-pane windows).
+ */
+export function extractExteriorFeatures(text: string): {
+  garageDoor?: 'single' | 'double';
+  entryDoor?: boolean;
+  deck?: boolean;
+  deckSize?: 'small' | 'medium' | 'large';
+  fence?: boolean;
+  fenceType?: 'picket_4ft' | 'privacy_6ft' | 'chain_link';
+  fenceLinearFeet?: number;
+  railings?: boolean;
+  railingType?: 'simple' | 'spindles';
+  balconies?: boolean;
+  gutters?: boolean;
+  foundation?: boolean;
+  overhangs?: boolean;
+  soffitsEaves?: boolean;
+  exteriorShutters?: boolean;
+  exteriorWindows?: boolean;
+} {
+  const t = text.toLowerCase();
+  const out: ReturnType<typeof extractExteriorFeatures> = {};
+
+  if (/\bgarage\s+doors?\b/.test(t)) {
+    if (/\b(two|2|double|two[-\s]?car)\s+(?:garage\s+)?doors?\b|\bdouble\s+garage\b/.test(t)) {
+      out.garageDoor = 'double';
+    } else {
+      out.garageDoor = 'single';
+    }
+  }
+
+  if (/\b(front|entry)\s+door\b/.test(t)) out.entryDoor = true;
+
+  if (/\bdecks?\b/.test(t) && !/\bdeck(?:ed)?\s+out\b/.test(t)) {
+    out.deck = true;
+    if (/\bsmall\s+deck\b/.test(t)) out.deckSize = 'small';
+    else if (/\blarge\s+deck\b|\bbig\s+deck\b/.test(t)) out.deckSize = 'large';
+    else if (/\bmedium\s+deck\b/.test(t)) out.deckSize = 'medium';
+  }
+
+  if (/\b(outside|outdoor|exterior)\s+(?:stair(?:case|way)?s?|steps)\b/.test(t)) {
+    out.railings = true;
+  }
+
+  if (/\bfences?\b/.test(t)) {
+    out.fence = true;
+    if (/\bpicket\s+fence\b/.test(t)) out.fenceType = 'picket_4ft';
+    else if (/\bprivacy\s+fence\b/.test(t)) out.fenceType = 'privacy_6ft';
+    else if (/\bchain[\s-]?link\b/.test(t)) out.fenceType = 'chain_link';
+    const fenceIdx = t.search(/\bfences?\b/);
+    if (fenceIdx >= 0) {
+      const window = t.slice(Math.max(0, fenceIdx - 20), fenceIdx + 30);
+      const m = window.match(/\b(\d{2,4})\s*(?:linear\s*)?(?:ft\.?|feet|'|lin\.?\s*ft)\b/);
+      if (m) {
+        const n = parseInt(m[1], 10);
+        if (isFinite(n) && n > 0 && n < 3000) out.fenceLinearFeet = n;
+      }
+    }
+  }
+
+  // Bannister/railing wording without any "stair(s)" mention nearby means a
+  // deck, porch, or balcony railing (exterior). Staircase railings/bannisters
+  // are handled separately by extractInteriorDetails as an interior detail.
+  if (/\b(railings?|hand\s*rails?|bannisters?|banisters?|balustrades?)\b/.test(t) && !/\bstair/.test(t)) {
+    out.railings = true;
+    if (/\bspindles?\b/.test(t)) out.railingType = 'spindles';
+  }
+
+  if (/\bbalcon(?:y|ies)\b/.test(t)) out.balconies = true;
+
+  if (/\bgutters?\b|\bdownspouts?\b/.test(t)) out.gutters = true;
+
+  if (/\bfoundation\b/.test(t)) out.foundation = true;
+
+  if (/\boverhangs?\b|\bpatio\s*cover\b|\bporch\s*roof\b|\bpatios?\b/.test(t)) out.overhangs = true;
+
+  if (/\bsoffits?\b|\beaves\b/.test(t)) out.soffitsEaves = true;
+
+  if (/\bshutters?\b/.test(t) && /\bexterior|\boutside|\bwindow shutters|\bhouse\b/.test(t)) {
+    out.exteriorShutters = true;
+  }
+
+  if (/\bwindow\s*frames?\b|\bwindow\s*trim\b|\bwindowsills?\b|\bwindow\s+sills?\b/.test(t)) {
+    out.exteriorWindows = true;
+  }
+
+  return out;
+}
+
+/**
+ * Interior architectural details — door frames/jambs, cabinet interiors,
+ * closet shelving, interior stairway bannisters, interior brick, and
+ * baseboard mentions.
+ */
+export function extractInteriorDetails(text: string): {
+  doorFrames?: boolean;
+  cabinetInsides?: boolean;
+  interiorShutters?: boolean;
+  stairway?: boolean;
+  stairwayWithRailings?: boolean;
+  interiorBrick?: boolean;
+  baseboardsMentioned?: boolean;
+} {
+  const t = text.toLowerCase();
+  const out: ReturnType<typeof extractInteriorDetails> = {};
+
+  if (/\bdoor\s*frames?\b|\bdoor\s*jambs?\b|\bjambs?\b/.test(t)) out.doorFrames = true;
+
+  if (/\b(inside|interior)\s+(?:of\s+)?(?:the\s+)?cabinets?\b|\bcabinet\s+interiors?\b/.test(t)) {
+    out.cabinetInsides = true;
+  }
+
+  if (/\bshutters?\b/.test(t) && !/\bexterior|\boutside|\bhouse\b/.test(t)) {
+    out.interiorShutters = true;
+  }
+
+  if (/\b(staircase|stairway|stairs)\b/.test(t)) {
+    out.stairway = true;
+    if (/\b(railings?|bannisters?|banisters?|balustrades?|hand\s*rails?)\b/.test(t)) {
+      out.stairwayWithRailings = true;
+    }
+  }
+
+  if (/\bbrick\b/.test(t) && /\bfireplace|\baccent\s+wall|\binterior\b/.test(t)) {
+    out.interiorBrick = true;
+  }
+
+  if (/\bbaseboards?\b/.test(t)) out.baseboardsMentioned = true;
+
+  return out;
+}
+
+/** French-pane windows/doors — distinct labor from standard flat panes. */
+export function extractFrenchPane(text: string): { window?: boolean; door?: boolean } {
+  const t = text.toLowerCase();
+  const out: ReturnType<typeof extractFrenchPane> = {};
+  if (/\bfrench[\s-]?pane[d]?\s+windows?\b|\bfrench\s+windows?\b/.test(t)) out.window = true;
+  if (/\bfrench[\s-]?pane[d]?\s+doors?\b|\bfrench\s+doors?\b/.test(t)) out.door = true;
+  return out;
+}
+
+/**
+ * Rental/apartment/unit phrasing — this almost always means the interior of
+ * a single dwelling unit, not the whole exterior of a multi-unit building,
+ * and it means the WHOLE unit rather than one room.
+ */
+export function extractUnitContext(text: string): { impliesInterior: boolean; impliesWholeUnit: boolean } {
+  const t = text.toLowerCase();
+  const isUnit = /\b(rental\s+unit|the\s+unit|my\s+unit|apartment|apt\.?|condo(?:minium)?|duplex|studio\s+apartment)\b/.test(t);
+  return { impliesInterior: isUnit, impliesWholeUnit: isUnit };
 }
 
 /**
@@ -405,6 +565,109 @@ export function extractAll(text: string, prev: EstimatorContext): ExtractResult 
     patch.occupancy = 'vacant';
   } else if (access.furnished || access.occupied) {
     patch.occupancy = 'furnished';
+  }
+
+  // Rental unit / apartment / condo — whole-unit scope, not a single room
+  const unitCtx = extractUnitContext(text);
+  if (unitCtx.impliesWholeUnit && !prev.interiorScope && prev.selectedRooms.length === 0) {
+    patch.interiorScope = 'whole_house';
+    acks.push('whole unit');
+  }
+
+  // Exterior architectural features
+  const ext = extractExteriorFeatures(text);
+  if (ext.garageDoor && prev.garageDoor === 'none') {
+    patch.garageDoor = ext.garageDoor;
+    acks.push(`${ext.garageDoor} garage door`);
+  }
+  if (ext.entryDoor && prev.entryDoor === 'no') {
+    patch.entryDoor = 'yes';
+    acks.push('entry door');
+  }
+  if (ext.deck && prev.deck === 'none') {
+    patch.deck = 'yes';
+    if (ext.deckSize) patch.deckSize = ext.deckSize;
+    acks.push('deck');
+  }
+  if (ext.fence && prev.fence === 'none') {
+    patch.fence = 'yes';
+    if (ext.fenceType) patch.fenceType = ext.fenceType;
+    if (ext.fenceLinearFeet) patch.fenceLinearFeet = ext.fenceLinearFeet;
+    acks.push(ext.fenceType === 'picket_4ft' ? 'picket fence' : 'fence');
+  }
+  if (ext.railings && prev.railings === 'none') {
+    patch.railings = 'yes';
+    if (ext.railingType) patch.railingType = ext.railingType;
+    acks.push('railings');
+  }
+  if (ext.balconies && prev.balconies === 'none') {
+    patch.balconies = 'yes';
+    acks.push('balconies');
+  }
+  if (ext.gutters && prev.gutters === 'no') {
+    patch.gutters = 'yes';
+    acks.push('gutters');
+  }
+  if (ext.foundation && prev.foundation === 'no') {
+    patch.foundation = 'yes';
+    acks.push('foundation');
+  }
+  if (ext.overhangs && prev.overhangs === 'no') {
+    patch.overhangs = 'yes';
+    acks.push('overhangs/patio cover');
+  }
+  if (ext.soffitsEaves && prev.soffitsEaves !== 'yes') {
+    patch.soffitsEaves = 'yes';
+    acks.push('soffits & eaves');
+  }
+  if (ext.exteriorShutters && prev.exteriorShutters === 'no') {
+    patch.exteriorShutters = 'yes';
+    acks.push('exterior shutters');
+  }
+  if (ext.exteriorWindows && prev.exteriorWindows === 'none') {
+    patch.exteriorWindows = 'trim_only';
+    acks.push('exterior window trim');
+  }
+
+  // Interior architectural details
+  const interiorDetails = extractInteriorDetails(text);
+  if (interiorDetails.doorFrames && prev.doorFrames === 'no') {
+    patch.doorFrames = 'yes';
+    acks.push('door frames');
+  }
+  if (interiorDetails.cabinetInsides && prev.cabinetScope !== 'inside_too') {
+    patch.cabinetScope = 'inside_too';
+    acks.push('cabinet interiors');
+  }
+  if (interiorDetails.interiorShutters && prev.interiorShutters === 'no') {
+    patch.interiorShutters = 'yes';
+    acks.push('interior shutters');
+  }
+  if (interiorDetails.stairway && prev.stairways === 'none') {
+    patch.stairways = 'yes';
+    patch.stairwayDetails = interiorDetails.stairwayWithRailings ? 'walls_and_railings' : 'walls_only';
+    acks.push('staircase');
+  } else if (interiorDetails.stairwayWithRailings && prev.stairways === 'yes' && prev.stairwayDetails !== 'walls_and_railings') {
+    patch.stairwayDetails = 'walls_and_railings';
+    acks.push('bannister/railings');
+  }
+  if (interiorDetails.interiorBrick && !prev.specialtyServices.includes('brick')) {
+    patch.specialtyServices = [...(patch.specialtyServices ?? prev.specialtyServices), 'brick'];
+    acks.push('interior brick');
+  }
+  if (interiorDetails.baseboardsMentioned && prev.baseboards !== 'yes') {
+    patch.baseboards = 'yes';
+  }
+
+  // French-pane windows/doors
+  const frenchPane = extractFrenchPane(text);
+  if (frenchPane.window && !prev.windowTypes.includes('french_pane')) {
+    patch.windowTypes = [...(patch.windowTypes ?? prev.windowTypes), 'french_pane'];
+    acks.push('French-pane windows');
+  }
+  if (frenchPane.door && !prev.doorTypes.includes('french')) {
+    patch.doorTypes = [...(patch.doorTypes ?? prev.doorTypes), 'french'];
+    acks.push('French doors');
   }
 
   // Surface scope limiters

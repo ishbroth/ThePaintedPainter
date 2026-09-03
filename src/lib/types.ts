@@ -80,6 +80,7 @@ export interface EstimatorContext {
   deckSize: string; // small, medium, large
   fence: string; // none, yes
   fenceLinearFeet: number | null;
+  fenceType: string; // picket_4ft, privacy_6ft, chain_link
   gutters: string; // yes, no, skip
   foundation: string; // yes, no, skip
   exteriorWindows: string; // none, trim_only, full

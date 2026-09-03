@@ -34,11 +34,11 @@ export function derive(ctx: EstimatorContext, transcript: string): Derivation[] 
   // Project type from room mentions
   // ——————————————————————————————————————————
   const mentionsIndoorRoom =
-    /\b(room|rooms|bedroom|bathroom|kitchen|living room|dining|hallway|closet|pantry|nursery|office|den|foyer|mudroom|laundry room)\b/.test(
+    /\b(room|rooms|bedroom|bathroom|kitchen|living room|dining|hallway|closet|pantry|nursery|office|den|foyer|mudroom|laundry room|apartment|apt\.?|condo(?:minium)?|duplex|rental unit|the unit|my unit|staircase|stairway|door frames?|door jambs?|cabinet interiors?|wainscoting|crown molding|baseboards?)\b/.test(
       t,
     );
   const mentionsExteriorSurface =
-    /\b(siding|stucco|fascia|soffit|eaves|gutter|exterior|outside|deck|fence|shed)\b/.test(t);
+    /\b(siding|stucco|hardie|shiplap|clapboard|concrete block|cinder block|aluminum siding|fascia|soffit|eaves|gutter|exterior|outside|outdoor|deck|fence|picket fence|shed|garage door|driveway|patio|overhang|porch|balcony|balconies|foundation walls|window frames|window trim|entry door)\b/.test(t);
 
   if (!ctx.projectType) {
     if (mentionsIndoorRoom && !mentionsExteriorSurface) {
@@ -56,6 +56,11 @@ export function derive(ctx: EstimatorContext, transcript: string): Derivation[] 
         patch: { projectType: 'both' },
         reason: 'Mentioned both interior and exterior elements',
       });
+    } else if (/\b(rental unit|the unit|my unit|apartment|apt\.?|condo(?:minium)?|duplex|studio apartment)\b/.test(t)) {
+      out.push({
+        patch: { projectType: 'interior' },
+        reason: 'Rental unit/apartment phrasing → interior project',
+      });
     }
   }
 
@@ -72,6 +77,11 @@ export function derive(ctx: EstimatorContext, transcript: string): Derivation[] 
       out.push({
         patch: { interiorScope: 'whole_house' },
         reason: 'Whole-house phrasing',
+      });
+    } else if (/\b(rental unit|the unit|my unit|apartment|apt\.?|condo(?:minium)?|duplex|studio apartment)\b/.test(t)) {
+      out.push({
+        patch: { interiorScope: 'whole_house' },
+        reason: 'Rental unit/apartment phrasing → whole unit, not a single room',
       });
     } else if (/\b(couple|few|several)\s+(rooms?|bedrooms?)\b/.test(t) || ctx.selectedRooms.length >= 1) {
       out.push({

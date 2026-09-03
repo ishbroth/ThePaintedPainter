@@ -497,10 +497,16 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
     // Fence
     if (ctx.fence === 'yes') {
       const fenceFt = ctx.fenceLinearFeet || 100;
+      const fenceRate = ctx.fenceType === 'picket_4ft' ? BASE_RATES.exterior.fence_per_linft_4ft
+        : ctx.fenceType === 'chain_link' ? BASE_RATES.exterior.fence_per_linft_chain
+        : BASE_RATES.exterior.fence_per_linft_6ft;
+      const fenceLabel = ctx.fenceType === 'picket_4ft' ? 'Picket Fence'
+        : ctx.fenceType === 'chain_link' ? 'Chain Link Fence'
+        : 'Fence';
       lineItems.push({
         category: 'Exterior',
-        description: `Fence (${fenceFt} ft)`,
-        amount: fenceFt * BASE_RATES.exterior.fence_per_linft_6ft * regionalMult,
+        description: `${fenceLabel} (${fenceFt} ft)`,
+        amount: fenceFt * fenceRate * regionalMult,
       });
     }
 
@@ -815,6 +821,7 @@ function getSidingRate(sidingType: string): number {
     case 'vinyl': return BASE_RATES.exterior.siding_vinyl;
     case 'brick': return BASE_RATES.exterior.siding_brick;
     case 'stone': return BASE_RATES.exterior.siding_stone;
+    case 'aluminum': return BASE_RATES.exterior.siding_aluminum;
     case 'mixed': return (BASE_RATES.exterior.siding_stucco + BASE_RATES.exterior.siding_wood) / 2;
     default: return BASE_RATES.exterior.siding_stucco;
   }

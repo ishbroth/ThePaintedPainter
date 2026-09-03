@@ -52,6 +52,7 @@ export function createInitialContext(): EstimatorContext {
     deckSize: '',
     fence: '',
     fenceLinearFeet: null,
+    fenceType: 'privacy_6ft',
     gutters: '',
     foundation: '',
     exteriorWindows: '',
