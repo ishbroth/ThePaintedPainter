@@ -1,7 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { fakePainters } from '../lib/fakePainters';
-import { hapticMedium, hapticTick } from '../lib/haptics';
+import { hapticMedium } from '../lib/haptics';
 import ChatPanel from '../components/ChatEstimator/ChatPanel';
 
 // Carousel 1 (4 triplets)
@@ -117,98 +116,6 @@ const SmoothCarousel = ({
   );
 };
 
-// Collect all deals from fake painters
-const allDeals = fakePainters.flatMap((painter) =>
-  painter.deals.map((deal) => ({
-    ...deal,
-    painterName: painter.company_name,
-    city: painter.city,
-    state: painter.state,
-    painterId: painter.id,
-    rating: painter.rating,
-  }))
-);
-
-// Deals of the Day rotating display
-const DealsOfTheDay = () => {
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [locationFilter, setLocationFilter] = useState('');
-  const [filteredDeals, setFilteredDeals] = useState(allDeals);
-
-  useEffect(() => {
-    if (locationFilter.trim()) {
-      const lower = locationFilter.toLowerCase();
-      const filtered = allDeals.filter(
-        (d) =>
-          d.city.toLowerCase().includes(lower) ||
-          d.state.toLowerCase().includes(lower)
-      );
-      setFilteredDeals(filtered.length > 0 ? filtered : allDeals);
-    } else {
-      setFilteredDeals(allDeals);
-    }
-    setCurrentIndex(0);
-  }, [locationFilter]);
-
-  useEffect(() => {
-    if (filteredDeals.length === 0) return;
-    const timer = setInterval(() => {
-      setCurrentIndex((prev) => (prev + 1) % filteredDeals.length);
-    }, 4000);
-    return () => clearInterval(timer);
-  }, [filteredDeals]);
-
-  const currentDeal = filteredDeals[currentIndex];
-  if (!currentDeal) return null;
-
-  return (
-    <section className="deals-section fade-in">
-      <h2>Deals of the Day</h2>
-      <p className="deals-subtitle">Exclusive offers from painters across the country</p>
-
-      <div className="deals-filter">
-        <input
-          type="text"
-          placeholder="Filter by city or state..."
-          value={locationFilter}
-          onChange={(e) => setLocationFilter(e.target.value)}
-          className="deals-filter-input"
-        />
-      </div>
-
-      <Link
-        to={`/painters/${currentDeal.painterId}`}
-        className="deal-card-link"
-      >
-        <div className="deal-card">
-          <div className="deal-badge">DEAL</div>
-          <h3 className="deal-title">{currentDeal.title}</h3>
-          <p className="deal-description">{currentDeal.description}</p>
-          <div className="deal-meta">
-            <span className="deal-painter">{currentDeal.painterName}</span>
-            <span className="deal-location">
-              {currentDeal.city}, {currentDeal.state}
-            </span>
-            <span className="deal-rating">{'★'.repeat(Math.round(currentDeal.rating))} {currentDeal.rating.toFixed(1)}</span>
-          </div>
-          <p className="deal-price">{currentDeal.price}</p>
-          <span className="deal-cta" onClick={() => hapticMedium()}>View Painter Profile →</span>
-        </div>
-      </Link>
-
-      <div className="deals-dots">
-        {filteredDeals.slice(0, 10).map((_, i) => (
-          <span
-            key={i}
-            className={`deals-dot ${i === currentIndex % 10 ? 'active' : ''}`}
-            onClick={() => { setCurrentIndex(i); hapticTick(); }}
-          />
-        ))}
-      </div>
-    </section>
-  );
-};
-
 const Home = () => {
   useEffect(() => {
     const fadeElements = document.querySelectorAll('.fade-in');
@@ -281,11 +188,6 @@ const Home = () => {
 
       {/* Carousel 2 */}
       <SmoothCarousel triplets={carousel2Triplets} speed={35} />
-
-      <div className="divider"></div>
-
-      {/* Deals of the Day — Replaces PayPal Section */}
-      <DealsOfTheDay />
 
       <div className="divider"></div>
 
