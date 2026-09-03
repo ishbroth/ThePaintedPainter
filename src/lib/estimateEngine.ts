@@ -14,7 +14,7 @@ import {
 
 export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
   const lineItems: EstimateLineItem[] = [];
-  const sqft = ctx.squareFeet || 1500;
+  const sqft = ctx.squareFeet || estimateSqftFromBedrooms(ctx.bedroomCount) || 1500;
   const { multiplier: regionalMult } = getRegionalMultiplier(ctx.zipCode);
   const ceilingHeight = CEILING_HEIGHTS[ctx.ceilingHeight] || 8;
 
@@ -811,6 +811,13 @@ function getCabinetRate(location: string, sqft: number): number {
     case 'laundry': return BASE_RATES.cabinets.laundry;
     default: return BASE_RATES.cabinets.kitchen_medium;
   }
+}
+
+/** Rough sqft-by-bedroom-count fallback, used only when the user never gives an actual square footage. */
+function estimateSqftFromBedrooms(bedroomCount: number | null): number | null {
+  if (!bedroomCount) return null;
+  const BY_BEDROOM: Record<number, number> = { 1: 750, 2: 1050, 3: 1450, 4: 1900, 5: 2400 };
+  return BY_BEDROOM[bedroomCount] ?? (bedroomCount >= 6 ? 2400 + (bedroomCount - 5) * 400 : 1500);
 }
 
 function getSidingRate(sidingType: string): number {

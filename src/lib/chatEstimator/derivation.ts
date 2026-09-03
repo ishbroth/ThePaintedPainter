@@ -56,7 +56,7 @@ export function derive(ctx: EstimatorContext, transcript: string): Derivation[] 
         patch: { projectType: 'both' },
         reason: 'Mentioned both interior and exterior elements',
       });
-    } else if (/\b(rental unit|the unit|my unit|apartment|apt\.?|condo(?:minium)?|duplex|studio apartment)\b/.test(t)) {
+    } else if (/\b(rental unit|the unit|my unit|apartment|apt\.?|condo(?:minium)?|duplex|studio)\b/.test(t)) {
       out.push({
         patch: { projectType: 'interior' },
         reason: 'Rental unit/apartment phrasing → interior project',
@@ -78,7 +78,7 @@ export function derive(ctx: EstimatorContext, transcript: string): Derivation[] 
         patch: { interiorScope: 'whole_house' },
         reason: 'Whole-house phrasing',
       });
-    } else if (/\b(rental unit|the unit|my unit|apartment|apt\.?|condo(?:minium)?|duplex|studio apartment)\b/.test(t)) {
+    } else if (/\b(rental unit|the unit|my unit|apartment|apt\.?|condo(?:minium)?|duplex|studio)\b/.test(t)) {
       out.push({
         patch: { interiorScope: 'whole_house' },
         reason: 'Rental unit/apartment phrasing → whole unit, not a single room',

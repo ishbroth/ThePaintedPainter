@@ -133,9 +133,11 @@ export const TOPICS: Topic[] = [
       c.projectType !== 'exterior' &&
       c.interiorScope === 'whole_house' &&
       !c.squareFeet,
-    alreadyAnswered: (c) => !!c.squareFeet || !!c.bedroomCount,
-    ask: () =>
-      "About how big is the place? Square footage or bedroom count works — whatever you know.",
+    alreadyAnswered: (c) => !!c.squareFeet,
+    ask: (c) =>
+      c.bedroomCount
+        ? "And about how many square feet is the place? Bedroom count alone can vary a lot in size, so a rough number helps me price it right."
+        : "About how big is the place? Square footage or bedroom count works — whatever you know.",
     clarify: () =>
       "I'll use it to estimate the total wall + ceiling area. You can say something like '1,800 square feet' or '3 bedroom 2 bath'.",
     example: () =>
@@ -370,6 +372,8 @@ export const metaBank = {
         return "No worries — I'll assume you're doing a different color. Price doesn't change much either way.";
       case 'siding':
         return "No problem — stucco's the most common in SoCal. I'll default to that unless it's clearly wood or brick.";
+      case 'house_size':
+        return "No problem — I'll estimate the size from the bedroom count you gave me.";
       default:
         return "No worries — just tell me what you do know and we'll work with it.";
     }

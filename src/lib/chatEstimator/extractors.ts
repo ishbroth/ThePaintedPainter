@@ -78,6 +78,20 @@ export function extractProjectCondition(
   return null;
 }
 
+/**
+ * Strip quantified bed/bath counts ("2 bed", "1 bath", "3 bedrooms", "2.5 ba")
+ * out of the text before room detection runs. Without this, a plain count
+ * like "2 bed 1 bath" gets misread by the bathroom pattern below as a
+ * specific single-bathroom callout, which wrongly locks the scope to "one
+ * room" instead of "the whole place."  Named/qualified mentions like "master
+ * bath" or "the bathroom" are untouched since they have no leading count.
+ */
+function stripQuantifiedBedBath(text: string): string {
+  const NUM = '(?:\\d+(?:\\.\\d)?|one|two|three|four|five|six|seven|eight|nine|ten)';
+  const re = new RegExp(`\\b${NUM}\\s*(?:-|\\s)?\\s*(?:bed(?:room)?s?|br|bd|bath(?:room)?s?|ba)\\b`, 'gi');
+  return text.replace(re, ' ');
+}
+
 export function extractRooms(text: string): string[] {
   const t = text.toLowerCase();
   const found: string[] = [];
@@ -331,7 +345,7 @@ export function extractFrenchPane(text: string): { window?: boolean; door?: bool
  */
 export function extractUnitContext(text: string): { impliesInterior: boolean; impliesWholeUnit: boolean } {
   const t = text.toLowerCase();
-  const isUnit = /\b(rental\s+unit|the\s+unit|my\s+unit|apartment|apt\.?|condo(?:minium)?|duplex|studio\s+apartment)\b/.test(t);
+  const isUnit = /\b(rental\s+unit|the\s+unit|my\s+unit|apartment|apt\.?|condo(?:minium)?|duplex|studio)\b/.test(t);
   return { impliesInterior: isUnit, impliesWholeUnit: isUnit };
 }
 
@@ -506,11 +520,21 @@ export function extractAll(text: string, prev: EstimatorContext): ExtractResult 
     else acks.push('repaint');
   }
 
-  const rooms = extractRooms(text);
+  const roomsSourceText = stripQuantifiedBedBath(text);
+  const quantifiedBedBathMention = roomsSourceText !== text;
+  const rooms = extractRooms(roomsSourceText);
   if (rooms.length > 0 && prev.selectedRooms.length === 0) {
     patch.selectedRooms = rooms;
     patch.interiorScope = 'specific_rooms';
     acks.push(`${rooms.length} rooms`);
+  } else if (
+    quantifiedBedBathMention &&
+    prev.selectedRooms.length === 0 &&
+    !prev.interiorScope &&
+    !patch.interiorScope
+  ) {
+    // "2 bed 1 bath", "4 bed 3 bath" etc. describe the whole place, not one room.
+    patch.interiorScope = 'whole_house';
   }
 
   const cab = extractCabinets(text);
