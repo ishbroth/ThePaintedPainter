@@ -114,8 +114,11 @@ const UPDATE_TOOL = {
       fence: { type: 'string', enum: ['none', 'yes'] },
       fenceType: { type: 'string', enum: ['picket_4ft', 'privacy_6ft', 'chain_link'] },
       fenceLinearFeet: { type: 'number' },
-      railings: { type: 'string', enum: ['none', 'yes'] },
-      railingType: { type: 'string', enum: ['simple', 'spindles', 'both'] },
+      railings: {
+        type: 'string', enum: ['none', 'yes'],
+        description: 'EXTERIOR railings only — deck, porch, or balcony. Do NOT set this for interior staircase railings/bannisters; use stairwayDetails="walls_and_railings" for those instead.',
+      },
+      railingType: { type: 'string', enum: ['simple', 'spindles', 'both'], description: 'Only relevant when railings is set (exterior deck/porch/balcony railings).' },
       balconies: { type: 'string', enum: ['none', 'yes'] },
       gutters: { type: 'string', enum: ['yes', 'no'] },
       foundation: { type: 'string', enum: ['yes', 'no'] },
@@ -143,6 +146,7 @@ Rules:
 - Be decisive about implied scope: "2 bed 1 bath", "4 bed 3 bath", "a rental unit", "an apartment", "a studio", "the whole place" all describe the WHOLE property, not a single room — set interiorScope to "whole_house" and do NOT add a room to selectedRooms just because "bath" or "bed" appears in a count.
 - Only populate selectedRooms when the user names specific rooms while implying others are excluded (e.g. "just the kitchen and master bedroom").
 - A rental unit/apartment/condo/duplex/studio being repainted almost always means interior, even if not stated explicitly.
+- "Staircase railings" or "bannisters" are an INTERIOR detail (stairwayDetails="walls_and_railings") — never also set the top-level railings field for those, since that field means exterior deck/porch/balcony railings only.
 - If the user's message is a question to the bot, an expression of uncertainty, a complaint, a greeting, or otherwise not job details, still extract any incidental facts but make sure the intents array reflects it.
 - Keep acknowledgements short (2-4 words each) and only for genuinely new information.`
 
