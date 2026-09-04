@@ -27,9 +27,10 @@ import {
   stackedAddend,
   type MatchedSituation,
 } from '../pricing/situations';
-import { classifyIntent, hasIntent, type Intent } from './intents';
+import { classifyIntent, hasIntent, type Intent, type IntentResult } from './intents';
 import { derive, applyDerivations } from './derivation';
 import { pickNextTopic, metaBank, type Topic } from './topics';
+import { extractWithLLM } from './llmClient';
 
 // ===== Message / state =====
 
@@ -135,14 +136,40 @@ function classifyResponseStyle(text: string): UserResponseStyle {
   return 'normal';
 }
 
-export function handleUserMessage(state: ChatState, userText: string): TurnResult {
+/**
+ * Understand the user's message: try the LLM-backed extractor first (better
+ * language understanding, same output shape), and fall back to the local
+ * regex rules engine if the LLM call fails, times out, or is unreachable.
+ */
+async function understand(
+  trimmed: string,
+  state: ChatState,
+): Promise<{ intent: IntentResult; patch: Partial<EstimatorContext>; acknowledgements: string[] }> {
+  const llm = await extractWithLLM(
+    trimmed,
+    state.ctx,
+    state.history.map((m) => ({ role: m.role, text: m.text })),
+    state.lastBotTopic ? state.lastBotTopic.ask(state.ctx) : null,
+  );
+  if (llm) {
+    return {
+      intent: { intents: llm.intents, normalized: trimmed.toLowerCase(), isQuestion: trimmed.trim().endsWith('?') },
+      patch: llm.patch,
+      acknowledgements: llm.acknowledgements,
+    };
+  }
+  const intent = classifyIntent(trimmed);
+  const extracted = extractAll(trimmed, state.ctx);
+  return { intent, patch: extracted.patch, acknowledgements: extracted.acknowledgements };
+}
+
+export async function handleUserMessage(state: ChatState, userText: string): Promise<TurnResult> {
   const trimmed = userText.trim();
   if (!trimmed) return { state, done: null };
 
-  const intent = classifyIntent(trimmed);
-
-  // 1. Extract explicit facts and apply derivations against the full transcript
-  const { patch, acknowledgements } = extractAll(trimmed, state.ctx);
+  // 1. Understand the message (LLM first, local rules engine as fallback),
+  //    then apply derivations against the full transcript
+  const { intent, patch, acknowledgements } = await understand(trimmed, state);
   const ctxWithExplicit: EstimatorContext = { ...state.ctx, ...patch };
   const newTranscript = `${state.transcript}\n${trimmed}`.trim();
   const derivations = derive(ctxWithExplicit, newTranscript);

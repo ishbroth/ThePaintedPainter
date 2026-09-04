@@ -10,6 +10,7 @@ import { hapticLight } from '../../lib/haptics';
 const ChatPanel = () => {
   const [state, setState] = useState<ChatState>(() => makeInitialState());
   const [input, setInput] = useState('');
+  const [thinking, setThinking] = useState(false);
   const messagesRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const navigate = useNavigate();
@@ -40,14 +41,20 @@ const ChatPanel = () => {
     }
   }, [state.finalEstimate, state.transcript, navigate]);
 
-  function send() {
+  async function send() {
     if (!input.trim()) return;
     hapticLight();
-    const result = handleUserMessage(state, input);
-    setState(result.state);
+    const text = input;
     setInput('');
-    // Re-focus textarea for continuous flow
-    setTimeout(() => textareaRef.current?.focus(), 0);
+    setThinking(true);
+    try {
+      const result = await handleUserMessage(state, text);
+      setState(result.state);
+    } finally {
+      setThinking(false);
+      // Re-focus textarea for continuous flow
+      setTimeout(() => textareaRef.current?.focus(), 0);
+    }
   }
 
   function onKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
@@ -86,6 +93,11 @@ const ChatPanel = () => {
               <div className="chat-bubble-text chat-loading">Preparing your results…</div>
             </div>
           )}
+          {thinking && !waiting && (
+            <div className="chat-bubble chat-bubble-bot">
+              <div className="chat-bubble-text chat-loading">…</div>
+            </div>
+          )}
         </div>
 
         <div className="chat-input-row">
@@ -96,14 +108,14 @@ const ChatPanel = () => {
             onKeyDown={onKeyDown}
             placeholder="Start typing, or tap your phone's mic to talk…"
             rows={2}
-            disabled={waiting}
+            disabled={waiting || thinking}
             className="chat-input"
             autoFocus
           />
           <button
             className="chat-send"
             onClick={send}
-            disabled={waiting || !input.trim()}
+            disabled={waiting || thinking || !input.trim()}
             aria-label="Send"
           >
             Send
