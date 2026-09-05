@@ -5,8 +5,7 @@ import type { Assumption } from '../lib/chatEstimator/defaultAssumptions';
 import type { MatchedSituation } from '../lib/pricing/situations';
 import { matchPainters, type PainterMatch } from '../lib/painterMatcher';
 import { hapticMedium } from '../lib/haptics';
-
-const PRICE_HOLD_MINUTES = 45;
+import { QUOTE_RESULT_KEY, QUOTE_EXPIRES_KEY, PRICE_HOLD_MINUTES } from '../lib/chatEstimator/persistence';
 
 interface LocationState {
   estimate: EstimateBreakdown;
@@ -14,6 +13,20 @@ interface LocationState {
   assumptions: Assumption[];
   matchedSituations: MatchedSituation[];
   transcript: string;
+  expiresAt?: number;
+}
+
+/** Falls back to the persisted quote if location.state is missing — e.g. a
+ * back/forward navigation or reload dropped the in-memory router state. */
+function loadState(locationState: LocationState | null): LocationState | null {
+  if (locationState) return locationState;
+  try {
+    const saved = sessionStorage.getItem(QUOTE_RESULT_KEY);
+    if (saved) return JSON.parse(saved) as LocationState;
+  } catch {
+    // Corrupt/unavailable storage — fall through to null (redirects home).
+  }
+  return null;
 }
 
 const currency = (n: number) =>
@@ -27,11 +40,23 @@ const currency = (n: number) =>
 const QuoteResults = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const state = location.state as LocationState | null;
+  const state = loadState(location.state as LocationState | null);
   const [breakdownOpen, setBreakdownOpen] = useState(false);
 
-  // Lock the expiry to the mount time so re-renders don't reset the clock.
-  const expiresAtRef = useRef<number>(Date.now() + PRICE_HOLD_MINUTES * 60 * 1000);
+  // Reuse the persisted expiry rather than resetting the clock on every
+  // mount — otherwise a back/forward navigation back to this page would
+  // quietly grant a fresh 45 minutes instead of counting down the real hold.
+  const expiresAtRef = useRef<number>((() => {
+    if (state?.expiresAt) return state.expiresAt;
+    try {
+      const saved = sessionStorage.getItem(QUOTE_EXPIRES_KEY);
+      const n = saved ? parseInt(saved, 10) : NaN;
+      if (isFinite(n) && n > Date.now()) return n;
+    } catch {
+      // ignore
+    }
+    return Date.now() + PRICE_HOLD_MINUTES * 60 * 1000;
+  })());
   const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
@@ -189,7 +214,7 @@ const QuoteResults = () => {
               your guaranteed rate. Tap to see their profile, portfolio, and lock in.
             </>
           ) : (
-            <>No direct matches in your area yet — the Mystery Painter below can still guarantee this price.</>
+            <>There are no preferred painters in your area yet — but The Painted Painter will work on finding one for your price.</>
           )}
         </p>
       </div>
@@ -226,14 +251,26 @@ const QuoteResults = () => {
             <span className="mystery-badge">Guaranteed Price</span>
           </div>
           <p className="mystery-painter-desc">
-            Accept the guaranteed price and we'll match you with a verified, licensed painter who
-            bids on your job. You won't choose the painter in advance — we fan the job out to every
-            qualified painter in the area and confirm the first one available. Guaranteed coverage,
-            best price.
+            {matchResult.mysteryPool.length > 0 ? (
+              <>
+                Accept the guaranteed price and we'll match you with a verified, licensed painter who
+                bids on your job. You won't choose the painter in advance — we fan the job out to every
+                qualified painter in the area and confirm the first one available. Guaranteed coverage,
+                best price.
+              </>
+            ) : (
+              <>
+                Accept the guaranteed price and we'll actively recruit a verified, licensed painter in
+                your area to take the job at this rate — we don't have one in our roster there yet,
+                but we guarantee the price regardless.
+              </>
+            )}
           </p>
-          <p className="mystery-painter-desc" style={{ marginTop: 8, fontSize: '0.8rem', color: '#74b9ff' }}>
-            {matchResult.mysteryPool.length} painter{matchResult.mysteryPool.length === 1 ? '' : 's'} in our pool could bid on this job.
-          </p>
+          {matchResult.mysteryPool.length > 0 && (
+            <p className="mystery-painter-desc" style={{ marginTop: 8, fontSize: '0.8rem', color: '#74b9ff' }}>
+              {matchResult.mysteryPool.length} painter{matchResult.mysteryPool.length === 1 ? '' : 's'} in our pool could bid on this job.
+            </p>
+          )}
         </div>
         <div className="mystery-painter-price">
           <div className="mystery-painter-price-main">{currency(estimate.total)}</div>

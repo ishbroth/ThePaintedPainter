@@ -29,10 +29,15 @@ import {
 } from '../pricing/situations';
 import { classifyIntent, hasIntent, type Intent, type IntentResult } from './intents';
 import { derive, applyDerivations } from './derivation';
-import { pickNextTopic, metaBank, type Topic } from './topics';
+import { pickNextTopic, findTopic, metaBank, type Topic } from './topics';
 import { extractWithLLM } from './llmClient';
+import { makeInitialContext } from './defaultContext';
 
 // ===== Message / state =====
+
+// Rotates so an acknowledgment lead-in doesn't say the exact same
+// "Got it —" verbatim every single turn of a long conversation.
+const ACK_LEAD_INS = ['Got it —', 'Noted —', 'Makes sense —', 'Perfect —', 'Okay —'];
 
 export type ChatRole = 'bot' | 'user';
 
@@ -65,38 +70,7 @@ export interface ChatResult {
 
 // ===== Initial state =====
 
-export function makeInitialContext(): EstimatorContext {
-  return {
-    zipCode: '', state: '', yearBuilt: null, propertyType: 'residential', projectType: '',
-    interiorScope: '', selectedRooms: [], interiorWalls: 'yes', accentWalls: 'no',
-    interiorCeilings: 'yes', ceilingType: '', interiorTrim: 'yes', crownMolding: 'no',
-    wainscoting: 'no', baseboards: 'yes', interiorDoors: 'some', doorCount: null, doorTypes: [],
-    doorFrames: 'no', interiorWindows: 'none', windowCount: null, windowTypes: [],
-    cabinets: 'none', cabinetLocations: [], closets: 'none', closetCount: null,
-    stairways: 'none', stairwayCount: null, stairwayDetails: '', interiorShutters: 'no',
-    interiorColorChange: '',
-    exteriorScope: 'full', sidingType: '', exteriorTrim: 'no', soffitsEaves: 'no',
-    exteriorShutters: 'no', exteriorShutterCount: null, garageDoor: 'none', entryDoor: 'no',
-    railings: 'none', railingType: '', balconies: 'none', balconyCount: null,
-    deck: 'none', deckSize: '', fence: 'none', fenceLinearFeet: null, fenceType: 'privacy_6ft', gutters: 'no',
-    foundation: 'no', exteriorWindows: 'none', exteriorWindowCount: null, overhangs: 'no',
-    accessRestrictions: 'none', exteriorColorChange: '', exteriorCondition: 'good',
-    prepWork: [], caulkingExtent: 'minor', drywallRepairExtent: 'minor',
-    woodRotExtent: 'minor', wallpaperRooms: null, popcornCeilingRooms: null,
-    squareFeet: null, stories: null, ceilingHeight: 'standard', occupancy: '',
-    utilities: 'yes', hoa: 'no',
-    contactName: '', contactPhone: '', contactEmail: '', contactNotes: '',
-    projectCondition: '', hasStainedWood: 'no', bedroomCount: null,
-    trimCondition: 'existing_good', wallTexture: 'smooth', doorMaterial: 'wood',
-    cabinetScope: 'fronts_only', closetShelving: 'none', stuccoCondition: 'good',
-    exteriorRailingMaterial: 'wood', interiorRailingMaterial: 'wood', additionalDetails: '',
-    specialtyServices: [], fireplaceType: '', fireplaceCount: null, beamLinearFeet: null,
-    beamLocation: 'standard', builtInCount: null, epoxyGarageSqft: null, epoxyType: 'basic',
-    furnitureItems: [], brickSqft: null, brickTreatment: 'paint',
-    answeredQuestions: 0, responseStyle: 'normal', responseLengths: [],
-    specialtyReferrals: [], isHighCostArea: false, stateComplianceNotes: [],
-  };
-}
+export { makeInitialContext };
 
 export function makeInitialState(): ChatState {
   return {
@@ -116,6 +90,45 @@ export function makeInitialState(): ChatState {
     wrapupAsked: false,
     finalEstimate: null,
   };
+}
+
+// ===== Persistence (sessionStorage) =====
+//
+// Bump this whenever ChatState or EstimatorContext's shape changes in a way
+// that could break loading an older saved conversation. Without a version
+// check, a schema change (a field added/removed/repurposed) could silently
+// load a subtly-incompatible object and misbehave in ways that are hard to
+// trace back to "the browser had stale storage."
+const CHAT_STATE_SCHEMA_VERSION = 2;
+
+/**
+ * `lastBotTopic` is a `Topic` object with live function properties (ask,
+ * clarify, example, chips). JSON.stringify silently drops functions, so a
+ * naive persist/restore round-trip leaves `lastBotTopic` a hollow object
+ * that throws the moment anything calls `.ask()` on it — every message
+ * after a restore would fail. Store just the topic id and re-resolve the
+ * real Topic (with its functions intact) via findTopic() on load instead.
+ */
+export function serializeChatState(state: ChatState): string {
+  return JSON.stringify({
+    version: CHAT_STATE_SCHEMA_VERSION,
+    state: { ...state, lastBotTopic: state.lastBotTopic?.id ?? null },
+  });
+}
+
+/** Returns null (caller should fall back to makeInitialState()) if the saved data is missing, corrupt, or from an incompatible schema version. */
+export function deserializeChatState(json: string): ChatState | null {
+  try {
+    const parsed = JSON.parse(json);
+    if (parsed?.version !== CHAT_STATE_SCHEMA_VERSION || !parsed.state) return null;
+    const raw = parsed.state as ChatState & { lastBotTopic: string | null };
+    return {
+      ...raw,
+      lastBotTopic: raw.lastBotTopic ? findTopic(raw.lastBotTopic) : null,
+    };
+  } catch {
+    return null;
+  }
 }
 
 // ===== Core turn handler =====
@@ -141,11 +154,16 @@ function classifyResponseStyle(text: string): UserResponseStyle {
  * language understanding, same output shape), and fall back to the local
  * regex rules engine if the LLM call fails, times out, or is unreachable.
  */
+// A real conversation finalizes well within this many exchanges — going far
+// beyond it looks like a runaway/abusive session, so stop spending on LLM
+// calls for it and quietly drop to the free local engine instead.
+const MAX_LLM_TURNS = 40;
+
 async function understand(
   trimmed: string,
   state: ChatState,
 ): Promise<{ intent: IntentResult; patch: Partial<EstimatorContext>; acknowledgements: string[] }> {
-  const llm = await extractWithLLM(
+  const llm = state.history.length > MAX_LLM_TURNS ? null : await extractWithLLM(
     trimmed,
     state.ctx,
     state.history.map((m) => ({ role: m.role, text: m.text })),
@@ -171,6 +189,16 @@ export async function handleUserMessage(state: ChatState, userText: string): Pro
   //    then apply derivations against the full transcript
   const { intent, patch, acknowledgements } = await understand(trimmed, state);
   const ctxWithExplicit: EstimatorContext = { ...state.ctx, ...patch };
+
+  // Safety backstop (covers both the LLM path and the local fallback):
+  // once the user has established a whole-house/whole-unit scope, a later
+  // message mentioning a specific room in passing must never silently
+  // collapse the quote down to just that room. Only an explicit "just the
+  // kitchen"-style scope limiter (handled elsewhere) should narrow it.
+  if (state.ctx.interiorScope === 'whole_house' && ctxWithExplicit.interiorScope === 'specific_rooms') {
+    ctxWithExplicit.interiorScope = 'whole_house';
+    ctxWithExplicit.selectedRooms = state.ctx.selectedRooms;
+  }
   const newTranscript = `${state.transcript}\n${trimmed}`.trim();
   const derivations = derive(ctxWithExplicit, newTranscript);
   const ctxNext = {
@@ -211,10 +239,17 @@ export async function handleUserMessage(state: ChatState, userText: string): Pro
 
   // 3. Frustration / greeting / restart
   if (hasIntent(intent, 'frustration')) {
+    // Acknowledge, but do NOT dead-end here — nothing was actually reset,
+    // so falling through to the normal topic-advance logic below keeps the
+    // conversation moving instead of risking a repeated "sorry" loop if the
+    // next message also reads as frustrated.
     s = { ...s, history: [...s.history, botMessage(metaBank.frustration())] };
-    return { state: s, done: null };
-  }
-  if (hasIntent(intent, 'greeting') && s.askedIds.length === 0) {
+  } else if (hasIntent(intent, 'greeting') && s.askedIds.length === 0 && Object.keys(patch).length === 0) {
+    // Only treat this as a bare "hi" with nothing else in it. A message like
+    // "hi, I need a 3 bedroom house painted" also gets tagged with the
+    // greeting intent (it does start with "hi"), but it has real job details
+    // that must not be thrown away in favor of a canned "what do you need
+    // painted?" — that reads as the bot completely ignoring what was just said.
     s = { ...s, history: [...s.history, botMessage(metaBank.greeting())] };
     return { state: s, done: null };
   }
@@ -227,7 +262,10 @@ export async function handleUserMessage(state: ChatState, userText: string): Pro
     if (readyToQuote(ctxNext)) {
       return finalizeTurn(s);
     }
-    // Not ready — tell the user what's still missing
+    // Not ready — acknowledge, then fall through to actually ASK the missing
+    // topic below instead of just describing it. Without this, a user who
+    // keeps saying "run it"/"that's all" would see this same static line
+    // forever instead of being walked to the answer.
     const missing = whatsMissing(ctxNext);
     s = {
       ...s,
@@ -236,7 +274,6 @@ export async function handleUserMessage(state: ChatState, userText: string): Pro
         botMessage(`Before I run the numbers I need one more thing: ${missing}`),
       ],
     };
-    return { state: s, done: null };
   }
 
   // 5. Handle negation / confirmation in the context of the last topic
@@ -282,9 +319,14 @@ export async function handleUserMessage(state: ChatState, userText: string): Pro
     return finalizeTurn(s);
   }
 
-  // 8. Ask the next topic
+  // 8. Ask the next topic — lead with a brief acknowledgment of what was
+  //    just said so the reply doesn't read as a non-sequitur when the user
+  //    volunteers detail beyond what the last question asked for.
   const chips = next.chips?.(ctxNext);
-  const prompt = next.ask(ctxNext) + (chips ? `  (${chips.join(' · ')})` : '');
+  const ackLeadIn = acknowledgements.length > 0
+    ? `${ACK_LEAD_INS[s.askedIds.length % ACK_LEAD_INS.length]} ${acknowledgements.join(', ')}. `
+    : '';
+  const prompt = ackLeadIn + next.ask(ctxNext) + (chips ? `  (${chips.join(' · ')})` : '');
   s = {
     ...s,
     askedIds: [...s.askedIds, next.id],
@@ -396,6 +438,43 @@ function finalizeTurn(state: ChatState): TurnResult {
   return { state: s, done: result };
 }
 
+// Plain-English reasons behind the pricing multipliers that most benefit
+// from being said out loud, keyed by the exact label estimateEngine.ts uses.
+const MULTIPLIER_EXPLANATIONS: Record<string, string> = {
+  'Rental Property (standard finish)':
+    "Since this is a rental, I knocked a bit off — rentals usually don't need the same showroom-perfect finish an owner-occupied home does.",
+  'Multi-Unit Volume Discount':
+    "Since it's multiple units, I applied a volume discount — bulk work like this typically runs cheaper per unit.",
+  'Commercial Property':
+    "Commercial space runs a bit higher — different insurance and scheduling needs than a residential job.",
+  'Rush Scheduling':
+    "I added a rush-scheduling premium since you need this done fast — that usually means pulling a crew off another job.",
+  'Pre-1978 Lead-Safe Practices':
+    "Since the home predates 1978, I've included EPA-required lead-safe prep — that's the law, not optional, and it adds a bit to the cost.",
+  'Difficult Access':
+    "I added a surcharge for the tough access — that means real extra time getting materials and equipment in and out.",
+};
+
+/** Spoken notes for line items that aren't multipliers — flat add-on fees the user should hear about explicitly, not just find in the itemized breakdown. */
+function lineItemNotes(ctx: EstimatorContext): string[] {
+  const notes: string[] = [];
+  if (ctx.multiTripRequired === 'yes') {
+    notes.push("I've built in a return-trip fee since this needs a second visit — that's normal for sequenced or cure-time work.");
+  }
+  if (ctx.specialEquipment === 'scaffolding') {
+    notes.push("I've included scaffolding rental in the price.");
+  } else if (ctx.specialEquipment === 'lift') {
+    notes.push("I've included a boom lift rental in the price — that's a real equipment cost, not just extra labor.");
+  }
+  if (ctx.fixtureRemoval === 'extensive') {
+    notes.push("I've added time for removing and reinstalling fixtures/hardware around the work area.");
+  }
+  if (ctx.hardwareReplacement === 'yes') {
+    notes.push("I've included labor for the hardware install — just note the hardware itself is a separate cost.");
+  }
+  return notes;
+}
+
 function finalize(ctx: EstimatorContext, transcript: string): ChatResult {
   const assumptions = defaultAssumptions(ctx);
   const withAssumptions = applyAssumptions(ctx, assumptions);
@@ -432,6 +511,16 @@ function finalize(ctx: EstimatorContext, transcript: string): ChatResult {
     pieces.push(
       `Included automatically: ${assumptions.map((a) => a.label.toLowerCase()).slice(0, 4).join(', ')}.`,
     );
+  }
+  const priceNotes = [
+    ...finalEstimate.multipliers.map((m) => MULTIPLIER_EXPLANATIONS[m.label]).filter((n): n is string => !!n),
+    ...lineItemNotes(withAssumptions),
+    ...matched
+      .filter((m) => m.situation.adjust.explainToUser)
+      .map((m) => m.situation.userNote ?? m.situation.narrative),
+  ];
+  if (priceNotes.length > 0) {
+    pieces.push(priceNotes.join(' '));
   }
   pieces.push(
     `Pulling up painters in your area now — plus a mystery-painter option if you want to lock in that guaranteed number.`,

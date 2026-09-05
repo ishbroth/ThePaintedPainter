@@ -3,17 +3,39 @@ import { useNavigate } from 'react-router-dom';
 import {
   makeInitialState,
   handleUserMessage,
+  serializeChatState,
+  deserializeChatState,
   type ChatState,
 } from '../../lib/chatEstimator/chatEngine';
 import { hapticLight } from '../../lib/haptics';
+import { CHAT_STATE_KEY, QUOTE_EXPIRES_KEY, QUOTE_RESULT_KEY, PRICE_HOLD_MINUTES } from '../../lib/chatEstimator/persistence';
+
+function loadInitialState(): ChatState {
+  try {
+    const saved = sessionStorage.getItem(CHAT_STATE_KEY);
+    if (saved) {
+      const restored = deserializeChatState(saved);
+      if (restored) return restored;
+    }
+  } catch {
+    // Corrupt/unavailable storage — fall through to a fresh conversation.
+  }
+  return makeInitialState();
+}
 
 const ChatPanel = () => {
-  const [state, setState] = useState<ChatState>(() => makeInitialState());
+  const [state, setState] = useState<ChatState>(loadInitialState);
   const [input, setInput] = useState('');
   const [thinking, setThinking] = useState(false);
   const messagesRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const navigate = useNavigate();
+  // True when the conversation was ALREADY finished before this component
+  // even mounted (restored from storage) — e.g. the user hit back from
+  // quote-results. In that case we must NOT auto-bounce them straight back
+  // to quote-results; that's what made the homepage feel like it "forwards"
+  // to the old quote instead of actually showing the homepage.
+  const restoredAlreadyFinishedRef = useRef(state.finalEstimate !== null);
 
   useEffect(() => {
     // Auto-scroll the message list as new messages arrive
@@ -24,22 +46,57 @@ const ChatPanel = () => {
   }, [state.history.length]);
 
   useEffect(() => {
-    // When the conversation completes, route to the results page
-    if (state.finalEstimate) {
+    // Persist on every change so a back-button nav (or reload) back to this
+    // page picks the conversation up where it left off instead of resetting.
+    try {
+      sessionStorage.setItem(CHAT_STATE_KEY, serializeChatState(state));
+    } catch {
+      // Storage unavailable (private browsing, quota) — degrade to in-memory only.
+    }
+  }, [state]);
+
+  useEffect(() => {
+    // When the conversation completes, route to the results page — but only
+    // for a FRESH completion, never for one restored already-done from a
+    // prior visit (see restoredAlreadyFinishedRef above).
+    if (state.finalEstimate && !restoredAlreadyFinishedRef.current) {
       const t = setTimeout(() => {
-        navigate('/quote-results', {
-          state: {
-            estimate: state.finalEstimate!.estimate,
-            ctx: state.finalEstimate!.ctx,
-            assumptions: state.finalEstimate!.assumptions,
-            matchedSituations: state.finalEstimate!.matchedSituations,
-            transcript: state.transcript,
-          },
-        });
+        const payload = {
+          estimate: state.finalEstimate!.estimate,
+          ctx: state.finalEstimate!.ctx,
+          assumptions: state.finalEstimate!.assumptions,
+          matchedSituations: state.finalEstimate!.matchedSituations,
+          transcript: state.transcript,
+        };
+        try {
+          // Reuse an existing, still-valid hold timer instead of resetting it —
+          // this effect can re-run on a remount that restores an
+          // already-finalized conversation (e.g. returning via back/forward).
+          const existing = sessionStorage.getItem(QUOTE_EXPIRES_KEY);
+          const existingMs = existing ? parseInt(existing, 10) : NaN;
+          const expiresAt = isFinite(existingMs) && existingMs > Date.now()
+            ? existingMs
+            : Date.now() + PRICE_HOLD_MINUTES * 60 * 1000;
+          sessionStorage.setItem(QUOTE_EXPIRES_KEY, String(expiresAt));
+          sessionStorage.setItem(QUOTE_RESULT_KEY, JSON.stringify({ ...payload, expiresAt }));
+          navigate('/quote-results', { state: { ...payload, expiresAt } });
+        } catch {
+          navigate('/quote-results', { state: payload });
+        }
       }, 1400); // brief pause so the user sees the wrap-up message
       return () => clearTimeout(t);
     }
   }, [state.finalEstimate, state.transcript, navigate]);
+
+  function startNewEstimate() {
+    restoredAlreadyFinishedRef.current = false;
+    try {
+      sessionStorage.removeItem(CHAT_STATE_KEY);
+    } catch {
+      // ignore
+    }
+    setState(makeInitialState());
+  }
 
   async function send() {
     if (!input.trim()) return;
@@ -99,6 +156,17 @@ const ChatPanel = () => {
             </div>
           )}
         </div>
+
+        {waiting && restoredAlreadyFinishedRef.current && (
+          <button type="button" className="chat-new-estimate-link" onClick={() => navigate('/quote-results')}>
+            View my quote
+          </button>
+        )}
+        {waiting && (
+          <button type="button" className="chat-new-estimate-link" onClick={startNewEstimate}>
+            Start a new estimate
+          </button>
+        )}
 
         <div className="chat-input-row">
           <textarea

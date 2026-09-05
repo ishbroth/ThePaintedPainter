@@ -64,7 +64,8 @@ export function classifyIntent(rawText: string): IntentResult {
   }
 
   // Restart
-  if (has(t, 'start over', 'restart', 'reset', 'begin again', 'wipe it', 'forget what i said')) {
+  if (has(t, 'start over', 'restart', 'reset', 'begin again', 'wipe it', 'forget what i said',
+    'clear this', 'clear it', 'clear the context', 'clear my info', 'clear everything', 'start fresh', 'start a new')) {
     intents.push('restart');
   }
 
