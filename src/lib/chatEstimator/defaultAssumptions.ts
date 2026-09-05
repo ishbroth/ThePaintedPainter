@@ -111,6 +111,27 @@ export function defaultAssumptions(ctx: EstimatorContext): Assumption[] {
     });
   }
 
+  // Pre-1978 construction — federal law (EPA RRP) requires lead-safe work
+  // practices on any pre-1978 home getting interior surfaces disturbed.
+  if (ctx.yearBuilt && ctx.yearBuilt < 1978 && (ctx.projectType === 'interior' || ctx.projectType === 'both')
+    && !ctx.prepWork.includes('lead_test')) {
+    out.push({
+      label: 'EPA lead-safe work practices (pre-1978 home)',
+      reason: 'Federally required lead-safe containment and cleanup for any home built before 1978.',
+      prepWork: ['lead_test'],
+      patch: {
+        specialtyReferrals: [
+          ...ctx.specialtyReferrals,
+          {
+            type: 'lead_paint',
+            reason: 'Home built before 1978 — EPA RRP lead-safe practices are legally required.',
+            severity: 'warning',
+          },
+        ],
+      },
+    });
+  }
+
   return out;
 }
 

@@ -18,6 +18,29 @@
 import { supabase } from '../supabase';
 import type { EstimatorContext } from '../types';
 import type { Intent } from './intents';
+import { makeInitialContext } from './defaultContext';
+
+const DEFAULT_CONTEXT = makeInitialContext();
+
+/**
+ * Only send fields that differ from a brand-new context's defaults. Without
+ * this, placeholder defaults like interiorWalls: 'yes' (present before the
+ * user has even said interior/exterior) get presented to the model as
+ * "already known" facts — which previously caused it to see those interior
+ * defaults sitting alongside a user answering "exterior" and conclude the
+ * job must be "both", since interior details looked pre-confirmed.
+ */
+function diffFromDefaults(ctx: EstimatorContext): Partial<EstimatorContext> {
+  const diff: Record<string, unknown> = {};
+  for (const key of Object.keys(ctx) as Array<keyof EstimatorContext>) {
+    const value = ctx[key];
+    const defaultValue = DEFAULT_CONTEXT[key];
+    if (JSON.stringify(value) !== JSON.stringify(defaultValue)) {
+      diff[key] = value;
+    }
+  }
+  return diff as Partial<EstimatorContext>;
+}
 
 const TIMEOUT_MS = 8000;
 
@@ -72,6 +95,14 @@ function sanitize(raw: Record<string, unknown>, prev: EstimatorContext): Partial
   const stories = clampNumber(raw.stories, 1, 3);
   if (stories) patch.stories = stories;
 
+  const yearBuilt = clampNumber(raw.yearBuilt, 1800, 2030);
+  if (yearBuilt) patch.yearBuilt = yearBuilt;
+
+  if (isEnum(raw.propertyType, ['residential', 'rental', 'multi_unit', 'commercial'] as const)) patch.propertyType = raw.propertyType;
+  if (isEnum(raw.timeline, ['asap', 'this_month', 'no_rush'] as const)) patch.timeline = raw.timeline;
+  if (isEnum(raw.accessRestrictions, ['some', 'significant'] as const)) patch.accessRestrictions = raw.accessRestrictions;
+  if (isEnum(raw.hoa, ['yes', 'no'] as const)) patch.hoa = raw.hoa;
+
   if (isEnum(raw.projectType, ['interior', 'exterior', 'both'] as const)) patch.projectType = raw.projectType;
   if (isEnum(raw.projectCondition, ['repaint', 'new_construction', 'renovation'] as const)) patch.projectCondition = raw.projectCondition;
   if (isEnum(raw.interiorScope, ['whole_house', 'specific_rooms'] as const)) patch.interiorScope = raw.interiorScope;
@@ -94,6 +125,22 @@ function sanitize(raw: Record<string, unknown>, prev: EstimatorContext): Partial
   if (isEnum(raw.interiorShutters, ['yes', 'no'] as const)) patch.interiorShutters = raw.interiorShutters;
   if (isEnum(raw.interiorColorChange, ['same', 'different', 'dramatic'] as const)) patch.interiorColorChange = raw.interiorColorChange;
   if (isEnum(raw.ceilingType, ['flat', 'popcorn', 'vaulted'] as const)) patch.ceilingType = raw.ceilingType;
+  if (isEnum(raw.ceilingHeight, ['nine_foot', 'ten_plus', 'vaulted_mixed'] as const)) patch.ceilingHeight = raw.ceilingHeight;
+  if (isEnum(raw.wallTexture, ['smooth', 'textured', 'heavy_texture'] as const)) patch.wallTexture = raw.wallTexture;
+  if (isEnum(raw.trimCondition, ['new', 'existing_fair'] as const)) patch.trimCondition = raw.trimCondition;
+  if (isEnum(raw.crownMolding, ['yes'] as const)) patch.crownMolding = raw.crownMolding;
+  if (isEnum(raw.wainscoting, ['yes'] as const)) patch.wainscoting = raw.wainscoting;
+  if (isEnum(raw.accentWalls, ['yes'] as const)) patch.accentWalls = raw.accentWalls;
+  if (isEnum(raw.hasStainedWood, ['yes'] as const)) patch.hasStainedWood = raw.hasStainedWood;
+  if (isEnum(raw.closetShelving, ['wire', 'built_in'] as const)) patch.closetShelving = raw.closetShelving;
+  if (isEnum(raw.woodRotExtent, ['moderate', 'major'] as const)) patch.woodRotExtent = raw.woodRotExtent;
+  if (isEnum(raw.exteriorColorChange, ['same', 'different'] as const)) patch.exteriorColorChange = raw.exteriorColorChange;
+  if (isEnum(raw.exteriorCondition, ['fair', 'poor'] as const)) patch.exteriorCondition = raw.exteriorCondition;
+  if (isEnum(raw.stuccoCondition, ['new_stucco', 'needs_repair'] as const)) patch.stuccoCondition = raw.stuccoCondition;
+  if (isEnum(raw.exteriorTrim, ['yes'] as const)) patch.exteriorTrim = raw.exteriorTrim;
+  if (isEnum(raw.exteriorRailingMaterial, ['metal', 'composite', 'cable'] as const)) patch.exteriorRailingMaterial = raw.exteriorRailingMaterial;
+  if (isEnum(raw.fireplaceType, ['brick_paint', 'brick_whitewash', 'stone', 'mantel_only'] as const)) patch.fireplaceType = raw.fireplaceType;
+  if (isEnum(raw.beamLocation, ['vaulted'] as const)) patch.beamLocation = raw.beamLocation;
   if (isEnum(raw.sidingType, ['stucco', 'wood', 'vinyl', 'hardie', 'brick', 'stone', 'aluminum', 'mixed'] as const)) patch.sidingType = raw.sidingType;
   if (isEnum(raw.garageDoor, ['none', 'single', 'double'] as const)) patch.garageDoor = raw.garageDoor;
   if (isEnum(raw.entryDoor, ['yes', 'no'] as const)) patch.entryDoor = raw.entryDoor;
@@ -113,6 +160,11 @@ function sanitize(raw: Record<string, unknown>, prev: EstimatorContext): Partial
   if (isEnum(raw.exteriorShutters, ['yes', 'no'] as const)) patch.exteriorShutters = raw.exteriorShutters;
   if (isEnum(raw.exteriorWindows, ['none', 'trim_only', 'full'] as const)) patch.exteriorWindows = raw.exteriorWindows;
   if (isEnum(raw.occupancy, ['vacant', 'furnished', 'occupied'] as const)) patch.occupancy = raw.occupancy;
+  if (isEnum(raw.multiTripRequired, ['yes'] as const)) patch.multiTripRequired = raw.multiTripRequired;
+  if (isEnum(raw.specialEquipment, ['extended_ladder', 'scaffolding', 'lift'] as const)) patch.specialEquipment = raw.specialEquipment;
+  if (isEnum(raw.fixtureRemoval, ['minor', 'extensive'] as const)) patch.fixtureRemoval = raw.fixtureRemoval;
+  if (isEnum(raw.hardwareReplacement, ['yes'] as const)) patch.hardwareReplacement = raw.hardwareReplacement;
+  if (isEnum(raw.lowVocRequested, ['yes'] as const)) patch.lowVocRequested = raw.lowVocRequested;
   if (isEnum(raw.drywallRepairExtent, ['minor', 'moderate', 'major'] as const)) patch.drywallRepairExtent = raw.drywallRepairExtent;
 
   // Cumulative arrays: merge (add), never overwrite.
@@ -133,7 +185,7 @@ function sanitize(raw: Record<string, unknown>, prev: EstimatorContext): Partial
     if (merged.length !== prev.specialtyServices.length) patch.specialtyServices = merged;
   }
   if (Array.isArray(raw.prepWorkAdd)) {
-    const allowed = ['caulking', 'stain_cover', 'drywall_repair', 'wood_rot', 'wallpaper_removal', 'power_washing', 'lead_test'];
+    const allowed = ['caulking', 'stain_cover', 'drywall_repair', 'wood_rot', 'wallpaper_removal', 'power_washing', 'lead_test', 'mold_treatment'];
     const add = raw.prepWorkAdd.filter((v) => allowed.includes(v));
     const merged = Array.from(new Set([...prev.prepWork, ...add]));
     if (merged.length !== prev.prepWork.length) patch.prepWork = merged;
@@ -148,9 +200,17 @@ function sanitizeIntents(raw: unknown): Intent[] {
   return valid.length > 0 ? valid : ['provide_info'];
 }
 
+// Meta-commentary about the conversation/user ("user frustrated", "confirmed
+// prior details") occasionally slips in instead of an actual job fact. These
+// are never legitimate acknowledgements, so drop them defensively even
+// though the prompt also tells the model not to produce them.
+const META_COMMENTARY_RE = /\b(user|customer|frustrat|confirm|prior detail|conversation|reset|reasoning|intent)\b/i;
+
 function sanitizeAcks(raw: unknown): string[] {
   if (!Array.isArray(raw)) return [];
-  return raw.filter((v) => typeof v === 'string' && v.length > 0 && v.length < 60).slice(0, 6);
+  return raw
+    .filter((v) => typeof v === 'string' && v.length > 0 && v.length < 60 && !META_COMMENTARY_RE.test(v))
+    .slice(0, 6);
 }
 
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
@@ -175,7 +235,7 @@ export async function extractWithLLM(
   try {
     const { data, error } = await withTimeout(
       supabase.functions.invoke('chat-estimator-extract', {
-        body: { message, history, ctx, lastBotQuestion },
+        body: { message, history, ctx: diffFromDefaults(ctx), lastBotQuestion },
       }),
       TIMEOUT_MS,
     );

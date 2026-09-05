@@ -1,26 +1,3 @@
-// ===== Conversation Node Types =====
-
-export type InputType = 'select' | 'multiselect' | 'text' | 'number' | 'email' | 'tel' | 'zip';
-
-export interface ConversationOption {
-  label: string;
-  value: string;
-}
-
-export interface ConversationNode {
-  id: string;
-  question: string;
-  subtext?: string;
-  inputType: InputType;
-  options?: ConversationOption[];
-  placeholder?: string;
-  nextNodeId: string | null;
-  skipWhen?: (ctx: EstimatorContext) => boolean;
-  validate?: (value: string | string[]) => string | null; // returns error message or null
-  onAnswer?: (ctx: EstimatorContext, value: string | string[]) => Partial<EstimatorContext>;
-  category: 'start' | 'interior' | 'exterior' | 'prep' | 'property' | 'specialty' | 'contact';
-}
-
 // ===== Response Style Detection =====
 
 export type UserResponseStyle = 'terse' | 'normal' | 'detailed';
@@ -32,7 +9,7 @@ export interface EstimatorContext {
   zipCode: string;
   state: string;
   yearBuilt: number | null;
-  propertyType: string; // residential, commercial, rental, hoa
+  propertyType: string; // '' (unasked), residential, condo, multi_unit, commercial, rental
   projectType: string; // interior, exterior, both
 
   // Interior
@@ -91,12 +68,19 @@ export interface EstimatorContext {
   exteriorCondition: string; // good, fair, poor
 
   // Prep Work
-  prepWork: string[]; // caulking, stain_cover, drywall_repair, wood_rot, wallpaper_removal, power_washing, lead_test
+  prepWork: string[]; // caulking, stain_cover, drywall_repair, wood_rot, wallpaper_removal, power_washing, lead_test, mold_treatment
   caulkingExtent: string; // minor, moderate, extensive
   drywallRepairExtent: string; // minor, moderate, major
   woodRotExtent: string; // minor, moderate, major
   wallpaperRooms: number | null;
   popcornCeilingRooms: number | null;
+
+  // Scheduling / access / add-on services
+  multiTripRequired: string; // '', yes, no — sequenced work (paint-before-install, cure-time delays) needing a return visit
+  specialEquipment: string; // none, extended_ladder, scaffolding, lift
+  fixtureRemoval: string; // none, minor, extensive — removing/reinstalling hardware, rods, covers, fixtures around paint work
+  hardwareReplacement: string; // yes, no — installing NEW hardware (hinges, knobs, pulls), not just reinstalling existing
+  lowVocRequested: string; // yes, no — low-odor/eco-friendly paint requested
 
   // Property
   squareFeet: number | null;
@@ -105,6 +89,7 @@ export interface EstimatorContext {
   occupancy: string; // vacant, furnished, occupied
   utilities: string; // yes, no
   hoa: string; // yes, no, skip
+  timeline: string; // '' (unasked), asap, this_month, no_rush
 
   // Contact
   contactName: string;
@@ -175,46 +160,6 @@ export interface EstimateBreakdown {
   highRange: number;
   confidence: 'low' | 'medium' | 'high';
   confidenceNote: string;
-}
-
-// ===== Job Summary =====
-
-export interface JobSummary {
-  projectOverview: {
-    propertyType: string;
-    projectType: string;
-    squareFeet: number | null;
-    stories: number | null;
-    yearBuilt: number | null;
-    location: string;
-  };
-  interiorScope: JobScopeSection | null;
-  exteriorScope: JobScopeSection | null;
-  prepWork: string[];
-  specialtyNeeds: SpecialtyReferral[];
-  contactInfo: {
-    name: string;
-    phone: string;
-    email: string;
-    notes: string;
-  };
-  estimateRange: string;
-  accessNotes: string;
-}
-
-export interface JobScopeSection {
-  scope: string;
-  details: string[];
-}
-
-// ===== Conversation State =====
-
-export interface ConversationState {
-  currentNodeId: string;
-  context: EstimatorContext;
-  history: { nodeId: string; answer: string | string[] }[];
-  isComplete: boolean;
-  estimate: EstimateBreakdown | null;
 }
 
 // ===== Supabase Expanded Quote =====

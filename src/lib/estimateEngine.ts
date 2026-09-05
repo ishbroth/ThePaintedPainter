@@ -636,6 +636,50 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
       });
     }
   }
+  if (ctx.prepWork.includes('mold_treatment')) {
+    // Typical affected area (bathroom ceiling corner, closet wall, etc.) — not the whole room
+    const moldSqft = 60;
+    lineItems.push({
+      category: 'Prep Work',
+      description: 'Mold/Mildew Treatment',
+      amount: moldSqft * BASE_RATES.prep.mold_treatment_per_sqft * regionalMult,
+    });
+  }
+
+  // ===== SCHEDULING / ACCESS / ADD-ON SERVICES =====
+
+  // Sequenced or cure-time-dependent work (paint-before-install then touch
+  // up, window glazing that needs to set, caulk/plaster cure time) means a
+  // second visit — real travel and setup time even for a quick touch-up.
+  if (ctx.multiTripRequired === 'yes') {
+    lineItems.push({
+      category: 'Scheduling',
+      description: 'Return Trip (sequenced/cure-time work)',
+      amount: (sqft > 2500 ? 250 : 150) * regionalMult,
+    });
+  }
+
+  // Specialty access equipment — real rental cost, not just extra labor time.
+  if (ctx.specialEquipment === 'scaffolding') {
+    lineItems.push({ category: 'Access', description: 'Scaffolding Rental', amount: 300 * regionalMult });
+  } else if (ctx.specialEquipment === 'lift') {
+    lineItems.push({ category: 'Access', description: 'Boom Lift Rental', amount: 450 * regionalMult });
+  }
+
+  // Fixture/hardware removal & reinstall around the work area (towel bars,
+  // curtain rods, switch plates, vent covers, mirrors, light fixtures).
+  if (ctx.fixtureRemoval === 'minor') {
+    lineItems.push({ category: 'Prep Work', description: 'Fixture Removal & Reinstall', amount: 60 * regionalMult });
+  } else if (ctx.fixtureRemoval === 'extensive') {
+    lineItems.push({ category: 'Prep Work', description: 'Extensive Fixture Removal & Reinstall', amount: 200 * regionalMult });
+  }
+
+  // New hardware installation (cabinet hinges/knobs, switch plates, etc.) is
+  // handyman-adjacent work most painters will do, but material cost varies —
+  // flag it as its own line so it's clearly separate from the paint job.
+  if (ctx.hardwareReplacement === 'yes') {
+    lineItems.push({ category: 'Add-On', description: 'Hardware Installation (labor; hardware cost separate)', amount: 75 * regionalMult });
+  }
 
   // ===== SUBTOTAL =====
   const subtotal = lineItems.reduce((sum, item) => sum + item.amount, 0);
@@ -646,6 +690,47 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
   // Commercial
   if (ctx.propertyType === 'commercial') {
     multipliers.push({ label: 'Commercial Property', factor: 1.10 });
+  }
+
+  // Rental/investment property — landlords typically don't need (or want to
+  // pay for) a showroom-perfect finish the way an owner-occupant would.
+  if (ctx.propertyType === 'rental') {
+    multipliers.push({ label: 'Rental Property (standard finish)', factor: 0.93 });
+  }
+
+  // Multi-unit / apartment building — bulk work runs cheaper per unit than
+  // a one-off single-family job.
+  if (ctx.propertyType === 'multi_unit') {
+    multipliers.push({ label: 'Multi-Unit Volume Discount', factor: 0.90 });
+  }
+
+  // Rush scheduling — a tight deadline usually means pulling a crew off
+  // another job or paying overtime to hit it.
+  if (ctx.timeline === 'asap') {
+    multipliers.push({ label: 'Rush Scheduling', factor: 1.10 });
+  }
+
+  // Pre-1978 construction — federal RRP rules require lead-safe work
+  // practices (containment, HEPA cleanup, certified disposal) on any home
+  // built before 1978, which meaningfully adds to interior prep cost.
+  if (ctx.yearBuilt && ctx.yearBuilt < 1978 && (ctx.projectType === 'interior' || ctx.projectType === 'both')) {
+    multipliers.push({ label: 'Pre-1978 Lead-Safe Practices', factor: 1.15 });
+  }
+
+  // Low-VOC / eco-friendly paint requested — premium material line costs more per gallon.
+  if (ctx.lowVocRequested === 'yes') {
+    multipliers.push({ label: 'Low-VOC / Eco-Friendly Paint', factor: 1.05 });
+  }
+
+  // Difficult access also slows down interior-only jobs (no elevator to a
+  // walk-up unit, tight stairwells for hauling material/equipment) — the
+  // exterior line item above already prices access for exterior/both jobs,
+  // so this only fires for interior-only to avoid double counting.
+  if (ctx.projectType === 'interior' && (ctx.accessRestrictions === 'some' || ctx.accessRestrictions === 'significant')) {
+    multipliers.push({
+      label: 'Difficult Access',
+      factor: ctx.accessRestrictions === 'significant' ? 1.12 : 1.05,
+    });
   }
 
   // Furnished/occupied
@@ -856,7 +941,7 @@ function calculateConfidence(ctx: EstimatorContext): {
   if (q >= 12 && ctx.responseStyle !== 'terse') {
     return {
       confidence: 'high',
-      confidenceNote: 'High confidence - detailed information provided.',
+      confidenceNote: 'Detailed information provided.',
       lowPct: 0.08,
       highPct: 0.08,
     };
@@ -865,7 +950,7 @@ function calculateConfidence(ctx: EstimatorContext): {
   if (q >= 6) {
     return {
       confidence: 'medium',
-      confidenceNote: 'Medium confidence - a site visit will refine the estimate.',
+      confidenceNote: 'A site visit will refine the estimate.',
       lowPct: 0.15,
       highPct: 0.15,
     };
@@ -873,7 +958,7 @@ function calculateConfidence(ctx: EstimatorContext): {
 
   return {
     confidence: 'low',
-    confidenceNote: 'Low confidence - limited details. Estimate padded for unknowns.',
+    confidenceNote: 'Limited details provided — estimate padded for unknowns.',
     lowPct: 0.25,
     highPct: 0.30,
   };

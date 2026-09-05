@@ -197,6 +197,24 @@ export const TOPICS: Topic[] = [
   },
 
   // ——————————————————————————————————————————
+  // Ownership — rentals/multi-unit/commercial price differently than an
+  // owner-occupied home. Applies to interior AND exterior jobs alike.
+  // ——————————————————————————————————————————
+  {
+    id: 'property_ownership',
+    priority: 32,
+    relevant: () => true,
+    alreadyAnswered: (c) => !!c.propertyType,
+    ask: () =>
+      "Is this your own home, or a rental/investment property? (Also let me know if it's a multi-unit building or a commercial space — those price differently too.)",
+    clarify: () =>
+      "Rentals usually don't need the same showroom-perfect finish a place you live in day-to-day does, so that can bring the price down a bit. Multi-unit buildings get a volume discount. Commercial space has different insurance/scheduling overhead, so it runs a bit higher.",
+    example: () =>
+      "E.g., 'it's our home', 'it's a rental I own', 'it's a 6-unit apartment building', or 'commercial office space'.",
+    chips: () => ['My home', 'Rental property', 'Multiple units', 'Commercial'],
+  },
+
+  // ——————————————————————————————————————————
   // Color change — always worth asking for interior
   // ——————————————————————————————————————————
   {
@@ -285,14 +303,21 @@ export const TOPICS: Topic[] = [
     id: 'timeline_and_access',
     priority: 60,
     relevant: () => true,
-    alreadyAnswered: (c) => !!c.occupancy && c.occupancy !== 'vacant' ? true : !!c.occupancy && c.additionalDetails.length > 0,
-    ask: () =>
-      "Last thing — when would you like this done, and will it be occupied / furnished / or empty when we work?",
+    alreadyAnswered: (c) => !!c.occupancy && !!c.timeline,
+    ask: (c) => {
+      if (c.occupancy && !c.timeline) return "Last thing — when would you like this done?";
+      if (!c.occupancy && c.timeline) return "Last thing — will the property be occupied, furnished, or completely empty when we work?";
+      return "Last thing — when would you like this done, and will it be occupied / furnished / or empty when we work?";
+    },
     clarify: () =>
-      "Timeline helps me flag rush jobs. Knowing if it's lived-in matters too because we have to be more careful protecting stuff.",
+      "Timeline helps me flag rush jobs, which run a bit higher since it usually means pulling a crew off another job. Knowing if it's lived-in matters too because we have to be more careful protecting stuff.",
     example: () =>
       "E.g., 'ASAP, place is vacant' / 'next month, we'll still be living there' / 'whenever, nothing urgent'.",
-    chips: () => ['ASAP · vacant', 'This month · occupied', 'No rush'],
+    chips: (c) => {
+      if (c.occupancy && !c.timeline) return ['ASAP', 'This month', 'No rush'];
+      if (!c.occupancy && c.timeline) return ['Vacant', 'Furnished', 'Occupied'];
+      return ['ASAP · vacant', 'This month · occupied', 'No rush'];
+    },
   },
 ];
 
@@ -356,7 +381,7 @@ export const metaBank = {
     "Happy to email it at the end. Quickest way is to finish the few quick questions and then I'll take your email.",
 
   frustration: () =>
-    "Sorry — let me reset. In your own words, what do you need painted? Just a quick description, I'll take it from there.",
+    "Sorry about that — nothing you've told me so far is lost, let's keep going.",
 
   uncertainty: (lastTopic: string | null) => {
     switch (lastTopic) {
@@ -364,6 +389,8 @@ export const metaBank = {
         return "No problem — I can still give a ballpark without it. What city are you in?";
       case 'room_size':
         return "Totally fine. Is it small, medium, or large — just by feel?";
+      case 'property_ownership':
+        return "No worries — I'll price it as a standard owner-occupied home unless you tell me otherwise.";
       case 'surfaces':
         return "All good — most folks go with walls only, so I'll default to that. Say 'everything' if you change your mind.";
       case 'condition':

@@ -195,6 +195,265 @@ export function extractAccessSignals(text: string): {
 }
 
 /**
+ * Ownership/property type — rentals and multi-unit buildings price
+ * differently from an owner-occupied home (rentals don't need showroom-
+ * perfect finish; multi-unit work gets a volume discount; commercial has
+ * different insurance/scheduling overhead).
+ */
+export function extractPropertyType(text: string): 'residential' | 'rental' | 'multi_unit' | 'commercial' | null {
+  const t = text.toLowerCase();
+  if (/\b(multi[\s-]?unit|apartment (?:complex|building)|\d+[\s-]?unit building|several units|multiple units)\b/.test(t)) {
+    return 'multi_unit';
+  }
+  if (/\b(commercial (?:space|property|building)|office space|retail (?:store|space)|warehouse|storefront)\b/.test(t)) {
+    return 'commercial';
+  }
+  if (/\b(rental|tenants?|landlord|renting it out|investment propert(?:y|ies)|airbnb|between tenants|turnover unit)\b/.test(t)) {
+    return 'rental';
+  }
+  if (/\b(my home|our house|we live (?:here|there|in it)|owner[\s-]?occupied|primary residence|our (?:forever )?home)\b/.test(t)) {
+    return 'residential';
+  }
+  return null;
+}
+
+/** Timeline urgency — rush jobs command a scheduling premium. */
+export function extractTimeline(text: string): 'asap' | 'this_month' | 'no_rush' | null {
+  const t = text.toLowerCase();
+  if (/\b(asap|urgent|as soon as possible|this week|by (?:next )?weekend|rush|need(?:s|ed)? (?:it |this )?done (?:now|immediately)|right away)\b/.test(t)) {
+    return 'asap';
+  }
+  if (/\b(no rush|whenever|not urgent|flexible timeline|no hurry|nothing urgent)\b/.test(t)) {
+    return 'no_rush';
+  }
+  if (/\b(this month|within a month|next few weeks|couple weeks)\b/.test(t)) {
+    return 'this_month';
+  }
+  return null;
+}
+
+const DECADE_MIDPOINTS: Record<string, number> = {
+  '1940s': 1945, '40s': 1945, '1950s': 1955, '50s': 1955, '1960s': 1965, '60s': 1965,
+  '1970s': 1975, '70s': 1975, '1980s': 1985, '80s': 1985, '1990s': 1995, '90s': 1995,
+};
+
+/** Year built — relevant mainly for the pre-1978 federal lead-paint rule. */
+export function extractYearBuilt(text: string): number | null {
+  const t = text.toLowerCase();
+  const exact = t.match(/\b(?:built|constructed|from)\s+(?:in\s+)?(\d{4})\b/) || t.match(/\bbuilt\s+(\d{4})\b/);
+  if (exact) {
+    const year = parseInt(exact[1], 10);
+    if (year > 1800 && year <= 2030) return year;
+  }
+  const decade = t.match(/\bbuilt\s+in\s+the\s+(\d{4}s|\d0s)\b/) || t.match(/\bfrom\s+the\s+(\d{4}s|\d0s)\b/);
+  if (decade && DECADE_MIDPOINTS[decade[1]]) return DECADE_MIDPOINTS[decade[1]];
+  if (/\b(older home|pre[\s-]?1978|before 1978|historic home|century[\s-]?old|100[\s-]?year[\s-]?old)\b/.test(t)) {
+    return 1965; // conservative placeholder — triggers lead-safe handling without a false-precise year
+  }
+  return null;
+}
+
+/** Access difficulty — steep roofs, no ladder clearance, gated/no-elevator access all add labor time. */
+export function extractAccessDifficulty(text: string): 'some' | 'significant' | null {
+  const t = text.toLowerCase();
+  if (/\b(no ladder access|can'?t get a ladder|no truck access|very (?:difficult|hard) access|steep (?:roof|driveway|hill|slope)|no elevator)\b/.test(t)) {
+    return 'significant';
+  }
+  if (/\b(tight (?:side\s?yard|access|space)|limited access|narrow (?:driveway|access)|hard to (?:reach|access)|gated community)\b/.test(t)) {
+    return 'some';
+  }
+  return null;
+}
+
+/** HOA-managed property — often means exterior color must be board-approved. */
+export function extractHOA(text: string): boolean {
+  return /\bhoa\b|\bhomeowners?\s+association\b|\barchitectural (?:committee|review)\b/.test(text.toLowerCase());
+}
+
+/**
+ * Interior surface/finish details that already have dedicated pricing logic
+ * in estimateEngine.ts (wall texture, trim condition, crown molding,
+ * wainscoting, accent walls, stained wood, closets) but previously had no
+ * way to be extracted from free text at all.
+ */
+export function extractInteriorSurfaceDetails(text: string): {
+  wallTexture?: 'smooth' | 'textured' | 'heavy_texture';
+  trimCondition?: 'new' | 'existing_fair';
+  crownMolding?: boolean;
+  wainscoting?: boolean;
+  accentWalls?: boolean;
+  hasStainedWood?: boolean;
+  closets?: 'standard' | 'walkin';
+  closetShelving?: 'wire' | 'built_in';
+  woodRotExtent?: 'moderate' | 'major';
+} {
+  const t = text.toLowerCase();
+  const out: ReturnType<typeof extractInteriorSurfaceDetails> = {};
+
+  if (/\b(heavy(?:ly)? textured|thick texture|heavy knockdown)\b/.test(t)) out.wallTexture = 'heavy_texture';
+  else if (/\b(textured walls?|orange peel|knockdown texture|light texture)\b/.test(t)) out.wallTexture = 'textured';
+  else if (/\b(smooth walls?|flat walls?, no texture)\b/.test(t)) out.wallTexture = 'smooth';
+
+  if (/\b(brand[\s-]?new trim|trim (?:was |is )?just installed|new trim work)\b/.test(t)) out.trimCondition = 'new';
+  else if (/\b(trim (?:is |in )?(?:pretty |really |very )?(?:rough|beat[\s-]?up|bad|poor|damaged) shape|trim.{0,15}(?:chipped|damaged|rough))\b/.test(t)) out.trimCondition = 'existing_fair';
+
+  if (/\bcrown molding\b/.test(t)) out.crownMolding = true;
+  if (/\bwainscoting\b|\bbeadboard\b|\bwall paneling\b/.test(t)) out.wainscoting = true;
+  if (/\baccent wall\b|\bfeature wall\b/.test(t)) out.accentWalls = true;
+  if (/\bstained (?:wood|trim|doors?|cabinets?)\b.{0,20}\b(paint|painted|painting)\b|\bpaint(?:ing)? over (?:the )?stained\b/.test(t)) {
+    out.hasStainedWood = true;
+  }
+
+  if (/\bwalk[\s-]?in closet\b/.test(t)) out.closets = 'walkin';
+  else if (/\bcloset (?:interiors?|insides?)\b|\binside (?:the |my )?closets?\b/.test(t)) out.closets = 'standard';
+  if (/\bwire shelving\b/.test(t)) out.closetShelving = 'wire';
+  else if (/\bbuilt[\s-]?in shelving\b|\bbuilt[\s-]?in shelves\b/.test(t)) out.closetShelving = 'built_in';
+
+  if (/\b(extensive|severe|major|significant) (?:wood )?rot\b/.test(t)) out.woodRotExtent = 'major';
+  else if (/\b(some|moderate|a bit of) (?:wood )?rot\b/.test(t)) out.woodRotExtent = 'moderate';
+
+  return out;
+}
+
+/** Ceiling height — a real multiplier on wall/ceiling square footage, independent of ceiling TYPE (flat/popcorn/vaulted). */
+export function extractCeilingHeight(text: string): 'nine_foot' | 'ten_plus' | 'vaulted_mixed' | null {
+  const t = text.toLowerCase();
+  if (/\b(vaulted|cathedral)\b/.test(t)) return 'vaulted_mixed';
+  if (/\b(10|ten)[\s-]?(?:\+|plus)?\s*f(?:oo|ee)?t ceilings?\b|\bhigh ceilings?\b/.test(t)) return 'ten_plus';
+  if (/\b(9|nine)[\s-]?f(?:oo|ee)?t ceilings?\b/.test(t)) return 'nine_foot';
+  return null;
+}
+
+/**
+ * Exterior surface/finish details mirroring the interior ones above —
+ * exterior color change, overall condition, stucco condition, fascia/trim,
+ * and railing material all already have pricing logic but no extraction.
+ */
+export function extractExteriorSurfaceDetails(text: string): {
+  exteriorColorChange?: 'same' | 'different';
+  exteriorCondition?: 'fair' | 'poor';
+  stuccoCondition?: 'new_stucco' | 'needs_repair';
+  exteriorTrim?: boolean;
+  exteriorRailingMaterial?: 'metal' | 'composite' | 'cable';
+} {
+  const t = text.toLowerCase();
+  const out: ReturnType<typeof extractExteriorSurfaceDetails> = {};
+
+  if (/\bsame color (?:on the outside|outside|for the exterior)\b|\bexterior.{0,15}same color\b/.test(t)) out.exteriorColorChange = 'same';
+  else if (/\bdifferent color (?:on the outside|outside|for the exterior)\b|\bexterior.{0,15}different color\b|\bchanging the exterior color\b/.test(t)) out.exteriorColorChange = 'different';
+
+  if (/\b(exterior|outside|siding).{0,20}\b(peeling|failing paint|really rough|in bad shape|falling apart)\b/.test(t)) out.exteriorCondition = 'poor';
+  else if (/\b(exterior|outside|siding).{0,20}\b(some fading|a bit worn|minor (?:issues|wear))\b/.test(t)) out.exteriorCondition = 'fair';
+
+  if (/\bnew stucco\b|\bstucco (?:was |is )?just (?:installed|applied|done)\b/.test(t)) out.stuccoCondition = 'new_stucco';
+  else if (/\bstucco (?:needs repair|is cracked|has cracks|needs patching)\b|\bcracked stucco\b/.test(t)) out.stuccoCondition = 'needs_repair';
+
+  if (/\b(fascia|exterior trim)\b/.test(t)) out.exteriorTrim = true;
+
+  if (/\bmetal railings?\b/.test(t) && /\b(deck|porch|balcony|exterior|outside)\b/.test(t)) out.exteriorRailingMaterial = 'metal';
+  else if (/\bcomposite railings?\b/.test(t)) out.exteriorRailingMaterial = 'composite';
+  else if (/\bcable railings?\b/.test(t)) out.exteriorRailingMaterial = 'cable';
+
+  return out;
+}
+
+/**
+ * Specialty services — fireplace, exposed beams, built-ins, garage epoxy
+ * floor, furniture painting. All five already have dedicated pricing in
+ * estimateEngine.ts (see ctx.specialtyServices) but previously had zero
+ * extraction — a fireplace or exposed-beam mention would just be silently
+ * dropped on the floor.
+ */
+export function extractSpecialtyServices(text: string): {
+  fireplace?: boolean;
+  fireplaceType?: 'brick_paint' | 'brick_whitewash' | 'stone' | 'mantel_only';
+  beams?: boolean;
+  beamLocation?: 'vaulted';
+  builtIns?: boolean;
+  epoxy?: boolean;
+  furniture?: boolean;
+} {
+  const t = text.toLowerCase();
+  const out: ReturnType<typeof extractSpecialtyServices> = {};
+
+  if (/\bfireplace\b|\bmantel\b/.test(t)) {
+    out.fireplace = true;
+    if (/\bwhitewash/.test(t)) out.fireplaceType = 'brick_whitewash';
+    else if (/\bstone fireplace\b/.test(t)) out.fireplaceType = 'stone';
+    else if (/\bmantel only\b|\bjust the mantel\b/.test(t)) out.fireplaceType = 'mantel_only';
+    else if (/\bbrick fireplace\b/.test(t)) out.fireplaceType = 'brick_paint';
+  }
+
+  if (/\bexposed beams?\b|\bwood beams?\b|\bceiling beams?\b/.test(t)) {
+    out.beams = true;
+    if (/\bvaulted\b/.test(t)) out.beamLocation = 'vaulted';
+  }
+
+  if (/\bbuilt[\s-]?ins?\b|\bbuilt[\s-]?in (?:bookshelf|bookshelves|shelving|cabinetry)\b/.test(t)) out.builtIns = true;
+
+  if (/\bepoxy\b.{0,20}\bgarage\b|\bgarage floor\b.{0,20}\bepoxy\b|\bepoxy (?:the )?(?:garage )?floor\b/.test(t)) out.epoxy = true;
+
+  if (/\bpaint (?:this|my|the|a) (?:dresser|table|chair|cabinet piece|bookshelf|nightstand|desk)\b/.test(t)) out.furniture = true;
+
+  return out;
+}
+
+/**
+ * Sequenced or cure-time-dependent work that requires a second visit:
+ * "paint the baseboards before install, touch up after", "window glazing
+ * needs to set before painting", "prime now, finish coat after the other
+ * trades", "spray the cabinet doors off-site then reinstall", etc.
+ */
+export function extractMultiTrip(text: string): boolean {
+  const t = text.toLowerCase();
+  return (
+    /\b(before it'?s? installed|before installation|then (?:come back|touch up|return)|touch[\s-]?ups? after|come back (?:and|to) (?:paint|finish|touch)|after (?:the )?install(?:ation)?)\b/.test(t) ||
+    /\b(needs? (?:time|a day|\d+ hours?|\d+ days?) to (?:set|cure|dry)|needs? to (?:cure|set) before|has to (?:cure|set|dry) (?:first|before)|window glazing)\b/.test(t) ||
+    /\b(prime (?:now|first)[,.]? (?:and )?(?:finish|topcoat|final coat) (?:coat )?after|second (?:trip|visit) (?:to|for) (?:paint|finish)|off[\s-]?site (?:and|then) reinstall)\b/.test(t)
+  );
+}
+
+/** Specialty access equipment — a real rental cost, not just extra labor time. */
+export function extractSpecialEquipment(text: string): 'extended_ladder' | 'scaffolding' | 'lift' | null {
+  const t = text.toLowerCase();
+  if (/\b(boom lift|scissor lift|cherry picker|man[\s-]?lift|aerial lift)\b/.test(t)) return 'lift';
+  if (/\b(scaffold(?:ing)?|swing stage)\b/.test(t)) return 'scaffolding';
+  if (/\b(extension ladder|\d{2}[\s-]?f(?:oo|ee)?t ladder|fall protection|really high (?:peak|roof|gable))\b/.test(t)) return 'extended_ladder';
+  return null;
+}
+
+/**
+ * Hardware/fixture removal & reinstall around the work area — towel bars,
+ * curtain rods, switch plates, outlet covers, vent covers, mirrors, light
+ * fixtures, thermostats, smoke detectors, blinds.
+ */
+export function extractFixtureRemoval(text: string): 'minor' | 'extensive' | null {
+  const t = text.toLowerCase();
+  const mentioned = /\b(towel bar|curtain rod|switch plates?|outlet covers?|vent covers?|register covers?|mirror|light fixtures?|ceiling fan|thermostat|smoke detectors?|blinds|shelf brackets?|house numbers?|mailbox)\b.*\b(remove|removed|removal|take down|taken down|off)\b|\b(remove|removed|removal|take down|taken down)\b.*\b(towel bar|curtain rod|switch plates?|outlet covers?|vent covers?|register covers?|mirror|light fixtures?|ceiling fan|thermostat|smoke detectors?|blinds|shelf brackets?)\b/.test(t);
+  if (!mentioned) return null;
+  if (/\b(all|every|whole house|each room|throughout)\b/.test(t)) return 'extensive';
+  return 'minor';
+}
+
+/** New hardware installation (cabinet hinges/knobs/pulls, switch plates) — handyman-adjacent add-on. */
+export function extractHardwareReplacement(text: string): boolean {
+  const t = text.toLowerCase();
+  return /\b(replace|swap out|install new|put (?:up|on) new)\b.{0,20}\b(hinges?|knobs?|pulls?|handles?|switch plates?|house numbers?)\b/.test(t);
+}
+
+/** Low-odor/eco-friendly paint request — premium material line, often driven by allergies/asthma/pregnancy. */
+export function extractLowVOC(text: string): boolean {
+  const t = text.toLowerCase();
+  return /\b(low[\s-]?voc|zero[\s-]?voc|no[\s-]?voc|low[\s-]?odor|no[\s-]?odor|eco[\s-]?friendly paint|non[\s-]?toxic paint)\b/.test(t) ||
+    (/\b(allerg(?:y|ies)|asthma|pregnant|sensitive to (?:fumes|smell))\b/.test(t) && /\bpaint\b/.test(t));
+}
+
+/** Mold/mildew present — needs treatment before painting. */
+export function extractMoldTreatment(text: string): boolean {
+  return /\b(mold|mildew|musty smell)\b/.test(text.toLowerCase());
+}
+
+/**
  * Exterior architectural features — garage doors, decks, fences, railings,
  * shutters, gutters, foundation, balconies, overhangs/patio covers, soffits &
  * eaves, and exterior window trim (including French-pane windows).
@@ -523,7 +782,10 @@ export function extractAll(text: string, prev: EstimatorContext): ExtractResult 
   const roomsSourceText = stripQuantifiedBedBath(text);
   const quantifiedBedBathMention = roomsSourceText !== text;
   const rooms = extractRooms(roomsSourceText);
-  if (rooms.length > 0 && prev.selectedRooms.length === 0) {
+  if (rooms.length > 0 && prev.selectedRooms.length === 0 && prev.interiorScope !== 'whole_house') {
+    // A room mentioned in passing ("the kitchen has some grease stains")
+    // must never narrow an already-established whole-house scope down to
+    // just that room — that silently collapses the whole quote.
     patch.selectedRooms = rooms;
     patch.interiorScope = 'specific_rooms';
     acks.push(`${rooms.length} rooms`);
@@ -589,6 +851,160 @@ export function extractAll(text: string, prev: EstimatorContext): ExtractResult 
     patch.occupancy = 'vacant';
   } else if (access.furnished || access.occupied) {
     patch.occupancy = 'furnished';
+  }
+
+  const propType = extractPropertyType(text);
+  if (propType && !prev.propertyType) {
+    patch.propertyType = propType;
+    if (propType === 'rental') acks.push('rental property');
+    else if (propType === 'multi_unit') acks.push('multi-unit');
+    else if (propType === 'commercial') acks.push('commercial');
+  }
+
+  const timeline = extractTimeline(text);
+  if (timeline && !prev.timeline) {
+    patch.timeline = timeline;
+    if (timeline === 'asap') acks.push('ASAP');
+  }
+
+  const yearBuilt = extractYearBuilt(text);
+  if (yearBuilt && !prev.yearBuilt) {
+    patch.yearBuilt = yearBuilt;
+    if (yearBuilt < 1978) acks.push('pre-1978 construction');
+  }
+
+  const accessDifficulty = extractAccessDifficulty(text);
+  if (accessDifficulty && prev.accessRestrictions === 'none') {
+    patch.accessRestrictions = accessDifficulty;
+    acks.push('tough access');
+  }
+
+  if (extractHOA(text) && prev.hoa !== 'yes') {
+    patch.hoa = 'yes';
+    acks.push('HOA');
+  }
+
+  if (extractMultiTrip(text) && prev.multiTripRequired !== 'yes') {
+    patch.multiTripRequired = 'yes';
+    acks.push('return trip needed');
+  }
+
+  const equipment = extractSpecialEquipment(text);
+  if (equipment && prev.specialEquipment === 'none') {
+    patch.specialEquipment = equipment;
+    acks.push(equipment === 'lift' ? 'lift needed' : equipment === 'scaffolding' ? 'scaffolding needed' : 'tall ladder needed');
+  }
+
+  const fixtureRemoval = extractFixtureRemoval(text);
+  if (fixtureRemoval && prev.fixtureRemoval === 'none') {
+    patch.fixtureRemoval = fixtureRemoval;
+    acks.push('fixture removal');
+  }
+
+  if (extractHardwareReplacement(text) && prev.hardwareReplacement !== 'yes') {
+    patch.hardwareReplacement = 'yes';
+    acks.push('new hardware');
+  }
+
+  if (extractLowVOC(text) && prev.lowVocRequested !== 'yes') {
+    patch.lowVocRequested = 'yes';
+    acks.push('low-VOC paint');
+  }
+
+  if (extractMoldTreatment(text)) {
+    addPrep('mold_treatment');
+    acks.push('mold treatment');
+  }
+
+  const interiorSurface = extractInteriorSurfaceDetails(text);
+  if (interiorSurface.wallTexture && !prev.wallTexture) {
+    patch.wallTexture = interiorSurface.wallTexture;
+    acks.push(interiorSurface.wallTexture.replace('_', ' '));
+  }
+  if (interiorSurface.trimCondition && prev.trimCondition === 'existing_good') {
+    patch.trimCondition = interiorSurface.trimCondition;
+    acks.push(interiorSurface.trimCondition === 'new' ? 'new trim' : 'trim needs work');
+  }
+  if (interiorSurface.crownMolding && prev.crownMolding !== 'yes') {
+    patch.crownMolding = 'yes';
+    acks.push('crown molding');
+  }
+  if (interiorSurface.wainscoting && prev.wainscoting !== 'yes') {
+    patch.wainscoting = 'yes';
+    acks.push('wainscoting');
+  }
+  if (interiorSurface.accentWalls && prev.accentWalls !== 'yes') {
+    patch.accentWalls = 'yes';
+    acks.push('accent wall');
+  }
+  if (interiorSurface.hasStainedWood && prev.hasStainedWood !== 'yes') {
+    patch.hasStainedWood = 'yes';
+    acks.push('stained wood prep');
+  }
+  if (interiorSurface.closets && prev.closets === 'none') {
+    patch.closets = interiorSurface.closets;
+    acks.push(interiorSurface.closets === 'walkin' ? 'walk-in closet' : 'closet interiors');
+  }
+  if (interiorSurface.closetShelving && prev.closetShelving === 'none') {
+    patch.closetShelving = interiorSurface.closetShelving;
+  }
+  if (interiorSurface.woodRotExtent && prev.woodRotExtent === 'minor') {
+    patch.woodRotExtent = interiorSurface.woodRotExtent;
+    addPrep('wood_rot');
+  }
+
+  const ceilingHeight = extractCeilingHeight(text);
+  if (ceilingHeight && (!prev.ceilingHeight || prev.ceilingHeight === 'standard')) {
+    patch.ceilingHeight = ceilingHeight;
+    acks.push(ceilingHeight === 'vaulted_mixed' ? 'vaulted ceilings' : `${ceilingHeight === 'ten_plus' ? '10+' : '9'} ft ceilings`);
+  }
+
+  const exteriorSurface = extractExteriorSurfaceDetails(text);
+  if (exteriorSurface.exteriorColorChange && !prev.exteriorColorChange) {
+    patch.exteriorColorChange = exteriorSurface.exteriorColorChange;
+  }
+  if (exteriorSurface.exteriorCondition && prev.exteriorCondition === 'good') {
+    patch.exteriorCondition = exteriorSurface.exteriorCondition;
+    acks.push(`exterior in ${exteriorSurface.exteriorCondition} condition`);
+  }
+  if (exteriorSurface.stuccoCondition && prev.stuccoCondition === 'good') {
+    patch.stuccoCondition = exteriorSurface.stuccoCondition;
+    acks.push(exteriorSurface.stuccoCondition === 'new_stucco' ? 'new stucco' : 'stucco repair needed');
+  }
+  if (exteriorSurface.exteriorTrim && prev.exteriorTrim !== 'yes') {
+    patch.exteriorTrim = 'yes';
+    acks.push('exterior trim/fascia');
+  }
+  if (exteriorSurface.exteriorRailingMaterial && prev.exteriorRailingMaterial === 'wood') {
+    patch.exteriorRailingMaterial = exteriorSurface.exteriorRailingMaterial;
+  }
+
+  const specialty = extractSpecialtyServices(text);
+  const addSpecialty = (key: string) => {
+    const existing = patch.specialtyServices ?? prev.specialtyServices ?? [];
+    if (!existing.includes(key)) patch.specialtyServices = [...existing, key];
+  };
+  if (specialty.fireplace) {
+    addSpecialty('fireplace');
+    if (specialty.fireplaceType) patch.fireplaceType = specialty.fireplaceType;
+    acks.push('fireplace');
+  }
+  if (specialty.beams) {
+    addSpecialty('beams');
+    if (specialty.beamLocation) patch.beamLocation = specialty.beamLocation;
+    acks.push('exposed beams');
+  }
+  if (specialty.builtIns) {
+    addSpecialty('built_ins');
+    acks.push('built-ins');
+  }
+  if (specialty.epoxy) {
+    addSpecialty('epoxy');
+    acks.push('garage epoxy floor');
+  }
+  if (specialty.furniture) {
+    addSpecialty('furniture');
+    acks.push('furniture piece');
   }
 
   // Rental unit / apartment / condo — whole-unit scope, not a single room
