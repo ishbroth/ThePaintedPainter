@@ -41,7 +41,7 @@ const Header = () => {
           <Link to="/about" onClick={closeMenu}>
             About
           </Link>
-          <Link to="/contact" onClick={closeMenu}>
+          <Link to="/" onClick={closeMenu}>
             Get Estimate
           </Link>
           <Link to="/painter-signup" onClick={closeMenu}>

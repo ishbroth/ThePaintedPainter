@@ -374,7 +374,7 @@ const PainterPublicProfile = () => {
           <h2 className="text-2xl font-bold mb-4">Interested in {painter.company_name}?</h2>
           <p className="text-gray-400 mb-8">Get a free estimate or browse more painters in your area.</p>
           <div className="flex flex-wrap justify-center gap-4">
-            <Link to="/contact" className="cta-button">
+            <Link to="/" className="cta-button">
               Get an Estimate
             </Link>
             <Link

@@ -5,7 +5,7 @@ const Footer = () => {
     <footer className="footer">
       <div className="footer-links">
         <Link to="/about">About</Link>
-        <Link to="/contact">Get Estimate</Link>
+        <Link to="/">Get Estimate</Link>
         <Link to="/painter-signup">For Painters</Link>
         <Link to="/support">Support</Link>
       </div>

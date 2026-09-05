@@ -8,7 +8,6 @@ import QuoteResults from './pages/QuoteResults';
 import About from './pages/About';
 import Services from './pages/Services';
 import Gallery from './pages/Gallery';
-import Contact from './pages/Contact';
 import PaintersMap from './pages/PaintersMap';
 import PainterSignup from './pages/PainterSignup';
 import Support from './pages/Support';
@@ -88,9 +87,9 @@ function App() {
                 <Route path="/quote-results" element={<QuoteResults />} />
                 <Route path="/about" element={<About />} />
                 <Route path="/services" element={<Services />} />
-                <Route path="/quote" element={<Navigate to="/contact" replace />} />
+                <Route path="/quote" element={<Navigate to="/" replace />} />
+                <Route path="/contact" element={<Navigate to="/" replace />} />
                 <Route path="/gallery" element={<Gallery />} />
-                <Route path="/contact" element={<Contact />} />
                 <Route path="/painters-map" element={<PaintersMap />} />
                 <Route path="/painter-signup" element={<PainterSignup />} />
 

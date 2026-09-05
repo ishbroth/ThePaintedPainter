@@ -111,7 +111,7 @@ const About = () => {
             <li>Only pay the balance when the work is done</li>
           </ul>
           <div className="text-center">
-            <Link to="/contact" className="cta-button">
+            <Link to="/" className="cta-button">
               Get Your Estimate
             </Link>
           </div>
@@ -124,7 +124,7 @@ const About = () => {
           <h2 className="text-2xl font-bold mb-4">Ready to Get Started?</h2>
           <p className="text-gray-400 mb-8">Whether you're a homeowner or a painter, we've got you covered.</p>
           <div className="flex flex-wrap justify-center gap-4">
-            <Link to="/contact" className="cta-button">
+            <Link to="/" className="cta-button">
               Get an Estimate
             </Link>
             <Link to="/painter-signup" className="cta-button">

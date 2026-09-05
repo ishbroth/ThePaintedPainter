@@ -196,7 +196,7 @@ export default function CustomerProjects() {
         <div className="text-center py-12 text-gray-500">
           <p className="text-lg mb-2">No active projects</p>
           <Link
-            to="/contact"
+            to="/"
             className="text-[#f5a623] hover:underline"
           >
             Get a new estimate

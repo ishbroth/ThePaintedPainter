@@ -66,7 +66,7 @@ export default function CustomerDashboard() {
       {/* Quick Actions */}
       <div className="flex flex-wrap gap-4 mb-10">
         <Link
-          to="/contact"
+          to="/"
           className="px-6 py-3 bg-[#f5a623] text-black font-semibold rounded-lg hover:bg-[#e09510] transition-colors"
         >
           Get New Estimate
