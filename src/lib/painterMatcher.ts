@@ -2,7 +2,9 @@
 // Painter Matcher
 // ============================================================================
 // Given a job context + guaranteed price, pick the painters who:
-//   - Serve the job's area (by ZIP prefix / state)
+//   - Are actually within a real service radius of the job (by ZIP distance,
+//     not ZIP-prefix guesswork — a 3-digit prefix match/mismatch says almost
+//     nothing about how far away someone actually is)
 //   - Match the job's specialty needs (cabinets, exterior, etc.)
 //   - Would plausibly bid within a reasonable range of the guaranteed price
 //     (deterministic — based on their rate tier, NOT random)
@@ -15,6 +17,9 @@
 //     the guaranteed price).
 //   - The "mystery pool" (for fanning out the guaranteed-price job) is every
 //     painter in the reasonably-close set.
+//   - If NO painter is within the service radius, `top` and `mysteryPool`
+//     come back empty — the caller shows a "we'll find you one" message
+//     rather than a wrong-side-of-the-country painter list.
 //
 // TODO: once the painter intake form is built, replace the sidecar
 // MATCH_PROFILES with painter.intakeProfile fields so each painter's pricing
@@ -23,14 +28,16 @@
 
 import type { EstimatorContext } from './types';
 import { fakePainters, type FakePainter } from './fakePainters';
+import { zipDistanceMiles } from './geo/distance';
+
+/** A painter must be within this many miles of the job to be shown at all. */
+const SERVICE_RADIUS_MILES = 50;
 
 // ===== Match criteria (sidecar — not on FakePainter itself) =====
 // Keyed by painter id. Anything missing falls back to sensible defaults derived
 // from the painter's existing fields (crew_size, years_experience, rating, etc.).
 
 interface PainterMatchProfile {
-  /** ZIP prefixes this painter serves (3-digit). */
-  serviceZipPrefixes?: string[];
   /** Rate tier relative to market: budget (-10%), standard (0%), premium (+10-15%). */
   rateTier?: 'budget' | 'standard' | 'premium';
   /** Min job size ($) this painter will bid on. */
@@ -47,7 +54,6 @@ const MATCH_PROFILES: Record<string, PainterMatchProfile> = {
   // Deliberately sparse — everything else falls back to heuristics below.
   // Update these (or feed via future conversations) as real data arrives.
   'a1b2c3d4-e5f6-7890-abcd-ef1234567890': { // Manhattan Brush Co (NY)
-    serviceZipPrefixes: ['100', '101', '102', '110', '111', '112'],
     rateTier: 'premium',
     minJobSize: 2500,
     maxJobSize: 250000,
@@ -55,7 +61,6 @@ const MATCH_PROFILES: Record<string, PainterMatchProfile> = {
     acceptRate: 0.35,
   },
   'b2c3d4e5-f6a7-8901-bcde-f12345678901': { // SoCal Pro (LA)
-    serviceZipPrefixes: ['900', '901', '902', '903', '904', '905', '906', '907', '908', '910', '911'],
     rateTier: 'standard',
     minJobSize: 1200,
     maxJobSize: 80000,
@@ -68,7 +73,6 @@ const MATCH_PROFILES: Record<string, PainterMatchProfile> = {
 
 function profileFor(p: FakePainter): Required<PainterMatchProfile> {
   const explicit = MATCH_PROFILES[p.id] ?? {};
-  const zipPrefix = p.zip_code.substring(0, 3);
 
   // Derive defaults from existing fields
   const defaultTier: PainterMatchProfile['rateTier'] =
@@ -82,7 +86,6 @@ function profileFor(p: FakePainter): Required<PainterMatchProfile> {
     defaultTier === 'budget' ? 0.75 : defaultTier === 'standard' ? 0.55 : 0.3;
 
   return {
-    serviceZipPrefixes: explicit.serviceZipPrefixes ?? [zipPrefix],
     rateTier: explicit.rateTier ?? defaultTier,
     minJobSize: explicit.minJobSize ?? (p.crew_size >= 8 ? 2000 : 800),
     maxJobSize: explicit.maxJobSize ?? (p.crew_size >= 8 ? 100000 : 40000),
@@ -116,6 +119,8 @@ export interface PainterMatch {
   painterPrice: number;
   /** Distance from guaranteed price as a signed fraction (-0.05 = 5% below, +0.10 = 10% above). */
   priceDelta: number;
+  /** Straight-line miles from the job's ZIP, or null if either ZIP couldn't be resolved. */
+  distanceMiles: number | null;
 }
 
 export interface MatchResult {
@@ -149,7 +154,6 @@ export function matchPainters(
   marketPrice: number,
   guaranteedPrice: number,
 ): MatchResult {
-  const jobZipPrefix = ctx.zipCode?.substring(0, 3) ?? '';
   const jobSpecialties = jobSpecialtiesFromCtx(ctx);
 
   // 1. Score & price every painter (deterministic).
@@ -158,18 +162,17 @@ export function matchPainters(
     const reasons: string[] = [];
     let score = 0;
 
-    // Area match (heavy weight)
-    if (jobZipPrefix && profile.serviceZipPrefixes.includes(jobZipPrefix)) {
-      score += 50;
-      reasons.push('serves your area');
-    } else {
-      const sameState = ctx.state && p.state.toLowerCase() === ctx.state.toLowerCase();
-      if (sameState) {
-        score += 15;
-        reasons.push(`${p.state}-based`);
-      } else {
-        score += 2;
-      }
+    const distanceMiles = ctx.zipCode ? zipDistanceMiles(ctx.zipCode, p.zip_code) : null;
+
+    // Area match (heavy weight) — real distance, not ZIP-prefix guesswork.
+    if (distanceMiles !== null && distanceMiles <= SERVICE_RADIUS_MILES) {
+      score += 50 - Math.min(distanceMiles, 40); // closer painters within the radius score higher
+      reasons.push(distanceMiles < 5 ? 'right in your area' : `~${Math.round(distanceMiles)} mi away`);
+    } else if (ctx.state && p.state.toLowerCase() === ctx.state.toLowerCase()) {
+      // Doesn't pass the service-radius gate below, but still worth a small
+      // score bump in case nobody in the whole roster is actually close.
+      score += 10;
+      reasons.push(`${p.state}-based`);
     }
 
     // Specialty match
@@ -198,17 +201,16 @@ export function matchPainters(
     const painterPrice = Math.round(marketPrice * TIER_PRICE_FACTOR[profile.rateTier]);
     const priceDelta = (painterPrice - guaranteedPrice) / guaranteedPrice;
 
-    return { painter: p, score, reasons, painterPrice, priceDelta };
+    return { painter: p, score, reasons, painterPrice, priceDelta, distanceMiles };
   });
 
-  // 2. Area/specialty gate: painter must actually be able to do the job.
-  //    (If we have no zip match and no shared state, they're out.)
-  const serviceable = scored.filter((m) => {
-    const profile = profileFor(m.painter);
-    const zipServed = jobZipPrefix && profile.serviceZipPrefixes.includes(jobZipPrefix);
-    const stateOk = ctx.state && m.painter.state.toLowerCase() === ctx.state.toLowerCase();
-    return zipServed || stateOk || !ctx.state; // if no zip/state known yet, let everyone pass
-  });
+  // 2. Area gate: painter must actually be within the service radius of the
+  //    job. No wrong-side-of-the-country results — if nobody qualifies, the
+  //    caller shows a "we'll find you one" message instead of an empty or
+  //    (worse) irrelevant list.
+  const serviceable = scored.filter(
+    (m) => m.distanceMiles !== null && m.distanceMiles <= SERVICE_RADIUS_MILES,
+  );
 
   // 3. Price gate: drop painters whose price falls wildly outside the guaranteed price.
   const inBand = serviceable.filter(
