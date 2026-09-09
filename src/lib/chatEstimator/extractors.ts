@@ -107,7 +107,7 @@ export function extractRooms(text: string): string[] {
     [/\bmaster\s+bath(?:room)?\b/, 'bathroom_master'],
     [/\bhalf\s+bath(?:room)?\b|\bpowder\s+room\b/, 'bathroom_3'],
     [/\bbath(?:room)?\b/, 'bathroom_2'],
-    [/\boffice\b|\bden\b|\bstudy\b/, 'office'],
+    [/\boffice\b(?!\s*(?:building|complex|tower|park|space|suite))|\bden\b|\bstudy\b/, 'office'],
     [/\blaundry\b|\bmud(?:room| room)\b/, 'laundry'],
     [/\bhall(?:way)?\b|\bcorridor\b/, 'hallway'],
     [/\bentry(?:way)?\b|\bfoyer\b/, 'entryway'],
@@ -205,7 +205,7 @@ export function extractPropertyType(text: string): 'residential' | 'rental' | 'm
   if (/\b(multi[\s-]?unit|apartment (?:complex|building)|\d+[\s-]?unit building|several units|multiple units)\b/.test(t)) {
     return 'multi_unit';
   }
-  if (/\b(commercial (?:space|property|building)|office space|retail (?:store|space)|warehouse|storefront)\b/.test(t)) {
+  if (/\b(commercial (?:space|property|building)|office (?:space|building|park|tower|suite|complex)|retail (?:store|space)|warehouse|storefront)\b/.test(t)) {
     return 'commercial';
   }
   if (/\b(rental|tenants?|landlord|renting it out|investment propert(?:y|ies)|airbnb|between tenants|turnover unit)\b/.test(t)) {
@@ -228,6 +228,18 @@ export function extractTimeline(text: string): 'asap' | 'this_month' | 'no_rush'
   }
   if (/\b(this month|within a month|next few weeks|couple weeks)\b/.test(t)) {
     return 'this_month';
+  }
+  return null;
+}
+
+/** Commercial jobs needing night/weekend scheduling to avoid disrupting business — a real scheduling premium. */
+export function extractAfterHoursRequired(text: string): 'yes' | 'no' | null {
+  const t = text.toLowerCase();
+  if (/\b(after[\s-]?hours|nights?\s+(?:and|or)?\s*weekends?|weekends? only|can'?t (?:be )?disrupt|while (?:we'?re )?closed|outside business hours)\b/.test(t)) {
+    return 'yes';
+  }
+  if (/\b(daytime is fine|during the day is fine|normal hours (?:are )?fine|business hours (?:are )?fine)\b/.test(t)) {
+    return 'no';
   }
   return null;
 }
@@ -867,6 +879,12 @@ export function extractAll(text: string, prev: EstimatorContext): ExtractResult 
     if (timeline === 'asap') acks.push('ASAP');
   }
 
+  const afterHours = extractAfterHoursRequired(text);
+  if (afterHours && !prev.afterHoursRequired) {
+    patch.afterHoursRequired = afterHours;
+    if (afterHours === 'yes') acks.push('after-hours scheduling');
+  }
+
   const yearBuilt = extractYearBuilt(text);
   if (yearBuilt && !prev.yearBuilt) {
     patch.yearBuilt = yearBuilt;
@@ -1013,6 +1031,7 @@ export function extractAll(text: string, prev: EstimatorContext): ExtractResult 
     patch.interiorScope = 'whole_house';
     acks.push('whole unit');
   }
+
 
   // Exterior architectural features
   const ext = extractExteriorFeatures(text);

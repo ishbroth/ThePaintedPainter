@@ -26,7 +26,7 @@ export function makeInitialContext(): EstimatorContext {
     multiTripRequired: '', specialEquipment: 'none', fixtureRemoval: 'none',
     hardwareReplacement: 'no', lowVocRequested: 'no',
     squareFeet: null, stories: null, ceilingHeight: 'standard', occupancy: '',
-    utilities: 'yes', hoa: 'no', timeline: '',
+    utilities: 'yes', hoa: 'no', timeline: '', afterHoursRequired: '',
     contactName: '', contactPhone: '', contactEmail: '', contactNotes: '',
     projectCondition: '', hasStainedWood: 'no', bedroomCount: null,
     trimCondition: 'existing_good', wallTexture: 'smooth', doorMaterial: 'wood',

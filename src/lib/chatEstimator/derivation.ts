@@ -33,10 +33,16 @@ export function derive(ctx: EstimatorContext, transcript: string): Derivation[] 
   // ——————————————————————————————————————————
   // Project type from room mentions
   // ——————————————————————————————————————————
+  // "office" alone means a home office room, but "office building/complex/
+  // tower/park/space/suite" means a commercial property — not a residential
+  // room mention at all (that was misreading "I have a small office
+  // building" as implying an interior home-office room).
+  const mentionsHomeOffice =
+    /\boffice\b(?!\s*(?:building|complex|tower|park|space|suite))/.test(t) && !/\bcommercial\b/.test(t);
   const mentionsIndoorRoom =
-    /\b(room|rooms|bedroom|bathroom|kitchen|living room|dining|hallway|closet|pantry|nursery|office|den|foyer|mudroom|laundry room|apartment|apt\.?|condo(?:minium)?|duplex|rental unit|the unit|my unit|staircase|stairway|door frames?|door jambs?|cabinet interiors?|wainscoting|crown molding|baseboards?)\b/.test(
+    /\b(room|rooms|bedroom|bathroom|kitchen|living room|dining|hallway|closet|pantry|nursery|den|foyer|mudroom|laundry room|apartment|apt\.?|condo(?:minium)?|duplex|rental unit|the unit|my unit|staircase|stairway|door frames?|door jambs?|cabinet interiors?|wainscoting|crown molding|baseboards?)\b/.test(
       t,
-    );
+    ) || mentionsHomeOffice;
   const mentionsExteriorSurface =
     /\b(siding|stucco|hardie|shiplap|clapboard|concrete block|cinder block|aluminum siding|fascia|soffit|eaves|gutter|exterior|outside|outdoor|deck|fence|picket fence|shed|garage door|driveway|patio|overhang|porch|balcony|balconies|foundation walls|window frames|window trim|entry door)\b/.test(t);
 
@@ -82,6 +88,18 @@ export function derive(ctx: EstimatorContext, transcript: string): Derivation[] 
       out.push({
         patch: { interiorScope: 'whole_house' },
         reason: 'Rental unit/apartment phrasing → whole unit, not a single room',
+      });
+    } else if (
+      (ctx.propertyType === 'commercial' || ctx.propertyType === 'multi_unit') &&
+      ctx.selectedRooms.length === 0
+    ) {
+      // A commercial building or multi-unit property doesn't fit the
+      // residential bedroom/living-room/kitchen room picker at all — this
+      // runs regardless of whether the LLM or the local fallback set
+      // propertyType, since derive() always runs after either extraction path.
+      out.push({
+        patch: { interiorScope: 'whole_house' },
+        reason: 'Commercial/multi-unit property → whole-space scope, not a residential room picker',
       });
     } else if (/\b(couple|few|several)\s+(rooms?|bedrooms?)\b/.test(t) || ctx.selectedRooms.length >= 1) {
       out.push({

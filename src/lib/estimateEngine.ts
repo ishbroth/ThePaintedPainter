@@ -710,6 +710,12 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
     multipliers.push({ label: 'Rush Scheduling', factor: 1.10 });
   }
 
+  // After-hours/weekend work for a business — outside a normal crew
+  // schedule, so it commands a premium like any off-hours labor.
+  if (ctx.afterHoursRequired === 'yes') {
+    multipliers.push({ label: 'After-Hours/Weekend Scheduling', factor: 1.12 });
+  }
+
   // Pre-1978 construction — federal RRP rules require lead-safe work
   // practices (containment, HEPA cleanup, certified disposal) on any home
   // built before 1978, which meaningfully adds to interior prep cost.

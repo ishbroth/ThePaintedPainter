@@ -191,7 +191,7 @@ const ChatPanel = () => {
         </div>
 
         <p className="chat-input-hint">
-          Press Enter to send · Shift+Enter for a new line · Use your keyboard's mic to speak
+          Getting off track? Try "Back Up" or "Start Over"
         </p>
       </div>
     </section>

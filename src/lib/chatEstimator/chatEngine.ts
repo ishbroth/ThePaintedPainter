@@ -29,7 +29,7 @@ import {
 } from '../pricing/situations';
 import { classifyIntent, hasIntent, type Intent, type IntentResult } from './intents';
 import { derive, applyDerivations } from './derivation';
-import { pickNextTopic, findTopic, metaBank, type Topic } from './topics';
+import { pickNextTopic, pickRetryTopic, findTopic, metaBank, type Topic } from './topics';
 import { extractWithLLM } from './llmClient';
 import { makeInitialContext } from './defaultContext';
 
@@ -48,16 +48,36 @@ export interface ChatMessage {
   ackChips?: string[];
 }
 
+/** A restorable snapshot of everything EXCEPT the visible chat history, so
+ * "back up" can undo the last exchange's effect on state without erasing
+ * what was actually said. Deliberately plain/JSON-safe (lastBotTopicId, not
+ * the Topic object) — see the lastBotTopic serialization note below. */
+export interface ChatSnapshot {
+  ctx: EstimatorContext;
+  transcript: string;
+  askedIds: string[];
+  retriedIds: string[];
+  lastBotTopicId: string | null;
+  wrapupAsked: boolean;
+}
+
 export interface ChatState {
   ctx: EstimatorContext;
   history: ChatMessage[];
   transcript: string;
   askedIds: string[];
+  /** Topics that were asked but the user answered something else instead —
+   * circled back to once, before giving up and falling to the generic
+   * wrap-up "what's missing" prompt instead of asking forever. */
+  retriedIds: string[];
   /** The last topic the bot asked about, for clarification replies. */
   lastBotTopic: Topic | null;
   /** Has the bot invited a final-wrap-up check? */
   wrapupAsked: boolean;
   finalEstimate: ChatResult | null;
+  /** State from immediately before the last processed message, restorable
+   * via "back up". Single-level undo only (no redo/multi-step). */
+  undoSnapshot: ChatSnapshot | null;
 }
 
 export interface ChatResult {
@@ -86,9 +106,11 @@ export function makeInitialState(): ChatState {
     ],
     transcript: '',
     askedIds: [],
+    retriedIds: [],
     lastBotTopic: null,
     wrapupAsked: false,
     finalEstimate: null,
+    undoSnapshot: null,
   };
 }
 
@@ -99,7 +121,7 @@ export function makeInitialState(): ChatState {
 // check, a schema change (a field added/removed/repurposed) could silently
 // load a subtly-incompatible object and misbehave in ways that are hard to
 // trace back to "the browser had stale storage."
-const CHAT_STATE_SCHEMA_VERSION = 2;
+const CHAT_STATE_SCHEMA_VERSION = 4;
 
 /**
  * `lastBotTopic` is a `Topic` object with live function properties (ask,
@@ -181,10 +203,63 @@ async function understand(
   return { intent, patch: extracted.patch, acknowledgements: extracted.acknowledgements };
 }
 
+// Deliberately a local, zero-cost regex check — not routed through the LLM
+// at all — so "back up" always works instantly and for free regardless of
+// how the model would classify it.
+const BACK_UP_RE = /^(back\s*up|go\s*back|undo(?:\s+that)?|previous\s+question)[\s.!?]*$/i;
+
+function snapshotOf(state: ChatState): ChatSnapshot {
+  return {
+    ctx: state.ctx,
+    transcript: state.transcript,
+    askedIds: state.askedIds,
+    retriedIds: state.retriedIds,
+    lastBotTopicId: state.lastBotTopic?.id ?? null,
+    wrapupAsked: state.wrapupAsked,
+  };
+}
+
 export async function handleUserMessage(state: ChatState, userText: string): Promise<TurnResult> {
   const trimmed = userText.trim();
   if (!trimmed) return { state, done: null };
 
+  if (BACK_UP_RE.test(trimmed)) {
+    const userMsg: ChatMessage = { role: 'user', text: trimmed, timestamp: Date.now() };
+    if (!state.undoSnapshot) {
+      return {
+        state: {
+          ...state,
+          history: [...state.history, userMsg, botMessage("We're right at the start — nothing to back up to yet.")],
+        },
+        done: null,
+      };
+    }
+    const snap = state.undoSnapshot;
+    const restoredTopic = snap.lastBotTopicId ? findTopic(snap.lastBotTopicId) : null;
+    const reask = restoredTopic
+      ? restoredTopic.ask(snap.ctx) + (restoredTopic.chips ? `  (${restoredTopic.chips(snap.ctx)!.join(' · ')})` : '')
+      : "What do you need painted?";
+    const restored: ChatState = {
+      ...state,
+      ctx: snap.ctx,
+      transcript: snap.transcript,
+      askedIds: snap.askedIds,
+      retriedIds: snap.retriedIds,
+      lastBotTopic: restoredTopic,
+      wrapupAsked: snap.wrapupAsked,
+      finalEstimate: null,
+      undoSnapshot: null, // single-level undo — no redo, no chained back-ups
+      history: [...state.history, userMsg, botMessage("No problem — backing up. " + reask)],
+    };
+    return { state: restored, done: null };
+  }
+
+  const preTurnSnapshot = snapshotOf(state);
+  const result = await processMessage(state, trimmed);
+  return { ...result, state: { ...result.state, undoSnapshot: preTurnSnapshot } };
+}
+
+async function processMessage(state: ChatState, trimmed: string): Promise<TurnResult> {
   // 1. Understand the message (LLM first, local rules engine as fallback),
   //    then apply derivations against the full transcript
   const { intent, patch, acknowledgements } = await understand(trimmed, state);
@@ -222,42 +297,12 @@ export async function handleUserMessage(state: ChatState, userText: string): Pro
     transcript: newTranscript,
   };
 
-  // 2. Handle meta questions / clarifications before advancing topics
-  const metaReply = metaAnswer(intent.intents, s.lastBotTopic, s);
-  if (metaReply) {
-    s = { ...s, history: [...s.history, botMessage(metaReply)] };
-    // After answering a meta question, re-ask the topic we were on (if any)
-    // so the user can continue where they left off.
-    if (s.lastBotTopic) {
-      const refocus =
-        "Anyway — " + s.lastBotTopic.ask(s.ctx).charAt(0).toLowerCase() +
-        s.lastBotTopic.ask(s.ctx).slice(1);
-      s = { ...s, history: [...s.history, botMessage(refocus)] };
-    }
-    return { state: s, done: null };
-  }
-
-  // 3. Frustration / greeting / restart
-  if (hasIntent(intent, 'frustration')) {
-    // Acknowledge, but do NOT dead-end here — nothing was actually reset,
-    // so falling through to the normal topic-advance logic below keeps the
-    // conversation moving instead of risking a repeated "sorry" loop if the
-    // next message also reads as frustrated.
-    s = { ...s, history: [...s.history, botMessage(metaBank.frustration())] };
-  } else if (hasIntent(intent, 'greeting') && s.askedIds.length === 0 && Object.keys(patch).length === 0) {
-    // Only treat this as a bare "hi" with nothing else in it. A message like
-    // "hi, I need a 3 bedroom house painted" also gets tagged with the
-    // greeting intent (it does start with "hi"), but it has real job details
-    // that must not be thrown away in favor of a canned "what do you need
-    // painted?" — that reads as the bot completely ignoring what was just said.
-    s = { ...s, history: [...s.history, botMessage(metaBank.greeting())] };
-    return { state: s, done: null };
-  }
-  if (hasIntent(intent, 'restart')) {
-    return { state: makeInitialState(), done: null };
-  }
-
-  // 4. Ready-to-finish — jump to finalize if we have enough
+  // 2. Ready-to-finish — jump to finalize if we have enough. Checked BEFORE
+  // the softer meta-chatter checks below (step 3): terse phrases like "run
+  // it" have occasionally also been tagged with something like "deflection"
+  // or "ask_clarification" by the model, and since those are checked first
+  // they'd otherwise win and produce a reply that has nothing to do with
+  // the user clearly signaling they're ready to see a price.
   if (hasIntent(intent, 'ready_to_finish')) {
     if (readyToQuote(ctxNext)) {
       return finalizeTurn(s);
@@ -274,10 +319,57 @@ export async function handleUserMessage(state: ChatState, userText: string): Pro
         botMessage(`Before I run the numbers I need one more thing: ${missing}`),
       ],
     };
+  } else {
+    // 3. Handle meta questions / clarifications before advancing topics
+    const metaReply = metaAnswer(intent.intents, s.lastBotTopic, s, Object.keys(patch).length > 0);
+    if (metaReply) {
+      s = { ...s, history: [...s.history, botMessage(metaReply)] };
+      // After answering a meta question, re-ask the topic we were on (if any)
+      // so the user can continue where they left off.
+      if (s.lastBotTopic) {
+        const refocus =
+          "Anyway — " + s.lastBotTopic.ask(s.ctx).charAt(0).toLowerCase() +
+          s.lastBotTopic.ask(s.ctx).slice(1);
+        s = { ...s, history: [...s.history, botMessage(refocus)] };
+      }
+      return { state: s, done: null };
+    }
+
+    // 4. Frustration / greeting / restart
+    if (hasIntent(intent, 'frustration')) {
+      // Acknowledge, but do NOT dead-end here — nothing was actually reset,
+      // so falling through to the normal topic-advance logic below keeps the
+      // conversation moving instead of risking a repeated "sorry" loop if the
+      // next message also reads as frustrated.
+      s = { ...s, history: [...s.history, botMessage(metaBank.frustration())] };
+    } else if (hasIntent(intent, 'greeting') && s.askedIds.length === 0 && Object.keys(patch).length === 0) {
+      // Only treat this as a bare "hi" with nothing else in it. A message like
+      // "hi, I need a 3 bedroom house painted" also gets tagged with the
+      // greeting intent (it does start with "hi"), but it has real job details
+      // that must not be thrown away in favor of a canned "what do you need
+      // painted?" — that reads as the bot completely ignoring what was just said.
+      s = { ...s, history: [...s.history, botMessage(metaBank.greeting())] };
+      return { state: s, done: null };
+    }
+    if (hasIntent(intent, 'restart')) {
+      return { state: makeInitialState(), done: null };
+    }
   }
 
   // 5. Handle negation / confirmation in the context of the last topic
-  if (hasIntent(intent, 'negation') && s.lastBotTopic) {
+  //
+  // Only treat "negation" as answering the LAST topic's yes/no question when
+  // the message isn't also correcting something more fundamental. A message
+  // like "not inside, outside" reads as negation (it does negate something)
+  // but is actually correcting projectType/propertyType/scope, not answering
+  // whatever the last topic asked — firing the canned "okay, just walls
+  // then" reply for that would be a non-sequitur that has nothing to do with
+  // what was actually said.
+  const isMajorCorrection =
+    patch.projectType !== undefined ||
+    patch.propertyType !== undefined ||
+    patch.interiorScope !== undefined;
+  if (hasIntent(intent, 'negation') && s.lastBotTopic && !isMajorCorrection) {
     const reply = metaBank.negation_after_topic(s.lastBotTopic.id);
     s = { ...s, history: [...s.history, botMessage(reply)] };
     // Fall through to topic advance
@@ -297,9 +389,27 @@ export async function handleUserMessage(state: ChatState, userText: string): Pro
     return finalizeTurn(s);
   }
 
-  // 7. Pick the next topic; if none, invite wrap-up then finalize
+  // 7. Pick the next topic; if none, try circling back to anything asked but
+  // never satisfactorily answered; if that's also exhausted, invite wrap-up
+  // then finalize.
   const next = pickNextTopic(ctxNext, s.askedIds);
   if (!next) {
+    const retry = pickRetryTopic(ctxNext, s.askedIds, s.retriedIds);
+    if (retry) {
+      const chips = retry.chips?.(ctxNext);
+      const question = retry.ask(ctxNext);
+      const retryPrompt =
+        (acknowledgements.length > 0 ? `${ACK_LEAD_INS[s.askedIds.length % ACK_LEAD_INS.length]} ${acknowledgements.join(', ')}. ` : '') +
+        `Circling back — I don't think I got this one: ${question.charAt(0).toLowerCase()}${question.slice(1)}` +
+        (chips ? `  (${chips.join(' · ')})` : '');
+      s = {
+        ...s,
+        retriedIds: [...s.retriedIds, retry.id],
+        lastBotTopic: retry,
+        history: [...s.history, botMessage(retryPrompt)],
+      };
+      return { state: s, done: null };
+    }
     if (!s.wrapupAsked) {
       s = {
         ...s,
@@ -342,6 +452,7 @@ function metaAnswer(
   intents: Intent[],
   lastTopic: Topic | null,
   state: ChatState,
+  hasSubstantiveInfo: boolean,
 ): string | null {
   if (intents.includes('meta_cost')) return metaBank.cost();
   if (intents.includes('meta_how_it_works')) return metaBank.how_it_works();
@@ -355,13 +466,20 @@ function metaAnswer(
   if (intents.includes('recommend_question')) return metaBank.recommend_question();
   if (intents.includes('off_topic')) return metaBank.off_topic();
 
-  if (intents.includes('ask_clarification')) {
-    if (lastTopic) return lastTopic.clarify(state.ctx);
-    return "What would you like me to clarify? Say more and I'll help.";
-  }
-  if (intents.includes('ask_example')) {
-    if (lastTopic) return lastTopic.example(state.ctx);
-    return "Tell me what part you'd like an example of and I'll walk through it.";
+  // A message that actually extracted real job facts (e.g. "4000 square
+  // feet") is not a confused user asking for clarification or an example,
+  // even if the classifier also tagged it that way — skip these two so the
+  // reply doesn't ignore the info just given in favor of a tangential
+  // "here's what that means" explainer.
+  if (!hasSubstantiveInfo) {
+    if (intents.includes('ask_clarification')) {
+      if (lastTopic) return lastTopic.clarify(state.ctx);
+      return "What would you like me to clarify? Say more and I'll help.";
+    }
+    if (intents.includes('ask_example')) {
+      if (lastTopic) return lastTopic.example(state.ctx);
+      return "Tell me what part you'd like an example of and I'll walk through it.";
+    }
   }
 
   if (intents.includes('deflection')) {
@@ -449,6 +567,8 @@ const MULTIPLIER_EXPLANATIONS: Record<string, string> = {
     "Commercial space runs a bit higher — different insurance and scheduling needs than a residential job.",
   'Rush Scheduling':
     "I added a rush-scheduling premium since you need this done fast — that usually means pulling a crew off another job.",
+  'After-Hours/Weekend Scheduling':
+    "Since this needs to happen after hours or on weekends to avoid disrupting the business, I've included a scheduling premium for that.",
   'Pre-1978 Lead-Safe Practices':
     "Since the home predates 1978, I've included EPA-required lead-safe prep — that's the law, not optional, and it adds a bit to the cost.",
   'Difficult Access':

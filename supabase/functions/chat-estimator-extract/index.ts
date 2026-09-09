@@ -90,11 +90,15 @@ const UPDATE_TOOL = {
       stories: { type: 'integer', enum: [1, 2, 3], description: 'Number of stories of the building, if mentioned.' },
       propertyType: {
         type: 'string', enum: ['residential', 'rental', 'multi_unit', 'commercial'],
-        description: 'Who occupies it and why that changes pricing: "residential" = owner lives there (default assumption, standard finish quality). "rental" = a landlord\'s rental/investment unit — these get a price DISCOUNT because rentals don\'t need showroom-perfect finish. "multi_unit" = an apartment building/complex with multiple units — gets a volume DISCOUNT. "commercial" = office/retail/warehouse — costs MORE due to insurance/scheduling overhead. Only set when the message actually implies ownership/use, not just building type.',
+        description: 'Who occupies it and why that changes pricing: "residential" = owner lives there (default assumption, standard finish quality). "rental" = a landlord\'s rental/investment unit — these get a price DISCOUNT because rentals don\'t need showroom-perfect finish. "multi_unit" = an apartment building/complex with multiple units — gets a volume DISCOUNT. "commercial" = office/retail/warehouse — costs MORE due to insurance/scheduling overhead. Only set when the message actually implies ownership/use, not just building type. Note: "an office building" or "office space" means commercial — do NOT confuse with someone\'s home office ROOM (which is just a residential room, selectedRooms: "office").',
       },
       timeline: {
         type: 'string', enum: ['asap', 'this_month', 'no_rush'],
         description: '"asap" = rush job, needed urgently — this adds a rush-scheduling premium since it usually means pulling a crew off another job. "no_rush" = flexible, no discount but no premium either. "this_month" = normal near-term timing.',
+      },
+      afterHoursRequired: {
+        type: 'string', enum: ['yes', 'no'],
+        description: 'For a COMMERCIAL job: "yes" if the work needs to happen after hours/nights/weekends so it doesn\'t disrupt business operations — this is a real scheduling premium, like any off-hours labor. "no" if daytime/normal hours are fine.',
       },
       yearBuilt: {
         type: 'integer',
@@ -110,7 +114,7 @@ const UPDATE_TOOL = {
       },
       projectType: {
         type: 'string', enum: ['interior', 'exterior', 'both'],
-        description: 'Infer confidently: a rental unit/apartment/condo/duplex/studio repaint is almost always interior; siding/deck/fence/garage-door/roofline mentions are exterior.',
+        description: 'ONLY set this when the message actually signals interior vs exterior — either the word itself, specific ROOMS (implies interior), or specific EXTERIOR surfaces (siding/deck/fence/garage-door/roofline — implies exterior). A rental unit/apartment/condo/duplex/studio repaint is almost always interior (living units don\'t typically include exterior work). But a bare "I need my house/building/property painted" with NO further qualifier is genuinely ambiguous — leave projectType UNSET in that case so the bot asks directly, rather than guessing. Guessing wrong here derails the whole conversation (it leads to asking interior-only questions about an exterior-only job, or vice versa).',
       },
       projectCondition: { type: 'string', enum: ['repaint', 'new_construction', 'renovation'] },
       interiorScope: {
@@ -243,6 +247,8 @@ const SYSTEM_PROMPT = `You are the natural-language understanding layer for a ho
 
 Rules:
 - Only include fields the LATEST message gives new information for. Do not repeat facts already known (see "Already known" below) unless the user is clearly correcting or changing a prior answer.
+- "ready_to_finish" means the user wants a price NOW, regardless of what the last question asked — "run it", "just run the numbers", "go ahead", "that's it", "I'm done", "give me a price", "show me the number". This is an unambiguous, high-priority signal — treat it as ready_to_finish even if it doesn't seem to directly answer whatever was just asked. Do NOT classify these as ask_clarification just because they don't address the last question.
+- "ask_clarification" is ONLY for a user who is genuinely confused and wants you to re-explain something — "what do you mean?", "like what?", "I don't understand". A short reply that simply doesn't engage with the last question (e.g. "sounds good", "run it", "ok whatever") is NOT clarification-seeking — if it carries no new job info either, it's closer to a mild confirmation/filler; don't invent an intent for it beyond provide_info.
 - Be decisive about implied scope: "2 bed 1 bath", "4 bed 3 bath", "a rental unit", "an apartment", "a studio", "the whole place" all describe the WHOLE property, not a single room — set interiorScope to "whole_house" and do NOT add a room to selectedRooms just because "bath" or "bed" appears in a count.
 - If the bot's last question directly asked "interior, exterior, or both?" and the user answers with just one of those words (or an unambiguous synonym), set projectType to EXACTLY that word. Do not upgrade a plain "exterior" (or "interior") answer to "both" based on other fields appearing in "Already known" — those are separate facts already gathered, not a signal that the OTHER side of the job is also in scope.
 - Only populate selectedRooms when the user names specific rooms while implying others are excluded (e.g. "just the kitchen and master bedroom").

@@ -100,6 +100,7 @@ function sanitize(raw: Record<string, unknown>, prev: EstimatorContext): Partial
 
   if (isEnum(raw.propertyType, ['residential', 'rental', 'multi_unit', 'commercial'] as const)) patch.propertyType = raw.propertyType;
   if (isEnum(raw.timeline, ['asap', 'this_month', 'no_rush'] as const)) patch.timeline = raw.timeline;
+  if (isEnum(raw.afterHoursRequired, ['yes', 'no'] as const)) patch.afterHoursRequired = raw.afterHoursRequired;
   if (isEnum(raw.accessRestrictions, ['some', 'significant'] as const)) patch.accessRestrictions = raw.accessRestrictions;
   if (isEnum(raw.hoa, ['yes', 'no'] as const)) patch.hoa = raw.hoa;
 

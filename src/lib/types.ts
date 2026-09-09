@@ -90,6 +90,7 @@ export interface EstimatorContext {
   utilities: string; // yes, no
   hoa: string; // yes, no, skip
   timeline: string; // '' (unasked), asap, this_month, no_rush
+  afterHoursRequired: string; // '' (unasked), yes, no — commercial jobs needing night/weekend scheduling to avoid disrupting business
 
   // Contact
   contactName: string;
