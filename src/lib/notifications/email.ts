@@ -1,12 +1,8 @@
 /**
  * Email Notification Integration (Resend)
  *
- * Groundwork for sending transactional emails via Resend.
- * These will be triggered by Supabase Edge Functions or database triggers.
- *
- * TODO: Set up Resend account and API key
- * TODO: Create Supabase Edge Function for sending emails
- * TODO: Set up email templates
+ * Sends transactional emails via the `send-email` Supabase Edge Function,
+ * which relays them through Resend.
  *
  * Email Types:
  *
@@ -23,7 +19,12 @@
  * - new_review: "You received a new [X]-star review"
  * - payment_received: "Payment of $[amount] has been processed"
  * - deal_expiring: "Your deal '[title]' expires in 3 days"
+ *
+ * INTERNAL:
+ * - painter_application_received: "New painter application received"
  */
+
+import { supabase } from '../supabase';
 
 export type EmailType =
   | 'estimate_ready'
@@ -35,7 +36,8 @@ export type EmailType =
   | 'offer_accepted'
   | 'new_review'
   | 'payment_received'
-  | 'deal_expiring';
+  | 'deal_expiring'
+  | 'painter_application_received';
 
 export interface EmailPayload {
   to: string;
@@ -53,18 +55,18 @@ export interface EmailPayload {
  *     data: { painterName: 'ABC Painting', projectDate: '2026-04-15' }
  *   });
  */
-export async function sendEmail(_payload: EmailPayload): Promise<{ success: boolean; error?: string }> {
-  // TODO: Implement via Supabase Edge Function
-  // const { data, error } = await supabase.functions.invoke('send-email', {
-  //   body: payload,
-  // });
-  //
-  // if (error) {
-  //   return { success: false, error: error.message };
-  // }
-  //
-  // return { success: true };
+export async function sendEmail(payload: EmailPayload): Promise<{ success: boolean; error?: string }> {
+  const { data, error } = await supabase.functions.invoke('send-email', {
+    body: payload,
+  });
 
-  console.log('Email sending not yet configured');
-  return { success: false, error: 'Email service not configured' };
+  if (error) {
+    return { success: false, error: error.message };
+  }
+
+  if (data?.error) {
+    return { success: false, error: data.error };
+  }
+
+  return { success: true };
 }

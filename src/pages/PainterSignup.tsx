@@ -2,6 +2,9 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
+import { sendEmail } from '../lib/notifications/email';
+
+const APPLICATION_NOTIFICATION_EMAIL = 'iw@thepaintedpainter.com';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -577,7 +580,28 @@ const PainterSignup = () => {
 
       if (insertError) throw insertError;
 
-      // 3. Redirect to painter dashboard
+      // 3. Notify the team of the new application (best-effort — don't block signup on it)
+      sendEmail({
+        to: APPLICATION_NOTIFICATION_EMAIL,
+        type: 'painter_application_received',
+        data: {
+          companyName: formData.companyName.trim(),
+          ownerName: formData.ownerName.trim(),
+          applicantEmail: formData.email.trim(),
+          phone: formData.phone.trim(),
+          city: formData.city.trim(),
+          state: formData.state,
+          zipCode: formData.zipCode.trim(),
+          serviceTypes: formData.serviceTypes.join(', '),
+          yearsInBusiness: formData.yearsInBusiness ?? 'N/A',
+          crewSize: formData.crewSize ?? 'N/A',
+          hasLicense: formData.hasLicense ? 'Yes' : 'No',
+          isInsured: formData.isInsured ? 'Yes' : 'No',
+          isBonded: formData.isBonded ? 'Yes' : 'No',
+        },
+      }).catch((err) => console.error('Failed to send application notification email:', err));
+
+      // 4. Redirect to painter dashboard
       navigate('/painter/dashboard');
     } catch (err: unknown) {
       const message =

@@ -34,6 +34,7 @@ const EMAIL_TYPE_MAP: Record<string, string> = {
   new_review:        'You received a new review',
   payment_received:  'Payment processed',
   deal_expiring:     'Your deal is expiring soon',
+  painter_application_received: 'New painter application received',
 }
 
 // The sender address for all outgoing emails
@@ -181,6 +182,22 @@ function buildEmailHtml(type: string, data: Record<string, unknown>): string {
         <p>Your deal for <strong>${projectName}</strong> is expiring soon${data.expiresAt ? ` on <strong>${data.expiresAt}</strong>` : ''}.</p>
         <p>Don't miss out — lock in your price before it expires.</p>
         ${data.dealUrl ? `<p><a class="btn" href="${data.dealUrl}">Secure Your Deal</a></p>` : ''}
+      `)
+
+    case 'painter_application_received':
+      return wrap(`
+        <p>A new painter has applied to join the network.</p>
+        <p>
+          <strong>${data.companyName || 'Unknown Company'}</strong><br />
+          Owner: ${data.ownerName || 'N/A'}<br />
+          Email: ${data.applicantEmail || 'N/A'}<br />
+          Phone: ${data.phone || 'N/A'}<br />
+          Location: ${data.city || 'N/A'}, ${data.state || 'N/A'} ${data.zipCode || ''}
+        </p>
+        ${data.serviceTypes ? `<p>Services: ${data.serviceTypes}</p>` : ''}
+        <p>Years in business: ${data.yearsInBusiness ?? 'N/A'} &middot; Crew size: ${data.crewSize ?? 'N/A'}</p>
+        <p>Licensed: ${data.hasLicense ?? 'N/A'} &middot; Insured: ${data.isInsured ?? 'N/A'} &middot; Bonded: ${data.isBonded ?? 'N/A'}</p>
+        <p>Log in to the admin dashboard to review and approve this application.</p>
       `)
 
     default:
