@@ -71,7 +71,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
     role: 'painter' | 'customer',
     displayName?: string
   ) => {
-    const { data, error } = await supabase.auth.signUp({ email, password });
+    // role/display_name travel in as auth user_metadata; a DB trigger
+    // (handle_new_user, see migrations) creates the public.profiles row
+    // server-side from it. We can't reliably insert that row from the
+    // client here: this project requires email confirmation, so signUp()
+    // returns a user with no active session yet — an insert attempted at
+    // this point has no auth.uid() and RLS rejects it.
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { role, display_name: displayName ?? null } },
+    });
 
     if (error) {
       return { error: new Error(error.message), user: null };
@@ -80,18 +90,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const newUser = data.user;
     if (!newUser) {
       return { error: new Error('Sign up succeeded but no user was returned'), user: null };
-    }
-
-    // Insert profile row with the chosen role
-    const { error: profileError } = await supabase.from('profiles').insert({
-      id: newUser.id,
-      role,
-      display_name: displayName ?? null,
-    });
-
-    if (profileError) {
-      console.error('Error creating profile:', profileError.message);
-      return { error: new Error(profileError.message), user: newUser };
     }
 
     return { error: null, user: newUser };
