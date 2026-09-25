@@ -39,12 +39,17 @@ export function derive(ctx: EstimatorContext, transcript: string): Derivation[] 
   // building" as implying an interior home-office room).
   const mentionsHomeOffice =
     /\boffice\b(?!\s*(?:building|complex|tower|park|space|suite))/.test(t) && !/\bcommercial\b/.test(t);
+  // Cabinets, vanities, fireplaces, built-ins, attics, and basements are
+  // never exterior surfaces in a house-painting context — unlike "ceiling"
+  // or "trim" or "railings", which legitimately exist on both sides (porch
+  // ceilings, exterior trim, deck railings), so those stay ambiguous on
+  // purpose and are deliberately NOT in this list.
   const mentionsIndoorRoom =
-    /\b(room|rooms|bedroom|bathroom|kitchen|living room|dining|hallway|closet|pantry|nursery|den|foyer|mudroom|laundry room|apartment|apt\.?|condo(?:minium)?|duplex|rental unit|the unit|my unit|staircase|stairway|door frames?|door jambs?|cabinet interiors?|wainscoting|crown molding|baseboards?)\b/.test(
+    /\b(room|rooms|bedroom|bathroom|kitchen|living room|dining|hallway|closet|pantry|nursery|den|foyer|mudroom|laundry room|apartment|apt\.?|condo(?:minium)?|duplex|rental unit|the unit|my unit|staircase|stairway|door frames?|door jambs?|cabinets?|cabinet interiors?|vanity|vanities|wainscoting|crown molding|chair rail|baseboards?|fireplace|mantel|built[\s-]?ins?|attic|basement|popcorn ceiling)\b/.test(
       t,
     ) || mentionsHomeOffice;
   const mentionsExteriorSurface =
-    /\b(siding|stucco|hardie|shiplap|clapboard|concrete block|cinder block|aluminum siding|fascia|soffit|eaves|gutter|exterior|outside|outdoor|deck|fence|picket fence|shed|garage door|driveway|patio|overhang|porch|balcony|balconies|foundation walls|window frames|window trim|entry door)\b/.test(t);
+    /\b(siding|stucco|hardie|shiplap|clapboard|concrete block|cinder block|aluminum siding|fascia|soffit|eaves|gutter|exterior|outside|outdoor|deck|fence|picket fence|shed|garage door|driveway|patio|overhang|porch|balcony|balconies|foundation|retaining wall|window frames|window trim|entry door)\b/.test(t);
 
   if (!ctx.projectType) {
     if (mentionsIndoorRoom && !mentionsExteriorSurface) {
@@ -213,6 +218,30 @@ export function derive(ctx: EstimatorContext, transcript: string): Derivation[] 
     out.push({
       patch: { occupancy: 'vacant' },
       reason: 'Pre-move-in phrasing → vacant',
+    });
+  }
+
+  // ——————————————————————————————————————————
+  // A total square footage given without naming any specific room means the
+  // customer is describing the whole space as one number ("600 sqft of
+  // popcorn ceiling", "1800 sqft needs painting") rather than enumerating
+  // rooms — so the room-list question is redundant. Reads `ctx.projectType`/
+  // `ctx.interiorScope` through whatever this same derive() call has already
+  // decided (e.g. the popcorn-ceiling → interior rule above), not just the
+  // pre-turn value, so ordering within this function can't produce a stale
+  // read the way it would if two rules disagreed on interiorScope.
+  // ——————————————————————————————————————————
+  const projectTypeSoFar = out.reduce<string>((acc, d) => d.patch.projectType ?? acc, ctx.projectType);
+  const interiorScopeSoFar = out.reduce<string>((acc, d) => d.patch.interiorScope ?? acc, ctx.interiorScope);
+  if (
+    !interiorScopeSoFar &&
+    ctx.selectedRooms.length === 0 &&
+    ctx.squareFeet &&
+    (projectTypeSoFar === 'interior' || projectTypeSoFar === 'both')
+  ) {
+    out.push({
+      patch: { interiorScope: 'whole_house' },
+      reason: 'Square footage given without naming specific rooms → whole-space scope',
     });
   }
 

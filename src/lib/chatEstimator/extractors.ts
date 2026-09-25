@@ -116,6 +116,13 @@ export function extractRooms(text: string): string[] {
   for (const [re, key] of map) {
     if (re.test(t) && !found.includes(key)) found.push(key);
   }
+  // Bare "bedroom"/"bed" with no qualifier (no master/second/third/guest/kids
+  // prefix) isn't caught by any pattern above — checked last, and only added
+  // if no bedroom was already found, so "master bedroom" doesn't also get
+  // counted as a second, unqualified bedroom.
+  if (/\bbed(?:room)?s?\b/.test(t) && !found.some((r) => r === 'master_bedroom' || r.startsWith('bedroom'))) {
+    found.push('bedroom_3');
+  }
   return found;
 }
 
@@ -406,6 +413,10 @@ export function extractSpecialtyServices(text: string): {
   if (/\bepoxy\b.{0,20}\bgarage\b|\bgarage floor\b.{0,20}\bepoxy\b|\bepoxy (?:the )?(?:garage )?floor\b/.test(t)) out.epoxy = true;
 
   if (/\bpaint (?:this|my|the|a) (?:dresser|table|chair|cabinet piece|bookshelf|nightstand|desk)\b/.test(t)) out.furniture = true;
+  // "Patio furniture" / "outdoor furniture" etc. names a category rather than
+  // a specific item, and shows up without the "paint the X" verb phrasing
+  // the pattern above expects ("I've also got patio furniture").
+  if (/\b(?:patio|outdoor|lawn|deck)\s+furniture\b/.test(t)) out.furniture = true;
 
   return out;
 }
@@ -1157,6 +1168,17 @@ export function extractAll(text: string, prev: EstimatorContext): ExtractResult 
   const sheen = extractSheen(text);
   if (sheen) {
     patch.additionalDetails = `${prev.additionalDetails ? prev.additionalDetails + '; ' : ''}${sheen} sheen`;
+  }
+
+  // Retaining walls — always exterior (handled by derive()'s projectType
+  // inference), but there's no dedicated pricing field for them like there
+  // is for fences/decks/gutters, so surface it as a note rather than
+  // silently dropping it. Flags it for manual follow-up instead of guessing
+  // at masonry-paint pricing.
+  if (/\bretaining wall/.test(text.toLowerCase()) && !prev.additionalDetails.toLowerCase().includes('retaining wall')) {
+    const base = patch.additionalDetails ?? prev.additionalDetails;
+    patch.additionalDetails = `${base ? base + '; ' : ''}retaining wall mentioned — needs manual follow-up`;
+    acks.push('retaining wall (noted)');
   }
 
   return { patch, acknowledgements: acks };
