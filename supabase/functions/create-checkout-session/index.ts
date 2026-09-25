@@ -47,7 +47,7 @@ serve(async (req: Request) => {
     // Step 2: Parse the request body
     // The client sends the project ID, amount, description, and redirect URLs.
     // ------------------------------------------------------------------------
-    const { projectId, amount, description, successUrl, cancelUrl } = await req.json()
+    const { projectId, amount, description, successUrl, cancelUrl, kind } = await req.json()
 
     // Validate required fields
     if (!projectId || !amount || !successUrl || !cancelUrl) {
@@ -111,9 +111,13 @@ serve(async (req: Request) => {
         },
       ],
       // Store the project ID in metadata so the stripe-webhook function can
-      // look up and update the correct project when payment completes
+      // look up and update the correct project when payment completes.
+      // `kind` tells the webhook which table this projectId belongs to
+      // ('quote_selection' for the job-claim deposit flow, unset/legacy
+      // for customer_projects) since the two share no ID space.
       metadata: {
         projectId,
+        ...(kind ? { kind } : {}),
       },
       success_url: successUrl,
       cancel_url: cancelUrl,

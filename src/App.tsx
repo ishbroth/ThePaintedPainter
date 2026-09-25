@@ -12,6 +12,7 @@ import PaintersMap from './pages/PaintersMap';
 import PainterSignup from './pages/PainterSignup';
 import Support from './pages/Support';
 import PainterPublicProfile from './pages/PainterPublicProfile';
+import ConfirmJob from './pages/ConfirmJob';
 import CustomerSignIn from './pages/auth/CustomerSignIn';
 import CustomerSignUp from './pages/auth/CustomerSignUp';
 import PainterSignIn from './pages/auth/PainterSignIn';
@@ -96,6 +97,7 @@ function App() {
                 {/* New public routes */}
                 <Route path="/support" element={<Support />} />
                 <Route path="/painters/:id" element={<PainterPublicProfile />} />
+                <Route path="/confirm-job" element={<ConfirmJob />} />
 
                 {/* Auth routes */}
                 <Route path="/auth/painter-sign-in" element={<PainterSignIn />} />

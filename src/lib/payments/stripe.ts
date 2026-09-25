@@ -10,6 +10,7 @@
  */
 
 import { loadStripe, type Stripe } from '@stripe/stripe-js';
+import { supabase } from '../supabase';
 
 let stripePromise: Promise<Stripe | null> | null = null;
 
@@ -30,47 +31,50 @@ export function getStripe(): Promise<Stripe | null> {
 }
 
 /**
- * Create a checkout session for the 10% deposit payment.
+ * Create a checkout session for a job claim's 10% deposit payment.
  *
  * Flow:
- * 1. Customer selects a painter or guaranteed price
- * 2. Frontend calls this function with the project details
- * 3. This calls a Supabase Edge Function to create a Stripe Checkout Session
- * 4. Customer is redirected to Stripe Checkout
- * 5. On success, Stripe webhook updates the customer_project.deposit_paid = true
+ * 1. A painter accepts the customer's job (claim-job function)
+ * 2. The customer gets an email with a /confirm-job?token=... link
+ * 3. That page calls this function with the quote_selections id + confirm token
+ * 4. This calls the create-checkout-session Edge Function, tagging the
+ *    session metadata with kind: 'quote_selection' so the webhook knows
+ *    which table to update
+ * 5. Customer is redirected to Stripe Checkout
+ * 6. On success, the webhook marks quote_selections.deposit_status = 'paid'
+ *    and emails the painter the customer's full contact details
  *
- * @param projectId - The customer_project ID
- * @param totalAmount - The total project price
+ * @param quoteSelectionId - The quote_selections row id (Stripe metadata key)
+ * @param confirmToken - The customer_confirm_token, so success/cancel redirects land back on the same job
+ * @param totalAmount - The guaranteed price (deposit is 10% of this)
  * @param painterName - Name of the painter (for checkout description)
  * @returns The Stripe Checkout Session URL to redirect to
  */
 export async function createDepositCheckout(
-  projectId: string,
+  quoteSelectionId: string,
+  confirmToken: string,
   totalAmount: number,
   painterName: string
 ): Promise<string | null> {
-  const depositAmount = Math.round(totalAmount * 0.10 * 100); // 10% in cents
+  const depositAmount = calculateDeposit(totalAmount); // 10%, in dollars — create-checkout-session converts to cents itself
 
-  // TODO: Replace with actual Supabase Edge Function call
-  // const { data, error } = await supabase.functions.invoke('create-checkout-session', {
-  //   body: {
-  //     projectId,
-  //     amount: depositAmount,
-  //     description: `10% deposit for painting project with ${painterName}`,
-  //     successUrl: `${window.location.origin}/customer/dashboard/projects?payment=success`,
-  //     cancelUrl: `${window.location.origin}/customer/dashboard/projects?payment=cancelled`,
-  //   },
-  // });
-  //
-  // if (error || !data?.url) {
-  //   console.error('Failed to create checkout session:', error);
-  //   return null;
-  // }
-  //
-  // return data.url;
+  const { data, error } = await supabase.functions.invoke('create-checkout-session', {
+    body: {
+      projectId: quoteSelectionId,
+      amount: depositAmount,
+      description: `10% deposit for painting project with ${painterName}`,
+      kind: 'quote_selection',
+      successUrl: `${window.location.origin}/confirm-job?token=${confirmToken}&payment=success`,
+      cancelUrl: `${window.location.origin}/confirm-job?token=${confirmToken}&payment=cancelled`,
+    },
+  });
 
-  console.log('Stripe checkout not yet configured', { projectId, depositAmount, painterName });
-  return null;
+  if (error || !data?.url) {
+    console.error('Failed to create checkout session:', error);
+    return null;
+  }
+
+  return data.url;
 }
 
 /**

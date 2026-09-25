@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useLocation, Navigate, useNavigate } from 'react-router-dom';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useLocation, Navigate, useNavigate } from 'react-router-dom';
 import type { EstimatorContext, EstimateBreakdown } from '../lib/types';
 import type { Assumption } from '../lib/chatEstimator/defaultAssumptions';
 import type { MatchedSituation } from '../lib/pricing/situations';
-import { matchPainters, type PainterMatch } from '../lib/painterMatcher';
+import { fetchNearbyPainters, type RealPainterMatch } from '../lib/realPainterMatcher';
+import { buildResponseSummary, timelineLabel } from '../lib/chatEstimator/responseSummary';
+import { supabase } from '../lib/supabase';
 import { hapticMedium } from '../lib/haptics';
 import { QUOTE_RESULT_KEY, QUOTE_EXPIRES_KEY, PRICE_HOLD_MINUTES } from '../lib/chatEstimator/persistence';
 
@@ -75,13 +77,24 @@ const QuoteResults = () => {
     ? '#f5a623'
     : '#74b9ff';
 
-  const matchResult = useMemo(() => {
-    if (!state) return null;
-    const market = Math.round(state.estimate.total / 0.9);
-    return matchPainters(state.ctx, market, state.estimate.total);
+  const [painterMatches, setPainterMatches] = useState<RealPainterMatch[] | null>(null);
+
+  useEffect(() => {
+    if (!state) return;
+    let cancelled = false;
+    fetchNearbyPainters(state.ctx).then((matches) => {
+      if (!cancelled) setPainterMatches(matches);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [state]);
 
-  if (!state || !matchResult) {
+  const [claimTarget, setClaimTarget] = useState<
+    { selectionType: 'specific_painter'; painter: RealPainterMatch['painter'] } | { selectionType: 'guaranteed' } | null
+  >(null);
+
+  if (!state) {
     return <Navigate to="/" replace />;
   }
 
@@ -204,14 +217,16 @@ const QuoteResults = () => {
         </div>
       )}
 
-      {/* Hotwire-style painter list */}
+      {/* Real painter list */}
       <div className="painter-list-header">
         <h2>Painters who can do this job</h2>
         <p>
-          {matchResult.top.length > 0 ? (
+          {painterMatches === null ? (
+            <>Finding painters near you…</>
+          ) : painterMatches.length > 0 ? (
             <>
-              {matchResult.top.length} painter{matchResult.top.length === 1 ? '' : 's'} priced near
-              your guaranteed rate. Tap to see their profile, portfolio, and lock in.
+              {painterMatches.length} painter{painterMatches.length === 1 ? '' : 's'} in your area. Pick one to
+              claim your price at {currency(estimate.total)}.
             </>
           ) : (
             <>There are no preferred painters in your area yet — but The Painted Painter will work on finding one for your price.</>
@@ -219,25 +234,21 @@ const QuoteResults = () => {
         </p>
       </div>
 
-      {matchResult.top.map((m) => (
-        <Link
-          to={expired ? '#' : `/painters/${m.painter.id}`}
+      {(painterMatches ?? []).map((m) => (
+        <div
           key={m.painter.id}
           style={{
-            textDecoration: 'none',
-            pointerEvents: expired ? 'none' : undefined,
+            cursor: expired ? 'not-allowed' : 'pointer',
             opacity: expired ? 0.55 : 1,
           }}
-          onClick={(e) => {
-            if (expired) {
-              e.preventDefault();
-              return;
-            }
+          onClick={() => {
+            if (expired) return;
             hapticMedium();
+            setClaimTarget({ selectionType: 'specific_painter', painter: m.painter });
           }}
         >
-          <PainterCard match={m} guaranteedPrice={estimate.total} />
-        </Link>
+          <PainterCard match={m} />
+        </div>
       ))}
 
       {/* Mystery painter */}
@@ -251,7 +262,7 @@ const QuoteResults = () => {
             <span className="mystery-badge">Guaranteed Price</span>
           </div>
           <p className="mystery-painter-desc">
-            {matchResult.mysteryPool.length > 0 ? (
+            {(painterMatches?.length ?? 0) > 0 ? (
               <>
                 Accept the guaranteed price and we'll match you with a verified, licensed painter who
                 bids on your job. You won't choose the painter in advance — we fan the job out to every
@@ -266,9 +277,9 @@ const QuoteResults = () => {
               </>
             )}
           </p>
-          {matchResult.mysteryPool.length > 0 && (
+          {(painterMatches?.length ?? 0) > 0 && (
             <p className="mystery-painter-desc" style={{ marginTop: 8, fontSize: '0.8rem', color: '#74b9ff' }}>
-              {matchResult.mysteryPool.length} painter{matchResult.mysteryPool.length === 1 ? '' : 's'} in our pool could bid on this job.
+              {painterMatches!.length} painter{painterMatches!.length === 1 ? '' : 's'} in our pool could bid on this job.
             </p>
           )}
         </div>
@@ -293,41 +304,38 @@ const QuoteResults = () => {
               cursor: expired ? 'not-allowed' : 'pointer',
             }}
             disabled={expired}
-            onClick={() => hapticMedium()}
+            onClick={() => {
+              hapticMedium();
+              setClaimTarget({ selectionType: 'guaranteed' });
+            }}
           >
             {expired ? 'Expired' : 'Book Guaranteed'}
           </button>
         </div>
       </div>
+
+      {claimTarget && (
+        <ClaimPriceModal
+          target={claimTarget}
+          ctx={ctx}
+          guaranteedPrice={estimate.total}
+          onClose={() => setClaimTarget(null)}
+        />
+      )}
     </div>
   );
 };
 
-const PainterCard = ({
-  match,
-  guaranteedPrice,
-}: {
-  match: PainterMatch;
-  guaranteedPrice: number;
-}) => {
-  const { painter, painterPrice, reasons, priceDelta } = match;
-  const vsGuaranteed =
-    painterPrice === guaranteedPrice
-      ? 'at guaranteed price'
-      : priceDelta > 0
-      ? `${Math.round(priceDelta * 100)}% above guaranteed`
-      : `${Math.round(-priceDelta * 100)}% below guaranteed`;
+const PainterCard = ({ match }: { match: RealPainterMatch }) => {
+  const { painter, reasons } = match;
   return (
     <div className="painter-card">
       <div>
         <div className="painter-card-name">{painter.company_name}</div>
         <div className="painter-card-meta">
-          <span className="painter-card-rating">
-            {'★'.repeat(Math.round(painter.rating))} {painter.rating.toFixed(1)} ({painter.review_count})
-          </span>
           <span>{painter.city}, {painter.state}</span>
-          <span>{painter.years_experience} yrs</span>
-          <span>Crew of {painter.crew_size}</span>
+          <span>{painter.years_in_business ?? '?'} yrs</span>
+          <span>Crew of {painter.crew_size ?? '?'}</span>
         </div>
         <div className="painter-card-tags">
           {reasons.slice(0, 3).map((r, i) => (
@@ -336,14 +344,146 @@ const PainterCard = ({
         </div>
       </div>
       <div>
-        <div className="painter-card-price">{currency(painterPrice)}</div>
-        <div className="painter-card-cta" style={{ color: priceDelta <= 0 ? '#74b9ff' : '#a9b0b6' }}>
-          {vsGuaranteed}
-        </div>
-        <div className="painter-card-cta">View profile →</div>
+        <div className="painter-card-cta">Claim your price →</div>
       </div>
     </div>
   );
+};
+
+// ---------------------------------------------------------------------------
+// Claim Your Price modal
+// ---------------------------------------------------------------------------
+
+type ClaimTarget =
+  | { selectionType: 'specific_painter'; painter: RealPainterMatch['painter'] }
+  | { selectionType: 'guaranteed' };
+
+const ClaimPriceModal = ({
+  target,
+  ctx,
+  guaranteedPrice,
+  onClose,
+}: {
+  target: ClaimTarget;
+  ctx: EstimatorContext;
+  guaranteedPrice: number;
+  onClose: () => void;
+}) => {
+  const [name, setName] = useState(ctx.contactName || '');
+  const [email, setEmail] = useState(ctx.contactEmail || '');
+  const [phone, setPhone] = useState(ctx.contactPhone || '');
+  const [streetAddress, setStreetAddress] = useState('');
+  const [city, setCity] = useState('');
+  const [state_, setState_] = useState(ctx.state || '');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [result, setResult] = useState<{ notifiedCount: number } | null>(null);
+
+  const handleSubmit = async () => {
+    if (!name.trim() || !email.trim() || !phone.trim() || !streetAddress.trim() || !city.trim() || !state_.trim()) {
+      setError('Please fill in all fields.');
+      return;
+    }
+    setSubmitting(true);
+    setError('');
+    try {
+      const { data, error: invokeError } = await supabase.functions.invoke('submit-quote-claim', {
+        body: {
+          selectionType: target.selectionType,
+          selectedPainterId: target.selectionType === 'specific_painter' ? target.painter.id : undefined,
+          guaranteedPrice,
+          quoteZip: ctx.zipCode,
+          customer: { name: name.trim(), email: email.trim(), phone: phone.trim(), streetAddress: streetAddress.trim(), city: city.trim(), state: state_.trim() },
+          timeline: ctx.timeline,
+          timelineLabel: timelineLabel(ctx.timeline),
+          qa: buildResponseSummary(ctx),
+        },
+      });
+
+      if (invokeError || data?.error) {
+        setError(data?.error || invokeError?.message || 'Something went wrong. Please try again.');
+        return;
+      }
+
+      setResult({ notifiedCount: data.notifiedCount });
+    } catch {
+      setError('Something went wrong. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div
+      style={{
+        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex',
+        alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20,
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{ background: '#1f2937', borderRadius: 14, padding: 28, maxWidth: 460, width: '100%', maxHeight: '90vh', overflowY: 'auto' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {result ? (
+          <>
+            <h2 style={{ marginTop: 0 }}>You're all set!</h2>
+            <p>
+              We've notified {result.notifiedCount} painter{result.notifiedCount === 1 ? '' : 's'}. As soon as one accepts,
+              we'll email you at <strong>{email}</strong> so you can confirm and secure your painter.
+            </p>
+            <button onClick={onClose} style={{ marginTop: 12, padding: '10px 20px', borderRadius: 10, border: 'none', background: '#74b9ff', color: '#0b1620', fontWeight: 700, cursor: 'pointer' }}>
+              Done
+            </button>
+          </>
+        ) : (
+          <>
+            <h2 style={{ marginTop: 0 }}>
+              {target.selectionType === 'specific_painter' ? `Claim your price with ${target.painter.company_name}` : 'Claim your guaranteed price'}
+            </h2>
+            <p style={{ color: '#a9b0b6', fontSize: '0.9rem' }}>
+              We'll keep your contact info private until a painter accepts the job.
+            </p>
+
+            <div style={{ display: 'grid', gap: 10, marginTop: 16 }}>
+              <input placeholder="Full name" value={name} onChange={(e) => setName(e.target.value)} style={inputStyle} />
+              <input placeholder="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} style={inputStyle} />
+              <input placeholder="Phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} style={inputStyle} />
+              <input placeholder="Street address" value={streetAddress} onChange={(e) => setStreetAddress(e.target.value)} style={inputStyle} />
+              <div style={{ display: 'flex', gap: 10 }}>
+                <input placeholder="City" value={city} onChange={(e) => setCity(e.target.value)} style={{ ...inputStyle, flex: 2 }} />
+                <input placeholder="State" value={state_} onChange={(e) => setState_(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
+              </div>
+            </div>
+
+            {error && <p style={{ color: '#e74c3c', marginTop: 10 }}>{error}</p>}
+
+            <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
+              <button onClick={onClose} style={{ padding: '10px 20px', borderRadius: 10, border: '1px solid #3a4046', background: 'transparent', color: '#a9b0b6', cursor: 'pointer' }}>
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmit}
+                disabled={submitting}
+                style={{ flex: 1, padding: '10px 20px', borderRadius: 10, border: 'none', background: '#74b9ff', color: '#0b1620', fontWeight: 700, cursor: submitting ? 'not-allowed' : 'pointer' }}
+              >
+                {submitting ? 'Submitting…' : 'Claim This Price'}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const inputStyle: CSSProperties = {
+  padding: '10px 12px',
+  borderRadius: 8,
+  border: '1px solid #3a4046',
+  background: '#111827',
+  color: '#fff',
+  fontSize: '0.9rem',
 };
 
 function describeJob(ctx: EstimatorContext): string {

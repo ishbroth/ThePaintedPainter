@@ -201,6 +201,7 @@ async function handleCheckoutSessionCompleted(
   // --------------------------------------------------------------------------
   const session = event.data.object as Stripe.Checkout.Session
   const projectId = session.metadata?.projectId
+  const kind = session.metadata?.kind
 
   if (!projectId) {
     console.error('checkout.session.completed: No projectId found in session metadata')
@@ -208,6 +209,11 @@ async function handleCheckoutSessionCompleted(
     // We still return without throwing so the webhook returns 200.
     // The missing metadata indicates a bug in session creation, not a
     // transient failure that retrying would fix.
+    return
+  }
+
+  if (kind === 'quote_selection') {
+    await handleQuoteSelectionDepositPaid(projectId, session, supabase)
     return
   }
 
@@ -313,5 +319,85 @@ async function handleCheckoutSessionCompleted(
       // Email failure is non-critical — log and continue
       console.error('Error sending deposit receipt email:', emailErr)
     }
+  }
+}
+
+/**
+ * Handle checkout.session.completed for a job-claim deposit (kind: 'quote_selection')
+ *
+ * Marks the quote_selections row confirmed/deposit_status = 'paid', then emails
+ * the accepted painter the customer's full contact details — this is the last
+ * step in the claim flow, gated on payment so the customer's identity stays
+ * masked until they've actually put money down.
+ */
+async function handleQuoteSelectionDepositPaid(
+  quoteSelectionId: string,
+  session: Stripe.Checkout.Session,
+  supabase: ReturnType<typeof createClient>,
+): Promise<void> {
+  const { data: job, error: updateError } = await supabase
+    .from('quote_selections')
+    .update({
+      deposit_status: 'paid',
+      status: 'confirmed',
+      confirmed_at: new Date().toISOString(),
+      stripe_checkout_session_id: session.id,
+    })
+    .eq('id', quoteSelectionId)
+    .select('id, customer_name, customer_email, customer_phone, customer_street_address, customer_city, customer_state, quote_zip, painter_payout_amount, accepted_by')
+    .maybeSingle()
+
+  if (updateError || !job) {
+    console.error(`Failed to update quote_selections for job ${quoteSelectionId}:`, updateError)
+    return
+  }
+
+  if (!job.accepted_by) {
+    console.error(`Job ${quoteSelectionId} paid but has no accepted_by painter — cannot notify`)
+    return
+  }
+
+  const { data: painter, error: painterError } = await supabase
+    .from('painters')
+    .select('email')
+    .eq('id', job.accepted_by)
+    .maybeSingle()
+
+  if (painterError || !painter?.email) {
+    console.error(`Could not find painter email for job ${quoteSelectionId}:`, painterError)
+    return
+  }
+
+  try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')
+    if (!supabaseUrl || !supabaseAnonKey) return
+
+    const emailResponse = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${supabaseAnonKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        to: painter.email,
+        type: 'job_confirmed_painter_details',
+        data: {
+          customerName: job.customer_name,
+          customerEmail: job.customer_email,
+          customerPhone: job.customer_phone,
+          customerStreetAddress: job.customer_street_address,
+          customerCity: job.customer_city,
+          customerState: job.customer_state,
+          customerZip: job.quote_zip,
+          payoutAmount: job.painter_payout_amount,
+        },
+      }),
+    })
+
+    if (emailResponse.ok) {
+      console.log(`Job-confirmed email sent to painter for job ${quoteSelectionId}`)
+    } else {
+      console.error(`Failed to send job-confirmed email: ${await emailResponse.text()}`)
+    }
+  } catch (emailErr) {
+    console.error('Error sending job-confirmed email:', emailErr)
   }
 }

@@ -35,6 +35,9 @@ const EMAIL_TYPE_MAP: Record<string, string> = {
   payment_received:  'Payment processed',
   deal_expiring:     'Your deal is expiring soon',
   painter_application_received: 'New painter application received',
+  job_offer_available: 'New job available in your area',
+  painter_accepted_confirm_deposit: 'A painter accepted your job — confirm & pay deposit',
+  job_confirmed_painter_details: 'Deposit received — job confirmed!',
 }
 
 // The sender address for all outgoing emails
@@ -57,6 +60,12 @@ const corsHeaders = {
 // In production, you would likely use a more sophisticated template engine
 // or pre-built HTML templates stored externally.
 // ---------------------------------------------------------------------------
+function formatMoney(value: unknown): string {
+  const n = typeof value === 'number' ? value : Number(value)
+  if (!isFinite(n)) return 'N/A'
+  return `$${n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
+}
+
 function buildEmailHtml(type: string, data: Record<string, unknown>): string {
   const customerName = (data.customerName as string) || 'Valued Customer'
   const projectName = (data.projectName as string) || 'your painting project'
@@ -198,6 +207,57 @@ function buildEmailHtml(type: string, data: Record<string, unknown>): string {
         <p>Years in business: ${data.yearsInBusiness ?? 'N/A'} &middot; Crew size: ${data.crewSize ?? 'N/A'}</p>
         <p>Licensed: ${data.hasLicense ?? 'N/A'} &middot; Insured: ${data.isInsured ?? 'N/A'} &middot; Bonded: ${data.isBonded ?? 'N/A'}</p>
         <p>Log in to the admin dashboard to review and approve this application.</p>
+      `)
+
+    case 'job_offer_available': {
+      const qa = Array.isArray(data.qa) ? (data.qa as { question: string; answer: string }[]) : []
+      const qaHtml = qa
+        .map((item) => `<p style="margin: 4px 0;"><strong>${item.question}:</strong> ${item.answer}</p>`)
+        .join('')
+
+      return wrap(`
+        <p>A customer near <strong>${data.zipCode || 'your area'}</strong> is looking for a painter.</p>
+        <p>
+          Customer: <strong>${data.customerFirstName || 'A customer'}</strong><br />
+          ZIP code: <strong>${data.zipCode || 'N/A'}</strong><br />
+          Desired schedule: <strong>${data.timelineLabel || 'Not specified'}</strong>
+        </p>
+        <p style="font-size: 22px; font-weight: 700; color: #2563eb; margin: 20px 0;">
+          You'd be paid: ${formatMoney(data.payoutAmount)}
+        </p>
+        ${data.acceptUrl ? `<p><a class="btn" href="${data.acceptUrl}">Accept This Job</a></p>` : ''}
+        <p style="margin-top: 8px; font-size: 13px; color: #6b7280;">This job is offered on a first-come, first-served basis — the first painter to accept gets it.</p>
+        <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
+        <p style="font-weight: 600; margin-bottom: 12px;">Job details</p>
+        ${qaHtml}
+      `)
+    }
+
+    case 'painter_accepted_confirm_deposit':
+      return wrap(`
+        <p>Good news — <strong>${data.painterCompanyName || 'A painter'}</strong> has accepted your job!</p>
+        <p>
+          Painter: <strong>${data.painterCompanyName || 'N/A'}</strong> (${data.painterOwnerName || 'N/A'})<br />
+          Email: <a href="mailto:${data.painterEmail || ''}">${data.painterEmail || 'N/A'}</a><br />
+          Phone: <a href="tel:${data.painterPhone || ''}">${data.painterPhone || 'N/A'}</a>
+        </p>
+        <p>Job price: <strong>${formatMoney(data.guaranteedPrice)}</strong></p>
+        <p>Deposit due now: <strong>${formatMoney(data.depositAmount)}</strong></p>
+        ${data.confirmUrl ? `<p><a class="btn" href="${data.confirmUrl}">Confirm &amp; Pay Deposit</a></p>` : ''}
+        <p style="margin-top: 8px; font-size: 13px; color: #6b7280;">Once you confirm and pay the deposit, we'll share your contact details with the painter so you can coordinate directly.</p>
+      `)
+
+    case 'job_confirmed_painter_details':
+      return wrap(`
+        <p>The deposit has been paid — this job is confirmed!</p>
+        <p>
+          Customer: <strong>${data.customerName || 'N/A'}</strong><br />
+          Address: ${data.customerStreetAddress || ''}, ${data.customerCity || ''}, ${data.customerState || ''} ${data.customerZip || ''}<br />
+          Email: <a href="mailto:${data.customerEmail || ''}">${data.customerEmail || 'N/A'}</a><br />
+          Phone: <a href="tel:${data.customerPhone || ''}">${data.customerPhone || 'N/A'}</a>
+        </p>
+        <p>Your payout: <strong>${formatMoney(data.payoutAmount)}</strong></p>
+        <p style="margin-top: 8px; font-size: 13px; color: #6b7280;">Reach out to the customer directly to schedule the work.</p>
       `)
 
     default:
