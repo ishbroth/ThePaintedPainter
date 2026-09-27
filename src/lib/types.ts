@@ -39,6 +39,19 @@ export interface EstimatorContext {
   stairwayDetails: string; // walls_only, walls_and_railings, full
   interiorShutters: string; // yes, no, skip
   interiorColorChange: string; // same, different, dramatic
+  // Refines the default "different color = whole space, one new color"
+  // assumption once a customer volunteers more detail. Deliberately not a
+  // standing question — see topics.ts `color_scope_clarify` for why.
+  colorChangeScope: string; // '' (default/unspecified), whole_house, most_of_house, some_rooms, accent_only, multiple_colors
+  colorChangeExcludedRoomCount: number | null; // rooms explicitly staying the original color when scope is most_of_house/some_rooms
+  colorCount: number | null; // total distinct colors, for a multiple_colors scope
+  colorClarificationNeeded: string; // '' (none pending), color_count, color_locations
+  // Customer wants the work spaced out on separate dates (e.g. bedrooms now,
+  // exterior later; or a property manager staggering several units). Still
+  // priced as one combined total — this only flags that they should be
+  // offered the option to split their claim into separately-scheduled
+  // phases (see QuoteResults' claim flow), not a mandatory question.
+  multiPhaseRequested: string; // '' (no signal), yes
 
   // Exterior
   exteriorScope: string; // full, partial

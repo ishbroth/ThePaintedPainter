@@ -146,6 +146,97 @@ export function extractColorChange(text: string): 'same' | 'different' | 'dramat
   return null;
 }
 
+/** Natural phrase describing the DEFAULT assumption behind a "different
+ * color" answer, so the acknowledgement invites correction if the reality is
+ * more nuanced ("OK, one different color for the whole house" rather than a
+ * silent, unstated assumption). Adapts to whatever the property's been
+ * described as so far. */
+function colorScopeAckPhrase(ctx: EstimatorContext): string {
+  if (ctx.interiorScope === 'specific_rooms') return 'for those rooms';
+  if (ctx.propertyType === 'rental' || ctx.propertyType === 'multi_unit') return 'for the whole unit';
+  if (ctx.propertyType === 'residential') return 'for the whole house';
+  return 'for the whole place';
+}
+
+/**
+ * Refines the default "different color = one new color, whole space"
+ * assumption once a customer volunteers more detail unprompted — e.g. "most
+ * of the house, but 2 bedrooms are staying the same", "several different
+ * colors", "one main color with accent walls". Deliberately NOT a standing
+ * question: most jobs really are one color for the whole space, so this only
+ * reacts to free text the customer offers on their own. When what they said
+ * is itself ambiguous (a color count or "accent wall" mention with no further
+ * detail), `needsClarification` drives a one-off reactive follow-up — see
+ * topics.ts `color_scope_clarify` — rather than a mandatory question that
+ * would trigger on every conversation.
+ */
+export function extractColorScope(text: string): {
+  scope?: 'whole_house' | 'most_of_house' | 'some_rooms' | 'accent_only' | 'multiple_colors';
+  excludedRoomCount?: number;
+  colorCount?: number;
+  accentWalls?: boolean;
+  needsClarification?: 'color_count' | 'color_locations';
+} {
+  const t = text.toLowerCase();
+  const out: ReturnType<typeof extractColorScope> = {};
+
+  // "2 bedrooms are staying the same/original color" / "except 2 rooms"
+  const excludeStaying = t.match(
+    /\b(\d+|one|two|three|four|five|six)\s+(?:bed)?rooms?\s+(?:is|are)?\s*(?:staying|stay|keeping|remaining)\s+(?:the\s+)?(?:same|original)/,
+  );
+  const excludeExcept = t.match(/\bexcept\s+(\d+|one|two|three|four|five|six)\s+(?:bed)?rooms?\b/);
+  const excludeMatch = excludeStaying ?? excludeExcept;
+  if (excludeMatch) {
+    const n = parseIntLoose(excludeMatch[1]);
+    if (n) {
+      out.excludedRoomCount = n;
+      out.scope = 'most_of_house';
+    }
+  }
+
+  if (/\b(most of the house|most rooms|most of the place|most of the unit)\b/.test(t)) {
+    out.scope = out.scope ?? 'most_of_house';
+  }
+  if (
+    /\b(the whole house|entire house|every room|whole place|whole unit|everywhere)\b.{0,25}\b(different|new)\s+colors?\b/.test(t) ||
+    /\b(different|new)\s+colors?\b.{0,25}\b(the whole house|entire house|every room|whole place|whole unit|everywhere)\b/.test(t)
+  ) {
+    out.scope = 'whole_house';
+  }
+
+  // A specific count ("3 different colors", "four colors total") resolves
+  // any ambiguity outright. A vague count ("several", "multiple", "a few")
+  // does not — that's exactly the case worth a quick follow-up for.
+  const countedColors = t.match(/\b(\d+|two|three|four|five|six|seven|eight)\s+(?:different\s+)?colors?\b/);
+  if (countedColors) {
+    const n = parseIntLoose(countedColors[1]);
+    if (n) {
+      out.colorCount = n;
+      out.scope = 'multiple_colors';
+    }
+  } else if (/\b(several|multiple|a few|many)\s+(?:different\s+)?colors?\b/.test(t)) {
+    out.scope = 'multiple_colors';
+    out.needsClarification = 'color_count';
+  }
+
+  // "one main color with accent walls" / "main color plus an accent wall" —
+  // the bulk of the space is a single (possibly unchanged) color, and only
+  // the accent wall(s) actually differ, which is priced as its own line item
+  // elsewhere rather than the blanket "different color" surcharge.
+  if (
+    /\b(one|a|single)\s+main\s+colou?r\b.{0,25}\baccent\s+walls?\b/.test(t) ||
+    /\bmain\s+colou?r\b.{0,15}(?:plus|with|and)\b.{0,10}\baccent\s+walls?\b/.test(t)
+  ) {
+    out.scope = 'accent_only';
+    out.accentWalls = true;
+    if (!/\b(bedroom|living room|kitchen|dining|bathroom|hallway|office|entryway)\b/.test(t)) {
+      out.needsClarification = 'color_locations';
+    }
+  }
+
+  return out;
+}
+
 export function extractSidingType(
   text: string,
 ): 'stucco' | 'wood' | 'vinyl' | 'hardie' | 'brick' | 'stone' | 'aluminum' | null {
@@ -215,7 +306,13 @@ export function extractPropertyType(text: string): 'residential' | 'rental' | 'm
   if (/\b(commercial (?:space|property|building)|office (?:space|building|park|tower|suite|complex)|retail (?:store|space)|warehouse|storefront)\b/.test(t)) {
     return 'commercial';
   }
-  if (/\b(rental|tenants?|landlord|renting it out|investment propert(?:y|ies)|airbnb|between tenants|turnover unit)\b/.test(t)) {
+  if (
+    /\b(rental|tenants?|landlord|renting it out|investment propert(?:y|ies)|airbnb|between tenants|turnover unit)\b/.test(t) ||
+    // Selling/listing a home means a quick, standard turnover finish for
+    // showings — not a showroom-perfect job for a family that'll live with
+    // it for years — so it prices the same way a rental turnover does.
+    /\b(putting (?:it |the house |the place )?(?:up )?for sale|listing (?:it|the house|the place)|put(?:ting)? (?:it |the place )?on the market|getting (?:it |the house )?ready to sell|prepping (?:it |the house )?to sell|house is going on the market|flip(?:ping)? (?:it|the house|this house))\b/.test(t)
+  ) {
     return 'rental';
   }
   if (/\b(my home|our house|we live (?:here|there|in it)|owner[\s-]?occupied|primary residence|our (?:forever )?home)\b/.test(t)) {
@@ -666,24 +763,30 @@ export function extractSurfaceScope(text: string): {
     const hasTrim = /\btrim\b/.test(limited);
     const hasDoors = /\bdoors?\b/.test(limited);
 
-    // If they said "just walls" — walls yes, default others no
-    if (hasWalls && !hasCeiling && !hasTrim && !hasDoors) {
-      out.walls = 'yes';
-      out.ceilings = 'no';
-      out.trim = 'no';
-      out.doors = 'no';
+    // Only treat this as a surface-scope statement if the "just/only" clause
+    // actually names a paintable surface. "just some minor nail holes to
+    // patch" names none — treating that as "scope: nothing" would silently
+    // zero out walls/ceilings/trim/doors a prior message already set.
+    if (hasWalls || hasCeiling || hasTrim || hasDoors) {
+      // If they said "just walls" — walls yes, default others no
+      if (hasWalls && !hasCeiling && !hasTrim && !hasDoors) {
+        out.walls = 'yes';
+        out.ceilings = 'no';
+        out.trim = 'no';
+        out.doors = 'no';
+        return out;
+      }
+      // "just walls and ceiling" — include listed, default exclude rest
+      if (hasWalls) out.walls = 'yes';
+      if (hasCeiling) out.ceilings = 'yes';
+      if (hasTrim) out.trim = 'yes';
+      if (hasDoors) out.doors = 'yes';
+      if (!hasWalls) out.walls = 'no';
+      if (!hasCeiling) out.ceilings = 'no';
+      if (!hasTrim) out.trim = 'no';
+      if (!hasDoors) out.doors = 'no';
       return out;
     }
-    // "just walls and ceiling" — include listed, default exclude rest
-    if (hasWalls) out.walls = 'yes';
-    if (hasCeiling) out.ceilings = 'yes';
-    if (hasTrim) out.trim = 'yes';
-    if (hasDoors) out.doors = 'yes';
-    if (!hasWalls) out.walls = 'no';
-    if (!hasCeiling) out.ceilings = 'no';
-    if (!hasTrim) out.trim = 'no';
-    if (!hasDoors) out.doors = 'no';
-    return out;
   }
 
   // Targeted negations — "no trim", "not the ceiling", "skip the doors"
@@ -760,9 +863,22 @@ export function extractBudget(text: string): number | null {
 
 // ===== Master extractor =====
 
+/** "I want the bedrooms now but the exterior later", a property manager
+ * staggering several units, etc. — the customer wants the work split into
+ * separately-scheduled phases rather than done all at once. */
+export function extractMultiPhaseRequest(text: string): boolean {
+  const t = text.toLowerCase();
+  return /\b(space(?:d)? out|spread out|staggered?|different dates|separate dates|in phases|in stages|different times|not all at once|one (?:room|section|part) at a time)\b/.test(t);
+}
+
 export function extractAll(text: string, prev: EstimatorContext): ExtractResult {
   const patch: Partial<EstimatorContext> = {};
   const acks: string[] = [];
+
+  if (extractMultiPhaseRequest(text) && prev.multiPhaseRequested !== 'yes') {
+    patch.multiPhaseRequested = 'yes';
+    acks.push('spaced out on separate dates');
+  }
 
   const zip = extractZip(text);
   if (zip && !prev.zipCode) {
@@ -832,8 +948,60 @@ export function extractAll(text: string, prev: EstimatorContext): ExtractResult 
   const color = extractColorChange(text);
   if (color && !prev.interiorColorChange) {
     patch.interiorColorChange = color;
-    if (color === 'dramatic') acks.push('dramatic color change');
-    else if (color === 'different') acks.push('color change');
+    if (color === 'dramatic') acks.push(`dramatic color change ${colorScopeAckPhrase(prev)}`);
+    else if (color === 'different') acks.push(`one different color ${colorScopeAckPhrase(prev)}`);
+  }
+
+  // Color-change scope refinement — see extractColorScope's doc comment for
+  // why this only reacts to volunteered detail rather than being a standing
+  // question.
+  const colorScope = extractColorScope(text);
+  if (colorScope.scope) {
+    patch.colorChangeScope = colorScope.scope;
+    // Scoping language like "several different colors" or "most of the
+    // house" unambiguously implies a real color change even when it doesn't
+    // literally say "different color" (extractColorChange's pattern is
+    // singular-only) — without this, the base color-change surcharge never
+    // fires and only the incremental multi-color/scope adjustment applies.
+    // "accent_only" is excluded: that phrasing explicitly means the MAIN
+    // color may be unchanged, only the accent wall differs.
+    if (!prev.interiorColorChange && !patch.interiorColorChange && colorScope.scope !== 'accent_only') {
+      patch.interiorColorChange = 'different';
+      acks.push(`different color ${colorScopeAckPhrase(prev)}`);
+    }
+    if (colorScope.scope === 'most_of_house' && colorScope.excludedRoomCount) {
+      acks.push(`${colorScope.excludedRoomCount} room${colorScope.excludedRoomCount === 1 ? '' : 's'} staying original color`);
+    } else if (colorScope.scope === 'multiple_colors' && colorScope.colorCount) {
+      acks.push(`${colorScope.colorCount} colors total`);
+    } else if (colorScope.scope === 'accent_only') {
+      acks.push('accent wall(s), main color unchanged');
+    }
+  }
+  if (colorScope.excludedRoomCount !== undefined) patch.colorChangeExcludedRoomCount = colorScope.excludedRoomCount;
+  if (colorScope.colorCount !== undefined) patch.colorCount = colorScope.colorCount;
+  if (colorScope.accentWalls) patch.accentWalls = 'yes';
+
+  if (colorScope.needsClarification) {
+    patch.colorClarificationNeeded = colorScope.needsClarification;
+  } else if (prev.colorClarificationNeeded === 'color_count') {
+    // A terse reply to "how many colors total?" ("three", "4") won't match
+    // the "N colors" phrasing extractColorScope looks for elsewhere — accept
+    // a bare leading number here since we know exactly what question this is
+    // answering.
+    const bare = text.trim().match(/^(\d+|one|two|three|four|five|six|seven|eight)\b/i);
+    const n = bare ? parseIntLoose(bare[1]) : null;
+    if (n) {
+      patch.colorCount = n;
+      patch.colorChangeScope = 'multiple_colors';
+      patch.colorClarificationNeeded = '';
+      acks.push(`${n} colors total`);
+    }
+  } else if (
+    prev.colorClarificationNeeded === 'color_locations' &&
+    /\b(bedroom|living room|kitchen|dining|bathroom|hallway|office|entryway|closet|wall|walls)\b/.test(text.toLowerCase())
+  ) {
+    patch.colorClarificationNeeded = '';
+    acks.push('noted where the color change goes');
   }
 
   const siding = extractSidingType(text);

@@ -15,6 +15,8 @@ export function makeInitialContext(): EstimatorContext {
     cabinets: 'none', cabinetLocations: [], closets: 'none', closetCount: null,
     stairways: 'none', stairwayCount: null, stairwayDetails: '', interiorShutters: 'no',
     interiorColorChange: '',
+    colorChangeScope: '', colorChangeExcludedRoomCount: null, colorCount: null, colorClarificationNeeded: '',
+    multiPhaseRequested: '',
     exteriorScope: 'full', sidingType: '', exteriorTrim: 'no', soffitsEaves: 'no',
     exteriorShutters: 'no', exteriorShutterCount: null, garageDoor: 'none', entryDoor: 'no',
     railings: 'none', railingType: '', balconies: 'none', balconyCount: null,

@@ -272,8 +272,9 @@ export const TOPICS: Topic[] = [
       const t = c.additionalDetails.toLowerCase();
       return (
         c.prepWork.length > 0 ||
-        c.drywallRepairExtent === 'major' ||
-        c.drywallRepairExtent === 'moderate' ||
+        !!c.drywallRepairExtent ||
+        c.projectCondition === 'repaint' ||
+        c.projectCondition === 'renovation' ||
         /\b(good|clean|great|fine|pristine|move[-\s]?in)\b/.test(t)
       );
     },
@@ -358,6 +359,34 @@ export const TOPICS: Topic[] = [
     example: () =>
       "Like 'same beige going back up' / 'changing to a light gray' / 'going from dark navy to white'.",
     chips: () => ['Same color', 'Different color', 'Dramatic change', 'Not sure yet'],
+  },
+
+  // ——————————————————————————————————————————
+  // Color-change scope clarification — a REACTIVE follow-up only, never a
+  // standing question. It only becomes relevant when the customer has
+  // already volunteered something ambiguous ("several different colors"
+  // with no count, or "one main color with accent walls" with no location)
+  // — see extractColorScope() in extractors.ts, which is what sets
+  // colorClarificationNeeded in the first place. Most jobs are one color
+  // for the whole space and never touch this topic at all.
+  // ——————————————————————————————————————————
+  {
+    id: 'color_scope_clarify',
+    priority: 36,
+    relevant: (c) => !!c.colorClarificationNeeded,
+    alreadyAnswered: (c) => !c.colorClarificationNeeded,
+    ask: (c) =>
+      c.colorClarificationNeeded === 'color_count'
+        ? "How many colors total, roughly?"
+        : "Can you describe where you want the different color(s) — which rooms or walls?",
+    clarify: (c) =>
+      c.colorClarificationNeeded === 'color_count'
+        ? "Just a rough count — 2, 3, several — helps me price the extra cutting-in between colors."
+        : "Just roughly which rooms or which walls get the different color — that's enough for me to scope it.",
+    example: (c) =>
+      c.colorClarificationNeeded === 'color_count'
+        ? "E.g. 'three colors' or 'four, one per bedroom'."
+        : "E.g. 'the living room accent wall' or 'the two kids' bedrooms'.",
   },
 
   // ——————————————————————————————————————————

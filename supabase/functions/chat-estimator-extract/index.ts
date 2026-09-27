@@ -137,6 +137,16 @@ const UPDATE_TOOL = {
       stairwayDetails: { type: 'string', enum: ['walls_only', 'walls_and_railings', 'full'] },
       interiorShutters: { type: 'string', enum: ['yes', 'no'] },
       interiorColorChange: { type: 'string', enum: ['same', 'different', 'dramatic'] },
+      colorChangeScope: {
+        type: 'string', enum: ['whole_house', 'most_of_house', 'some_rooms', 'accent_only', 'multiple_colors'],
+        description: 'Only set when the user REFINES a "different"/"dramatic" color change beyond the default whole-space assumption. "most_of_house"/"some_rooms" = some named rooms are staying the original color (also set colorChangeExcludedRoomCount). "accent_only" = only an accent wall differs, main color is unchanged (also set accentWalls="yes"). "multiple_colors" = more than one new color across the space (also set colorCount if a number was given, otherwise set colorClarificationNeeded="color_count").',
+      },
+      colorChangeExcludedRoomCount: { type: 'integer', description: 'Number of rooms explicitly staying the original color, when colorChangeScope is most_of_house/some_rooms.' },
+      colorCount: { type: 'integer', description: 'Total distinct new colors, when colorChangeScope is multiple_colors and a specific number was given.' },
+      colorClarificationNeeded: {
+        type: 'string', enum: ['color_count', 'color_locations'],
+        description: 'Set ONLY when the user mentioned something ambiguous about color scope that genuinely needs a follow-up: "color_count" for a vague count like "several different colors" (no number given). "color_locations" for "one main color with accent walls" with no indication of which wall/room. Do NOT set this if the message already gave enough detail (a number, or named rooms) — that goes in colorCount/colorChangeExcludedRoomCount/colorChangeScope instead, not here.',
+      },
       ceilingType: { type: 'string', enum: ['flat', 'popcorn', 'vaulted'] },
       ceilingHeight: {
         type: 'string', enum: ['nine_foot', 'ten_plus', 'vaulted_mixed'],
@@ -216,6 +226,10 @@ const UPDATE_TOOL = {
       occupancy: { type: 'string', enum: ['vacant', 'furnished', 'occupied'] },
       prepWorkAdd: { type: 'array', items: { type: 'string', enum: ['caulking', 'stain_cover', 'drywall_repair', 'wood_rot', 'wallpaper_removal', 'power_washing', 'lead_test', 'mold_treatment'] } },
       drywallRepairExtent: { type: 'string', enum: ['minor', 'moderate', 'major'] },
+      multiPhaseRequested: {
+        type: 'string', enum: ['yes'],
+        description: 'Set to "yes" when the customer wants the work spaced out on separate dates rather than done all at once — e.g. "bedrooms now, exterior later", a property manager staggering several units, or explicitly wanting it done in phases/stages. Still priced as one combined total; this only flags that they should be offered phased scheduling when they claim their price.',
+      },
       multiTripRequired: {
         type: 'string', enum: ['yes'],
         description: 'Set to "yes" when the job needs a SECOND visit due to sequencing or cure time — e.g. "paint the trim before it\'s installed, touch up after", "window glazing needs to set before painting", "prime now, final coat after the other trades finish", "spray the cabinet doors off-site then reinstall". This is a real scheduling/travel cost, not optional.',
@@ -256,6 +270,7 @@ Rules:
 - "Staircase railings" or "bannisters" are an INTERIOR detail (stairwayDetails="walls_and_railings") — never also set the top-level railings field for those, since that field means exterior deck/porch/balcony railings only.
 - If the user's message is a question to the bot, an expression of uncertainty, a complaint, a greeting, or otherwise not job details, still extract any incidental facts but make sure the intents array reflects it.
 - Keep acknowledgements short (2-4 words each) and only for genuinely new information.
+- When you first set interiorColorChange to "different" or "dramatic", phrase that acknowledgement as the assumption it is — e.g. "one different color for the whole house" (or "...for the whole unit" for a rental/apartment, "...for those rooms" if scope is specific_rooms) — so the wording itself invites the user to correct it if reality is more nuanced (multiple colors, only some rooms, an accent wall). Do NOT ask a proactive follow-up about color scope; only extract colorChangeScope/colorCount/colorChangeExcludedRoomCount/colorClarificationNeeded when the user volunteers that detail on their own in a later message.
 
 Painting-industry pricing knowledge — apply these whenever the message implies them, even if the user doesn't use these exact terms:
 - Rentals/investment properties don't need a flawless finish the way an owner-occupied home does — cheaper standard-grade paint, single coat where the color matches, less meticulous cutting-in. This is a real, expected price DECREASE, not a compromise to apologize for.

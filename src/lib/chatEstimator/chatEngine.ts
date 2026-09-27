@@ -17,7 +17,7 @@
 //   5. If no topics left, finalize with the full estimate.
 // ============================================================================
 
-import type { EstimatorContext, EstimateBreakdown, UserResponseStyle } from '../types';
+import type { EstimatorContext, EstimateBreakdown, EstimateLineItem, UserResponseStyle } from '../types';
 import { calculateEstimate } from '../estimateEngine';
 import { extractAll } from './extractors';
 import { defaultAssumptions, applyAssumptions, type Assumption } from './defaultAssumptions';
@@ -559,8 +559,8 @@ function finalizeTurn(state: ChatState): TurnResult {
 // Plain-English reasons behind the pricing multipliers that most benefit
 // from being said out loud, keyed by the exact label estimateEngine.ts uses.
 const MULTIPLIER_EXPLANATIONS: Record<string, string> = {
-  'Rental Property (standard finish)':
-    "Since this is a rental, I knocked a bit off — rentals usually don't need the same showroom-perfect finish an owner-occupied home does.",
+  'Standard Turnover Finish (rental/pre-sale)':
+    "Since this is a rental or a pre-sale turnover, I knocked a bit off — that kind of job usually doesn't need the same showroom-perfect finish an owner-occupied home does.",
   'Multi-Unit Volume Discount':
     "Since it's multiple units, I applied a volume discount — bulk work like this typically runs cheaper per unit.",
   'Commercial Property':
@@ -576,8 +576,11 @@ const MULTIPLIER_EXPLANATIONS: Record<string, string> = {
 };
 
 /** Spoken notes for line items that aren't multipliers — flat add-on fees the user should hear about explicitly, not just find in the itemized breakdown. */
-function lineItemNotes(ctx: EstimatorContext): string[] {
+function lineItemNotes(ctx: EstimatorContext, lineItems: EstimateLineItem[]): string[] {
   const notes: string[] = [];
+  if (lineItems.some((li) => li.description === 'Touch-Up Callback Allowance (high-end market)')) {
+    notes.push("I've built in a small allowance for a possible touch-up visit — homes in this market tend to expect a very crisp finish.");
+  }
   if (ctx.multiTripRequired === 'yes') {
     notes.push("I've built in a return-trip fee since this needs a second visit — that's normal for sequenced or cure-time work.");
   }
@@ -634,13 +637,18 @@ function finalize(ctx: EstimatorContext, transcript: string): ChatResult {
   }
   const priceNotes = [
     ...finalEstimate.multipliers.map((m) => MULTIPLIER_EXPLANATIONS[m.label]).filter((n): n is string => !!n),
-    ...lineItemNotes(withAssumptions),
+    ...lineItemNotes(withAssumptions, finalEstimate.lineItems),
     ...matched
       .filter((m) => m.situation.adjust.explainToUser)
       .map((m) => m.situation.userNote ?? m.situation.narrative),
   ];
   if (priceNotes.length > 0) {
     pieces.push(priceNotes.join(' '));
+  }
+  if (withAssumptions.multiPhaseRequested === 'yes') {
+    pieces.push(
+      `Since you mentioned spacing the work out, this total covers everything — mention the phases you have in mind when you claim your price so we can help coordinate separate dates.`,
+    );
   }
   pieces.push(
     `Pulling up painters in your area now — plus a mystery-painter option if you want to lock in that guaranteed number.`,

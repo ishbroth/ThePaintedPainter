@@ -354,6 +354,7 @@ export function estimateHouseLayout(sqft: number, bedrooms?: number): HouseLayou
 
   // Aggregate
   let totalWall = 0, totalCeiling = 0, totalTrim = 0, totalDoors = 0, totalWindows = 0, totalClosets = 0;
+  let templateFloorSqFt = 0;
   for (const r of rooms) {
     const spec = STANDARD_ROOMS[r];
     if (spec) {
@@ -363,14 +364,30 @@ export function estimateHouseLayout(sqft: number, bedrooms?: number): HouseLayou
       totalDoors += spec.doors;
       totalWindows += spec.windows;
       totalClosets += spec.closets;
+      templateFloorSqFt += spec.widthFt * spec.lengthFt;
     }
   }
 
+  // The room LIST above is chosen by bedroom count only, so its implied
+  // floor area (sum of each room's widthFt*lengthFt) is just a typical
+  // guess — a "1 bedroom" template implies ~950 sqft, which badly
+  // overstates a compact apartment and would understate an unusually
+  // roomy one. Scale the continuous surfaces (wall/ceiling/trim) to match
+  // what the customer actually reported; door/window/closet counts stay as
+  // the template's typical counts for that room mix since those are
+  // discrete fixtures, not something that shrinks continuously with floor
+  // area (a small bedroom still has exactly one door).
+  const scale = templateFloorSqFt > 0 ? sqft / templateFloorSqFt : 1;
+  // Clamp so a wildly small/large stated sqft (or a customer describing
+  // something the room template doesn't represent well, like an open loft)
+  // can't swing surface area more than 2x either way.
+  const clampedScale = Math.min(2, Math.max(0.5, scale));
+
   return {
     rooms,
-    totalWallSqFt: totalWall,
-    totalCeilingSqFt: totalCeiling,
-    totalTrimLinFt: totalTrim,
+    totalWallSqFt: Math.round(totalWall * clampedScale),
+    totalCeilingSqFt: Math.round(totalCeiling * clampedScale),
+    totalTrimLinFt: Math.round(totalTrim * clampedScale),
     totalDoors: totalDoors,
     totalWindows: totalWindows,
     totalClosets: totalClosets,

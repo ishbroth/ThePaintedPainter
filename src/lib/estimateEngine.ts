@@ -36,10 +36,15 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
       const textureMultiplier = ctx.wallTexture === 'heavy_texture' ? 1.15
         : ctx.wallTexture === 'textured' ? 1.05
         : 1.0;
+      // Same color = usually a spot-prime + single-coat recoat, not a full
+      // two-coat color change — the base wall rate assumes a standard
+      // repaint, so give same-color jobs a modest efficiency discount
+      // instead of charging identically to a real color change.
+      const colorEfficiency = ctx.interiorColorChange === 'same' ? 0.92 : 1.0;
       lineItems.push({
         category: 'Interior',
         description: 'Interior Walls',
-        amount: effectiveWallSqFt * wallRate * textureMultiplier * regionalMult * conditionMultiplier,
+        amount: effectiveWallSqFt * wallRate * textureMultiplier * colorEfficiency * regionalMult * conditionMultiplier,
       });
     }
 
@@ -351,13 +356,40 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
       });
     }
 
-    // Color change surcharge
-    if (ctx.interiorColorChange === 'different') {
-      const extraCoatSqFt = effectiveWallSqFt * 0.3; // ~30% surcharge for extra coat
+    // Color change surcharge — scope-aware. Defaults to the whole space
+    // when the customer hasn't refined it (colorChangeScope unset — most
+    // jobs really are one color change, whole space). Skipped entirely when
+    // scoped to an accent wall, since that's already priced as its own line
+    // item above (double-billing the same "different color" callout
+    // otherwise). Reduced proportionally when specific rooms are staying
+    // the original color.
+    if (ctx.interiorColorChange === 'different' && ctx.accentWalls !== 'yes') {
+      const totalRooms = layout.rooms.length || 1;
+      const excluded = Math.min(ctx.colorChangeExcludedRoomCount ?? 0, totalRooms - 1);
+      const scopeFraction =
+        (ctx.colorChangeScope === 'most_of_house' || ctx.colorChangeScope === 'some_rooms') && excluded > 0
+          ? Math.max(0, (totalRooms - excluded) / totalRooms)
+          : 1; // whole_house, multiple_colors, or unset (default assumption)
+      const extraCoatSqFt = effectiveWallSqFt * 0.3 * scopeFraction;
       lineItems.push({
         category: 'Interior',
-        description: 'Color Change (extra coat)',
+        description: excluded > 0
+          ? `Color Change (extra coat, ${excluded} room${excluded === 1 ? '' : 's'} excluded)`
+          : 'Color Change (extra coat)',
         amount: extraCoatSqFt * BASE_RATES.interior.walls_repaint * regionalMult,
+      });
+    }
+
+    // Multiple distinct colors mean more cutting-in and taping between
+    // colors than a single uniform color change — a per-extra-color
+    // surcharge on top of the base color-change line above. Only kicks in
+    // past 2 colors, and capped so an unusually high count can't run away.
+    if (ctx.colorChangeScope === 'multiple_colors' && ctx.colorCount && ctx.colorCount > 2) {
+      const extraColors = Math.min(ctx.colorCount - 2, 6);
+      lineItems.push({
+        category: 'Interior',
+        description: `Multi-Color Cut-In (${ctx.colorCount} colors)`,
+        amount: extraColors * 0.05 * effectiveWallSqFt * BASE_RATES.interior.walls_repaint * regionalMult,
       });
     }
   }
@@ -681,6 +713,23 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
     lineItems.push({ category: 'Add-On', description: 'Hardware Installation (labor; hardware cost separate)', amount: 75 * regionalMult });
   }
 
+  // High-end market callback allowance — customers in very affluent markets
+  // tend to be pickier about finish quality (crisp cut-lines, no roller
+  // stipple, etc.), which realistically costs a painter an extra touch-up
+  // visit sometimes. Skip it for rentals/multi-unit/commercial: landlords,
+  // property managers, and businesses are the ones setting the finish bar
+  // there, not a picky homeowner, so the affluence of the ZIP code isn't a
+  // good signal for callback risk in that case.
+  const isPickyMarket = regionalMult >= 1.3;
+  const ownerIsLikelyPicky = ctx.propertyType !== 'rental' && ctx.propertyType !== 'multi_unit' && ctx.propertyType !== 'commercial';
+  if (isPickyMarket && ownerIsLikelyPicky && (ctx.projectType === 'interior' || ctx.projectType === 'both')) {
+    lineItems.push({
+      category: 'Scheduling',
+      description: 'Touch-Up Callback Allowance (high-end market)',
+      amount: Math.round((regionalMult - 1.0) * 300),
+    });
+  }
+
   // ===== SUBTOTAL =====
   const subtotal = lineItems.reduce((sum, item) => sum + item.amount, 0);
 
@@ -692,10 +741,13 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
     multipliers.push({ label: 'Commercial Property', factor: 1.10 });
   }
 
-  // Rental/investment property — landlords typically don't need (or want to
-  // pay for) a showroom-perfect finish the way an owner-occupant would.
+  // Rental turnover or pre-sale listing — landlords and sellers-in-a-hurry
+  // typically don't need (or want to pay for) a showroom-perfect finish the
+  // way an owner-occupant staying long-term would. extractPropertyType()
+  // maps both "it's a rental" and "we're putting it up for sale" language
+  // to 'rental' since the same standard-finish pricing applies either way.
   if (ctx.propertyType === 'rental') {
-    multipliers.push({ label: 'Rental Property (standard finish)', factor: 0.93 });
+    multipliers.push({ label: 'Standard Turnover Finish (rental/pre-sale)', factor: 0.93 });
   }
 
   // Multi-unit / apartment building — bulk work runs cheaper per unit than

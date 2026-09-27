@@ -125,6 +125,19 @@ function sanitize(raw: Record<string, unknown>, prev: EstimatorContext): Partial
   if (isEnum(raw.stairwayDetails, ['walls_only', 'walls_and_railings', 'full'] as const)) patch.stairwayDetails = raw.stairwayDetails;
   if (isEnum(raw.interiorShutters, ['yes', 'no'] as const)) patch.interiorShutters = raw.interiorShutters;
   if (isEnum(raw.interiorColorChange, ['same', 'different', 'dramatic'] as const)) patch.interiorColorChange = raw.interiorColorChange;
+  if (isEnum(raw.colorChangeScope, ['whole_house', 'most_of_house', 'some_rooms', 'accent_only', 'multiple_colors'] as const)) patch.colorChangeScope = raw.colorChangeScope;
+  const excludedRooms = clampNumber(raw.colorChangeExcludedRoomCount, 1, 20);
+  if (excludedRooms) patch.colorChangeExcludedRoomCount = excludedRooms;
+  const colorCount = clampNumber(raw.colorCount, 1, 20);
+  if (colorCount) patch.colorCount = colorCount;
+  if (isEnum(raw.colorClarificationNeeded, ['color_count', 'color_locations'] as const)) {
+    patch.colorClarificationNeeded = raw.colorClarificationNeeded;
+  } else if (prev.colorClarificationNeeded && (patch.colorCount !== undefined || patch.colorChangeScope !== undefined)) {
+    // The model doesn't need to explicitly say the ambiguity is resolved —
+    // if this message gave us a color count or scope while a clarification
+    // was pending, that IS the resolution.
+    patch.colorClarificationNeeded = '';
+  }
   if (isEnum(raw.ceilingType, ['flat', 'popcorn', 'vaulted'] as const)) patch.ceilingType = raw.ceilingType;
   if (isEnum(raw.ceilingHeight, ['nine_foot', 'ten_plus', 'vaulted_mixed'] as const)) patch.ceilingHeight = raw.ceilingHeight;
   if (isEnum(raw.wallTexture, ['smooth', 'textured', 'heavy_texture'] as const)) patch.wallTexture = raw.wallTexture;
@@ -167,6 +180,7 @@ function sanitize(raw: Record<string, unknown>, prev: EstimatorContext): Partial
   if (isEnum(raw.hardwareReplacement, ['yes'] as const)) patch.hardwareReplacement = raw.hardwareReplacement;
   if (isEnum(raw.lowVocRequested, ['yes'] as const)) patch.lowVocRequested = raw.lowVocRequested;
   if (isEnum(raw.drywallRepairExtent, ['minor', 'moderate', 'major'] as const)) patch.drywallRepairExtent = raw.drywallRepairExtent;
+  if (isEnum(raw.multiPhaseRequested, ['yes'] as const)) patch.multiPhaseRequested = raw.multiPhaseRequested;
 
   // Cumulative arrays: merge (add), never overwrite.
   if (Array.isArray(raw.windowTypesAdd)) {
