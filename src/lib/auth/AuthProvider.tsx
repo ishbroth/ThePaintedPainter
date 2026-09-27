@@ -84,7 +84,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     });
 
     if (error) {
-      return { error: new Error(error.message), user: null };
+      return { error: new Error(error.message), user: null, needsEmailConfirmation: false };
     }
 
     const newUser = data.user;
