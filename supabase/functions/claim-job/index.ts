@@ -6,14 +6,14 @@
 // flips the job to painter_accepted — the UPDATE's WHERE status='offer_sent'
 // clause is what makes this race-safe: if two painters click at once, only
 // one UPDATE matches a row and returns it; the loser gets 0 rows back and
-// sees "already claimed." On success, emails the customer to confirm + pay
-// the deposit, and returns a plain HTML confirmation page (there's no
-// browser session here — this is a link click, not an app route).
+// sees "already claimed." On success, redirects the painter to a real app
+// page (/painter/confirm-date) to set the scheduled start date — the
+// customer isn't emailed to confirm+pay until that date is set, so their
+// confirm email can show it (see confirm-painter-date).
 //
 // Environment variables required:
 //   SUPABASE_URL              - auto-injected
 //   SUPABASE_SERVICE_ROLE_KEY - auto-injected
-//   SUPABASE_ANON_KEY         - auto-injected (used for the internal send-email call)
 //   FRONTEND_URL              - e.g. https://thepaintedpainter.com (defaults to that)
 //
 // Deploy:
@@ -65,10 +65,9 @@ serve(async (req: Request) => {
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-    const anonKey = Deno.env.get('SUPABASE_ANON_KEY')
     const frontendUrl = Deno.env.get('FRONTEND_URL') ?? 'https://thepaintedpainter.com'
 
-    if (!supabaseUrl || !serviceRoleKey || !anonKey) {
+    if (!supabaseUrl || !serviceRoleKey) {
       throw new Error('Missing Supabase environment variables')
     }
 
@@ -79,7 +78,7 @@ serve(async (req: Request) => {
     // Look up the job to confirm the token matches and this painter was eligible.
     const { data: job, error: jobError } = await supabase
       .from('quote_selections')
-      .select('id, status, selection_type, selected_painter_id, notified_painters, customer_email, customer_confirm_token, painter_payout_amount, deposit_amount, guaranteed_price')
+      .select('id, status, selection_type, selected_painter_id, notified_painters')
       .eq('claim_token', token)
       .maybeSingle()
 
@@ -114,42 +113,8 @@ serve(async (req: Request) => {
       )
     }
 
-    // Fetch this painter's contact info for the customer-facing email.
-    const { data: painter } = await supabase
-      .from('painters')
-      .select('company_name, owner_name, email, phone')
-      .eq('id', painterId)
-      .maybeSingle()
-
-    const confirmUrl = `${frontendUrl}/confirm-job?token=${job.customer_confirm_token}`
-
-    try {
-      await fetch(`${supabaseUrl}/functions/v1/send-email`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${anonKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          to: job.customer_email,
-          type: 'painter_accepted_confirm_deposit',
-          data: {
-            painterCompanyName: painter?.company_name ?? 'Your painter',
-            painterOwnerName: painter?.owner_name ?? '',
-            painterEmail: painter?.email ?? '',
-            painterPhone: painter?.phone ?? '',
-            guaranteedPrice: job.guaranteed_price,
-            depositAmount: job.deposit_amount,
-            confirmUrl,
-          },
-        }),
-      })
-    } catch (emailErr) {
-      console.error('Failed to send customer confirm email:', emailErr)
-    }
-
-    return htmlPage(
-      'Job claimed!',
-      'You\'ve accepted this job. We\'ve notified the customer to confirm and pay the deposit — we\'ll email you their full contact details as soon as they do.',
-      'success',
-    )
+    const dateConfirmUrl = `${frontendUrl}/painter/confirm-date?token=${token}&painter_id=${painterId}`
+    return new Response(null, { status: 302, headers: { Location: dateConfirmUrl } })
   } catch (error) {
     console.error('Error claiming job:', error)
     return htmlPage('Something went wrong', 'Please try again or contact support.', 'error')

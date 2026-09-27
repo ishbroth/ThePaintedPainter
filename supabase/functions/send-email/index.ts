@@ -221,6 +221,7 @@ function buildEmailHtml(type: string, data: Record<string, unknown>): string {
           Customer: <strong>${data.customerFirstName || 'A customer'}</strong><br />
           ZIP code: <strong>${data.zipCode || 'N/A'}</strong><br />
           Desired schedule: <strong>${data.timelineLabel || 'Not specified'}</strong>
+          ${data.customerPreferredDate ? `<br />Requested start date: <strong>${data.customerPreferredDate}</strong>` : ''}
         </p>
         <p style="font-size: 22px; font-weight: 700; color: #2563eb; margin: 20px 0;">
           You'd be paid: ${formatMoney(data.payoutAmount)}
@@ -242,6 +243,7 @@ function buildEmailHtml(type: string, data: Record<string, unknown>): string {
           Phone: <a href="tel:${data.painterPhone || ''}">${data.painterPhone || 'N/A'}</a>
         </p>
         <p>Job price: <strong>${formatMoney(data.guaranteedPrice)}</strong></p>
+        ${data.scheduledDate ? `<p>Start date: <strong>${data.scheduledDate}</strong></p>` : ''}
         <p>Deposit due now: <strong>${formatMoney(data.depositAmount)}</strong></p>
         ${data.confirmUrl ? `<p><a class="btn" href="${data.confirmUrl}">Confirm &amp; Pay Deposit</a></p>` : ''}
         <p style="margin-top: 8px; font-size: 13px; color: #6b7280;">Once you confirm and pay the deposit, we'll share your contact details with the painter so you can coordinate directly.</p>
@@ -256,8 +258,9 @@ function buildEmailHtml(type: string, data: Record<string, unknown>): string {
           Email: <a href="mailto:${data.customerEmail || ''}">${data.customerEmail || 'N/A'}</a><br />
           Phone: <a href="tel:${data.customerPhone || ''}">${data.customerPhone || 'N/A'}</a>
         </p>
+        ${data.scheduledDate ? `<p>Start date: <strong>${data.scheduledDate}</strong></p>` : ''}
         <p>Your payout: <strong>${formatMoney(data.payoutAmount)}</strong></p>
-        <p style="margin-top: 8px; font-size: 13px; color: #6b7280;">Reach out to the customer directly to schedule the work.</p>
+        <p style="margin-top: 8px; font-size: 13px; color: #6b7280;">Reach out to the customer directly to confirm details.</p>
       `)
 
     default:

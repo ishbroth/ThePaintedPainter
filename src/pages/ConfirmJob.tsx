@@ -9,6 +9,8 @@ interface JobDetails {
   guaranteedPrice: number;
   depositAmount: number;
   depositStatus: string;
+  scheduledDate: string | null;
+  phaseLabel: string | null;
   painter: {
     companyName: string;
     ownerName: string;
@@ -99,7 +101,8 @@ const ConfirmJob = () => {
 
       {alreadyPaid ? (
         <p style={{ color: '#2ecc71' }}>
-          Deposit received — {job.painter?.companyName} has your full contact details and will be in touch to schedule the work.
+          Deposit received — {job.painter?.companyName} has your full contact details
+          {job.scheduledDate ? <> and is scheduled to start <strong>{job.scheduledDate}</strong></> : ' and will be in touch to schedule the work'}.
         </p>
       ) : (
         <>
@@ -114,6 +117,9 @@ const ConfirmJob = () => {
           </div>
 
           <p>Job price: <strong>{currency(job.guaranteedPrice)}</strong></p>
+          {job.scheduledDate && (
+            <p>Start date: <strong>{job.scheduledDate}</strong>{job.phaseLabel ? ` (${job.phaseLabel})` : ''}</p>
+          )}
           <p>Deposit due now: <strong>{currency(job.depositAmount)}</strong></p>
 
           {error && <p style={{ color: '#e74c3c' }}>{error}</p>}

@@ -50,6 +50,15 @@ interface ClaimRequest {
   timeline: string
   timelineLabel: string
   qa: ResponseQA[]
+  /** Optional — a request, not a commitment. The painter sets the actual scheduled_date when accepting. */
+  preferredDate?: string
+  /** Set when the customer was logged in at claim time, so My Projects can find this row without relying on email matching. */
+  customerId?: string
+  /** When a customer splits one estimate into multiple independently-scheduled
+   * phases (see the chat estimator's phase detection), each phase is submitted
+   * as its own claim sharing a parentQuoteId, with its own phaseLabel. */
+  parentQuoteId?: string
+  phaseLabel?: string
 }
 
 function coordsForZip(zip: string): [number, number] | null {
@@ -89,7 +98,10 @@ serve(async (req: Request) => {
 
   try {
     const body = await req.json() as ClaimRequest
-    const { selectionType, selectedPainterId, guaranteedPrice, quoteZip, customer, timeline, timelineLabel, qa } = body
+    const {
+      selectionType, selectedPainterId, guaranteedPrice, quoteZip, customer, timeline, timelineLabel, qa,
+      preferredDate, customerId, parentQuoteId, phaseLabel,
+    } = body
 
     if (!selectionType || !guaranteedPrice || !customer?.name || !customer?.email || !customer?.phone || !customer?.streetAddress) {
       return new Response(
@@ -190,6 +202,10 @@ serve(async (req: Request) => {
         commission_rate: COMMISSION_RATE,
         painter_payout_amount: painterPayoutAmount,
         deposit_amount: depositAmount,
+        customer_preferred_date: preferredDate || null,
+        customer_id: customerId || null,
+        parent_quote_id: parentQuoteId || null,
+        phase_label: phaseLabel || null,
       })
       .select('id, claim_token')
       .single()
@@ -214,6 +230,7 @@ serve(async (req: Request) => {
               customerFirstName,
               zipCode: quoteZip,
               timelineLabel,
+              customerPreferredDate: preferredDate || null,
               payoutAmount: painterPayoutAmount,
               acceptUrl,
               qa,

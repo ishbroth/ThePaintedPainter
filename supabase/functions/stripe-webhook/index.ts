@@ -344,7 +344,7 @@ async function handleQuoteSelectionDepositPaid(
       stripe_checkout_session_id: session.id,
     })
     .eq('id', quoteSelectionId)
-    .select('id, customer_name, customer_email, customer_phone, customer_street_address, customer_city, customer_state, quote_zip, painter_payout_amount, accepted_by')
+    .select('id, customer_name, customer_email, customer_phone, customer_street_address, customer_city, customer_state, quote_zip, painter_payout_amount, accepted_by, scheduled_date')
     .maybeSingle()
 
   if (updateError || !job) {
@@ -388,6 +388,7 @@ async function handleQuoteSelectionDepositPaid(
           customerState: job.customer_state,
           customerZip: job.quote_zip,
           payoutAmount: job.painter_payout_amount,
+          scheduledDate: job.scheduled_date,
         },
       }),
     })

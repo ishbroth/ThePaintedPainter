@@ -6,6 +6,7 @@ import type { MatchedSituation } from '../lib/pricing/situations';
 import { fetchNearbyPainters, type RealPainterMatch } from '../lib/realPainterMatcher';
 import { buildResponseSummary, timelineLabel } from '../lib/chatEstimator/responseSummary';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../lib/auth';
 import { hapticMedium } from '../lib/haptics';
 import { QUOTE_RESULT_KEY, QUOTE_EXPIRES_KEY, PRICE_HOLD_MINUTES } from '../lib/chatEstimator/persistence';
 
@@ -375,9 +376,11 @@ const ClaimPriceModal = ({
   const [streetAddress, setStreetAddress] = useState('');
   const [city, setCity] = useState('');
   const [state_, setState_] = useState(ctx.state || '');
+  const [preferredDate, setPreferredDate] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState<{ notifiedCount: number } | null>(null);
+  const { user } = useAuth();
 
   const handleSubmit = async () => {
     if (!name.trim() || !email.trim() || !phone.trim() || !streetAddress.trim() || !city.trim() || !state_.trim()) {
@@ -397,6 +400,8 @@ const ClaimPriceModal = ({
           timeline: ctx.timeline,
           timelineLabel: timelineLabel(ctx.timeline),
           qa: buildResponseSummary(ctx),
+          preferredDate: preferredDate || undefined,
+          customerId: user?.id,
         },
       });
 
@@ -453,6 +458,12 @@ const ClaimPriceModal = ({
               <div style={{ display: 'flex', gap: 10 }}>
                 <input placeholder="City" value={city} onChange={(e) => setCity(e.target.value)} style={{ ...inputStyle, flex: 2 }} />
                 <input placeholder="State" value={state_} onChange={(e) => setState_(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
+              </div>
+              <div>
+                <label style={{ fontSize: '0.8rem', color: '#a9b0b6', display: 'block', marginBottom: 4 }}>
+                  Preferred start date (optional — the painter will confirm)
+                </label>
+                <input type="date" value={preferredDate} onChange={(e) => setPreferredDate(e.target.value)} style={inputStyle} />
               </div>
             </div>
 

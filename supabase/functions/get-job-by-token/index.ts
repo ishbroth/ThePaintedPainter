@@ -53,7 +53,7 @@ serve(async (req: Request) => {
 
     const { data: job, error } = await supabase
       .from('quote_selections')
-      .select('id, status, guaranteed_price, deposit_amount, deposit_status, accepted_by, confirmed_at')
+      .select('id, status, guaranteed_price, deposit_amount, deposit_status, accepted_by, confirmed_at, scheduled_date, phase_label')
       .eq('customer_confirm_token', token)
       .maybeSingle()
 
@@ -85,6 +85,8 @@ serve(async (req: Request) => {
         depositAmount: job.deposit_amount,
         depositStatus: job.deposit_status,
         confirmedAt: job.confirmed_at,
+        scheduledDate: job.scheduled_date,
+        phaseLabel: job.phase_label,
         painter: painter
           ? {
               companyName: painter.company_name,
