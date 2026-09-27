@@ -84,6 +84,18 @@ export interface EstimatorContext {
   prepWork: string[]; // caulking, stain_cover, drywall_repair, wood_rot, wallpaper_removal, power_washing, lead_test, mold_treatment
   caulkingExtent: string; // minor, moderate, extensive
   drywallRepairExtent: string; // minor, moderate, major
+  // drywallRepairExtent defaults to 'minor' (not empty), so it can't by
+  // itself distinguish "customer said it's minor" from "never discussed" —
+  // this tracks whether condition/prep was actually addressed at all, so
+  // the "condition" topic doesn't loop forever re-asking something the
+  // customer already answered with e.g. "no damage, just nail holes".
+  conditionAddressed: boolean;
+  // Same problem as conditionAddressed: nothing ever wrote a structured
+  // field for "how far along are the other trades" answers, so the
+  // reno_context topic's old check (additionalDetails containing the
+  // literal word "drywall"/"contractor") almost never matched a realistic
+  // answer like "everything installed, just needs paint" and looped.
+  renoStageAddressed: boolean;
   woodRotExtent: string; // minor, moderate, major
   wallpaperRooms: number | null;
   popcornCeilingRooms: number | null;

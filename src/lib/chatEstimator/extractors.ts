@@ -754,8 +754,18 @@ export function extractSurfaceScope(text: string): {
     return out;
   }
 
-  // "just walls" / "only walls" → walls yes, rest no
-  const justOnly = /\b(?:just|only)\s+(?:the\s+)?([\w\s,]+?)(?:$|[.,;])/i.exec(t);
+  // "walls only" (trailing) or "just walls" / "only walls" (leading) — both
+  // equally common in normal speech, and this used to only recognize the
+  // leading form, which left interiorCeilings/interiorTrim/interiorDoors
+  // stuck at their 'yes' defaults and the "surfaces" topic endlessly
+  // re-asked despite the customer having already answered it. Try the
+  // trailing form FIRST: the leading regex's "only" branch is too eager —
+  // in "trim only please" it reads "only" as the trigger word and captures
+  // "please" as the object (finding no surface keyword there), which would
+  // shadow the correct trailing-form match if tried second.
+  const justOnly =
+    /(?:^|[.,;]\s*)([\w\s]+?)\s+only\b/i.exec(t) ??
+    /\b(?:just|only)\s+(?:the\s+)?([\w\s,]+?)(?:$|[.,;])/i.exec(t);
   if (justOnly) {
     const limited = justOnly[1];
     const hasWalls = /\bwalls?\b/.test(limited);
@@ -1018,6 +1028,21 @@ export function extractAll(text: string, prev: EstimatorContext): ExtractResult 
   }
 
   const damage = extractDamageSignals(text);
+  // drywallRepairExtent defaults to 'minor', so setting it to 'minor' again
+  // here is indistinguishable from never having discussed condition at all
+  // — track that it was actually addressed separately (see EstimatorContext
+  // doc comment) so the "condition" topic doesn't loop.
+  if (
+    damage.wallpaper || damage.rot || damage.heavyPrep || damage.holes || damage.damage ||
+    /\b(good shape|great shape|in good condition|looks good|no (?:damage|issues|problems)|clean|pristine|move[-\s]?in ready)\b/.test(text.toLowerCase())
+  ) {
+    patch.conditionAddressed = true;
+  }
+  if (
+    /\b(drywall|contractor|primer|other trades|taped and textured|ready for paint|(?:still|not yet) (?:being )?installed|still in progress|(?:everything|all) (?:installed|finished|done))\b/.test(text.toLowerCase())
+  ) {
+    patch.renoStageAddressed = true;
+  }
   const addPrep = (key: string) => {
     const existing = patch.prepWork ?? prev.prepWork ?? [];
     if (!existing.includes(key)) patch.prepWork = [...existing, key];

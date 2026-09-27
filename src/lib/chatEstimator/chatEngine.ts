@@ -377,9 +377,18 @@ async function processMessage(state: ChatState, trimmed: string): Promise<TurnRe
   if (hasIntent(intent, 'express_uncertainty')) {
     const reply = metaBank.uncertainty(s.lastBotTopic?.id ?? null);
     s = { ...s, history: [...s.history, botMessage(reply)] };
-    // Mark the topic as "answered by uncertainty" so we don't re-ask
+    // Mark the topic as "answered by uncertainty" so we don't re-ask — and
+    // also mark it as already retried, since the metaBank.uncertainty()
+    // reply already told the user we're moving on with an assumption (e.g.
+    // "no worries — I'll assume X"). Without also touching retriedIds, that
+    // promise was broken: pickRetryTopic would still circle back to this
+    // same topic later with a jarring "I don't think I got this one" once
+    // other topics ran out, even though the user was told it was settled.
     if (s.lastBotTopic && !s.askedIds.includes(s.lastBotTopic.id)) {
       s = { ...s, askedIds: [...s.askedIds, s.lastBotTopic.id] };
+    }
+    if (s.lastBotTopic && !s.retriedIds.includes(s.lastBotTopic.id)) {
+      s = { ...s, retriedIds: [...s.retriedIds, s.lastBotTopic.id] };
     }
     return advanceAfterUncertainty(s);
   }

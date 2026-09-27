@@ -125,10 +125,22 @@ const UPDATE_TOOL = {
         type: 'array', items: { type: 'string', enum: ROOM_KEYS },
         description: 'Only set when interiorScope is "specific_rooms" — the specific named rooms.',
       },
-      interiorWalls: { type: 'string', enum: ['yes', 'no'] },
-      interiorCeilings: { type: 'string', enum: ['yes', 'no'] },
-      interiorTrim: { type: 'string', enum: ['yes', 'no'] },
-      interiorDoors: { type: 'string', enum: ['none', 'some', 'all'] },
+      interiorWalls: {
+        type: 'string', enum: ['yes', 'no'],
+        description: 'Set to "yes" whenever walls are being painted at all (the default/common case). Set to "no" only if the customer explicitly excludes walls.',
+      },
+      interiorCeilings: {
+        type: 'string', enum: ['yes', 'no'],
+        description: 'IMPORTANT — this is a scope-EXCLUSION field, not just an inclusion one: when the customer says "walls only", "just the walls", "just walls, no ceiling/trim/doors", or similar scope-limiting language, set this to "no" in that SAME turn (not left unset) — the customer excluding other surfaces is itself new information, just as much as them including a surface. Set to "yes" only when ceilings are explicitly part of the job (e.g. "walls and ceiling", "the whole room", "everything").',
+      },
+      interiorTrim: {
+        type: 'string', enum: ['yes', 'no'],
+        description: 'Same scope-exclusion logic as interiorCeilings: "walls only"/"just walls" means set this to "no" in the same turn, not leave it unset. Set to "yes" only when trim/baseboards are explicitly included.',
+      },
+      interiorDoors: {
+        type: 'string', enum: ['none', 'some', 'all'],
+        description: 'Same scope-exclusion logic as interiorCeilings/interiorTrim: "walls only"/"just walls" means set this to "none" in the same turn, not leave it unset. Set to "some"/"all" only when doors are explicitly included.',
+      },
       doorFrames: { type: 'string', enum: ['yes', 'no'] },
       cabinets: { type: 'string', enum: ['none', 'kitchen', 'bathroom', 'laundry', 'multiple'] },
       cabinetScope: { type: 'string', enum: ['fronts_only', 'inside_too'] },
@@ -226,6 +238,14 @@ const UPDATE_TOOL = {
       occupancy: { type: 'string', enum: ['vacant', 'furnished', 'occupied'] },
       prepWorkAdd: { type: 'array', items: { type: 'string', enum: ['caulking', 'stain_cover', 'drywall_repair', 'wood_rot', 'wallpaper_removal', 'power_washing', 'lead_test', 'mold_treatment'] } },
       drywallRepairExtent: { type: 'string', enum: ['minor', 'moderate', 'major'] },
+      conditionAddressed: {
+        type: 'boolean',
+        description: 'Set to true whenever the customer says ANYTHING about the current wall/surface condition, even "it\'s fine" or "no damage, just some nail holes" — this just needs to be true so the condition question isn\'t asked again; it does not need drywallRepairExtent to also be "major"/"moderate" to count.',
+      },
+      renoStageAddressed: {
+        type: 'boolean',
+        description: 'Only relevant for a renovation/new-construction job. Set to true whenever the customer says ANYTHING about how far along the other trades are — "drywall\'s up", "everything installed, just needs paint", "still waiting on trim", "not sure" — this just needs to be true so that question isn\'t asked again.',
+      },
       multiPhaseRequested: {
         type: 'string', enum: ['yes'],
         description: 'Set to "yes" when the customer wants the work spaced out on separate dates rather than done all at once — e.g. "bedrooms now, exterior later", a property manager staggering several units, or explicitly wanting it done in phases/stages. Still priced as one combined total; this only flags that they should be offered phased scheduling when they claim their price.',
@@ -261,6 +281,8 @@ const SYSTEM_PROMPT = `You are the natural-language understanding layer for a ho
 
 Rules:
 - Only include fields the LATEST message gives new information for. Do not repeat facts already known (see "Already known" below) unless the user is clearly correcting or changing a prior answer.
+- Excluding something is just as much "new information" as including it: a customer saying "walls only" or "just walls" is giving you new facts about ceilings, trim, AND doors (all excluded), not just about walls. The same logic applies anywhere a scope-limiting word ("only", "just", "no X") appears — set every affected field that same turn rather than leaving the unmentioned ones unset. Leaving them unset means the bot will ask about each one separately, which reads as not having listened to an answer the customer already gave.
+- conditionAddressed and renoStageAddressed exist ONLY to stop a question from being re-asked — set them to true whenever the customer says anything at all on that topic, even a vague answer or "not sure", regardless of what other fields you do or don't also set that turn.
 - "ready_to_finish" means the user wants a price NOW, regardless of what the last question asked — "run it", "just run the numbers", "go ahead", "that's it", "I'm done", "give me a price", "show me the number". This is an unambiguous, high-priority signal — treat it as ready_to_finish even if it doesn't seem to directly answer whatever was just asked. Do NOT classify these as ask_clarification just because they don't address the last question.
 - "ask_clarification" is ONLY for a user who is genuinely confused and wants you to re-explain something — "what do you mean?", "like what?", "I don't understand". A short reply that simply doesn't engage with the last question (e.g. "sounds good", "run it", "ok whatever") is NOT clarification-seeking — if it carries no new job info either, it's closer to a mild confirmation/filler; don't invent an intent for it beyond provide_info.
 - Be decisive about implied scope: "2 bed 1 bath", "4 bed 3 bath", "a rental unit", "an apartment", "a studio", "the whole place" all describe the WHOLE property, not a single room — set interiorScope to "whole_house" and do NOT add a room to selectedRooms just because "bath" or "bed" appears in a count.

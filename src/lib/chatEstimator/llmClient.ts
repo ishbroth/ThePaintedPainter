@@ -180,6 +180,8 @@ function sanitize(raw: Record<string, unknown>, prev: EstimatorContext): Partial
   if (isEnum(raw.hardwareReplacement, ['yes'] as const)) patch.hardwareReplacement = raw.hardwareReplacement;
   if (isEnum(raw.lowVocRequested, ['yes'] as const)) patch.lowVocRequested = raw.lowVocRequested;
   if (isEnum(raw.drywallRepairExtent, ['minor', 'moderate', 'major'] as const)) patch.drywallRepairExtent = raw.drywallRepairExtent;
+  if (raw.conditionAddressed === true) patch.conditionAddressed = true;
+  if (raw.renoStageAddressed === true) patch.renoStageAddressed = true;
   if (isEnum(raw.multiPhaseRequested, ['yes'] as const)) patch.multiPhaseRequested = raw.multiPhaseRequested;
 
   // Cumulative arrays: merge (add), never overwrite.

@@ -271,8 +271,10 @@ export const TOPICS: Topic[] = [
     alreadyAnswered: (c) => {
       const t = c.additionalDetails.toLowerCase();
       return (
+        c.conditionAddressed ||
         c.prepWork.length > 0 ||
-        !!c.drywallRepairExtent ||
+        c.drywallRepairExtent === 'major' ||
+        c.drywallRepairExtent === 'moderate' ||
         c.projectCondition === 'repaint' ||
         c.projectCondition === 'renovation' ||
         /\b(good|clean|great|fine|pristine|move[-\s]?in)\b/.test(t)
@@ -396,7 +398,8 @@ export const TOPICS: Topic[] = [
     id: 'reno_context',
     priority: 40,
     relevant: (c) => c.projectCondition === 'renovation' || c.projectCondition === 'new_construction',
-    alreadyAnswered: (c) => c.additionalDetails.toLowerCase().includes('drywall') ||
+    alreadyAnswered: (c) => c.renoStageAddressed ||
+      c.additionalDetails.toLowerCase().includes('drywall') ||
       c.additionalDetails.toLowerCase().includes('contractor'),
     ask: (c) =>
       pick(
