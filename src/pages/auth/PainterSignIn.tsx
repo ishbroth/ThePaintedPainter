@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../lib/auth/index.ts';
+import SignInRoleToggle from '../../components/auth/SignInRoleToggle';
 
 export default function PainterSignIn() {
   const { signIn } = useAuth();
@@ -33,6 +34,7 @@ export default function PainterSignIn() {
   return (
     <div className="flex items-center justify-center min-h-[70vh] px-4">
       <div className="w-full max-w-[400px] bg-[#222] rounded-lg p-8">
+        <SignInRoleToggle active="painter" />
         <h1 className="text-2xl font-bold text-white text-center">Painter Sign In</h1>
         <p className="text-gray-400 text-center mt-2 mb-6">
           Sign in to manage your painter profile

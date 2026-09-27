@@ -1,0 +1,29 @@
+import { Link } from 'react-router-dom';
+import type { CSSProperties } from 'react';
+
+/** Lets someone on either sign-in page switch to the other — painters have
+ * no other discoverable way to reach their sign-in page (the header's "Sign
+ * In" link only points at the customer one). */
+export default function SignInRoleToggle({ active }: { active: 'customer' | 'painter' }) {
+  const tabStyle = (isActive: boolean): CSSProperties => ({
+    flex: 1,
+    textAlign: 'center',
+    padding: '8px 0',
+    fontSize: '0.85rem',
+    fontWeight: 600,
+    textDecoration: 'none',
+    borderBottom: isActive ? '2px solid #3b82f6' : '2px solid #444',
+    color: isActive ? '#fff' : '#888',
+  });
+
+  return (
+    <div className="flex mb-6" style={{ display: 'flex' }}>
+      <Link to="/auth/customer-sign-in" style={tabStyle(active === 'customer')}>
+        Customer
+      </Link>
+      <Link to="/auth/painter-sign-in" style={tabStyle(active === 'painter')}>
+        Painter
+      </Link>
+    </div>
+  );
+}

@@ -12,6 +12,7 @@ export default function CustomerSignUp() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [confirmEmailSent, setConfirmEmailSent] = useState(false);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -30,9 +31,14 @@ export default function CustomerSignUp() {
     setLoading(true);
 
     try {
-      const { error: signUpError } = await signUp(email, password, 'customer', name);
+      const { error: signUpError, needsEmailConfirmation } = await signUp(email, password, 'customer', name);
       if (signUpError) {
         setError(signUpError.message);
+      } else if (needsEmailConfirmation) {
+        // No active session yet — navigating to the (protected) dashboard
+        // here would just get bounced straight back to sign-in with no
+        // explanation of what happened.
+        setConfirmEmailSent(true);
       } else {
         navigate('/customer/dashboard');
       }
@@ -42,6 +48,26 @@ export default function CustomerSignUp() {
       setLoading(false);
     }
   };
+
+  if (confirmEmailSent) {
+    return (
+      <div className="flex items-center justify-center min-h-[70vh] px-4">
+        <div className="w-full max-w-[400px] bg-[#222] rounded-lg p-8 text-center">
+          <h1 className="text-2xl font-bold text-white">Check your email</h1>
+          <p className="text-gray-400 mt-3">
+            We sent a confirmation link to <span className="text-white">{email}</span>. Click it to activate your
+            account, then sign in.
+          </p>
+          <Link
+            to="/auth/customer-sign-in"
+            className="inline-block mt-6 text-blue-400 hover:text-blue-300 text-sm"
+          >
+            Go to sign in
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex items-center justify-center min-h-[70vh] px-4">

@@ -89,10 +89,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     const newUser = data.user;
     if (!newUser) {
-      return { error: new Error('Sign up succeeded but no user was returned'), user: null };
+      return { error: new Error('Sign up succeeded but no user was returned'), user: null, needsEmailConfirmation: false };
     }
 
-    return { error: null, user: newUser };
+    // No session means email confirmation is pending — the caller must not
+    // navigate to a protected dashboard route here, since ProtectedRoute
+    // will immediately bounce an unauthenticated user back to sign-in with
+    // no explanation of what happened.
+    return { error: null, user: newUser, needsEmailConfirmation: !data.session };
   };
 
   const signOut = async () => {

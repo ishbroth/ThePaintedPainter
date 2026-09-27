@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
 import { sendEmail } from '../lib/notifications/email';
@@ -385,7 +385,7 @@ const PainterSignup = () => {
   const [formData, setFormData] = useState<PainterFormData>(initialFormData);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
-  const [submitted] = useState(false);
+  const [needsEmailConfirmation, setNeedsEmailConfirmation] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [slideDirection, setSlideDirection] = useState<'left' | 'right'>('right');
 
@@ -521,7 +521,7 @@ const PainterSignup = () => {
 
     try {
       // 1. Create Supabase auth account
-      const { error: authError, user: newUser } = await signUp(
+      const { error: authError, user: newUser, needsEmailConfirmation } = await signUp(
         formData.email.trim(),
         formData.password,
         'painter',
@@ -601,8 +601,14 @@ const PainterSignup = () => {
         },
       }).catch((err) => console.error('Failed to send application notification email:', err));
 
-      // 4. Redirect to painter dashboard
-      navigate('/painter/dashboard');
+      // 4. No active session yet if email confirmation is pending —
+      // navigating to the (protected) dashboard here would just get bounced
+      // straight back to sign-in with no explanation of what happened.
+      if (needsEmailConfirmation) {
+        setNeedsEmailConfirmation(true);
+      } else {
+        navigate('/painter/dashboard');
+      }
     } catch (err: unknown) {
       const message =
         err instanceof Error ? err.message : 'Something went wrong. Please try again.';
@@ -1130,10 +1136,40 @@ const PainterSignup = () => {
   // Main render
   // =========================================================================
 
-  if (submitted) {
-    // Redirect handled in handleSubmit via navigate(); this is a fallback
-    navigate('/painter/dashboard');
-    return null;
+  if (needsEmailConfirmation) {
+    return (
+      <div className="bg-[#1a1a1a] text-white" style={{ minHeight: '100vh' }}>
+        <section className="bg-[#111] text-white py-16 border-b border-[#333]">
+          <div className="container-custom text-center">
+            <h1
+              className="text-3xl md:text-4xl font-bold mb-3"
+              style={{ fontFamily: "'Cabin', sans-serif" }}
+            >
+              Application Received
+            </h1>
+            <p className="text-gray-400">Partner with The Painted Painter</p>
+          </div>
+        </section>
+        <section style={{ padding: '48px 20px', textAlign: 'center' }}>
+          <div style={{ maxWidth: '520px', margin: '0 auto' }}>
+            <p style={{ marginBottom: 16 }}>
+              Thanks — we've got your application and account details for{' '}
+              <strong>{formData.companyName.trim()}</strong>.
+            </p>
+            <p style={{ marginBottom: 16, color: '#aaa' }}>
+              We sent a confirmation link to <strong>{formData.email.trim()}</strong>. Click it to activate your
+              account, then sign in to check your application status.
+            </p>
+            <Link
+              to="/auth/painter-sign-in"
+              style={{ color: '#74b9ff', textDecoration: 'underline' }}
+            >
+              Go to painter sign in
+            </Link>
+          </div>
+        </section>
+      </div>
+    );
   }
 
   return (
