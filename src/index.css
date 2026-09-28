@@ -18,40 +18,15 @@
    :root shares light's values (not dark's) so the very first paint —
    before ThemeProvider's effect sets data-theme — already matches the
    default theme instead of flashing dark then swapping to light.
+   IMPORTANT: :root matches the <html> element UNCONDITIONALLY, regardless
+   of its data-theme attribute — so this combined block must come BEFORE
+   [data-theme="dark"] in source order. Both selectors have equal
+   specificity, so ties break on source order; putting :root's block after
+   [data-theme="dark"] (as a previous version of this file did) made every
+   toggle-to-dark click silently no-op, since :root's light values would
+   always win the cascade for the <html> element no matter what the
+   attribute said.
    ============================================================================ */
-[data-theme="dark"] {
-  --bg-page: #1a1a1a;
-  --bg-chrome: #111111;       /* header, hero, footer, CTA bands */
-  --bg-surface: #222222;      /* cards, alternating sections */
-  --bg-surface-hover: #2a2a2a;
-  --border: #333333;
-  --border-strong: #444444;
-  --input-border: #555555;
-  --text-primary: #ffffff;
-  --text-secondary: #999999;
-  --text-faint: #bbbbbb;
-  --accent: #f5a623;
-  --accent-hover: #e09500;
-  --accent-ink: #1a1a1a;      /* text color ON TOP of --accent */
-  --accent-blue: #74b9ff;
-  --accent-blue-hover: #92c9ff;
-  --accent-blue-ink: #0b1620;  /* text color ON TOP of --accent-blue */
-  --danger: #e74c3c;
-  --success: #4caf50;
-  --overlay: rgba(0, 0, 0, 0.6);
-  --watermark-opacity: 0.08;
-  --mystery-grad-start: #1e2c3e;
-  --mystery-grad-end: #13293d;
-  --tint-info-bg: #1a2a3a;
-  --tint-info-border: #2a4a6a;
-  --tint-warning-bg: #3a3a1a;
-  --tint-warning-border: #6a6a2a;
-  --tint-critical-bg: #3a1a1a;
-  --tint-critical-border: #6a2a2a;
-  --tint-success-bg: #1a3a1a;
-  --tint-success-border: #2d6b2d;
-}
-
 :root,
 [data-theme="light"] {
   --bg-page: #fdf9f2;
@@ -84,6 +59,39 @@
   --tint-critical-border: #f87171;
   --tint-success-bg: #dcfce7;
   --tint-success-border: #4ade80;
+}
+
+[data-theme="dark"] {
+  --bg-page: #1a1a1a;
+  --bg-chrome: #111111;       /* header, hero, footer, CTA bands */
+  --bg-surface: #222222;      /* cards, alternating sections */
+  --bg-surface-hover: #2a2a2a;
+  --border: #333333;
+  --border-strong: #444444;
+  --input-border: #555555;
+  --text-primary: #ffffff;
+  --text-secondary: #999999;
+  --text-faint: #bbbbbb;
+  --accent: #f5a623;
+  --accent-hover: #e09500;
+  --accent-ink: #1a1a1a;      /* text color ON TOP of --accent */
+  --accent-blue: #74b9ff;
+  --accent-blue-hover: #92c9ff;
+  --accent-blue-ink: #0b1620;  /* text color ON TOP of --accent-blue */
+  --danger: #e74c3c;
+  --success: #4caf50;
+  --overlay: rgba(0, 0, 0, 0.6);
+  --watermark-opacity: 0.08;
+  --mystery-grad-start: #1e2c3e;
+  --mystery-grad-end: #13293d;
+  --tint-info-bg: #1a2a3a;
+  --tint-info-border: #2a4a6a;
+  --tint-warning-bg: #3a3a1a;
+  --tint-warning-border: #6a6a2a;
+  --tint-critical-bg: #3a1a1a;
+  --tint-critical-border: #6a2a2a;
+  --tint-success-bg: #1a3a1a;
+  --tint-success-border: #2d6b2d;
 }
 
 * {
