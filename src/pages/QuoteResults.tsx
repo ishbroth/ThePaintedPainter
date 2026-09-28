@@ -406,6 +406,7 @@ const ClaimPriceModal = ({
           qa: buildResponseSummary(ctx),
           preferredDate: preferredDate || undefined,
           customerId: user?.id,
+          photos: ctx.photos.length > 0 ? ctx.photos : undefined,
         },
       });
 

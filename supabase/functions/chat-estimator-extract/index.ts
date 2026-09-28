@@ -63,9 +63,9 @@ const INTENTS = [
   'greeting', 'ask_clarification', 'ask_example', 'express_uncertainty',
   'meta_cost', 'meta_how_it_works', 'meta_bot_check', 'meta_real_person',
   'meta_time', 'meta_privacy', 'off_topic', 'deflection', 'negation',
-  'confirmation', 'scope_limiter', 'frustration', 'ready_to_finish',
-  'restart', 'color_question', 'recommend_question', 'painter_question',
-  'booking_question', 'provide_info',
+  'confirmation', 'scope_limiter', 'frustration', 'already_answered',
+  'ready_to_finish', 'restart', 'color_question', 'recommend_question',
+  'painter_question', 'booking_question', 'provide_info',
 ]
 
 const UPDATE_TOOL = {
@@ -77,7 +77,7 @@ const UPDATE_TOOL = {
       intents: {
         type: 'array',
         items: { type: 'string', enum: INTENTS },
-        description: 'One or more intents for the LATEST user message, most confident first. Always include at least one; default to "provide_info" if the message is just describing the job. "restart" covers any request to clear/reset/wipe everything and start over ("clear this", "start fresh", "reset", "forget what I said"), not just the literal word "restart".',
+        description: 'One or more intents for the LATEST user message, most confident first. Always include at least one; default to "provide_info" if the message is just describing the job. "restart" covers any request to clear/reset/wipe everything and start over ("clear this", "start fresh", "reset", "forget what I said"), not just the literal word "restart". "already_answered" covers the user asserting they already gave an answer ("I already told you", "I said that already", "I just told you that") — tag this whenever the user says it, REGARDLESS of whether you can actually find that fact in "Already known" or recent history; a separate step re-checks the full transcript and handles the reply, so your only job here is recognizing the assertion.',
       },
       acknowledgements: {
         type: 'array',
@@ -85,7 +85,7 @@ const UPDATE_TOOL = {
         description: 'Short factual phrases (2-4 words) about the PAINTING JOB ONLY, e.g. "2-bedroom", "vacant", "picket fence". NEVER describe the user\'s tone, the conversation, or your own reasoning (e.g. never write things like "user frustrated" or "confirmed prior details") — those are not job facts. Empty array if the message contains no new job detail, which is normal and expected for questions, complaints, or filler like "ok" or "not sure".',
       },
       zipCode: { type: 'string', description: '5-digit US ZIP code, if mentioned.' },
-      squareFeet: { type: 'number', description: 'Total square footage of the property/unit, if explicitly stated.' },
+      squareFeet: { type: 'number', description: 'Total square footage of the property/unit, if explicitly stated — including a BARE number with no unit when the bot\'s last question directly asked for square footage/size (e.g. bot asked "about how big is the place?" and the user just replied "600" — that\'s 600 sqft, not a value to ignore for lacking "sqft").' },
       bedroomCount: { type: 'integer', description: 'Number of bedrooms, if mentioned.' },
       stories: { type: 'integer', enum: [1, 2, 3], description: 'Number of stories of the building, if mentioned.' },
       propertyType: {
@@ -235,12 +235,15 @@ const UPDATE_TOOL = {
         type: 'array', items: { type: 'string', enum: ['fireplace', 'beams', 'built_ins', 'epoxy', 'furniture', 'brick'] },
         description: 'Specialty items that each have their own dedicated pricing — a fireplace/mantel, exposed wood beams, built-in bookshelves/cabinetry, a garage floor epoxy coating, or a specific furniture piece to paint. Easy to miss since they\'re rarely the main topic of a message — watch for them mentioned in passing.',
       },
-      occupancy: { type: 'string', enum: ['vacant', 'furnished', 'occupied'] },
+      occupancy: {
+        type: 'string', enum: ['vacant', 'furnished', 'occupied'],
+        description: 'Whether the space is lived-in during the work. Set this from a bare one-word reply too ("vacant" / "furnished" / "occupied") when the bot just asked this directly — those exact words are the suggested quick-reply options, so a plain answer like that is not vague, it\'s a direct answer.',
+      },
       prepWorkAdd: { type: 'array', items: { type: 'string', enum: ['caulking', 'stain_cover', 'drywall_repair', 'wood_rot', 'wallpaper_removal', 'power_washing', 'lead_test', 'mold_treatment'] } },
       drywallRepairExtent: { type: 'string', enum: ['minor', 'moderate', 'major'] },
       conditionAddressed: {
         type: 'boolean',
-        description: 'Set to true whenever the customer says ANYTHING about the current wall/surface condition, even "it\'s fine" or "no damage, just some nail holes" — this just needs to be true so the condition question isn\'t asked again; it does not need drywallRepairExtent to also be "major"/"moderate" to count.',
+        description: 'Set to true whenever the customer says ANYTHING about the current wall/surface condition, even "it\'s fine", "no damage, just some nail holes", "needs some repairs", or "needs fixing" — this just needs to be true so the condition question isn\'t asked again; it does not need drywallRepairExtent to also be "major"/"moderate" to count.',
       },
       renoStageAddressed: {
         type: 'boolean',

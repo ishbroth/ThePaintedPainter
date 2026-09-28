@@ -10,9 +10,8 @@ function getInitialTheme(): Theme {
   } catch {
     // ignore (private browsing, etc.)
   }
-  // Default to dark — matches the site's existing look, so anyone who
-  // hasn't picked a preference yet sees exactly what they saw before.
-  return 'dark';
+  // Default to light for anyone who hasn't picked a preference yet.
+  return 'light';
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {

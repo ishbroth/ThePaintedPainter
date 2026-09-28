@@ -20,6 +20,13 @@ export interface EstimatorContext {
   interiorCeilings: string; // yes, no
   ceilingType: string; // flat, popcorn, vaulted, skip
   interiorTrim: string; // yes, no
+  // "Trim" alone is ambiguous — it prices baseboards only (see
+  // surfaceAreaEngine's trimLinearFt), but customers often mean door
+  // frames/casings, window trim, closet shelving, or built-ins too, each
+  // of which is a separate line item. Same problem as conditionAddressed:
+  // tracks whether that scope was actually clarified, since "no" on
+  // doorFrames/etc. is indistinguishable from "never asked".
+  trimScopeAddressed: boolean;
   crownMolding: string; // yes, no, skip
   wainscoting: string; // yes, no, skip
   baseboards: string; // yes, no
@@ -159,6 +166,31 @@ export interface EstimatorContext {
   specialtyReferrals: SpecialtyReferral[];
   isHighCostArea: boolean;
   stateComplianceNotes: string[];
+
+  // Photos — some scope descriptions (repair extent, closet shelving,
+  // furniture pieces, unusual trim details) are genuinely hard to price
+  // sight-unseen, so certain keywords prompt the customer for a picture
+  // instead of guessing. photoRequests tracks which prompts have been
+  // raised (and whether fulfilled) so the same trigger doesn't fire twice;
+  // photos holds what was actually uploaded, forwarded to the painter
+  // along with the rest of the job details.
+  photoRequests: PhotoRequest[];
+  photos: UploadedPhoto[];
+}
+
+export interface PhotoRequest {
+  id: string;
+  /** What to say in "Provide a picture of ___" — e.g. "the closet shelving". */
+  label: string;
+  fulfilled: boolean;
+}
+
+export interface UploadedPhoto {
+  id: string;
+  url: string;
+  description: string;
+  /** Which request this fulfilled ("property" for the generic end-of-chat ask). */
+  label: string;
 }
 
 // ===== Specialty Referrals =====

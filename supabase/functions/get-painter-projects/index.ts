@@ -37,7 +37,7 @@ const JOB_COLUMNS = `
   customer_name, customer_email, customer_phone,
   customer_street_address, customer_city, customer_state,
   scheduled_date, customer_preferred_date, phase_label, parent_quote_id,
-  completed_at, confirmed_at, accepted_at, offer_sent_at, project_summary
+  completed_at, confirmed_at, accepted_at, offer_sent_at, project_summary, photos
 `
 
 serve(async (req: Request) => {
@@ -104,6 +104,7 @@ serve(async (req: Request) => {
       preferredDate: r.customer_preferred_date,
       phaseLabel: r.phase_label,
       offerSentAt: r.offer_sent_at,
+      photos: r.photos ?? [],
     })
 
     const shapeJob = (r: Record<string, unknown>) => ({
@@ -122,6 +123,7 @@ serve(async (req: Request) => {
       completedAt: r.completed_at,
       confirmedAt: r.confirmed_at,
       acceptedAt: r.accepted_at,
+      photos: r.photos ?? [],
     })
 
     const accepted = (acceptedRes.data ?? []).map(shapeJob)

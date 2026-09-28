@@ -19,7 +19,7 @@
 
 import type { EstimatorContext, EstimateBreakdown, EstimateLineItem, UserResponseStyle } from '../types';
 import { calculateEstimate } from '../estimateEngine';
-import { extractAll } from './extractors';
+import { extractAll, extractPhotoTriggers } from './extractors';
 import { defaultAssumptions, applyAssumptions, type Assumption } from './defaultAssumptions';
 import {
   matchSituations,
@@ -114,6 +114,76 @@ export function makeInitialState(): ChatState {
   };
 }
 
+/**
+ * Records a photo the customer just uploaded in response to a
+ * `[[photo:id|label]]` link (or the generic end-of-chat property-photo
+ * ask), marks that request fulfilled, and has the bot briefly acknowledge
+ * it. Called directly by the UI's upload handler — no LLM/extraction
+ * involved, since the "which request does this fulfill" mapping is already
+ * known (the user clicked a specific link).
+ */
+export function applyUploadedPhoto(
+  state: ChatState,
+  requestId: string,
+  photo: { url: string; description: string; label: string },
+): ChatState {
+  const photoRequests = state.ctx.photoRequests.map((r) =>
+    r.id === requestId ? { ...r, fulfilled: true } : r,
+  );
+  const photos = [...state.ctx.photos, { id: `${requestId}-${Date.now()}`, ...photo }];
+  return {
+    ...state,
+    ctx: { ...state.ctx, photoRequests, photos },
+    history: [
+      ...state.history,
+      botMessage(`Got the photo of ${photo.label} — thanks, that helps a lot.`),
+    ],
+  };
+}
+
+export interface PhotoAssessment {
+  severity: 'minor' | 'moderate' | 'extensive' | null;
+  matchesDescription: boolean;
+  note: string;
+}
+
+// Which pricing field a photo's visual severity read feeds, and how the
+// generic minor/moderate/extensive scale maps onto that field's own
+// vocabulary. Only requests with a clear existing pricing lever are listed
+// here — everything else's photo is still attached/forwarded, just without
+// an automatic pricing adjustment.
+const SEVERITY_TARGETS: Record<string, { field: 'drywallRepairExtent' | 'closetShelving'; map: Record<string, string> }> = {
+  extensive_repair: { field: 'drywallRepairExtent', map: { minor: 'minor', moderate: 'moderate', extensive: 'major' } },
+  closet_shelving: { field: 'closetShelving', map: { minor: 'wire', moderate: 'built_in', extensive: 'extensive' } },
+};
+
+/**
+ * Folds a vision assessment of an uploaded photo into the estimate — for
+ * the two trigger types with a clear existing pricing lever (repair
+ * extent, closet shelving scope), and always as a brief bot note either
+ * way. Called once analyze-quote-photo resolves, which happens after the
+ * photo is already attached — this only refines pricing, it never blocks
+ * or delays showing the photo as attached.
+ */
+export function applyPhotoAssessment(state: ChatState, requestId: string, assessment: PhotoAssessment): ChatState {
+  let ctx = state.ctx;
+  const target = assessment.severity ? SEVERITY_TARGETS[requestId] : undefined;
+  if (target) {
+    const mapped = target.map[assessment.severity!];
+    if (mapped) {
+      ctx = { ...ctx, [target.field]: mapped, conditionAddressed: true };
+    }
+  }
+  if (!assessment.note.trim()) {
+    return ctx === state.ctx ? state : { ...state, ctx };
+  }
+  return {
+    ...state,
+    ctx,
+    history: [...state.history, botMessage(assessment.note.trim())],
+  };
+}
+
 // ===== Persistence (sessionStorage) =====
 //
 // Bump this whenever ChatState or EstimatorContext's shape changes in a way
@@ -121,7 +191,7 @@ export function makeInitialState(): ChatState {
 // check, a schema change (a field added/removed/repurposed) could silently
 // load a subtly-incompatible object and misbehave in ways that are hard to
 // trace back to "the browser had stale storage."
-const CHAT_STATE_SCHEMA_VERSION = 4;
+const CHAT_STATE_SCHEMA_VERSION = 5;
 
 /**
  * `lastBotTopic` is a `Topic` object with live function properties (ask,
@@ -199,7 +269,7 @@ async function understand(
     };
   }
   const intent = classifyIntent(trimmed);
-  const extracted = extractAll(trimmed, state.ctx);
+  const extracted = extractAll(trimmed, state.ctx, state.lastBotTopic?.id ?? null);
   return { intent, patch: extracted.patch, acknowledgements: extracted.acknowledgements };
 }
 
@@ -282,6 +352,25 @@ async function processMessage(state: ChatState, trimmed: string): Promise<TurnRe
     responseStyle: classifyResponseStyle(trimmed),
     responseLengths: [...state.ctx.responseLengths, trimmed.length],
   };
+
+  // Photo-request triggers — a bare keyword match, run independently of
+  // whichever extraction path (LLM or regex) handled the rest of this
+  // message, and deduplicated against requests already raised so the same
+  // trigger doesn't fire twice in one conversation.
+  const newPhotoTriggers = extractPhotoTriggers(trimmed).filter(
+    (t) => !state.ctx.photoRequests.some((r) => r.id === t.key),
+  );
+  if (newPhotoTriggers.length > 0) {
+    ctxNext.photoRequests = [
+      ...ctxNext.photoRequests,
+      ...newPhotoTriggers.map((t) => ({ id: t.key, label: t.label, fulfilled: false })),
+    ];
+  }
+  // Embedded in the bot's reply text as `[[photo:key|label]]` — ChatPanel
+  // renders these as clickable "Provide a picture of ___" links, positioned
+  // (by insertion order below) right after the acknowledgment of what the
+  // customer just said and before the next question, per spec.
+  const photoLinkMarker = newPhotoTriggers.map((t) => `[[photo:${t.key}|${t.label}]]`).join(' ');
 
   const userMsg: ChatMessage = {
     role: 'user',
@@ -374,6 +463,43 @@ async function processMessage(state: ChatState, trimmed: string): Promise<TurnRe
     s = { ...s, history: [...s.history, botMessage(reply)] };
     // Fall through to topic advance
   }
+  // "I already told you" — the user is pointing at a specific repeated
+  // question, not just venting, so look back through the FULL transcript
+  // (every message they've sent this whole conversation, not just this
+  // one) with the same extractors, told which topic is currently pending
+  // so context-only signals (a bare "600" for size, etc.) can resolve too.
+  // If that turns up the answer, apply it and move on for real instead of
+  // just apologizing and re-asking the same question. If it genuinely
+  // isn't anywhere in the transcript, say so honestly and move on with a
+  // stated default rather than repeating the loop.
+  if (hasIntent(intent, 'already_answered') && s.lastBotTopic) {
+    const topic = s.lastBotTopic;
+    const rescan = extractAll(s.transcript, s.ctx, topic.id);
+    const rescannedCtx = { ...s.ctx, ...rescan.patch };
+    const resolved = Object.keys(rescan.patch).length > 0 && topic.alreadyAnswered(rescannedCtx);
+    if (resolved) {
+      s = {
+        ...s,
+        ctx: rescannedCtx,
+        history: [
+          ...s.history,
+          botMessage(`You're right, sorry about that — found it: ${rescan.acknowledgements.join(', ') || 'got it'}.`),
+        ],
+      };
+    } else {
+      const fallback = metaBank.uncertainty(topic.id);
+      s = {
+        ...s,
+        history: [
+          ...s.history,
+          botMessage(`I'm sorry — I don't actually see that anywhere in what you've sent so far. ${fallback}`),
+        ],
+      };
+    }
+    if (!s.askedIds.includes(topic.id)) s = { ...s, askedIds: [...s.askedIds, topic.id] };
+    if (!s.retriedIds.includes(topic.id)) s = { ...s, retriedIds: [...s.retriedIds, topic.id] };
+    return advanceAfterUncertainty(s);
+  }
   if (hasIntent(intent, 'express_uncertainty')) {
     const reply = metaBank.uncertainty(s.lastBotTopic?.id ?? null);
     s = { ...s, history: [...s.history, botMessage(reply)] };
@@ -409,6 +535,7 @@ async function processMessage(state: ChatState, trimmed: string): Promise<TurnRe
       const question = retry.ask(ctxNext);
       const retryPrompt =
         (acknowledgements.length > 0 ? `${ACK_LEAD_INS[s.askedIds.length % ACK_LEAD_INS.length]} ${acknowledgements.join(', ')}. ` : '') +
+        (photoLinkMarker ? `${photoLinkMarker} ` : '') +
         `Circling back — I don't think I got this one: ${question.charAt(0).toLowerCase()}${question.slice(1)}` +
         (chips ? `  (${chips.join(' · ')})` : '');
       s = {
@@ -420,14 +547,34 @@ async function processMessage(state: ChatState, trimmed: string): Promise<TurnRe
       return { state: s, done: null };
     }
     if (!s.wrapupAsked) {
+      // One more photo ask at the very end regardless of whether anything
+      // else triggered one — actual property photos (not just the specific
+      // detail shots above) help painters respond faster and with more
+      // confidence, so it's worth inviting even for a straightforward job.
+      const alreadyAskedForProperty = ctxNext.photoRequests.some((r) => r.id === 'property');
+      const propertyMarker = alreadyAskedForProperty ? '' : '[[photo:property|the property]] ';
+
+      // Anything raised earlier in the conversation that never got a photo
+      // attached — remind here rather than letting it quietly drop, since
+      // this is the last natural chance before the estimate finalizes.
+      const unfulfilled = ctxNext.photoRequests.filter((r) => !r.fulfilled && r.id !== 'property');
+      const reminderMarkers = unfulfilled.map((r) => `[[photo:${r.id}|${r.label}]]`).join(' ');
+      const reminderLeadIn = unfulfilled.length > 0
+        ? `While we're at it, I still don't have a picture for ${unfulfilled.length === 1 ? 'this' : 'these'}: `
+        : '';
+
       s = {
         ...s,
+        ctx: alreadyAskedForProperty
+          ? s.ctx
+          : { ...s.ctx, photoRequests: [...s.ctx.photoRequests, { id: 'property', label: 'the property', fulfilled: false }] },
         wrapupAsked: true,
         askedIds: [...s.askedIds, 'wrapup'],
         history: [
           ...s.history,
           botMessage(
-            "I think I've got enough to put a number together. Anything else I should know — unusual heights, tough access, special colors, timing? " +
+            `I think I've got enough to put a number together. ${reminderLeadIn}${reminderMarkers}${reminderMarkers ? ' ' : ''}${propertyMarker}A couple of photos of the property help painters respond faster and with more confidence, so feel free to attach some. ` +
+              "Anything else I should know — unusual heights, tough access, special colors, timing? " +
               "Otherwise just say 'run it' and I'll price it out.",
           ),
         ],
@@ -445,7 +592,7 @@ async function processMessage(state: ChatState, trimmed: string): Promise<TurnRe
   const ackLeadIn = acknowledgements.length > 0
     ? `${ACK_LEAD_INS[s.askedIds.length % ACK_LEAD_INS.length]} ${acknowledgements.join(', ')}. `
     : '';
-  const prompt = ackLeadIn + next.ask(ctxNext) + (chips ? `  (${chips.join(' · ')})` : '');
+  const prompt = ackLeadIn + (photoLinkMarker ? `${photoLinkMarker} ` : '') + next.ask(ctxNext) + (chips ? `  (${chips.join(' · ')})` : '');
   s = {
     ...s,
     askedIds: [...s.askedIds, next.id],

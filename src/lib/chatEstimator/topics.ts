@@ -224,9 +224,15 @@ export const TOPICS: Topic[] = [
     priority: 25,
     relevant: (c) => c.projectType === 'interior' || c.projectType === 'both',
     alreadyAnswered: (c) =>
-      // Answered if any of the surface scope fields has been set explicitly from "just walls" etc.
-      (c.interiorWalls === 'yes' &&
-        (c.interiorCeilings === 'no' || c.interiorTrim === 'no' || c.interiorDoors === 'none')) ||
+      // Answered once ANY surface scope field has moved off its default —
+      // this used to require interiorWalls === 'yes' specifically, which
+      // "trim only" (walls: no, ceilings: no, trim: yes, doors: none) never
+      // satisfies, so the topic kept re-asking a scope the customer had
+      // already given.
+      c.interiorWalls === 'no' ||
+      c.interiorCeilings === 'no' ||
+      c.interiorTrim === 'no' ||
+      c.interiorDoors === 'none' ||
       c.additionalDetails.toLowerCase().includes('walls only') ||
       c.additionalDetails.toLowerCase().includes('whole room'),
     ask: (c) => {
@@ -259,6 +265,32 @@ export const TOPICS: Topic[] = [
     example: () =>
       "'Just walls' is common. Or 'walls and ceiling, no trim'. Or 'everything except the doors'.",
     chips: () => ['Just walls', 'Walls + ceiling', 'Everything', 'Not sure'],
+  },
+
+  // ——————————————————————————————————————————
+  // Trim scope — "trim" alone only prices baseboards; door frames/casings,
+  // closet shelving, and built-ins are each separate line items, so ask
+  // once trim is in scope rather than silently guessing.
+  // ——————————————————————————————————————————
+  {
+    id: 'trim_scope',
+    priority: 26,
+    relevant: (c) => (c.projectType === 'interior' || c.projectType === 'both') && c.interiorTrim === 'yes',
+    alreadyAnswered: (c) => c.trimScopeAddressed || c.doorFrames === 'yes' || c.specialtyServices.includes('built_ins'),
+    ask: (c) =>
+      pick(
+        [
+          "Quick one on the trim — is that just the baseboards, or does it also cover door frames/casings, closet shelving, or other woodwork like built-ins?",
+          "When you say trim, do you mean baseboards only, or should I also price door frames, casings, or built-in shelving?",
+          "Just to price the trim right — baseboards alone, or also door frames/casings and any built-in woodwork?",
+        ],
+        seed(c),
+      ),
+    clarify: () =>
+      "Baseboards alone is one price. Door frames/casings, closet shelving, and built-ins each add their own labor, so it helps to know which ones apply.",
+    example: () =>
+      "'Just baseboards' or 'baseboards and door frames' or 'everything — trim, doors, closets, all of it'.",
+    chips: () => ['Just baseboards', 'Door frames too', 'All the woodwork', 'Not sure'],
   },
 
   // ——————————————————————————————————————————
@@ -319,7 +351,7 @@ export const TOPICS: Topic[] = [
       "Rentals usually don't need the same showroom-perfect finish a place you live in day-to-day does, so that can bring the price down a bit. Multi-unit buildings get a volume discount. Commercial space has different insurance/scheduling overhead, so it runs a bit higher.",
     example: () =>
       "E.g., 'it's our home', 'it's a rental I own', 'it's a 6-unit apartment building', or 'commercial office space'.",
-    chips: () => ['My home', 'Rental property', 'Multiple units', 'Commercial'],
+    chips: () => ['My home', 'Rental property', 'Selling', 'Commercial'],
   },
 
   // ——————————————————————————————————————————

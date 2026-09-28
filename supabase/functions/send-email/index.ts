@@ -66,6 +66,18 @@ function formatMoney(value: unknown): string {
   return `$${n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
 }
 
+// Free-text fields (qa answers, photo descriptions) are customer-typed and
+// get interpolated straight into an HTML email body — escape them so a
+// customer can't inject markup/script into what the painter's mail client renders.
+function escapeHtml(value: unknown): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
 function buildEmailHtml(type: string, data: Record<string, unknown>): string {
   const customerName = (data.customerName as string) || 'Valued Customer'
   const projectName = (data.projectName as string) || 'your painting project'
@@ -212,16 +224,32 @@ function buildEmailHtml(type: string, data: Record<string, unknown>): string {
     case 'job_offer_available': {
       const qa = Array.isArray(data.qa) ? (data.qa as { question: string; answer: string }[]) : []
       const qaHtml = qa
-        .map((item) => `<p style="margin: 4px 0;"><strong>${item.question}:</strong> ${item.answer}</p>`)
+        .map((item) => `<p style="margin: 4px 0;"><strong>${escapeHtml(item.question)}:</strong> ${escapeHtml(item.answer)}</p>`)
         .join('')
 
+      const photos = Array.isArray(data.photos) ? (data.photos as { url: string; description: string; label: string }[]) : []
+      const photosHtml = photos.length > 0
+        ? `
+          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
+          <p style="font-weight: 600; margin-bottom: 12px;">Photos from the customer (${photos.length})</p>
+          <div>
+            ${photos.map((p) => `
+              <div style="margin-bottom: 14px;">
+                <a href="${escapeHtml(p.url)}"><img src="${escapeHtml(p.url)}" alt="${escapeHtml(p.label)}" style="max-width: 260px; border-radius: 8px; display: block;" /></a>
+                <p style="margin: 6px 0 0; font-size: 13px; color: #4b5563;">${escapeHtml(p.description)}</p>
+              </div>
+            `).join('')}
+          </div>
+        `
+        : ''
+
       return wrap(`
-        <p>A customer near <strong>${data.zipCode || 'your area'}</strong> is looking for a painter.</p>
+        <p>A customer near <strong>${escapeHtml(data.zipCode) || 'your area'}</strong> is looking for a painter.</p>
         <p>
-          Customer: <strong>${data.customerFirstName || 'A customer'}</strong><br />
-          ZIP code: <strong>${data.zipCode || 'N/A'}</strong><br />
-          Desired schedule: <strong>${data.timelineLabel || 'Not specified'}</strong>
-          ${data.customerPreferredDate ? `<br />Requested start date: <strong>${data.customerPreferredDate}</strong>` : ''}
+          Customer: <strong>${escapeHtml(data.customerFirstName) || 'A customer'}</strong><br />
+          ZIP code: <strong>${escapeHtml(data.zipCode) || 'N/A'}</strong><br />
+          Desired schedule: <strong>${escapeHtml(data.timelineLabel) || 'Not specified'}</strong>
+          ${data.customerPreferredDate ? `<br />Requested start date: <strong>${escapeHtml(data.customerPreferredDate)}</strong>` : ''}
         </p>
         <p style="font-size: 22px; font-weight: 700; color: #2563eb; margin: 20px 0;">
           You'd be paid: ${formatMoney(data.payoutAmount)}
@@ -231,6 +259,7 @@ function buildEmailHtml(type: string, data: Record<string, unknown>): string {
         <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
         <p style="font-weight: 600; margin-bottom: 12px;">Job details</p>
         ${qaHtml}
+        ${photosHtml}
       `)
     }
 

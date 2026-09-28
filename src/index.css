@@ -11,12 +11,14 @@
 }
 
 /* ============================================================================
-   Theme variables — dark (default) and light.
+   Theme variables — light (default) and dark.
    Every color in this file (and the Tailwind arbitrary-value classes used
    across pages/components) resolves through these so the light/dark toggle
    can flip the whole site without touching layout, images, or graphics.
+   :root shares light's values (not dark's) so the very first paint —
+   before ThemeProvider's effect sets data-theme — already matches the
+   default theme instead of flashing dark then swapping to light.
    ============================================================================ */
-:root,
 [data-theme="dark"] {
   --bg-page: #1a1a1a;
   --bg-chrome: #111111;       /* header, hero, footer, CTA bands */
@@ -50,6 +52,7 @@
   --tint-success-border: #2d6b2d;
 }
 
+:root,
 [data-theme="light"] {
   --bg-page: #fdf9f2;
   --bg-chrome: #ffffff;

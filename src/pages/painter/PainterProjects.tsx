@@ -2,6 +2,12 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../../lib/auth';
 import { supabaseUrl } from '../../lib/supabase';
 
+interface JobPhoto {
+  url: string;
+  description: string;
+  label: string;
+}
+
 interface Offer {
   id: string;
   zip: string | null;
@@ -9,6 +15,7 @@ interface Offer {
   timelineLabel: string | null;
   preferredDate: string | null;
   phaseLabel: string | null;
+  photos: JobPhoto[];
 }
 
 interface Job {
@@ -25,6 +32,7 @@ interface Job {
   phaseLabel: string | null;
   completedAt: string | null;
   confirmedAt: string | null;
+  photos: JobPhoto[];
 }
 
 interface PainterProjectsData {
@@ -71,6 +79,23 @@ function EmptyState({ text }: { text: string }) {
   );
 }
 
+function PhotoThumbnails({ photos }: { photos: JobPhoto[] }) {
+  if (photos.length === 0) return null;
+  return (
+    <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+      {photos.map((p, i) => (
+        <a key={i} href={p.url} target="_blank" rel="noreferrer" title={p.description}>
+          <img
+            src={p.url}
+            alt={p.description || p.label}
+            style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)' }}
+          />
+        </a>
+      ))}
+    </div>
+  );
+}
+
 function OfferCard({ offer }: { offer: Offer }) {
   return (
     <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 18, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
@@ -82,6 +107,7 @@ function OfferCard({ offer }: { offer: Offer }) {
           {offer.timelineLabel || 'Timeline not specified'}
           {offer.preferredDate ? ` · Requested start: ${offer.preferredDate}` : ''}
         </p>
+        <PhotoThumbnails photos={offer.photos} />
       </div>
       <div style={{ textAlign: 'right' }}>
         <p style={{ color: 'var(--accent)', fontWeight: 700, fontSize: '1.1rem', margin: '0 0 4px' }}>{currency(offer.payoutAmount)}</p>
@@ -110,6 +136,7 @@ function JobCard({ job, onMarkCompleted, marking }: { job: Job; onMarkCompleted?
               ? `Completed ${job.completedAt ?? ''}`
               : `${job.scheduledDate ? `Scheduled: ${job.scheduledDate}` : job.preferredDate ? `Requested: ${job.preferredDate}` : 'Date not yet set'}`}
           </p>
+          <PhotoThumbnails photos={job.photos} />
         </div>
         <div style={{ textAlign: 'right', flexShrink: 0 }}>
           <p style={{ color: 'var(--text-primary)', fontWeight: 700, margin: '0 0 4px' }}>{currency(job.payoutAmount ?? job.price)}</p>

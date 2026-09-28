@@ -275,7 +275,11 @@ export function extractDamageSignals(text: string): {
     // "nail holes".
     holes: /\b(holes?|nail\s*holes?|patch|dent)\b/.test(t),
     rot: /\b(wood rot|dry rot|rotting|rotten)\b/.test(t),
-    damage: /\b(damage|damaged|cracks?|peeling|chipping|failing paint)\b/.test(t),
+    // "needs repairs"/"needs fixing"/"needs work" are the most natural way
+    // to answer "what's the condition, does it need repairs?" — none of
+    // these were previously matched anywhere, so that answer silently fell
+    // through and the condition topic kept re-asking.
+    damage: /\b(damage|damaged|cracks?|peeling|chipping|failing paint|repairs?|needs (?:fixing|work)|fixer[\s-]?upper)\b/.test(t),
     heavyPrep: /\b(needs a lot of prep|extensive prep|tons of prep|lots of repairs?)\b/.test(t),
   };
 }
@@ -288,7 +292,11 @@ export function extractAccessSignals(text: string): {
 } {
   const t = text.toLowerCase();
   return {
-    occupied: /\b(we live|living here|we'?re still (?:here|in)|kids at home|pets at home)\b/.test(t),
+    // Bare "occupied" matters here, not just descriptive phrasing — it's
+    // literally one of this topic's own suggested chip labels ("Vacant" /
+    // "Furnished" / "Occupied"), so a customer just answering with that
+    // exact word must register, not just longer phrases like "we live here".
+    occupied: /\b(occupied|we live|living here|we'?re still (?:here|in)|kids at home|pets at home)\b/.test(t),
     furnished: /\b(furnished|furniture in|moved in|all our stuff)\b/.test(t),
     vacant: /\b(vacant|empty|no one lives|not moved in|before we move)\b/.test(t),
     asap: /\b(asap|urgent|as soon as possible|this week|by (?:next )?weekend|rush)\b/.test(t),
@@ -313,8 +321,10 @@ export function extractPropertyType(text: string): 'residential' | 'rental' | 'm
     /\b(rental|tenants?|landlord|renting it out|investment propert(?:y|ies)|airbnb|between tenants|turnover unit)\b/.test(t) ||
     // Selling/listing a home means a quick, standard turnover finish for
     // showings — not a showroom-perfect job for a family that'll live with
-    // it for years — so it prices the same way a rental turnover does.
-    /\b(putting (?:it |the house |the place )?(?:up )?for sale|listing (?:it|the house|the place)|put(?:ting)? (?:it |the place )?on the market|getting (?:it |the house )?ready to sell|prepping (?:it |the house )?to sell|house is going on the market|flip(?:ping)? (?:it|the house|this house))\b/.test(t)
+    // it for years — so it prices the same way a rental turnover does. Bare
+    // "selling"/"selling it" (e.g. the chip-list quick reply) counts too,
+    // not just the longer descriptive phrasings.
+    /\b(selling( it)?|putting (?:it |the house |the place )?(?:up )?for sale|listing (?:it|the house|the place)|put(?:ting)? (?:it |the place )?on the market|getting (?:it |the house )?ready to sell|prepping (?:it |the house )?to sell|house is going on the market|flip(?:ping)? (?:it|the house|this house))\b/.test(t)
   ) {
     return 'rental';
   }
@@ -522,6 +532,101 @@ export function extractSpecialtyServices(text: string): {
 }
 
 /**
+ * Photo-request triggers — some scope details are genuinely hard to price
+ * from a text description alone (how extensive is "some repairs"? one
+ * closet shelf or a whole built-in system? which specific antique door?),
+ * so these keywords prompt the customer for a picture instead of guessing.
+ * Each trigger fires at most once per key per conversation — the caller
+ * (chatEngine) is responsible for de-duplicating against ctx.photoRequests.
+ */
+export interface PhotoTrigger {
+  key: string;
+  label: string;
+}
+
+const PHOTO_TRIGGER_RULES: { key: string; label: string; test: RegExp }[] = [
+  {
+    key: 'extensive_repair',
+    label: 'the repair work',
+    test: /\b(extensive (?:repairs?|damage|prep)|a lot of (?:damage|repairs?)|major (?:damage|repairs?)|significant damage|large (?:holes?|repair)|big holes?|structural damage)\b/i,
+  },
+  {
+    key: 'closet_shelving',
+    label: 'the closet shelving',
+    test: /\bcloset shelving\b|\bshelving in the closet\b|\bbuilt[\s-]?in (?:shelving|shelves)\b/i,
+  },
+  {
+    key: 'furniture',
+    label: 'the furniture piece',
+    test: /\bfurniture\b|\bdresser\b|\bnightstand\b/i,
+  },
+  {
+    key: 'ornate_trim',
+    label: 'the trim detail',
+    test: /\b(corbels?|victorian spindles?|flying buttress(?:es)?|coffered ceilings?|ceiling medallions?|balustrades?|gingerbread trim|scrollwork|ornate (?:molding|trim|woodwork)|custom millwork|fretwork|hand[\s-]?carved)\b/i,
+  },
+  {
+    key: 'wood_rot',
+    label: 'the wood rot',
+    test: /\b(wood rot|dry rot|rotting|rotten)\b/i,
+  },
+  {
+    key: 'water_damage',
+    label: 'the water damage',
+    test: /\bwater damage\b|\bwater stains?\b|\bwater spots?\b/i,
+  },
+  {
+    key: 'wallpaper',
+    label: 'the wallpaper',
+    test: /\bwallpaper\b/i,
+  },
+  {
+    key: 'exposed_beams',
+    label: 'the exposed beams',
+    test: /\bexposed beams?\b|\bwood beams?\b|\bceiling beams?\b/i,
+  },
+  {
+    key: 'stone_brick_veneer',
+    label: 'the stone/brick',
+    test: /\b(stone veneer|brick veneer|natural stone|stacked stone)\b/i,
+  },
+  {
+    key: 'specialty_door',
+    label: 'the door',
+    test: /\b(antique door|stained[\s-]?glass door|carved door|vintage door)\b/i,
+  },
+  {
+    key: 'custom_cabinetry',
+    label: 'the cabinetry',
+    test: /\bcustom cabinetry\b|\bbuilt[\s-]?in cabinet(?:s|ry)?\b|\brefinish(?:ing)? (?:the )?cabinets?\b/i,
+  },
+  {
+    key: 'deck_condition',
+    label: 'the deck condition',
+    test: /\bweathered deck\b|\bdeck\b.{0,20}\b(?:rot|damage|warp(?:ed|ing)?|split(?:ting)?|graying)\b/i,
+  },
+  {
+    key: 'stucco_damage',
+    label: 'the stucco',
+    test: /\bstucco crack(?:s|ing)?\b|\bcracked stucco\b|\bstucco (?:needs? repair|damage)\b/i,
+  },
+  {
+    key: 'garage_floor',
+    label: 'the garage floor',
+    test: /\bepoxy\b.{0,20}\bgarage\b|\bgarage floor\b.{0,20}\bepoxy\b|\bepoxy (?:the )?(?:garage )?floor\b/i,
+  },
+  {
+    key: 'mold',
+    label: 'the mold area',
+    test: /\bmold\b/i,
+  },
+];
+
+export function extractPhotoTriggers(text: string): PhotoTrigger[] {
+  return PHOTO_TRIGGER_RULES.filter((rule) => rule.test.test(text)).map((rule) => ({ key: rule.key, label: rule.label }));
+}
+
+/**
  * Sequenced or cure-time-dependent work that requires a second visit:
  * "paint the baseboards before install, touch up after", "window glazing
  * needs to set before painting", "prime now, finish coat after the other
@@ -685,7 +790,7 @@ export function extractInteriorDetails(text: string): {
   const t = text.toLowerCase();
   const out: ReturnType<typeof extractInteriorDetails> = {};
 
-  if (/\bdoor\s*frames?\b|\bdoor\s*jambs?\b|\bjambs?\b/.test(t)) out.doorFrames = true;
+  if (/\bdoor\s*frames?\b|\bdoor\s*jambs?\b|\bjambs?\b|\bcasings?\b/.test(t)) out.doorFrames = true;
 
   if (/\b(inside|interior)\s+(?:of\s+)?(?:the\s+)?cabinets?\b|\bcabinet\s+interiors?\b/.test(t)) {
     out.cabinetInsides = true;
@@ -884,7 +989,7 @@ export function extractMultiPhaseRequest(text: string): boolean {
   return /\b(space(?:d)? out|spread out|staggered?|different dates|separate dates|in phases|in stages|different times|not all at once|one (?:room|section|part) at a time)\b/.test(t);
 }
 
-export function extractAll(text: string, prev: EstimatorContext): ExtractResult {
+export function extractAll(text: string, prev: EstimatorContext, lastBotTopicId: string | null = null): ExtractResult {
   const patch: Partial<EstimatorContext> = {};
   const acks: string[] = [];
 
@@ -903,6 +1008,20 @@ export function extractAll(text: string, prev: EstimatorContext): ExtractResult 
   if (sqft && !prev.squareFeet) {
     patch.squareFeet = sqft;
     acks.push(`${sqft.toLocaleString()} sqft`);
+  } else if (
+    !prev.squareFeet &&
+    (lastBotTopicId === 'room_size' || lastBotTopicId === 'house_size')
+  ) {
+    // extractSquareFeet requires a unit ("600 sqft") — but the question that
+    // was JUST asked ("about how big is the place?") makes a bare number
+    // unambiguous, and requiring the unit anyway is exactly what made a
+    // plain "600" reply invisible, so the topic looped asking for it again.
+    const bare = text.trim().match(/^(?:about|around|roughly)?\s*(\d{2,5})\s*$/i);
+    const n = bare ? parseInt(bare[1], 10) : null;
+    if (n && n > 100 && n < 50000) {
+      patch.squareFeet = n;
+      acks.push(`${n.toLocaleString()} sqft`);
+    }
   }
 
   const beds = extractBedroomCount(text);
@@ -1345,6 +1464,32 @@ export function extractAll(text: string, prev: EstimatorContext): ExtractResult 
   if (surf.closets !== undefined) patch.closets = surf.closets === 'yes' ? 'standard' : 'none';
   if (surf.everything) acks.push('whole room');
   if (surf.walls === 'yes' && surf.trim === 'no') acks.push('walls only');
+
+  // Trim/woodwork scope — "trim" alone is ambiguous (it prices baseboards
+  // only; door frames/casings, closet shelving, and built-ins each price
+  // separately), so once trim is in scope, track whether that ambiguity
+  // was ever actually resolved. interiorDetails (line frames/jambs/casings)
+  // and specialty (built-ins) were already extracted above and handle the
+  // specific mentions; this only needs the broad "all the woodwork" catch-
+  // all and the "not sure" case.
+  const trimNowInScope = (patch.interiorTrim ?? prev.interiorTrim) === 'yes';
+  if (trimNowInScope && !prev.trimScopeAddressed) {
+    const tLower = text.toLowerCase();
+    const allWoodwork = /\ball (?:the )?wood\s*work\b|\beverything wood\b|\ball\s+the\s+woodwork\b|\bevery(?:thing)?\b.{0,20}\bwood\b/.test(tLower);
+    if (allWoodwork) {
+      if (prev.doorFrames !== 'yes') { patch.doorFrames = 'yes'; acks.push('door frames'); }
+      if (!prev.specialtyServices.includes('built_ins')) addSpecialty('built_ins');
+    }
+    if (
+      interiorDetails.doorFrames ||
+      specialty.builtIns ||
+      allWoodwork ||
+      /\b(just|only)\b.{0,15}\bbaseboards?\b|\bbaseboards?\b.{0,10}\bonly\b/.test(tLower) ||
+      /\bnot sure\b|\bno idea\b|\bdon'?t know\b/.test(tLower)
+    ) {
+      patch.trimScopeAddressed = true;
+    }
+  }
 
   // Room size (qualitative or dimensions)
   if (!prev.squareFeet) {

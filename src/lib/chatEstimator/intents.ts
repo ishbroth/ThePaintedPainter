@@ -27,6 +27,7 @@ export type Intent =
   | 'confirmation'          // "yes" / "yep" / "sure"
   | 'scope_limiter'         // "just walls, no trim" / "only the bedroom"
   | 'frustration'           // "this is stupid" / "you're not listening"
+  | 'already_answered'      // "I already told you" / "I said that already"
   | 'ready_to_finish'       // "that's all" / "nothing else" / "run the numbers"
   | 'restart'               // "start over" / "reset"
   | 'color_question'        // "what color should I pick?"
@@ -188,6 +189,19 @@ export function classifyIntent(rawText: string): IntentResult {
   if (has(t, /\bthis\s+is\s+(stupid|dumb|ridiculous|pointless|annoying)\b/, /\byou'?re\s+not\s+listening\b/,
     /\bugh\b/, /\bnevermind\b/, /\bforget\s+it\b/)) {
     intents.push('frustration');
+  }
+
+  // "I already told you" — distinct from generic frustration: the user is
+  // pointing at a SPECIFIC repeated question, not just venting, so the
+  // engine should go look back through the transcript rather than just
+  // apologize and re-ask the same thing.
+  if (has(t,
+    /\bi\s+(?:already|just)\s+(?:told|said|answered|gave)\b/,
+    /\bi\s+said\s+that\s+(?:already|before)?\b/,
+    /\balready\s+(?:told|said|answered)\s+(?:you|that)\b/,
+    /\bi\s+(?:literally\s+)?(?:just\s+)?(?:told|said)\s+you\s+that\b/,
+  )) {
+    intents.push('already_answered');
   }
 
   // Off-topic (very conservative — only obvious cases)

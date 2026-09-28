@@ -34,6 +34,12 @@ interface ResponseQA {
   answer: string
 }
 
+interface QuotePhoto {
+  url: string
+  description: string
+  label: string
+}
+
 interface ClaimRequest {
   selectionType: 'specific_painter' | 'guaranteed'
   selectedPainterId?: string
@@ -59,6 +65,8 @@ interface ClaimRequest {
    * as its own claim sharing a parentQuoteId, with its own phaseLabel. */
   parentQuoteId?: string
   phaseLabel?: string
+  /** Photos the customer uploaded during the chat estimate — forwarded to the painter. */
+  photos?: QuotePhoto[]
 }
 
 function coordsForZip(zip: string): [number, number] | null {
@@ -100,7 +108,7 @@ serve(async (req: Request) => {
     const body = await req.json() as ClaimRequest
     const {
       selectionType, selectedPainterId, guaranteedPrice, quoteZip, customer, timeline, timelineLabel, qa,
-      preferredDate, customerId, parentQuoteId, phaseLabel,
+      preferredDate, customerId, parentQuoteId, phaseLabel, photos,
     } = body
 
     if (!selectionType || !guaranteedPrice || !customer?.name || !customer?.email || !customer?.phone || !customer?.streetAddress) {
@@ -196,6 +204,7 @@ serve(async (req: Request) => {
         selected_painter_id: selectionType === 'specific_painter' ? selectedPainterId : null,
         selected_painter_price: guaranteedPrice,
         project_summary: { qa, timeline, timelineLabel },
+        photos: photos ?? [],
         notified_painters: notifiedPainters.map((p) => p.id),
         status: 'offer_sent',
         offer_sent_at: new Date().toISOString(),
@@ -234,6 +243,7 @@ serve(async (req: Request) => {
               payoutAmount: painterPayoutAmount,
               acceptUrl,
               qa,
+              photos: photos ?? [],
             },
           }),
         })

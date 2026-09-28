@@ -24,7 +24,7 @@ export function makeInitialContext(): EstimatorContext {
     foundation: 'no', exteriorWindows: 'none', exteriorWindowCount: null, overhangs: 'no',
     accessRestrictions: 'none', exteriorColorChange: '', exteriorCondition: 'good',
     prepWork: [], caulkingExtent: 'minor', drywallRepairExtent: 'minor', conditionAddressed: false,
-    renoStageAddressed: false,
+    renoStageAddressed: false, trimScopeAddressed: false,
     woodRotExtent: 'minor', wallpaperRooms: null, popcornCeilingRooms: null,
     multiTripRequired: '', specialEquipment: 'none', fixtureRemoval: 'none',
     hardwareReplacement: 'no', lowVocRequested: 'no',
@@ -40,5 +40,6 @@ export function makeInitialContext(): EstimatorContext {
     furnitureItems: [], brickSqft: null, brickTreatment: 'paint',
     answeredQuestions: 0, responseStyle: 'normal', responseLengths: [],
     specialtyReferrals: [], isHighCostArea: false, stateComplianceNotes: [],
+    photoRequests: [], photos: [],
   };
 }

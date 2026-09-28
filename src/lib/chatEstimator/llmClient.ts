@@ -59,9 +59,9 @@ const VALID_INTENTS: Intent[] = [
   'greeting', 'ask_clarification', 'ask_example', 'express_uncertainty',
   'meta_cost', 'meta_how_it_works', 'meta_bot_check', 'meta_real_person',
   'meta_time', 'meta_privacy', 'off_topic', 'deflection', 'negation',
-  'confirmation', 'scope_limiter', 'frustration', 'ready_to_finish',
-  'restart', 'color_question', 'recommend_question', 'painter_question',
-  'booking_question', 'provide_info',
+  'confirmation', 'scope_limiter', 'frustration', 'already_answered',
+  'ready_to_finish', 'restart', 'color_question', 'recommend_question',
+  'painter_question', 'booking_question', 'provide_info',
 ];
 
 const ROOM_KEYS = [
@@ -182,6 +182,7 @@ function sanitize(raw: Record<string, unknown>, prev: EstimatorContext): Partial
   if (isEnum(raw.drywallRepairExtent, ['minor', 'moderate', 'major'] as const)) patch.drywallRepairExtent = raw.drywallRepairExtent;
   if (raw.conditionAddressed === true) patch.conditionAddressed = true;
   if (raw.renoStageAddressed === true) patch.renoStageAddressed = true;
+  if (raw.trimScopeAddressed === true) patch.trimScopeAddressed = true;
   if (isEnum(raw.multiPhaseRequested, ['yes'] as const)) patch.multiPhaseRequested = raw.multiPhaseRequested;
 
   // Cumulative arrays: merge (add), never overwrite.
