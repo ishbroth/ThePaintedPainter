@@ -987,12 +987,30 @@ button, .nav a, .cta-button, .nav-cta {
     display: block;
   }
 
-  .collage-wrapper img {
-    height: 70px;
+  /* Hero fills most of the first screen on mobile — the composite image is
+     a fixed 1:1 square, so getting it to occupy most of a tall portrait
+     viewport means letting it crop (object-fit: cover) inside a
+     height-driven box rather than just scaling to container width, which
+     is what the un-mobile-specific base rule does and why this used to
+     render as a tiny ~70px-tall strip (a stale leftover from an earlier
+     grid-based collage layout that no longer exists in the markup). */
+  .hero-collage {
+    padding: 0;
+    max-width: 100%;
   }
 
-  .collage-center img {
-    height: 140px;
+  .collage-wrapper {
+    height: 70vh;
+    max-height: 620px;
+    min-height: 380px;
+  }
+
+  .collage-wrapper img {
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    object-fit: cover;
+    object-position: center;
   }
 
   .carousel-slide {
@@ -1014,12 +1032,8 @@ button, .nav a, .cta-button, .nav-cta {
 
 @media (max-width: 480px) {
   .collage-wrapper {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .collage-center {
-    grid-column: 1 / 3;
-    grid-row: 2;
+    height: 62vh;
+    min-height: 320px;
   }
 
   .carousel-slide {

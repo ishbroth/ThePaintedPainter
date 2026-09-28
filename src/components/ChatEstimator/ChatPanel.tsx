@@ -106,8 +106,20 @@ const ChatPanel = () => {
     // when the card crosses it.
     const el = sectionRef.current;
     if (!el || !ttsSupported) return;
+    // IntersectionObserver always reports the element's CURRENT state as
+    // soon as observe() is called, even with no scroll at all — on a short
+    // viewport (most phones) the card already overlaps the center band on
+    // first paint, so this fired before the user had scrolled or done
+    // anything at all. Only a callback caused by an actual crossing (i.e.
+    // every invocation after the first) should count as "the user scrolled
+    // to it".
+    let isInitialReport = true;
     const observer = new IntersectionObserver(
       ([entry]) => {
+        if (isInitialReport) {
+          isInitialReport = false;
+          return;
+        }
         if (entry.isIntersecting) playIntroIfFreshRef.current();
       },
       { rootMargin: '-50% 0px -50% 0px', threshold: 0 },
@@ -389,7 +401,6 @@ const ChatPanel = () => {
             rows={2}
             disabled={waiting || thinking}
             className="chat-input"
-            autoFocus
           />
           <button
             className="chat-send"
