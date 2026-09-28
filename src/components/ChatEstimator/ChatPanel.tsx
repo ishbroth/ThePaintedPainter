@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   makeInitialState,
   handleUserMessage,
@@ -35,9 +35,12 @@ const ChatPanel = () => {
   const [thinking, setThinking] = useState(false);
   const [readAloud, setReadAloud] = useState(() => {
     try {
-      return localStorage.getItem(READ_ALOUD_KEY) === 'true';
+      const saved = localStorage.getItem(READ_ALOUD_KEY);
+      // On by default — a saved 'false' (explicit mute) is honored, but no
+      // saved preference at all means a first-time visitor, who gets it on.
+      return saved === null ? true : saved === 'true';
     } catch {
-      return false;
+      return true;
     }
   });
   const [pendingPhotoRequest, setPendingPhotoRequest] = useState<{ id: string; label: string } | null>(null);
@@ -49,7 +52,9 @@ const ChatPanel = () => {
   const messagesRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
+  const sectionRef = useRef<HTMLElement>(null);
   const navigate = useNavigate();
+  const location = useLocation();
   const ttsSupported = isTTSSupported();
   // Skip anything already in history at mount (restored conversations, or
   // the initial greeting) — only speak messages that arrive from here on,
@@ -63,6 +68,84 @@ const ChatPanel = () => {
   // to quote-results; that's what made the homepage feel like it "forwards"
   // to the old quote instead of actually showing the homepage.
   const restoredAlreadyFinishedRef = useRef(state.finalEstimate !== null);
+  // Whether this is still a brand-new, untouched conversation at mount —
+  // decides whether scrolling to the estimator should read the intro aloud
+  // at all (a restored, already-progressed conversation shouldn't have its
+  // first message replayed just because the user scrolled past it).
+  const isFreshRef = useRef(state.history.length === 1 && !state.finalEstimate);
+  // Only auto-play once per page load from the passive scroll-into-view
+  // trigger, so scrolling up and down past the estimator repeatedly
+  // doesn't repeatedly trigger audio. The explicit "Get Estimate" header
+  // link (handled separately below) intentionally bypasses this.
+  const hasAutoPlayedRef = useRef(false);
+  // Tracks the last navigation (by React Router's location.key) already
+  // handled by the "/#estimator" effect below — see that effect for why.
+  const processedHashRef = useRef<string | null>(null);
+  const readAloudRef = useRef(readAloud);
+  useEffect(() => {
+    readAloudRef.current = readAloud;
+  }, [readAloud]);
+
+  // Speaks the intro greeting once, if read-aloud is on and this is still a
+  // fresh conversation. Read through a ref (see below) so callers created
+  // once in an effect (the IntersectionObserver) always see the current
+  // function rather than a stale closure from mount.
+  function playIntroIfFresh() {
+    if (hasAutoPlayedRef.current || !isFreshRef.current) return;
+    if (!readAloudRef.current || !ttsSupported) return;
+    hasAutoPlayedRef.current = true;
+    speak(state.history[0].text);
+  }
+  const playIntroIfFreshRef = useRef(playIntroIfFresh);
+  playIntroIfFreshRef.current = playIntroIfFresh;
+
+  useEffect(() => {
+    // Auto-read the intro when the estimator card scrolls to the vertical
+    // center of the viewport — rootMargin shrinks the observer's root to a
+    // zero-height line at that center, so isIntersecting flips true exactly
+    // when the card crosses it.
+    const el = sectionRef.current;
+    if (!el || !ttsSupported) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) playIntroIfFreshRef.current();
+      },
+      { rootMargin: '-50% 0px -50% 0px', threshold: 0 },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [ttsSupported]);
+
+  useEffect(() => {
+    // The header's "Get Estimate" link points at "/#estimator" — jump down
+    // to center the card and read the intro, whether arriving fresh or
+    // already on the homepage (a same-path hash change doesn't remount
+    // this component, so this has to be its own effect on location.hash
+    // rather than mount-only logic).
+    //
+    // Two things that look redundant but each fix a real bug found while
+    // testing this:
+    //  - processedHashRef guards against StrictMode's dev-mode double
+    //    effect invocation, which otherwise spoke the intro twice on a
+    //    single click (both invocations see the same still-unprocessed
+    //    hash before either has a chance to clear it).
+    //  - clearing the hash via navigate() (React Router's own history),
+    //    not a raw window.history.replaceState call — the latter changes
+    //    the URL bar but not React Router's internal location, so a
+    //    second click on the exact same "/#estimator" link was never
+    //    seen as a change at all and silently did nothing.
+    if (location.hash === '#estimator' && processedHashRef.current !== location.key) {
+      processedHashRef.current = location.key;
+      sectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      hasAutoPlayedRef.current = true;
+      if (readAloudRef.current && ttsSupported) {
+        const lastBotMessage = [...state.history].reverse().find((m) => m.role === 'bot');
+        if (lastBotMessage) speak(lastBotMessage.text);
+      }
+      navigate(location.pathname + location.search, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.hash, location.key]);
 
   useEffect(() => {
     // Auto-scroll the message list as new messages arrive
@@ -226,7 +309,7 @@ const ChatPanel = () => {
   const waiting = !!state.finalEstimate;
 
   return (
-    <section className="chat-estimator-section">
+    <section className="chat-estimator-section" ref={sectionRef}>
       <div className="chat-estimator-card">
         <div className="chat-estimator-header">
           <div className="chat-estimator-header-row">
@@ -236,11 +319,11 @@ const ChatPanel = () => {
                 type="button"
                 className={`chat-read-aloud-toggle ${readAloud ? 'active' : ''}`}
                 onClick={toggleReadAloud}
-                aria-pressed={readAloud}
-                aria-label={readAloud ? 'Turn off read aloud' : 'Turn on read aloud'}
-                title={readAloud ? 'Turn off read aloud' : 'Read messages aloud'}
+                aria-pressed={!readAloud}
+                aria-label={readAloud ? 'Mute' : 'Unmute'}
+                title={readAloud ? 'Mute' : 'Unmute'}
               >
-                {readAloud ? '\u{1F50A}' : '\u{1F507}'} Read aloud
+                {readAloud ? '\u{1F50A} Mute' : '\u{1F507} Unmute'}
               </button>
             )}
           </div>

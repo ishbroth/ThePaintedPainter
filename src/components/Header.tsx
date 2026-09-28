@@ -38,7 +38,7 @@ const Header = () => {
           The Painted Painter
         </Link>
         <nav className={`nav ${isMenuOpen ? 'active' : ''}`} id="nav">
-          <Link to="/" onClick={closeMenu}>
+          <Link to="/#estimator" onClick={closeMenu}>
             Get Estimate
           </Link>
           <Link to="/painter-signup" onClick={closeMenu}>

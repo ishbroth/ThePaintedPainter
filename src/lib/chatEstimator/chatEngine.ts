@@ -98,9 +98,7 @@ export function makeInitialState(): ChatState {
     history: [
       {
         role: 'bot',
-        text:
-          "Hey! What do you need painted? Tell me as much or as little as you want — " +
-          "I'll ask follow-ups only when I need to.",
+        text: "Hello, what do you need painted?",
         timestamp: Date.now(),
       },
     ],
