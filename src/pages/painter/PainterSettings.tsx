@@ -34,13 +34,13 @@ export default function PainterSettings() {
   };
 
   const inputClass =
-    'w-full px-3 py-2 bg-[#1a1a1a] border border-[#555] rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-[#f5a623] transition-colors text-sm';
+    'w-full px-3 py-2 bg-[var(--bg-page)] border border-[var(--input-border)] rounded-lg text-[var(--text-primary)] placeholder-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)] transition-colors text-sm';
 
   function Toggle({ enabled, onChange }: { enabled: boolean; onChange: () => void }) {
     return (
       <div
         className={`w-12 h-6 rounded-full relative cursor-pointer transition-colors ${
-          enabled ? 'bg-[#f5a623]' : 'bg-[#555]'
+          enabled ? 'bg-[var(--accent)]' : 'bg-[var(--input-border)]'
         }`}
         onClick={onChange}
       >
@@ -55,17 +55,17 @@ export default function PainterSettings() {
 
   return (
     <div className="max-w-3xl mx-auto">
-      <h1 className="text-2xl font-bold text-white mb-6">Settings</h1>
+      <h1 className="text-2xl font-bold text-[var(--text-primary)] mb-6">Settings</h1>
 
       {toast && (
-        <div className="bg-green-900/30 border border-green-600 text-green-400 px-4 py-3 rounded-lg mb-6 text-sm">
+        <div className="bg-[var(--tint-success-bg)] border border-[var(--tint-success-border)] text-[var(--success)] px-4 py-3 rounded-lg mb-6 text-sm">
           {toast}
         </div>
       )}
 
       {/* Email */}
-      <form onSubmit={handleEmailSave} className="bg-[#222] border border-[#333] rounded-xl p-6 mb-6">
-        <h2 className="text-lg font-semibold text-white mb-4">Email Address</h2>
+      <form onSubmit={handleEmailSave} className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-xl p-6 mb-6">
+        <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Email Address</h2>
         <div className="flex flex-col sm:flex-row gap-3">
           <input
             type="email"
@@ -76,7 +76,7 @@ export default function PainterSettings() {
           />
           <button
             type="submit"
-            className="px-5 py-2 bg-[#f5a623] hover:bg-[#e09500] text-black font-semibold rounded-lg transition-colors text-sm whitespace-nowrap"
+            className="px-5 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-ink)] font-semibold rounded-lg transition-colors text-sm whitespace-nowrap"
           >
             Update Email
           </button>
@@ -84,10 +84,10 @@ export default function PainterSettings() {
       </form>
 
       {/* Password */}
-      <form onSubmit={handlePasswordSave} className="bg-[#222] border border-[#333] rounded-xl p-6 mb-6 space-y-4">
-        <h2 className="text-lg font-semibold text-white mb-2">Change Password</h2>
+      <form onSubmit={handlePasswordSave} className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-xl p-6 mb-6 space-y-4">
+        <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-2">Change Password</h2>
         <div>
-          <label className="block text-sm text-gray-300 mb-1">Current Password</label>
+          <label className="block text-sm text-[var(--text-secondary)] mb-1">Current Password</label>
           <input
             type="password"
             required
@@ -98,7 +98,7 @@ export default function PainterSettings() {
           />
         </div>
         <div>
-          <label className="block text-sm text-gray-300 mb-1">New Password</label>
+          <label className="block text-sm text-[var(--text-secondary)] mb-1">New Password</label>
           <input
             type="password"
             required
@@ -109,7 +109,7 @@ export default function PainterSettings() {
           />
         </div>
         <div>
-          <label className="block text-sm text-gray-300 mb-1">Confirm New Password</label>
+          <label className="block text-sm text-[var(--text-secondary)] mb-1">Confirm New Password</label>
           <input
             type="password"
             required
@@ -121,34 +121,34 @@ export default function PainterSettings() {
         </div>
         <button
           type="submit"
-          className="px-5 py-2 bg-[#f5a623] hover:bg-[#e09500] text-black font-semibold rounded-lg transition-colors text-sm"
+          className="px-5 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-ink)] font-semibold rounded-lg transition-colors text-sm"
         >
           Update Password
         </button>
       </form>
 
       {/* Notification preferences */}
-      <div className="bg-[#222] border border-[#333] rounded-xl p-6 mb-6">
-        <h2 className="text-lg font-semibold text-white mb-4">Notification Preferences</h2>
+      <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-xl p-6 mb-6">
+        <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Notification Preferences</h2>
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-white font-medium">Email Notifications</p>
-              <p className="text-xs text-gray-500">Receive job offers and updates via email</p>
+              <p className="text-sm text-[var(--text-primary)] font-medium">Email Notifications</p>
+              <p className="text-xs text-[var(--text-faint)]">Receive job offers and updates via email</p>
             </div>
             <Toggle enabled={emailNotifications} onChange={() => setEmailNotifications(!emailNotifications)} />
           </div>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-white font-medium">SMS Notifications</p>
-              <p className="text-xs text-gray-500">Receive urgent alerts via text message</p>
+              <p className="text-sm text-[var(--text-primary)] font-medium">SMS Notifications</p>
+              <p className="text-xs text-[var(--text-faint)]">Receive urgent alerts via text message</p>
             </div>
             <Toggle enabled={smsNotifications} onChange={() => setSmsNotifications(!smsNotifications)} />
           </div>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-white font-medium">Deal Alerts</p>
-              <p className="text-xs text-gray-500">Get notified when customers interact with your deals</p>
+              <p className="text-sm text-[var(--text-primary)] font-medium">Deal Alerts</p>
+              <p className="text-xs text-[var(--text-faint)]">Get notified when customers interact with your deals</p>
             </div>
             <Toggle enabled={dealAlerts} onChange={() => setDealAlerts(!dealAlerts)} />
           </div>
@@ -156,14 +156,14 @@ export default function PainterSettings() {
       </div>
 
       {/* Danger zone */}
-      <div className="bg-[#222] border border-red-900/50 rounded-xl p-6">
-        <h2 className="text-lg font-semibold text-red-400 mb-2">Danger Zone</h2>
-        <p className="text-sm text-gray-400 mb-4">
+      <div className="bg-[var(--bg-surface)] border border-red-900/50 rounded-xl p-6">
+        <h2 className="text-lg font-semibold text-[var(--danger)] mb-2">Danger Zone</h2>
+        <p className="text-sm text-[var(--text-secondary)] mb-4">
           Once you delete your account, there is no going back. All your data, deals, and reviews will be permanently removed.
         </p>
         {showDeleteConfirm ? (
           <div className="bg-red-900/20 border border-red-800 rounded-lg p-4">
-            <p className="text-sm text-red-400 mb-3">
+            <p className="text-sm text-[var(--danger)] mb-3">
               Are you sure you want to delete your account? This action cannot be undone.
             </p>
             <div className="flex gap-3">
@@ -172,13 +172,13 @@ export default function PainterSettings() {
                   setShowDeleteConfirm(false);
                   showToast('Account deletion is not available in this demo.');
                 }}
-                className="px-4 py-2 bg-red-700 hover:bg-red-600 text-white text-sm font-semibold rounded-lg transition-colors"
+                className="px-4 py-2 bg-red-700 hover:bg-red-600 text-[var(--text-primary)] text-sm font-semibold rounded-lg transition-colors"
               >
                 Yes, Delete My Account
               </button>
               <button
                 onClick={() => setShowDeleteConfirm(false)}
-                className="px-4 py-2 border border-[#555] text-gray-300 hover:text-white hover:border-[#888] text-sm rounded-lg transition-colors"
+                className="px-4 py-2 border border-[var(--input-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--text-secondary)] text-sm rounded-lg transition-colors"
               >
                 Cancel
               </button>

@@ -52,15 +52,15 @@ export default function CustomerSignUp() {
   if (confirmEmailSent) {
     return (
       <div className="flex items-center justify-center min-h-[70vh] px-4">
-        <div className="w-full max-w-[400px] bg-[#222] rounded-lg p-8 text-center">
-          <h1 className="text-2xl font-bold text-white">Check your email</h1>
-          <p className="text-gray-400 mt-3">
-            We sent a confirmation link to <span className="text-white">{email}</span>. Click it to activate your
+        <div className="w-full max-w-[400px] bg-[var(--bg-surface)] rounded-lg p-8 text-center">
+          <h1 className="text-2xl font-bold text-[var(--text-primary)]">Check your email</h1>
+          <p className="text-[var(--text-secondary)] mt-3">
+            We sent a confirmation link to <span className="text-[var(--text-primary)]">{email}</span>. Click it to activate your
             account, then sign in.
           </p>
           <Link
             to="/auth/customer-sign-in"
-            className="inline-block mt-6 text-blue-400 hover:text-blue-300 text-sm"
+            className="inline-block mt-6 text-[var(--accent-blue)] hover:text-[var(--accent-blue-hover)] text-sm"
           >
             Go to sign in
           </Link>
@@ -71,21 +71,21 @@ export default function CustomerSignUp() {
 
   return (
     <div className="flex items-center justify-center min-h-[70vh] px-4">
-      <div className="w-full max-w-[400px] bg-[#222] rounded-lg p-8">
-        <h1 className="text-2xl font-bold text-white text-center">Create Account</h1>
-        <p className="text-gray-400 text-center mt-2 mb-6">
+      <div className="w-full max-w-[400px] bg-[var(--bg-surface)] rounded-lg p-8">
+        <h1 className="text-2xl font-bold text-[var(--text-primary)] text-center">Create Account</h1>
+        <p className="text-[var(--text-secondary)] text-center mt-2 mb-6">
           Sign up to find and hire painters
         </p>
 
         {error && (
-          <div className="bg-red-900/30 border border-red-500 text-red-400 px-4 py-3 rounded mb-4 text-sm">
+          <div className="bg-[var(--tint-critical-bg)] border border-[var(--tint-critical-border)] text-[var(--danger)] px-4 py-3 rounded mb-4 text-sm">
             {error}
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="name" className="block text-sm font-medium text-gray-300 mb-1">
+            <label htmlFor="name" className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
               Full Name
             </label>
             <input
@@ -94,13 +94,13 @@ export default function CustomerSignUp() {
               required
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full px-3 py-2 bg-[#1a1a1a] border border-[#555] rounded text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+              className="w-full px-3 py-2 bg-[var(--bg-page)] border border-[var(--input-border)] rounded text-[var(--text-primary)] placeholder-[var(--text-faint)] focus:outline-none focus:border-[var(--accent-blue)]"
               placeholder="John Doe"
             />
           </div>
 
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-1">
+            <label htmlFor="email" className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
               Email
             </label>
             <input
@@ -109,13 +109,13 @@ export default function CustomerSignUp() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-3 py-2 bg-[#1a1a1a] border border-[#555] rounded text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+              className="w-full px-3 py-2 bg-[var(--bg-page)] border border-[var(--input-border)] rounded text-[var(--text-primary)] placeholder-[var(--text-faint)] focus:outline-none focus:border-[var(--accent-blue)]"
               placeholder="you@example.com"
             />
           </div>
 
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-1">
+            <label htmlFor="password" className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
               Password
             </label>
             <input
@@ -124,13 +124,13 @@ export default function CustomerSignUp() {
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-3 py-2 bg-[#1a1a1a] border border-[#555] rounded text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+              className="w-full px-3 py-2 bg-[var(--bg-page)] border border-[var(--input-border)] rounded text-[var(--text-primary)] placeholder-[var(--text-faint)] focus:outline-none focus:border-[var(--accent-blue)]"
               placeholder="At least 6 characters"
             />
           </div>
 
           <div>
-            <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-300 mb-1">
+            <label htmlFor="confirmPassword" className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
               Confirm Password
             </label>
             <input
@@ -139,7 +139,7 @@ export default function CustomerSignUp() {
               required
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full px-3 py-2 bg-[#1a1a1a] border border-[#555] rounded text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+              className="w-full px-3 py-2 bg-[var(--bg-page)] border border-[var(--input-border)] rounded text-[var(--text-primary)] placeholder-[var(--text-faint)] focus:outline-none focus:border-[var(--accent-blue)]"
               placeholder="Confirm your password"
             />
           </div>
@@ -147,7 +147,7 @@ export default function CustomerSignUp() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded transition-colors"
+            className="w-full py-2 px-4 bg-[var(--accent-blue)] hover:bg-[var(--accent-blue-hover)] disabled:opacity-50 disabled:cursor-not-allowed text-[var(--text-primary)] font-medium rounded transition-colors"
           >
             {loading ? 'Creating account...' : 'Create Account'}
           </button>
@@ -156,7 +156,7 @@ export default function CustomerSignUp() {
         <div className="mt-6 text-center">
           <Link
             to="/auth/customer-sign-in"
-            className="text-blue-400 hover:text-blue-300 text-sm"
+            className="text-[var(--accent-blue)] hover:text-[var(--accent-blue-hover)] text-sm"
           >
             Already have an account?
           </Link>

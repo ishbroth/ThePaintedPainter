@@ -309,9 +309,9 @@ export const TOPICS: Topic[] = [
     ask: (c) =>
       pick(
         [
-          "Is this your own home, or a rental/investment property? (Also let me know if it's a multi-unit building or a commercial space — those price differently too.)",
-          "Quick one — owner-occupied, a rental you own, a multi-unit building, or commercial space?",
-          "Whose place is this — you live there, it's a rental, multiple units, or a business?",
+          "Are you living here, or renting/selling it?",
+          "Is this your home, or a rental/listing?",
+          "Quick one — do you live here, or is it a rental or something you're selling?",
         ],
         seed(c),
       ),

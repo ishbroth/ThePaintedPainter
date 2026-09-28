@@ -92,9 +92,9 @@ const Gallery = () => {
   const visibleImages = filteredImages.slice(0, visibleCount);
 
   return (
-    <div className="bg-[#1a1a1a] text-white" style={{ minHeight: '100vh' }}>
+    <div className="text-[var(--text-primary)]" style={{ minHeight: '100vh' }}>
       {/* Hero */}
-      <section className="bg-[#111] text-white py-16 border-b border-[#333]">
+      <section className="bg-[var(--bg-chrome)] text-[var(--text-primary)] py-16 border-b border-[var(--border)]">
         <div className="container-custom text-center">
           <h1
             className="text-3xl md:text-4xl font-bold mb-3"
@@ -102,7 +102,7 @@ const Gallery = () => {
           >
             Project Gallery
           </h1>
-          <p className="text-gray-400 max-w-2xl mx-auto">
+          <p className="text-[var(--text-secondary)] max-w-2xl mx-auto">
             Browse real work from verified painters across the country.
           </p>
         </div>
@@ -125,8 +125,8 @@ const Gallery = () => {
                   fontWeight: 600,
                   fontSize: '0.85rem',
                   transition: 'all 0.2s',
-                  background: filter === cat.id ? '#f5a623' : '#333',
-                  color: filter === cat.id ? '#111' : '#ccc',
+                  background: filter === cat.id ? 'var(--accent)' : 'var(--border)',
+                  color: filter === cat.id ? 'var(--bg-chrome)' : 'var(--text-faint)',
                 }}
               >
                 {cat.label}
@@ -134,7 +134,7 @@ const Gallery = () => {
             ))}
           </div>
 
-          <p className="text-center text-gray-500 text-sm mb-6">
+          <p className="text-center text-[var(--text-faint)] text-sm mb-6">
             {filteredImages.length} project{filteredImages.length !== 1 ? 's' : ''} found
           </p>
 
@@ -147,7 +147,7 @@ const Gallery = () => {
                 style={{
                   borderRadius: '10px',
                   overflow: 'hidden',
-                  background: '#222',
+                  background: 'var(--bg-surface)',
                 }}
               >
                 <div
@@ -161,7 +161,7 @@ const Gallery = () => {
                     loading="lazy"
                   />
                   <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <span className="text-white font-semibold text-sm">View</span>
+                    <span className="text-[var(--text-primary)] font-semibold text-sm">View</span>
                   </div>
                 </div>
                 <Link
@@ -172,10 +172,10 @@ const Gallery = () => {
                     textDecoration: 'none',
                   }}
                 >
-                  <p style={{ color: '#fff', fontSize: '0.85rem', fontWeight: 600, margin: 0 }}>
+                  <p style={{ color: 'var(--text-primary)', fontSize: '0.85rem', fontWeight: 600, margin: 0 }}>
                     {item.companyName}
                   </p>
-                  <p style={{ color: '#888', fontSize: '0.75rem', margin: '2px 0 0' }}>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', margin: '2px 0 0' }}>
                     {item.city}, {item.state}
                   </p>
                 </Link>
@@ -191,8 +191,8 @@ const Gallery = () => {
                 style={{
                   padding: '12px 32px',
                   background: 'transparent',
-                  border: '2px solid #f5a623',
-                  color: '#f5a623',
+                  border: '2px solid var(--accent)',
+                  color: 'var(--accent)',
                   borderRadius: '8px',
                   cursor: 'pointer',
                   fontWeight: 600,
@@ -213,7 +213,7 @@ const Gallery = () => {
           onClick={() => setSelectedImage(null)}
         >
           <button
-            className="absolute top-4 right-4 text-white hover:text-[#f5a623] transition-colors"
+            className="absolute top-4 right-4 text-[var(--text-primary)] hover:text-[var(--accent)] transition-colors"
             onClick={() => setSelectedImage(null)}
           >
             <X size={32} />
@@ -227,11 +227,11 @@ const Gallery = () => {
             <div className="mt-4">
               <Link
                 to={`/painters/${selectedImage.painterId}`}
-                style={{ color: '#f5a623', fontWeight: 600, textDecoration: 'none', fontSize: '0.95rem' }}
+                style={{ color: 'var(--accent)', fontWeight: 600, textDecoration: 'none', fontSize: '0.95rem' }}
               >
                 {selectedImage.companyName}
               </Link>
-              <p className="text-gray-400 text-sm mt-1">
+              <p className="text-[var(--text-secondary)] text-sm mt-1">
                 {selectedImage.city}, {selectedImage.state}
               </p>
             </div>

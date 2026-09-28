@@ -19,14 +19,14 @@ export default function DashboardSidebar({ items, title, onLogout }: DashboardSi
   const linkClasses = ({ isActive }: { isActive: boolean }) =>
     `flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors ${
       isActive
-        ? 'bg-[#f5a623] text-black font-semibold'
-        : 'text-gray-300 hover:bg-[#222] hover:text-white'
+        ? 'bg-[var(--accent)] text-[var(--accent-ink)] font-semibold'
+        : 'text-[var(--text-secondary)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]'
     }`;
 
   const navContent = (
     <>
-      <div className="px-4 py-6 border-b border-[#333]">
-        <h2 className="text-lg font-bold text-white tracking-wide">{title}</h2>
+      <div className="px-4 py-6 border-b border-[var(--border)]">
+        <h2 className="text-lg font-bold text-[var(--text-primary)] tracking-wide">{title}</h2>
       </div>
 
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
@@ -44,10 +44,10 @@ export default function DashboardSidebar({ items, title, onLogout }: DashboardSi
         ))}
       </nav>
 
-      <div className="px-3 py-4 border-t border-[#333]">
+      <div className="px-3 py-4 border-t border-[var(--border)]">
         <button
           onClick={onLogout}
-          className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm text-gray-400 hover:bg-red-900/30 hover:text-red-400 transition-colors w-full"
+          className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm text-[var(--text-secondary)] hover:bg-red-900/30 hover:text-red-400 transition-colors w-full"
         >
           <span className="text-lg leading-none">{'\u{1F6AA}'}</span>
           <span>Logout</span>
@@ -61,7 +61,7 @@ export default function DashboardSidebar({ items, title, onLogout }: DashboardSi
       {/* Mobile hamburger button */}
       <button
         onClick={() => setDrawerOpen(true)}
-        className="lg:hidden fixed top-3 left-3 z-50 bg-[#222] border border-[#444] text-white p-2 rounded-lg"
+        className="lg:hidden fixed top-3 left-3 z-50 bg-[var(--bg-surface)] border border-[var(--border-strong)] text-[var(--text-primary)] p-2 rounded-lg"
         aria-label="Open menu"
       >
         <span className="text-xl leading-none">{'\u2630'}</span>
@@ -77,13 +77,13 @@ export default function DashboardSidebar({ items, title, onLogout }: DashboardSi
 
       {/* Mobile drawer */}
       <aside
-        className={`lg:hidden fixed top-0 left-0 h-full w-64 bg-[#111] z-50 flex flex-col transform transition-transform duration-300 ${
+        className={`lg:hidden fixed top-0 left-0 h-full w-64 bg-[var(--bg-chrome)] z-50 flex flex-col transform transition-transform duration-300 ${
           drawerOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         <button
           onClick={() => setDrawerOpen(false)}
-          className="absolute top-4 right-4 text-gray-400 hover:text-white text-xl"
+          className="absolute top-4 right-4 text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-xl"
           aria-label="Close menu"
         >
           {'\u2715'}
@@ -92,7 +92,7 @@ export default function DashboardSidebar({ items, title, onLogout }: DashboardSi
       </aside>
 
       {/* Desktop sidebar */}
-      <aside className="hidden lg:flex w-64 min-h-screen bg-[#111] flex-col flex-shrink-0">
+      <aside className="hidden lg:flex w-64 min-h-screen bg-[var(--bg-chrome)] flex-col flex-shrink-0">
         {navContent}
       </aside>
     </>

@@ -33,22 +33,22 @@ export default function CustomerSignIn() {
 
   return (
     <div className="flex items-center justify-center min-h-[70vh] px-4">
-      <div className="w-full max-w-[400px] bg-[#222] rounded-lg p-8">
+      <div className="w-full max-w-[400px] bg-[var(--bg-surface)] rounded-lg p-8">
         <SignInRoleToggle active="customer" />
-        <h1 className="text-2xl font-bold text-white text-center">Customer Sign In</h1>
-        <p className="text-gray-400 text-center mt-2 mb-6">
+        <h1 className="text-2xl font-bold text-[var(--text-primary)] text-center">Customer Sign In</h1>
+        <p className="text-[var(--text-secondary)] text-center mt-2 mb-6">
           Sign in to manage your projects
         </p>
 
         {error && (
-          <div className="bg-red-900/30 border border-red-500 text-red-400 px-4 py-3 rounded mb-4 text-sm">
+          <div className="bg-[var(--tint-critical-bg)] border border-[var(--tint-critical-border)] text-[var(--danger)] px-4 py-3 rounded mb-4 text-sm">
             {error}
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-1">
+            <label htmlFor="email" className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
               Email
             </label>
             <input
@@ -57,13 +57,13 @@ export default function CustomerSignIn() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-3 py-2 bg-[#1a1a1a] border border-[#555] rounded text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+              className="w-full px-3 py-2 bg-[var(--bg-page)] border border-[var(--input-border)] rounded text-[var(--text-primary)] placeholder-[var(--text-faint)] focus:outline-none focus:border-[var(--accent-blue)]"
               placeholder="you@example.com"
             />
           </div>
 
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-1">
+            <label htmlFor="password" className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
               Password
             </label>
             <input
@@ -72,7 +72,7 @@ export default function CustomerSignIn() {
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-3 py-2 bg-[#1a1a1a] border border-[#555] rounded text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+              className="w-full px-3 py-2 bg-[var(--bg-page)] border border-[var(--input-border)] rounded text-[var(--text-primary)] placeholder-[var(--text-faint)] focus:outline-none focus:border-[var(--accent-blue)]"
               placeholder="Your password"
             />
           </div>
@@ -80,7 +80,7 @@ export default function CustomerSignIn() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded transition-colors"
+            className="w-full py-2 px-4 bg-[var(--accent-blue)] hover:bg-[var(--accent-blue-hover)] disabled:opacity-50 disabled:cursor-not-allowed text-[var(--text-primary)] font-medium rounded transition-colors"
           >
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
@@ -89,14 +89,14 @@ export default function CustomerSignIn() {
         <div className="mt-6 text-center space-y-2">
           <Link
             to="/auth/customer-sign-up"
-            className="block text-blue-400 hover:text-blue-300 text-sm"
+            className="block text-[var(--accent-blue)] hover:text-[var(--accent-blue-hover)] text-sm"
           >
             Create an account
           </Link>
           <button
             type="button"
             onClick={() => alert('Password reset coming soon. Please contact support.')}
-            className="text-gray-400 hover:text-gray-300 text-sm"
+            className="text-[var(--text-secondary)] hover:text-[var(--text-secondary)] text-sm"
           >
             Forgot password?
           </button>

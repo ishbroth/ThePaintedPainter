@@ -73,10 +73,10 @@ const QuoteResults = () => {
   const seconds = Math.floor((msLeft % 60000) / 1000);
   const pad = (n: number) => n.toString().padStart(2, '0');
   const timerColor = expired
-    ? '#e74c3c'
+    ? 'var(--danger)'
     : msLeft < 5 * 60 * 1000
-    ? '#f5a623'
-    : '#74b9ff';
+    ? 'var(--accent)'
+    : 'var(--accent-blue)';
 
   const [painterMatches, setPainterMatches] = useState<RealPainterMatch[] | null>(null);
 
@@ -146,16 +146,13 @@ const QuoteResults = () => {
       {/* Hero / price */}
       <div className="quote-results-hero">
         <h1>Your Estimate</h1>
-        <p style={{ color: '#a9b0b6', fontSize: '0.9rem' }}>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
           {describeJob(ctx)}
         </p>
         <div className="quote-results-price">{currency(estimate.total)}</div>
         <div className="quote-results-range">
           Likely range: {currency(estimate.lowRange)} – {currency(estimate.highRange)}
         </div>
-        <span className="quote-results-confidence">
-          {estimate.confidence} confidence · {estimate.confidenceNote}
-        </span>
       </div>
 
       {/* Collapsed breakdown */}
@@ -212,7 +209,7 @@ const QuoteResults = () => {
             <h3>Total</h3>
             <div className="breakdown-line" style={{ fontWeight: 700, fontSize: '1.05rem' }}>
               <span>Guaranteed price (10% below market)</span>
-              <span style={{ color: '#74b9ff' }}>{currency(estimate.total)}</span>
+              <span style={{ color: 'var(--accent-blue)' }}>{currency(estimate.total)}</span>
             </div>
           </div>
         </div>
@@ -279,7 +276,7 @@ const QuoteResults = () => {
             )}
           </p>
           {(painterMatches?.length ?? 0) > 0 && (
-            <p className="mystery-painter-desc" style={{ marginTop: 8, fontSize: '0.8rem', color: '#74b9ff' }}>
+            <p className="mystery-painter-desc" style={{ marginTop: 8, fontSize: '0.8rem', color: 'var(--accent-blue)' }}>
               {painterMatches!.length} painter{painterMatches!.length === 1 ? '' : 's'} in our pool could bid on this job.
             </p>
           )}
@@ -293,8 +290,8 @@ const QuoteResults = () => {
             style={{
               marginTop: 10,
               padding: '10px 18px',
-              background: expired ? '#3a4046' : '#74b9ff',
-              color: expired ? '#6e7479' : '#0b1620',
+              background: expired ? 'var(--border-strong)' : 'var(--accent-blue)',
+              color: expired ? 'var(--text-faint)' : 'var(--accent-blue-ink)',
               border: 'none',
               borderRadius: 10,
               fontWeight: 700,
@@ -332,7 +329,14 @@ const PainterCard = ({ match }: { match: RealPainterMatch }) => {
   return (
     <div className="painter-card">
       <div>
-        <div className="painter-card-name">{painter.company_name}</div>
+        <div className="painter-card-name">
+          {painter.company_name}
+          {painter.reviewCount > 0 && (
+            <span style={{ marginLeft: 8, fontSize: '0.8rem', fontWeight: 600, color: 'var(--accent)' }}>
+              ★ {painter.avgRating.toFixed(1)} <span style={{ color: 'var(--text-faint)', fontWeight: 400 }}>({painter.reviewCount})</span>
+            </span>
+          )}
+        </div>
         <div className="painter-card-meta">
           <span>{painter.city}, {painter.state}</span>
           <span>{painter.years_in_business ?? '?'} yrs</span>
@@ -427,7 +431,7 @@ const ClaimPriceModal = ({
       onClick={onClose}
     >
       <div
-        style={{ background: '#1f2937', borderRadius: 14, padding: 28, maxWidth: 460, width: '100%', maxHeight: '90vh', overflowY: 'auto' }}
+        style={{ background: 'var(--bg-surface)', borderRadius: 14, padding: 28, maxWidth: 460, width: '100%', maxHeight: '90vh', overflowY: 'auto' }}
         onClick={(e) => e.stopPropagation()}
       >
         {result ? (
@@ -437,7 +441,7 @@ const ClaimPriceModal = ({
               We've notified {result.notifiedCount} painter{result.notifiedCount === 1 ? '' : 's'}. As soon as one accepts,
               we'll email you at <strong>{email}</strong> so you can confirm and secure your painter.
             </p>
-            <button onClick={onClose} style={{ marginTop: 12, padding: '10px 20px', borderRadius: 10, border: 'none', background: '#74b9ff', color: '#0b1620', fontWeight: 700, cursor: 'pointer' }}>
+            <button onClick={onClose} style={{ marginTop: 12, padding: '10px 20px', borderRadius: 10, border: 'none', background: 'var(--accent-blue)', color: 'var(--accent-blue-ink)', fontWeight: 700, cursor: 'pointer' }}>
               Done
             </button>
           </>
@@ -446,7 +450,7 @@ const ClaimPriceModal = ({
             <h2 style={{ marginTop: 0 }}>
               {target.selectionType === 'specific_painter' ? `Claim your price with ${target.painter.company_name}` : 'Claim your guaranteed price'}
             </h2>
-            <p style={{ color: '#a9b0b6', fontSize: '0.9rem' }}>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
               We'll keep your contact info private until a painter accepts the job.
             </p>
 
@@ -460,23 +464,23 @@ const ClaimPriceModal = ({
                 <input placeholder="State" value={state_} onChange={(e) => setState_(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
               </div>
               <div>
-                <label style={{ fontSize: '0.8rem', color: '#a9b0b6', display: 'block', marginBottom: 4 }}>
+                <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
                   Preferred start date (optional — the painter will confirm)
                 </label>
                 <input type="date" value={preferredDate} onChange={(e) => setPreferredDate(e.target.value)} style={inputStyle} />
               </div>
             </div>
 
-            {error && <p style={{ color: '#e74c3c', marginTop: 10 }}>{error}</p>}
+            {error && <p style={{ color: 'var(--danger)', marginTop: 10 }}>{error}</p>}
 
             <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
-              <button onClick={onClose} style={{ padding: '10px 20px', borderRadius: 10, border: '1px solid #3a4046', background: 'transparent', color: '#a9b0b6', cursor: 'pointer' }}>
+              <button onClick={onClose} style={{ padding: '10px 20px', borderRadius: 10, border: '1px solid var(--border-strong)', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer' }}>
                 Cancel
               </button>
               <button
                 onClick={handleSubmit}
                 disabled={submitting}
-                style={{ flex: 1, padding: '10px 20px', borderRadius: 10, border: 'none', background: '#74b9ff', color: '#0b1620', fontWeight: 700, cursor: submitting ? 'not-allowed' : 'pointer' }}
+                style={{ flex: 1, padding: '10px 20px', borderRadius: 10, border: 'none', background: 'var(--accent-blue)', color: 'var(--accent-blue-ink)', fontWeight: 700, cursor: submitting ? 'not-allowed' : 'pointer' }}
               >
                 {submitting ? 'Submitting…' : 'Claim This Price'}
               </button>
@@ -491,9 +495,9 @@ const ClaimPriceModal = ({
 const inputStyle: CSSProperties = {
   padding: '10px 12px',
   borderRadius: 8,
-  border: '1px solid #3a4046',
-  background: '#111827',
-  color: '#fff',
+  border: '1px solid var(--border-strong)',
+  background: 'var(--bg-page)',
+  color: 'var(--text-primary)',
   fontSize: '0.9rem',
 };
 

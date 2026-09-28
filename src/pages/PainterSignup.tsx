@@ -258,28 +258,28 @@ const styles = {
   input: {
     width: '100%',
     padding: '12px 14px',
-    border: '1px solid #ddd',
+    border: '1px solid var(--text-faint)',
     fontSize: '0.9rem',
     fontFamily: 'inherit',
-    background: '#333',
-    color: '#fff',
+    background: 'var(--border)',
+    color: 'var(--text-primary)',
     borderRadius: '0',
     outline: 'none',
   } as React.CSSProperties,
   inputError: {
-    borderColor: '#e74c3c',
+    borderColor: 'var(--danger)',
   } as React.CSSProperties,
   inputFocus: {
-    borderColor: '#74b9ff',
+    borderColor: 'var(--accent-blue)',
   } as React.CSSProperties,
   select: {
     width: '100%',
     padding: '12px 14px',
-    border: '1px solid #555',
+    border: '1px solid var(--input-border)',
     fontSize: '0.9rem',
     fontFamily: 'inherit',
-    background: '#333',
-    color: '#fff',
+    background: 'var(--border)',
+    color: 'var(--text-primary)',
     borderRadius: '0',
     outline: 'none',
     appearance: 'auto' as const,
@@ -289,27 +289,27 @@ const styles = {
     marginBottom: '6px',
     fontSize: '0.85rem',
     fontWeight: 600,
-    color: '#ccc',
+    color: 'var(--text-faint)',
     letterSpacing: '0.3px',
   } as React.CSSProperties,
   sectionTitle: {
     fontFamily: "'Cabin', sans-serif",
     fontSize: '1.15rem',
     fontWeight: 700,
-    color: '#fff',
+    color: 'var(--text-primary)',
     marginBottom: '20px',
     textTransform: 'uppercase' as const,
     letterSpacing: '1.5px',
   } as React.CSSProperties,
   helperText: {
     fontSize: '0.78rem',
-    color: '#666',
+    color: 'var(--text-secondary)',
     marginTop: '4px',
     lineHeight: 1.4,
   } as React.CSSProperties,
   errorText: {
     fontSize: '0.78rem',
-    color: '#e74c3c',
+    color: 'var(--danger)',
     marginTop: '4px',
   } as React.CSSProperties,
   formGroup: {
@@ -323,16 +323,16 @@ const styles = {
   } as React.CSSProperties,
   toggleLabel: {
     fontSize: '0.9rem',
-    color: '#ccc',
+    color: 'var(--text-faint)',
     fontWeight: 500,
   } as React.CSSProperties,
   toggleButton: (active: boolean): React.CSSProperties => ({
     padding: '6px 18px',
     fontSize: '0.8rem',
     fontWeight: 600,
-    border: active ? '1px solid #74b9ff' : '1px solid #999',
-    background: active ? '#74b9ff' : '#f0f0f0',
-    color: active ? '#000' : '#444',
+    border: active ? '1px solid var(--accent-blue)' : '1px solid var(--text-secondary)',
+    background: active ? 'var(--accent-blue)' : '#f0f0f0',
+    color: active ? 'var(--accent-blue-ink)' : 'var(--text-secondary)',
     cursor: 'pointer',
     transition: 'all 0.2s',
     fontFamily: 'inherit',
@@ -346,19 +346,19 @@ const styles = {
   } as React.CSSProperties,
   checkboxLabel: {
     fontSize: '0.88rem',
-    color: '#ccc',
+    color: 'var(--text-faint)',
     cursor: 'pointer',
     userSelect: 'none' as const,
   } as React.CSSProperties,
   card: {
-    background: '#222',
+    background: 'var(--bg-surface)',
     padding: '30px 28px',
     maxWidth: '700px',
     margin: '0 auto',
   } as React.CSSProperties,
   cardTitle: {
     fontFamily: "'Cabin', sans-serif",
-    color: '#fff',
+    color: 'var(--text-primary)',
     fontSize: '1.05rem',
     marginBottom: '22px',
     fontWeight: 600,
@@ -369,7 +369,7 @@ const styles = {
     gap: '16px',
   } as React.CSSProperties,
   requiredStar: {
-    color: '#e74c3c',
+    color: 'var(--danger)',
     marginLeft: '2px',
   } as React.CSSProperties,
 } as const;
@@ -685,10 +685,10 @@ const PainterSignup = () => {
             ...(errors[key] ? styles.inputError : {}),
           }}
           onFocus={(e) => {
-            e.currentTarget.style.borderColor = '#74b9ff';
+            e.currentTarget.style.borderColor = 'var(--accent-blue)';
           }}
           onBlur={(e) => {
-            e.currentTarget.style.borderColor = errors[key] ? '#e74c3c' : '#ddd';
+            e.currentTarget.style.borderColor = errors[key] ? 'var(--danger)' : 'var(--text-faint)';
           }}
         />
         {helper && <p style={styles.helperText}>{helper}</p>}
@@ -833,7 +833,7 @@ const PainterSignup = () => {
             background: '#f9f9f9',
             padding: '16px',
             marginBottom: '18px',
-            borderLeft: '3px solid #74b9ff',
+            borderLeft: '3px solid var(--accent-blue)',
           }}
         >
           <div style={styles.grid2}>
@@ -880,7 +880,7 @@ const PainterSignup = () => {
             background: '#f9f9f9',
             padding: '16px',
             marginBottom: '18px',
-            borderLeft: '3px solid #74b9ff',
+            borderLeft: '3px solid var(--accent-blue)',
           }}
         >
           <div style={styles.grid2}>
@@ -905,7 +905,7 @@ const PainterSignup = () => {
             background: '#f9f9f9',
             padding: '16px',
             marginBottom: '18px',
-            borderLeft: '3px solid #74b9ff',
+            borderLeft: '3px solid var(--accent-blue)',
           }}
         >
           <div style={styles.grid2}>
@@ -934,7 +934,7 @@ const PainterSignup = () => {
             background: '#f9f9f9',
             padding: '16px',
             marginBottom: '18px',
-            borderLeft: '3px solid #74b9ff',
+            borderLeft: '3px solid var(--accent-blue)',
           }}
         >
           {renderInput('workersCompCarrier', 'Workers Comp Carrier', {
@@ -953,7 +953,7 @@ const PainterSignup = () => {
               type="checkbox"
               checked={formData.certifications.includes(cert)}
               onChange={() => toggleArrayItem('certifications', cert)}
-              style={{ accentColor: '#74b9ff', width: '16px', height: '16px' }}
+              style={{ accentColor: 'var(--accent-blue)', width: '16px', height: '16px' }}
             />
             <span style={styles.checkboxLabel}>{cert}</span>
           </label>
@@ -991,7 +991,7 @@ const PainterSignup = () => {
                 type="checkbox"
                 checked={formData.serviceTypes.includes(svc)}
                 onChange={() => toggleArrayItem('serviceTypes', svc)}
-                style={{ accentColor: '#74b9ff', width: '16px', height: '16px' }}
+                style={{ accentColor: 'var(--accent-blue)', width: '16px', height: '16px' }}
               />
               <span style={styles.checkboxLabel}>{svc}</span>
             </label>
@@ -1027,12 +1027,12 @@ const PainterSignup = () => {
                 fontWeight: 500,
                 border:
                   formData.maxProjectSize === opt.value
-                    ? '1px solid #74b9ff'
-                    : '1px solid #ccc',
+                    ? '1px solid var(--accent-blue)'
+                    : '1px solid var(--text-faint)',
                 background:
-                  formData.maxProjectSize === opt.value ? '#74b9ff' : '#fff',
+                  formData.maxProjectSize === opt.value ? 'var(--accent-blue)' : 'var(--text-primary)',
                 color:
-                  formData.maxProjectSize === opt.value ? '#000' : '#555',
+                  formData.maxProjectSize === opt.value ? 'var(--accent-blue-ink)' : 'var(--input-border)',
                 cursor: 'pointer',
                 transition: 'all 0.2s',
                 fontFamily: 'inherit',
@@ -1074,7 +1074,7 @@ const PainterSignup = () => {
       <p
         style={{
           fontSize: '0.88rem',
-          color: '#666',
+          color: 'var(--text-secondary)',
           lineHeight: 1.7,
           marginBottom: '24px',
         }}
@@ -1092,13 +1092,13 @@ const PainterSignup = () => {
             style={{
               marginBottom: '24px',
               paddingBottom: '24px',
-              borderBottom: '1px solid #eee',
+              borderBottom: '1px solid var(--border)',
             }}
           >
-            <label style={{ ...styles.label, color: '#ccc', fontSize: '0.9rem' }}>
+            <label style={{ ...styles.label, color: 'var(--text-faint)', fontSize: '0.9rem' }}>
               {scenario.label}
             </label>
-            <p style={{ ...styles.helperText, color: '#555', marginBottom: '8px' }}>
+            <p style={{ ...styles.helperText, color: 'var(--input-border)', marginBottom: '8px' }}>
               {scenario.description}
             </p>
             <div style={{ maxWidth: '220px' }}>
@@ -1119,10 +1119,10 @@ const PainterSignup = () => {
                   maxWidth: '220px',
                 }}
                 onFocus={(e) => {
-                  e.currentTarget.style.borderColor = '#74b9ff';
+                  e.currentTarget.style.borderColor = 'var(--accent-blue)';
                 }}
                 onBlur={(e) => {
-                  e.currentTarget.style.borderColor = '#ddd';
+                  e.currentTarget.style.borderColor = 'var(--text-faint)';
                 }}
               />
             </div>
@@ -1138,8 +1138,8 @@ const PainterSignup = () => {
 
   if (needsEmailConfirmation) {
     return (
-      <div className="bg-[#1a1a1a] text-white" style={{ minHeight: '100vh' }}>
-        <section className="bg-[#111] text-white py-16 border-b border-[#333]">
+      <div className="text-[var(--text-primary)]" style={{ minHeight: '100vh' }}>
+        <section className="bg-[var(--bg-chrome)] text-[var(--text-primary)] py-16 border-b border-[var(--border)]">
           <div className="container-custom text-center">
             <h1
               className="text-3xl md:text-4xl font-bold mb-3"
@@ -1147,7 +1147,7 @@ const PainterSignup = () => {
             >
               Application Received
             </h1>
-            <p className="text-gray-400">Partner with The Painted Painter</p>
+            <p className="text-[var(--text-secondary)]">Partner with The Painted Painter</p>
           </div>
         </section>
         <section style={{ padding: '48px 20px', textAlign: 'center' }}>
@@ -1156,13 +1156,13 @@ const PainterSignup = () => {
               Thanks — we've got your application and account details for{' '}
               <strong>{formData.companyName.trim()}</strong>.
             </p>
-            <p style={{ marginBottom: 16, color: '#aaa' }}>
+            <p style={{ marginBottom: 16, color: 'var(--text-secondary)' }}>
               We sent a confirmation link to <strong>{formData.email.trim()}</strong>. Click it to activate your
               account, then sign in to check your application status.
             </p>
             <Link
               to="/auth/painter-sign-in"
-              style={{ color: '#74b9ff', textDecoration: 'underline' }}
+              style={{ color: 'var(--accent-blue)', textDecoration: 'underline' }}
             >
               Go to painter sign in
             </Link>
@@ -1173,9 +1173,9 @@ const PainterSignup = () => {
   }
 
   return (
-    <div className="bg-[#1a1a1a] text-white" style={{ minHeight: '100vh' }}>
+    <div className="text-[var(--text-primary)]" style={{ minHeight: '100vh' }}>
       {/* Hero */}
-      <section className="bg-[#111] text-white py-16 border-b border-[#333]">
+      <section className="bg-[var(--bg-chrome)] text-[var(--text-primary)] py-16 border-b border-[var(--border)]">
         <div className="container-custom text-center">
           <h1
             className="text-3xl md:text-4xl font-bold mb-3"
@@ -1183,12 +1183,12 @@ const PainterSignup = () => {
           >
             Join Our Network
           </h1>
-          <p className="text-gray-400">Partner with The Painted Painter</p>
+          <p className="text-[var(--text-secondary)]">Partner with The Painted Painter</p>
         </div>
       </section>
 
       {/* Step Indicator */}
-      <section style={{ background: '#1e2120', padding: '24px 20px 0' }}>
+      <section style={{ background: 'var(--bg-chrome)', padding: '24px 20px 0' }}>
         <div
           style={{
             maxWidth: '700px',
@@ -1220,7 +1220,7 @@ const PainterSignup = () => {
                       left: 0,
                       right: '50%',
                       height: '2px',
-                      background: isCompleted || isActive ? '#74b9ff' : '#444',
+                      background: isCompleted || isActive ? 'var(--accent-blue)' : 'var(--border-strong)',
                       zIndex: 0,
                     }}
                   />
@@ -1233,7 +1233,7 @@ const PainterSignup = () => {
                       left: '50%',
                       right: 0,
                       height: '2px',
-                      background: isCompleted ? '#74b9ff' : '#444',
+                      background: isCompleted ? 'var(--accent-blue)' : 'var(--border-strong)',
                       zIndex: 0,
                     }}
                   />
@@ -1246,11 +1246,11 @@ const PainterSignup = () => {
                     height: '34px',
                     borderRadius: '50%',
                     background: isActive
-                      ? '#74b9ff'
+                      ? 'var(--accent-blue)'
                       : isCompleted
-                        ? '#74b9ff'
-                        : '#333',
-                    color: isActive || isCompleted ? '#000' : '#888',
+                        ? 'var(--accent-blue)'
+                        : 'var(--border)',
+                    color: isActive || isCompleted ? 'var(--accent-blue-ink)' : 'var(--text-secondary)',
                     display: 'inline-flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -1267,7 +1267,7 @@ const PainterSignup = () => {
                 <p
                   style={{
                     fontSize: '0.72rem',
-                    color: isActive ? '#74b9ff' : '#777',
+                    color: isActive ? 'var(--accent-blue)' : 'var(--text-secondary)',
                     marginTop: '6px',
                     letterSpacing: '0.5px',
                     textTransform: 'uppercase',
@@ -1287,7 +1287,7 @@ const PainterSignup = () => {
             maxWidth: '700px',
             margin: '20px auto 0',
             height: '3px',
-            background: '#333',
+            background: 'var(--border)',
             overflow: 'hidden',
           }}
         >
@@ -1295,7 +1295,7 @@ const PainterSignup = () => {
             style={{
               height: '100%',
               width: `${((currentStep - 1) / 3) * 100}%`,
-              background: '#74b9ff',
+              background: 'var(--accent-blue)',
               transition: 'width 0.4s ease',
             }}
           />
@@ -1303,7 +1303,7 @@ const PainterSignup = () => {
       </section>
 
       {/* Form Body */}
-      <section style={{ background: '#1e2120', padding: '30px 20px 50px' }}>
+      <section style={{ background: 'var(--bg-chrome)', padding: '30px 20px 50px' }}>
         <div
           key={currentStep}
           style={{
@@ -1378,7 +1378,7 @@ const PainterSignup = () => {
           <p
             style={{
               textAlign: 'center',
-              color: '#e74c3c',
+              color: 'var(--danger)',
               fontSize: '0.85rem',
               marginTop: '16px',
             }}

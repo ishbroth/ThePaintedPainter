@@ -82,7 +82,7 @@ const ConfirmJob = () => {
     return (
       <div className="confirm-job-page">
         <h1>Confirm Your Job</h1>
-        <p style={{ color: '#e74c3c' }}>{error}</p>
+        <p style={{ color: 'var(--danger)' }}>{error}</p>
       </div>
     );
   }
@@ -96,17 +96,17 @@ const ConfirmJob = () => {
       <h1>Your painter accepted the job!</h1>
 
       {paymentStatus === 'cancelled' && (
-        <p style={{ color: '#f5a623' }}>Payment was cancelled — you can try again below.</p>
+        <p style={{ color: 'var(--accent)' }}>Payment was cancelled — you can try again below.</p>
       )}
 
       {alreadyPaid ? (
-        <p style={{ color: '#2ecc71' }}>
+        <p style={{ color: 'var(--success)' }}>
           Deposit received — {job.painter?.companyName} has your full contact details
           {job.scheduledDate ? <> and is scheduled to start <strong>{job.scheduledDate}</strong></> : ' and will be in touch to schedule the work'}.
         </p>
       ) : (
         <>
-          <div style={{ background: '#1f2937', borderRadius: 12, padding: 24, margin: '20px 0' }}>
+          <div style={{ background: 'var(--bg-surface)', borderRadius: 12, padding: 24, margin: '20px 0' }}>
             <h2 style={{ marginTop: 0 }}>{job.painter?.companyName}</h2>
             <p>{job.painter?.ownerName}</p>
             <p>
@@ -122,7 +122,7 @@ const ConfirmJob = () => {
           )}
           <p>Deposit due now: <strong>{currency(job.depositAmount)}</strong></p>
 
-          {error && <p style={{ color: '#e74c3c' }}>{error}</p>}
+          {error && <p style={{ color: 'var(--danger)' }}>{error}</p>}
 
           <button
             onClick={handleConfirmAndPay}
@@ -130,8 +130,8 @@ const ConfirmJob = () => {
             style={{
               marginTop: 12,
               padding: '12px 24px',
-              background: '#74b9ff',
-              color: '#0b1620',
+              background: 'var(--accent-blue)',
+              color: 'var(--accent-blue-ink)',
               border: 'none',
               borderRadius: 10,
               fontWeight: 700,

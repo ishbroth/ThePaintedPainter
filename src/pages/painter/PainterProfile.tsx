@@ -42,26 +42,26 @@ export default function PainterProfile() {
   };
 
   const inputClass =
-    'w-full px-3 py-2 bg-[#1a1a1a] border border-[#555] rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-[#f5a623] transition-colors';
+    'w-full px-3 py-2 bg-[var(--bg-page)] border border-[var(--input-border)] rounded-lg text-[var(--text-primary)] placeholder-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)] transition-colors';
 
   return (
     <div className="max-w-3xl mx-auto">
-      <h1 className="text-2xl font-bold text-white mb-6">Edit Profile</h1>
+      <h1 className="text-2xl font-bold text-[var(--text-primary)] mb-6">Edit Profile</h1>
 
       {saved && (
-        <div className="bg-green-900/30 border border-green-600 text-green-400 px-4 py-3 rounded-lg mb-6 text-sm">
+        <div className="bg-[var(--tint-success-bg)] border border-[var(--tint-success-border)] text-[var(--success)] px-4 py-3 rounded-lg mb-6 text-sm">
           Profile saved successfully!
         </div>
       )}
 
       <form onSubmit={handleSave} className="space-y-6">
         {/* Company info */}
-        <div className="bg-[#222] border border-[#333] rounded-xl p-6 space-y-4">
-          <h2 className="text-lg font-semibold text-white mb-2">Company Information</h2>
+        <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-xl p-6 space-y-4">
+          <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-2">Company Information</h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm text-gray-300 mb-1">Company Name</label>
+              <label className="block text-sm text-[var(--text-secondary)] mb-1">Company Name</label>
               <input
                 type="text"
                 value={form.companyName}
@@ -70,7 +70,7 @@ export default function PainterProfile() {
               />
             </div>
             <div>
-              <label className="block text-sm text-gray-300 mb-1">Owner Name</label>
+              <label className="block text-sm text-[var(--text-secondary)] mb-1">Owner Name</label>
               <input
                 type="text"
                 value={form.ownerName}
@@ -81,7 +81,7 @@ export default function PainterProfile() {
           </div>
 
           <div>
-            <label className="block text-sm text-gray-300 mb-1">Phone</label>
+            <label className="block text-sm text-[var(--text-secondary)] mb-1">Phone</label>
             <input
               type="tel"
               value={form.phone}
@@ -92,7 +92,7 @@ export default function PainterProfile() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm text-gray-300 mb-1">City</label>
+              <label className="block text-sm text-[var(--text-secondary)] mb-1">City</label>
               <input
                 type="text"
                 value={form.city}
@@ -101,7 +101,7 @@ export default function PainterProfile() {
               />
             </div>
             <div>
-              <label className="block text-sm text-gray-300 mb-1">State</label>
+              <label className="block text-sm text-[var(--text-secondary)] mb-1">State</label>
               <input
                 type="text"
                 value={form.state}
@@ -110,7 +110,7 @@ export default function PainterProfile() {
               />
             </div>
             <div>
-              <label className="block text-sm text-gray-300 mb-1">ZIP Code</label>
+              <label className="block text-sm text-[var(--text-secondary)] mb-1">ZIP Code</label>
               <input
                 type="text"
                 value={form.zip}
@@ -121,7 +121,7 @@ export default function PainterProfile() {
           </div>
 
           <div>
-            <label className="block text-sm text-gray-300 mb-1">Bio</label>
+            <label className="block text-sm text-[var(--text-secondary)] mb-1">Bio</label>
             <textarea
               value={form.bio}
               onChange={(e) => update('bio', e.target.value)}
@@ -132,11 +132,11 @@ export default function PainterProfile() {
         </div>
 
         {/* License & credentials */}
-        <div className="bg-[#222] border border-[#333] rounded-xl p-6 space-y-4">
-          <h2 className="text-lg font-semibold text-white mb-2">Credentials</h2>
+        <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-xl p-6 space-y-4">
+          <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-2">Credentials</h2>
 
           <div>
-            <label className="block text-sm text-gray-300 mb-1">License Number</label>
+            <label className="block text-sm text-[var(--text-secondary)] mb-1">License Number</label>
             <input
               type="text"
               value={form.licenseNumber}
@@ -149,7 +149,7 @@ export default function PainterProfile() {
             <label className="flex items-center gap-3 cursor-pointer">
               <div
                 className={`w-12 h-6 rounded-full relative transition-colors ${
-                  form.insured ? 'bg-[#f5a623]' : 'bg-[#555]'
+                  form.insured ? 'bg-[var(--accent)]' : 'bg-[var(--input-border)]'
                 }`}
                 onClick={() => update('insured', !form.insured)}
               >
@@ -159,13 +159,13 @@ export default function PainterProfile() {
                   }`}
                 />
               </div>
-              <span className="text-sm text-gray-300">Insured</span>
+              <span className="text-sm text-[var(--text-secondary)]">Insured</span>
             </label>
 
             <label className="flex items-center gap-3 cursor-pointer">
               <div
                 className={`w-12 h-6 rounded-full relative transition-colors ${
-                  form.bonded ? 'bg-[#f5a623]' : 'bg-[#555]'
+                  form.bonded ? 'bg-[var(--accent)]' : 'bg-[var(--input-border)]'
                 }`}
                 onClick={() => update('bonded', !form.bonded)}
               >
@@ -175,14 +175,14 @@ export default function PainterProfile() {
                   }`}
                 />
               </div>
-              <span className="text-sm text-gray-300">Bonded</span>
+              <span className="text-sm text-[var(--text-secondary)]">Bonded</span>
             </label>
           </div>
         </div>
 
         <button
           type="submit"
-          className="w-full sm:w-auto px-8 py-3 bg-[#f5a623] hover:bg-[#e09500] text-black font-semibold rounded-lg transition-colors"
+          className="w-full sm:w-auto px-8 py-3 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-ink)] font-semibold rounded-lg transition-colors"
         >
           Save Profile
         </button>

@@ -78,10 +78,10 @@ serve(async (req: Request) => {
         id, status, guaranteed_price, selected_painter_price, quote_zip,
         customer_street_address, customer_city, customer_state,
         scheduled_date, customer_preferred_date, phase_label, parent_quote_id,
-        confirmed_at, accepted_by
+        confirmed_at, completed_at, review_token, review_submitted_at, accepted_by
       `)
       .or(orFilter)
-      .in('status', ['confirmed', 'painter_accepted'])
+      .in('status', ['confirmed', 'painter_accepted', 'completed'])
       .order('scheduled_date', { ascending: true, nullsFirst: false })
 
     if (error) throw error
@@ -108,6 +108,9 @@ serve(async (req: Request) => {
       phaseLabel: r.phase_label,
       parentQuoteId: r.parent_quote_id,
       confirmedAt: r.confirmed_at,
+      completedAt: r.completed_at,
+      reviewToken: r.status === 'completed' && !r.review_submitted_at ? r.review_token : null,
+      reviewSubmitted: !!r.review_submitted_at,
       painter: r.accepted_by ? paintersById[r.accepted_by] ?? null : null,
     }))
 

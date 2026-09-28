@@ -270,7 +270,10 @@ export function extractDamageSignals(text: string): {
   const t = text.toLowerCase();
   return {
     wallpaper: /\bwallpaper\b/.test(t),
-    holes: /\b(hole|holes|nail holes|patch|dent)\b/.test(t),
+    // \s* (not a literal space) so compound phrasing like "nailholes" or
+    // "nailhole" — very common in casual typing — matches just as well as
+    // "nail holes".
+    holes: /\b(holes?|nail\s*holes?|patch|dent)\b/.test(t),
     rot: /\b(wood rot|dry rot|rotting|rotten)\b/.test(t),
     damage: /\b(damage|damaged|cracks?|peeling|chipping|failing paint)\b/.test(t),
     heavyPrep: /\b(needs a lot of prep|extensive prep|tons of prep|lots of repairs?)\b/.test(t),
@@ -324,7 +327,7 @@ export function extractPropertyType(text: string): 'residential' | 'rental' | 'm
 /** Timeline urgency — rush jobs command a scheduling premium. */
 export function extractTimeline(text: string): 'asap' | 'this_month' | 'no_rush' | null {
   const t = text.toLowerCase();
-  if (/\b(asap|urgent|as soon as possible|this week|by (?:next )?weekend|rush|need(?:s|ed)? (?:it |this )?done (?:now|immediately)|right away)\b/.test(t)) {
+  if (/\b(asap|urgent|as soon as possible|this week|next week|by (?:next )?weekend|rush|need(?:s|ed)? (?:it |this )?done (?:now|immediately|next week)|right away)\b/.test(t)) {
     return 'asap';
   }
   if (/\b(no rush|whenever|not urgent|flexible timeline|no hurry|nothing urgent)\b/.test(t)) {

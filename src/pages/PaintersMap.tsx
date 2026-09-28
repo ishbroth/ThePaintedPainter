@@ -46,14 +46,14 @@ const PaintersMap = () => {
   const hasFilters = locationQuery !== '' || serviceFilter !== '';
 
   return (
-    <div className="min-h-screen bg-[#1a1a1a] text-white">
+    <div className="min-h-screen text-[var(--text-primary)]">
       {/* Hero */}
-      <section className="bg-[#111] border-b border-[#333] py-16 md:py-20">
+      <section className="bg-[var(--bg-chrome)] border-b border-[var(--border)] py-16 md:py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h1 className="text-4xl md:text-5xl font-bold mb-3">
-            Find Painters <span className="text-[#f5a623]">Nationwide</span>
+            Find Painters <span className="text-[var(--accent)]">Nationwide</span>
           </h1>
-          <p className="text-lg text-gray-400 max-w-2xl">
+          <p className="text-lg text-[var(--text-secondary)] max-w-2xl">
             Browse our network of 50 vetted, professional painters across the
             country. Filter by location or service to find the right team for
             your project.
@@ -62,20 +62,20 @@ const PaintersMap = () => {
       </section>
 
       {/* Search / filter bar */}
-      <section className="border-b border-[#333] bg-[#1a1a1a] sticky top-0 z-20">
+      <section className="border-b border-[var(--border)] bg-[var(--bg-page)] sticky top-0 z-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-wrap items-center gap-3">
           <input
             type="text"
             placeholder="City, state, or zip..."
             value={locationQuery}
             onChange={(e) => setLocationQuery(e.target.value)}
-            className="bg-[#222] border border-[#444] rounded-lg px-4 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-[#f5a623] w-full sm:w-64"
+            className="bg-[var(--bg-surface)] border border-[var(--border-strong)] rounded-lg px-4 py-2 text-sm text-[var(--text-primary)] placeholder-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)] w-full sm:w-64"
           />
 
           <select
             value={serviceFilter}
             onChange={(e) => setServiceFilter(e.target.value)}
-            className="bg-[#222] border border-[#444] rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-[#f5a623] w-full sm:w-auto"
+            className="bg-[var(--bg-surface)] border border-[var(--border-strong)] rounded-lg px-4 py-2 text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] w-full sm:w-auto"
           >
             <option value="">All Services</option>
             {ALL_SERVICES.map((s) => (
@@ -88,13 +88,13 @@ const PaintersMap = () => {
           {hasFilters && (
             <button
               onClick={clearFilters}
-              className="text-sm text-[#f5a623] hover:text-white transition-colors"
+              className="text-sm text-[var(--accent)] hover:text-[var(--text-primary)] transition-colors"
             >
               Clear filters
             </button>
           )}
 
-          <span className="ml-auto text-sm text-gray-400">
+          <span className="ml-auto text-sm text-[var(--text-secondary)]">
             Showing {filtered.length} of {fakePainters.length} painters
           </span>
         </div>
@@ -104,12 +104,12 @@ const PaintersMap = () => {
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {filtered.length === 0 ? (
           <div className="text-center py-24">
-            <p className="text-xl text-gray-400">
+            <p className="text-xl text-[var(--text-secondary)]">
               No painters found matching your filters.
             </p>
             <button
               onClick={clearFilters}
-              className="mt-4 text-[#f5a623] hover:text-white text-sm transition-colors"
+              className="mt-4 text-[var(--accent)] hover:text-[var(--text-primary)] text-sm transition-colors"
             >
               Clear filters
             </button>
@@ -121,18 +121,18 @@ const PaintersMap = () => {
               {filtered.map((p) => (
                 <div
                   key={p.id}
-                  className="bg-[#222] border border-[#333] rounded-xl p-5 hover:border-[#f5a623] transition-colors"
+                  className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-xl p-5 hover:border-[var(--accent)] transition-colors"
                 >
                   {/* Company + location */}
                   <div className="flex items-start justify-between gap-3 mb-2">
                     <div>
                       <Link
                         to={`/painters/${p.id}`}
-                        className="text-lg font-semibold text-[#f5a623] hover:text-white transition-colors"
+                        className="text-lg font-semibold text-[var(--accent)] hover:text-[var(--text-primary)] transition-colors"
                       >
                         {p.company_name}
                       </Link>
-                      <p className="text-sm text-gray-400">
+                      <p className="text-sm text-[var(--text-secondary)]">
                         {p.city}, {p.state}
                       </p>
                     </div>
@@ -143,14 +143,14 @@ const PaintersMap = () => {
                       <span className="font-semibold text-sm">
                         {p.rating.toFixed(1)}
                       </span>
-                      <span className="text-xs text-gray-500">
+                      <span className="text-xs text-[var(--text-faint)]">
                         ({p.review_count})
                       </span>
                     </div>
                   </div>
 
                   {/* Meta row */}
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-400 mb-3">
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[var(--text-secondary)] mb-3">
                     <span>{p.years_experience} yrs exp</span>
                     <span>Crew of {p.crew_size}</span>
 
@@ -186,7 +186,7 @@ const PaintersMap = () => {
                     {p.services.slice(0, 3).map((s) => (
                       <span
                         key={s}
-                        className="bg-[#2a2a2a] border border-[#444] rounded-full px-3 py-0.5 text-xs text-gray-300"
+                        className="bg-[var(--bg-surface-hover)] border border-[var(--border-strong)] rounded-full px-3 py-0.5 text-xs text-[var(--text-secondary)]"
                       >
                         {s}
                       </span>
@@ -195,11 +195,11 @@ const PaintersMap = () => {
 
                   {/* Current deal */}
                   {p.deals.length > 0 && (
-                    <div className="bg-[#2a2200] border border-[#f5a623]/30 rounded-lg px-3 py-2 text-sm">
-                      <span className="font-semibold text-[#f5a623]">
+                    <div className="bg-[color-mix(in_srgb,var(--accent)_12%,transparent)] border border-[color-mix(in_srgb,var(--accent)_30%,transparent)] rounded-lg px-3 py-2 text-sm">
+                      <span className="font-semibold text-[var(--accent)]">
                         {p.deals[0].title}
                       </span>
-                      <span className="text-gray-400">
+                      <span className="text-[var(--text-secondary)]">
                         {' '}
                         &mdash; {p.deals[0].description} &middot;{' '}
                         {p.deals[0].price}
@@ -212,14 +212,14 @@ const PaintersMap = () => {
 
             {/* Right — map placeholder */}
             <div className="hidden lg:block">
-              <div className="bg-[#222] border border-[#333] rounded-xl h-[calc(100vh-220px)] sticky top-[90px] flex flex-col items-center justify-center text-center px-6">
-                <div className="text-gray-500 text-5xl mb-4">&#128506;</div>
-                <p className="text-gray-400 text-lg font-medium mb-2">
+              <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-xl h-[calc(100vh-220px)] sticky top-[90px] flex flex-col items-center justify-center text-center px-6">
+                <div className="text-[var(--text-faint)] text-5xl mb-4">&#128506;</div>
+                <p className="text-[var(--text-secondary)] text-lg font-medium mb-2">
                   Map view &mdash; Google Maps API key required
                 </p>
-                <p className="text-gray-600 text-sm max-w-xs">
-                  Set <code className="text-gray-400">VITE_GOOGLE_MAPS_API_KEY</code>{' '}
-                  in your <code className="text-gray-400">.env</code> file to
+                <p className="text-[var(--text-secondary)] text-sm max-w-xs">
+                  Set <code className="text-[var(--text-secondary)]">VITE_GOOGLE_MAPS_API_KEY</code>{' '}
+                  in your <code className="text-[var(--text-secondary)]">.env</code> file to
                   enable the interactive map.
                 </p>
               </div>

@@ -103,7 +103,6 @@ const SmoothCarousel = ({
               </div>
               <div className="carousel-slide art-slide">
                 <img src={triplet.art} alt={triplet.caption} />
-                <div className="art-caption">{triplet.caption}</div>
               </div>
               <div className="carousel-slide">
                 <img src={triplet.after} alt="After" />

@@ -12,8 +12,8 @@ export default function SignInRoleToggle({ active }: { active: 'customer' | 'pai
     fontSize: '0.85rem',
     fontWeight: 600,
     textDecoration: 'none',
-    borderBottom: isActive ? '2px solid #3b82f6' : '2px solid #444',
-    color: isActive ? '#fff' : '#888',
+    borderBottom: isActive ? '2px solid var(--accent-blue)' : '2px solid var(--border-strong)',
+    color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
   });
 
   return (

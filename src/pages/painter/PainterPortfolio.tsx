@@ -60,12 +60,12 @@ export default function PainterPortfolio() {
     <div className="max-w-6xl mx-auto">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white">Portfolio</h1>
-          <p className="text-gray-400 text-sm mt-1">Showcase your best work to attract customers.</p>
+          <h1 className="text-2xl font-bold text-[var(--text-primary)]">Portfolio</h1>
+          <p className="text-[var(--text-secondary)] text-sm mt-1">Showcase your best work to attract customers.</p>
         </div>
         <button
           onClick={handleUploadClick}
-          className="px-5 py-2.5 bg-[#f5a623] hover:bg-[#e09500] text-black font-semibold rounded-lg transition-colors text-sm"
+          className="px-5 py-2.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-ink)] font-semibold rounded-lg transition-colors text-sm"
         >
           + Upload Image
         </button>
@@ -79,20 +79,20 @@ export default function PainterPortfolio() {
       </div>
 
       {toast && (
-        <div className="bg-[#222] border border-[#f5a623] text-[#f5a623] px-4 py-3 rounded-lg mb-6 text-sm">
+        <div className="bg-[var(--bg-surface)] border border-[var(--accent)] text-[var(--accent)] px-4 py-3 rounded-lg mb-6 text-sm">
           {toast}
         </div>
       )}
 
       {images.length === 0 ? (
-        <div className="bg-[#222] border border-[#333] rounded-xl p-12 text-center">
-          <p className="text-gray-400 text-lg mb-2">No portfolio images yet</p>
-          <p className="text-gray-500 text-sm">Upload images of your completed projects to build your portfolio.</p>
+        <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-xl p-12 text-center">
+          <p className="text-[var(--text-secondary)] text-lg mb-2">No portfolio images yet</p>
+          <p className="text-[var(--text-faint)] text-sm">Upload images of your completed projects to build your portfolio.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {images.map((img) => (
-            <div key={img.id} className="bg-[#222] border border-[#333] rounded-xl overflow-hidden group">
+            <div key={img.id} className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-xl overflow-hidden group">
               <div className="relative">
                 <img
                   src={img.url}
@@ -101,7 +101,7 @@ export default function PainterPortfolio() {
                 />
                 <button
                   onClick={() => handleDelete(img.id)}
-                  className="absolute top-2 right-2 w-8 h-8 bg-red-600 hover:bg-red-700 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-sm"
+                  className="absolute top-2 right-2 w-8 h-8 bg-red-600 hover:bg-red-700 text-[var(--text-primary)] rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-sm"
                   title="Delete image"
                 >
                   {'\u2715'}
@@ -114,7 +114,7 @@ export default function PainterPortfolio() {
                       type="text"
                       value={editCaption}
                       onChange={(e) => setEditCaption(e.target.value)}
-                      className="flex-1 px-2 py-1 bg-[#1a1a1a] border border-[#555] rounded text-white text-sm focus:outline-none focus:border-[#f5a623]"
+                      className="flex-1 px-2 py-1 bg-[var(--bg-page)] border border-[var(--input-border)] rounded text-[var(--text-primary)] text-sm focus:outline-none focus:border-[var(--accent)]"
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') saveCaption(img.id);
                         if (e.key === 'Escape') setEditingId(null);
@@ -123,14 +123,14 @@ export default function PainterPortfolio() {
                     />
                     <button
                       onClick={() => saveCaption(img.id)}
-                      className="px-3 py-1 bg-[#f5a623] text-black text-sm rounded font-semibold"
+                      className="px-3 py-1 bg-[var(--accent)] text-[var(--accent-ink)] text-sm rounded font-semibold"
                     >
                       Save
                     </button>
                   </div>
                 ) : (
                   <p
-                    className="text-sm text-gray-300 cursor-pointer hover:text-[#f5a623] transition-colors"
+                    className="text-sm text-[var(--text-secondary)] cursor-pointer hover:text-[var(--accent)] transition-colors"
                     onClick={() => startEdit(img)}
                     title="Click to edit caption"
                   >

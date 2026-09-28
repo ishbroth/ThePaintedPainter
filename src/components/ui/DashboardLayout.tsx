@@ -18,7 +18,7 @@ export default function DashboardLayout({ items, title }: DashboardLayoutProps) 
   };
 
   return (
-    <div className="flex min-h-screen bg-[#1a1a1a]">
+    <div className="flex min-h-screen">
       <DashboardSidebar items={items} title={title} onLogout={handleLogout} />
       <main className="flex-1 min-w-0 p-4 lg:p-8">
         <Outlet />

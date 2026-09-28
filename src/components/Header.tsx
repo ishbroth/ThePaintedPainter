@@ -38,9 +38,6 @@ const Header = () => {
           The Painted Painter
         </Link>
         <nav className={`nav ${isMenuOpen ? 'active' : ''}`} id="nav">
-          <Link to="/about" onClick={closeMenu}>
-            About
-          </Link>
           <Link to="/" onClick={closeMenu}>
             Get Estimate
           </Link>
@@ -59,8 +56,8 @@ const Header = () => {
                 onClick={handleSignOut}
                 style={{
                   background: 'transparent',
-                  border: '1px solid #555',
-                  color: '#ccc',
+                  border: '1px solid var(--input-border)',
+                  color: 'var(--text-faint)',
                   padding: '6px 14px',
                   fontSize: '0.75rem',
                   letterSpacing: '1.5px',

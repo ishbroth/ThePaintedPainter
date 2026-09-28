@@ -16,10 +16,10 @@ interface Notification {
 }
 
 const typeColors: Record<NotificationType, string> = {
-  project_update: '#3b82f6',
-  painter_assigned: '#f5a623',
-  review_reminder: '#a855f7',
-  estimate_ready: '#22c55e',
+  project_update: 'var(--accent-blue)',
+  painter_assigned: 'var(--accent)',
+  review_reminder: 'var(--accent-blue)',
+  estimate_ready: 'var(--success)',
 };
 
 const initialNotifications: Notification[] = [
@@ -108,9 +108,9 @@ export default function CustomerNotifications() {
     <div>
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-white">Notifications</h1>
+          <h1 className="text-3xl font-bold text-[var(--text-primary)]">Notifications</h1>
           {unreadCount > 0 && (
-            <p className="text-gray-400 text-sm mt-1">
+            <p className="text-[var(--text-secondary)] text-sm mt-1">
               {unreadCount} unread notification{unreadCount !== 1 ? 's' : ''}
             </p>
           )}
@@ -118,7 +118,7 @@ export default function CustomerNotifications() {
         {unreadCount > 0 && (
           <button
             onClick={markAllAsRead}
-            className="px-4 py-2 text-sm font-semibold text-[#f5a623] border border-[#f5a623] rounded-lg hover:bg-[#f5a623] hover:text-black transition-colors"
+            className="px-4 py-2 text-sm font-semibold text-[var(--accent)] border border-[var(--accent)] rounded-lg hover:bg-[var(--accent)] hover:text-[var(--accent-ink)] transition-colors"
           >
             Mark all as read
           </button>
@@ -130,9 +130,9 @@ export default function CustomerNotifications() {
           <button
             key={notification.id}
             onClick={() => markAsRead(notification.id)}
-            className={`w-full text-left bg-[#222] border rounded-xl p-5 transition-colors hover:bg-[#2a2a2a] ${
+            className={`w-full text-left bg-[var(--bg-surface)] border rounded-xl p-5 transition-colors hover:bg-[var(--bg-surface-hover)] ${
               notification.read
-                ? 'border-[#333]'
+                ? 'border-[var(--border)]'
                 : 'border-l-4'
             }`}
             style={
@@ -146,24 +146,24 @@ export default function CustomerNotifications() {
                 <div className="flex items-center gap-2 mb-1">
                   <h3
                     className={`font-semibold ${
-                      notification.read ? 'text-gray-400' : 'text-white'
+                      notification.read ? 'text-[var(--text-secondary)]' : 'text-[var(--text-primary)]'
                     }`}
                   >
                     {notification.title}
                   </h3>
                   {!notification.read && (
-                    <span className="w-2 h-2 rounded-full bg-[#f5a623] flex-shrink-0" />
+                    <span className="w-2 h-2 rounded-full bg-[var(--accent)] flex-shrink-0" />
                   )}
                 </div>
                 <p
                   className={`text-sm ${
-                    notification.read ? 'text-gray-500' : 'text-gray-300'
+                    notification.read ? 'text-[var(--text-faint)]' : 'text-[var(--text-secondary)]'
                   }`}
                 >
                   {notification.body}
                 </p>
               </div>
-              <span className="text-gray-500 text-xs whitespace-nowrap flex-shrink-0">
+              <span className="text-[var(--text-faint)] text-xs whitespace-nowrap flex-shrink-0">
                 {notification.timestamp}
               </span>
             </div>
@@ -172,7 +172,7 @@ export default function CustomerNotifications() {
       </div>
 
       {notifications.length === 0 && (
-        <div className="text-center py-12 text-gray-500">
+        <div className="text-center py-12 text-[var(--text-faint)]">
           <p className="text-lg">No notifications</p>
         </div>
       )}

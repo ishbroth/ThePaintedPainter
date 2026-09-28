@@ -31,6 +31,8 @@ export interface RealPainter {
   years_in_business: number | null;
   crew_size: number | null;
   service_types: string[];
+  avgRating: number;
+  reviewCount: number;
 }
 
 export interface RealPainterMatch {
@@ -62,9 +64,23 @@ export async function fetchNearbyPainters(ctx: EstimatorContext): Promise<RealPa
     return [];
   }
 
+  const painterIds = data.map((p) => p.id);
+  const ratingsById: Record<string, { avg_rating: number; review_count: number }> = {};
+  if (painterIds.length > 0) {
+    const { data: ratings } = await supabase
+      .from('painter_ratings')
+      .select('painter_id, avg_rating, review_count')
+      .in('painter_id', painterIds);
+    for (const r of ratings ?? []) {
+      ratingsById[r.painter_id] = { avg_rating: r.avg_rating, review_count: r.review_count };
+    }
+  }
+
   const jobSpecialties = jobSpecialtiesFromCtx(ctx);
 
-  const scored: RealPainterMatch[] = (data as RealPainter[]).map((painter) => {
+  const scored: RealPainterMatch[] = (data as RealPainter[]).map((painterRow) => {
+    const rating = ratingsById[painterRow.id];
+    const painter: RealPainter = { ...painterRow, avgRating: rating?.avg_rating ?? 0, reviewCount: rating?.review_count ?? 0 };
     const distanceMiles = ctx.zipCode ? zipDistanceMiles(ctx.zipCode, painter.zip_code) : null;
     const reasons: string[] = [];
 

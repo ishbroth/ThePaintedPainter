@@ -78,7 +78,7 @@ const PainterConfirmDate = () => {
     return (
       <div style={{ maxWidth: 480, margin: '0 auto', padding: '40px 20px' }}>
         <h1>Confirm Start Date</h1>
-        <p style={{ color: '#e74c3c' }}>{error}</p>
+        <p style={{ color: 'var(--danger)' }}>{error}</p>
       </div>
     );
   }
@@ -97,11 +97,11 @@ const PainterConfirmDate = () => {
   return (
     <div style={{ maxWidth: 480, margin: '0 auto', padding: '40px 20px' }}>
       <h1>You accepted this job{job.phaseLabel ? ` — ${job.phaseLabel}` : ''}!</h1>
-      <p style={{ color: '#a9b0b6' }}>
+      <p style={{ color: 'var(--text-secondary)' }}>
         One last step — set the start date so the customer can confirm and pay the deposit.
       </p>
 
-      <div style={{ background: '#1f2937', borderRadius: 12, padding: 24, margin: '20px 0' }}>
+      <div style={{ background: 'var(--bg-surface)', borderRadius: 12, padding: 24, margin: '20px 0' }}>
         <p>ZIP: <strong>{job.zipCode}</strong></p>
         <p>Job price: <strong>{currency(job.guaranteedPrice)}</strong></p>
         {job.customerPreferredDate && (
@@ -109,17 +109,17 @@ const PainterConfirmDate = () => {
         )}
       </div>
 
-      <label style={{ display: 'block', marginBottom: 8, fontSize: '0.9rem', color: '#a9b0b6' }}>
+      <label style={{ display: 'block', marginBottom: 8, fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
         Start date
       </label>
       <input
         type="date"
         value={date}
         onChange={(e) => setDate(e.target.value)}
-        style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #3a4046', background: '#111827', color: '#fff', width: '100%', maxWidth: 220 }}
+        style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-strong)', background: 'var(--bg-page)', color: 'var(--text-primary)', width: '100%', maxWidth: 220 }}
       />
 
-      {error && <p style={{ color: '#e74c3c', marginTop: 12 }}>{error}</p>}
+      {error && <p style={{ color: 'var(--danger)', marginTop: 12 }}>{error}</p>}
 
       <div style={{ marginTop: 20 }}>
         <button
@@ -127,8 +127,8 @@ const PainterConfirmDate = () => {
           disabled={submitting || !date}
           style={{
             padding: '12px 24px',
-            background: '#74b9ff',
-            color: '#0b1620',
+            background: 'var(--accent-blue)',
+            color: 'var(--accent-blue-ink)',
             border: 'none',
             borderRadius: 10,
             fontWeight: 700,

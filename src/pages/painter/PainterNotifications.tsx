@@ -111,8 +111,8 @@ export default function PainterNotifications() {
     <div className="max-w-4xl mx-auto">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white">Notifications</h1>
-          <p className="text-gray-400 text-sm mt-1">
+          <h1 className="text-2xl font-bold text-[var(--text-primary)]">Notifications</h1>
+          <p className="text-[var(--text-secondary)] text-sm mt-1">
             {unreadCount > 0
               ? `You have ${unreadCount} unread notification${unreadCount > 1 ? 's' : ''}.`
               : 'You are all caught up!'}
@@ -121,7 +121,7 @@ export default function PainterNotifications() {
         {unreadCount > 0 && (
           <button
             onClick={markAllAsRead}
-            className="px-5 py-2.5 border border-[#555] text-gray-300 hover:text-white hover:border-[#888] rounded-lg transition-colors text-sm"
+            className="px-5 py-2.5 border border-[var(--input-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--text-secondary)] rounded-lg transition-colors text-sm"
           >
             Mark all as read
           </button>
@@ -133,22 +133,22 @@ export default function PainterNotifications() {
           <div
             key={n.id}
             onClick={() => !n.read && markAsRead(n.id)}
-            className={`bg-[#222] border rounded-xl p-4 flex items-start gap-3 transition-colors ${
+            className={`bg-[var(--bg-surface)] border rounded-xl p-4 flex items-start gap-3 transition-colors ${
               n.read
-                ? 'border-[#333] opacity-70'
-                : 'border-[#f5a623]/30 cursor-pointer hover:bg-[#2a2a2a]'
+                ? 'border-[var(--border)] opacity-70'
+                : 'border-[color-mix(in_srgb,var(--accent)_30%,transparent)] cursor-pointer hover:bg-[var(--bg-surface-hover)]'
             }`}
           >
             <span className="text-2xl mt-0.5 flex-shrink-0">{n.icon}</span>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-0.5">
-                <h3 className="text-sm font-semibold text-white">{n.title}</h3>
+                <h3 className="text-sm font-semibold text-[var(--text-primary)]">{n.title}</h3>
                 {!n.read && (
-                  <span className="w-2 h-2 rounded-full bg-[#f5a623] flex-shrink-0" />
+                  <span className="w-2 h-2 rounded-full bg-[var(--accent)] flex-shrink-0" />
                 )}
               </div>
-              <p className="text-sm text-gray-400 leading-relaxed">{n.body}</p>
-              <p className="text-xs text-gray-600 mt-1">{n.timestamp}</p>
+              <p className="text-sm text-[var(--text-secondary)] leading-relaxed">{n.body}</p>
+              <p className="text-xs text-[var(--text-secondary)] mt-1">{n.timestamp}</p>
             </div>
           </div>
         ))}

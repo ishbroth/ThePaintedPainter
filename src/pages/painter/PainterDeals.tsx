@@ -117,19 +117,19 @@ export default function PainterDeals() {
   };
 
   const inputClass =
-    'w-full px-3 py-2 bg-[#1a1a1a] border border-[#555] rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-[#f5a623] transition-colors text-sm';
+    'w-full px-3 py-2 bg-[var(--bg-page)] border border-[var(--input-border)] rounded-lg text-[var(--text-primary)] placeholder-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)] transition-colors text-sm';
 
   return (
     <div className="max-w-4xl mx-auto">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white">Deals</h1>
-          <p className="text-gray-400 text-sm mt-1">Create and manage your special offers.</p>
+          <h1 className="text-2xl font-bold text-[var(--text-primary)]">Deals</h1>
+          <p className="text-[var(--text-secondary)] text-sm mt-1">Create and manage your special offers.</p>
         </div>
         {!showForm && (
           <button
             onClick={() => { setShowForm(true); setEditingId(null); setFormData(emptyDeal); }}
-            className="px-5 py-2.5 bg-[#f5a623] hover:bg-[#e09500] text-black font-semibold rounded-lg transition-colors text-sm"
+            className="px-5 py-2.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-ink)] font-semibold rounded-lg transition-colors text-sm"
           >
             + Create New Deal
           </button>
@@ -137,19 +137,19 @@ export default function PainterDeals() {
       </div>
 
       {toast && (
-        <div className="bg-green-900/30 border border-green-600 text-green-400 px-4 py-3 rounded-lg mb-6 text-sm">
+        <div className="bg-[var(--tint-success-bg)] border border-[var(--tint-success-border)] text-[var(--success)] px-4 py-3 rounded-lg mb-6 text-sm">
           {toast}
         </div>
       )}
 
       {/* Create / Edit form */}
       {showForm && (
-        <form onSubmit={handleSubmit} className="bg-[#222] border border-[#333] rounded-xl p-6 mb-6 space-y-4">
-          <h2 className="text-lg font-semibold text-white">
+        <form onSubmit={handleSubmit} className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-xl p-6 mb-6 space-y-4">
+          <h2 className="text-lg font-semibold text-[var(--text-primary)]">
             {editingId !== null ? 'Edit Deal' : 'New Deal'}
           </h2>
           <div>
-            <label className="block text-sm text-gray-300 mb-1">Title</label>
+            <label className="block text-sm text-[var(--text-secondary)] mb-1">Title</label>
             <input
               type="text"
               required
@@ -160,7 +160,7 @@ export default function PainterDeals() {
             />
           </div>
           <div>
-            <label className="block text-sm text-gray-300 mb-1">Description</label>
+            <label className="block text-sm text-[var(--text-secondary)] mb-1">Description</label>
             <textarea
               required
               value={formData.description}
@@ -172,7 +172,7 @@ export default function PainterDeals() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm text-gray-300 mb-1">Price</label>
+              <label className="block text-sm text-[var(--text-secondary)] mb-1">Price</label>
               <input
                 type="text"
                 required
@@ -183,7 +183,7 @@ export default function PainterDeals() {
               />
             </div>
             <div>
-              <label className="block text-sm text-gray-300 mb-1">Valid From</label>
+              <label className="block text-sm text-[var(--text-secondary)] mb-1">Valid From</label>
               <input
                 type="date"
                 required
@@ -193,7 +193,7 @@ export default function PainterDeals() {
               />
             </div>
             <div>
-              <label className="block text-sm text-gray-300 mb-1">Valid To</label>
+              <label className="block text-sm text-[var(--text-secondary)] mb-1">Valid To</label>
               <input
                 type="date"
                 required
@@ -206,14 +206,14 @@ export default function PainterDeals() {
           <div className="flex gap-3 pt-2">
             <button
               type="submit"
-              className="px-6 py-2 bg-[#f5a623] hover:bg-[#e09500] text-black font-semibold rounded-lg transition-colors text-sm"
+              className="px-6 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-ink)] font-semibold rounded-lg transition-colors text-sm"
             >
               {editingId !== null ? 'Update Deal' : 'Create Deal'}
             </button>
             <button
               type="button"
               onClick={cancelForm}
-              className="px-6 py-2 border border-[#555] text-gray-300 hover:text-white hover:border-[#888] rounded-lg transition-colors text-sm"
+              className="px-6 py-2 border border-[var(--input-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--text-secondary)] rounded-lg transition-colors text-sm"
             >
               Cancel
             </button>
@@ -223,54 +223,54 @@ export default function PainterDeals() {
 
       {/* Deals list */}
       {deals.length === 0 ? (
-        <div className="bg-[#222] border border-[#333] rounded-xl p-12 text-center">
-          <p className="text-gray-400">No deals yet. Create your first deal to attract customers.</p>
+        <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-xl p-12 text-center">
+          <p className="text-[var(--text-secondary)]">No deals yet. Create your first deal to attract customers.</p>
         </div>
       ) : (
         <div className="space-y-4">
           {deals.map((deal) => (
             <div
               key={deal.id}
-              className={`bg-[#222] border rounded-xl p-5 ${
-                deal.active ? 'border-[#333]' : 'border-[#333] opacity-60'
+              className={`bg-[var(--bg-surface)] border rounded-xl p-5 ${
+                deal.active ? 'border-[var(--border)]' : 'border-[var(--border)] opacity-60'
               }`}
             >
               <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <h3 className="text-white font-semibold">{deal.title}</h3>
+                    <h3 className="text-[var(--text-primary)] font-semibold">{deal.title}</h3>
                     <span
                       className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                         deal.active
                           ? 'bg-green-900/40 text-green-400'
-                          : 'bg-gray-700 text-gray-400'
+                          : 'bg-gray-700 text-[var(--text-secondary)]'
                       }`}
                     >
                       {deal.active ? 'Active' : 'Inactive'}
                     </span>
                   </div>
-                  <p className="text-sm text-gray-400 mb-2">{deal.description}</p>
-                  <div className="flex flex-wrap gap-4 text-xs text-gray-500">
-                    <span>Price: <span className="text-[#f5a623] font-semibold">{deal.price}</span></span>
+                  <p className="text-sm text-[var(--text-secondary)] mb-2">{deal.description}</p>
+                  <div className="flex flex-wrap gap-4 text-xs text-[var(--text-faint)]">
+                    <span>Price: <span className="text-[var(--accent)] font-semibold">{deal.price}</span></span>
                     <span>Valid: {deal.validFrom} to {deal.validTo}</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <button
                     onClick={() => toggleActive(deal.id)}
-                    className="px-3 py-1.5 text-xs border border-[#555] text-gray-300 hover:text-white hover:border-[#888] rounded-lg transition-colors"
+                    className="px-3 py-1.5 text-xs border border-[var(--input-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--text-secondary)] rounded-lg transition-colors"
                   >
                     {deal.active ? 'Deactivate' : 'Activate'}
                   </button>
                   <button
                     onClick={() => startEdit(deal)}
-                    className="px-3 py-1.5 text-xs border border-[#555] text-gray-300 hover:text-[#f5a623] hover:border-[#f5a623] rounded-lg transition-colors"
+                    className="px-3 py-1.5 text-xs border border-[var(--input-border)] text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)] rounded-lg transition-colors"
                   >
                     Edit
                   </button>
                   <button
                     onClick={() => handleDelete(deal.id)}
-                    className="px-3 py-1.5 text-xs border border-[#555] text-red-400 hover:bg-red-900/30 hover:border-red-500 rounded-lg transition-colors"
+                    className="px-3 py-1.5 text-xs border border-[var(--input-border)] text-red-400 hover:bg-red-900/30 hover:border-red-500 rounded-lg transition-colors"
                   >
                     Delete
                   </button>
