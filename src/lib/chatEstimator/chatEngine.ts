@@ -189,7 +189,14 @@ export function applyPhotoAssessment(state: ChatState, requestId: string, assess
 // check, a schema change (a field added/removed/repurposed) could silently
 // load a subtly-incompatible object and misbehave in ways that are hard to
 // trace back to "the browser had stale storage."
-const CHAT_STATE_SCHEMA_VERSION = 5;
+//
+// Also bump for a content-only change worth forcing everyone to see fresh
+// (e.g. the greeting text) — sessionStorage survives a hard refresh, so a
+// restored conversation keeps whatever greeting was baked into history[0]
+// at the time it was saved, and (separately) ChatPanel's scroll-triggered
+// read-aloud only fires for a still-fresh conversation, so a restored
+// mid-conversation session silently never autoplays either.
+const CHAT_STATE_SCHEMA_VERSION = 6;
 
 /**
  * `lastBotTopic` is a `Topic` object with live function properties (ask,
