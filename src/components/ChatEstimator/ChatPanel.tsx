@@ -277,6 +277,7 @@ const ChatPanel = () => {
   }, [state.finalEstimate, state.transcript, navigate]);
 
   function startNewEstimate() {
+    stopSpeaking();
     restoredAlreadyFinishedRef.current = false;
     try {
       sessionStorage.removeItem(CHAT_STATE_KEY);

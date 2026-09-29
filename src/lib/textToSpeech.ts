@@ -10,11 +10,10 @@
 //      literally instead of "by". naturalizeForSpeech() rewrites these to
 //      how a person would actually say them before handing text to the
 //      synthesizer.
-//   2. The multiple-choice chip list the bot appends ("... (Just walls ·
-//      Walls + ceiling · Everything · Not sure)") is a run-on the
-//      synthesizer has no reason to pause on — naturalizeForSpeech() turns
-//      that trailing parenthetical into a spoken "Your options are: A, B,
-//      or C." list instead.
+//   2. The "[[photo:id|label]]" markers ChatPanel renders as clickable
+//      "Provide a picture of ___" links have no business being read aloud
+//      at all — naturalizeForSpeech() drops them entirely rather than
+//      speaking the link text, so only the surrounding sentence is heard.
 
 export function isTTSSupported(): boolean {
   return typeof window !== 'undefined' && 'speechSynthesis' in window;
@@ -27,26 +26,15 @@ export function naturalizeForSpeech(text: string): string {
   // Markdown bold markers — not spoken, just emphasis in the transcript.
   s = s.replace(/\*\*([^*]+)\*\*/g, '$1');
 
-  // The trailing multiple-choice chip list, e.g. "  (Just walls · Walls +
-  // ceiling · Everything · Not sure)" — turn it into a spoken list with a
-  // lead-in and "or" before the last option, instead of a run-on the
-  // synthesizer reads with no pauses at all.
-  s = s.replace(/\s*\(([^()]*·[^()]*)\)\s*$/, (_m, inner: string, offset: number, whole: string) => {
-    const options = inner.split('·').map((o) => o.trim()).filter(Boolean);
-    if (options.length === 0) return '';
-    // Avoid a doubled-up "...included)?. Your options" when the question
-    // itself already ends in terminal punctuation right before the chip list.
-    const before = whole.slice(0, offset).replace(/\s+$/, '');
-    const lead = /[.?!]$/.test(before) ? '' : '.';
-    if (options.length === 1) return `${lead} Your option is ${options[0]}.`;
-    const last = options[options.length - 1];
-    const rest = options.slice(0, -1).join(', ');
-    return `${lead} Your options are ${rest}, or ${last}.`;
-  });
+  // "Provide a picture of ___" link markers — rendered visually by
+  // ChatPanel, but not meant to be read aloud at all; drop entirely rather
+  // than speaking the label, then collapse the double space this leaves
+  // behind between the surrounding sentences.
+  s = s.replace(/\[\[photo:[^|]+\|[^\]]+\]\]/g, '').replace(/ {2,}/g, ' ').trim();
 
-  // Any stray middle dots elsewhere (shouldn't normally happen, but a
-  // literal "·" glyph read aloud is worse than a dropped one) — treat as a
-  // soft "or" list separator too.
+  // Any stray middle dots (shouldn't normally happen, but a literal "·"
+  // glyph read aloud is worse than a dropped one) — treat as a soft "or"
+  // list separator.
   s = s.replace(/\s*·\s*/g, ', or ');
 
   // Dollar ranges before single amounts, so "$1,500 – $2,000" becomes
