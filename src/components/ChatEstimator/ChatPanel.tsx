@@ -257,14 +257,15 @@ const ChatPanel = () => {
           transcript: state.transcript,
         };
         try {
-          // Reuse an existing, still-valid hold timer instead of resetting it —
-          // this effect can re-run on a remount that restores an
-          // already-finalized conversation (e.g. returning via back/forward).
-          const existing = sessionStorage.getItem(QUOTE_EXPIRES_KEY);
-          const existingMs = existing ? parseInt(existing, 10) : NaN;
-          const expiresAt = isFinite(existingMs) && existingMs > Date.now()
-            ? existingMs
-            : Date.now() + PRICE_HOLD_MINUTES * 60 * 1000;
+          // Always a fresh hold window here — this whole block only runs for
+          // a genuinely NEW completion (see the `!restoredAlreadyFinishedRef`
+          // guard above), never for remounting/returning to an
+          // already-computed quote, so there's no old timer that's actually
+          // still valid to reuse. Previously this read back whatever
+          // QUOTE_EXPIRES_KEY already had, which meant starting a new
+          // estimate right after a previous one just inherited however much
+          // time was left on THAT quote's hold instead of getting its own.
+          const expiresAt = Date.now() + PRICE_HOLD_MINUTES * 60 * 1000;
           sessionStorage.setItem(QUOTE_EXPIRES_KEY, String(expiresAt));
           sessionStorage.setItem(QUOTE_RESULT_KEY, JSON.stringify({ ...payload, expiresAt }));
           navigate('/quote-results', { state: { ...payload, expiresAt } });
