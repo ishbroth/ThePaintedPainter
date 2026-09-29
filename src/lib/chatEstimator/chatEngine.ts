@@ -207,25 +207,41 @@ const CHAT_STATE_SCHEMA_VERSION = 6;
  * real Topic (with its functions intact) via findTopic() on load instead.
  */
 export function serializeChatState(state: ChatState): string {
-  return JSON.stringify({
-    version: CHAT_STATE_SCHEMA_VERSION,
-    state: { ...state, lastBotTopic: state.lastBotTopic?.id ?? null },
-  });
+  return JSON.stringify(chatStateToPortable(state));
 }
 
 /** Returns null (caller should fall back to makeInitialState()) if the saved data is missing, corrupt, or from an incompatible schema version. */
 export function deserializeChatState(json: string): ChatState | null {
   try {
-    const parsed = JSON.parse(json);
-    if (parsed?.version !== CHAT_STATE_SCHEMA_VERSION || !parsed.state) return null;
-    const raw = parsed.state as ChatState & { lastBotTopic: string | null };
-    return {
-      ...raw,
-      lastBotTopic: raw.lastBotTopic ? findTopic(raw.lastBotTopic) : null,
-    };
+    return chatStateFromPortable(JSON.parse(json));
   } catch {
     return null;
   }
+}
+
+/**
+ * Same shape as serializeChatState()/deserializeChatState() but as a plain
+ * object rather than a JSON string, for storing directly in a JSONB
+ * column (account-level persistence for signed-in users — see
+ * chatEstimator/accountPersistence.ts) instead of round-tripping through
+ * an extra layer of string encoding.
+ */
+export function chatStateToPortable(state: ChatState): unknown {
+  return {
+    version: CHAT_STATE_SCHEMA_VERSION,
+    state: { ...state, lastBotTopic: state.lastBotTopic?.id ?? null },
+  };
+}
+
+/** Returns null if the data is missing, corrupt, or from an incompatible schema version. */
+export function chatStateFromPortable(parsed: unknown): ChatState | null {
+  const p = parsed as { version?: number; state?: unknown } | null;
+  if (!p || p.version !== CHAT_STATE_SCHEMA_VERSION || !p.state) return null;
+  const raw = p.state as ChatState & { lastBotTopic: string | null };
+  return {
+    ...raw,
+    lastBotTopic: raw.lastBotTopic ? findTopic(raw.lastBotTopic) : null,
+  };
 }
 
 // ===== Core turn handler =====

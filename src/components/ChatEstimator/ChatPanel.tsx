@@ -13,6 +13,8 @@ import { hapticLight } from '../../lib/haptics';
 import { CHAT_STATE_KEY, QUOTE_EXPIRES_KEY, QUOTE_RESULT_KEY, PRICE_HOLD_MINUTES } from '../../lib/chatEstimator/persistence';
 import { isTTSSupported, speak, stopSpeaking } from '../../lib/textToSpeech';
 import { uploadQuotePhoto, analyzeQuotePhoto } from '../../lib/chatEstimator/photoUpload';
+import { loadAccountChatState, saveAccountChatState } from '../../lib/chatEstimator/accountPersistence';
+import { useAuth } from '../../lib/auth';
 
 const READ_ALOUD_KEY = 'tpp-read-aloud';
 
@@ -30,6 +32,7 @@ function loadInitialState(): ChatState {
 }
 
 const ChatPanel = () => {
+  const { user } = useAuth();
   const [state, setState] = useState<ChatState>(loadInitialState);
   const [input, setInput] = useState('');
   const [thinking, setThinking] = useState(false);
@@ -181,12 +184,64 @@ const ChatPanel = () => {
   useEffect(() => {
     // Persist on every change so a back-button nav (or reload) back to this
     // page picks the conversation up where it left off instead of resetting.
+    // This is intentionally sessionStorage (not localStorage): it survives
+    // a refresh but is gone once the tab/browser actually closes, which is
+    // the right default for a guest with no account to tie progress to.
     try {
       sessionStorage.setItem(CHAT_STATE_KEY, serializeChatState(state));
     } catch {
       // Storage unavailable (private browsing, quota) — degrade to in-memory only.
     }
   }, [state]);
+
+  // Signed-in users get real cross-session persistence on top of the
+  // sessionStorage above — their progress (or completed quote) is tied to
+  // their account, so it survives actually closing the browser and follows
+  // them to another device, instead of resetting like a guest's does.
+  const appliedAccountStateRef = useRef<string | null>(null);
+  // Guards the persist effect below: without this, it fires on the very
+  // first render for a newly-signed-in user with whatever local (fresh,
+  // untouched) state happens to be showing, and that write can reach the
+  // server BEFORE the load below finishes — clobbering whatever the
+  // account actually had saved with a blank conversation, which the load
+  // then just reads back, making the "restore" a no-op. Persisting is held
+  // off until the initial load attempt (found something or not) resolves.
+  const accountLoadCompleteRef = useRef(false);
+  useEffect(() => {
+    if (!user) {
+      appliedAccountStateRef.current = null;
+      accountLoadCompleteRef.current = false;
+      return;
+    }
+    if (appliedAccountStateRef.current === user.id) return;
+    appliedAccountStateRef.current = user.id;
+    loadAccountChatState(user.id).then((saved) => {
+      if (saved) {
+        // This fetch is async and kicked off at mount — if the user typed
+        // and sent a message before it resolved, applying it now would
+        // silently throw away real local progress. Check freshness against
+        // the CURRENT state via the updater form, not the `state` this
+        // effect closed over at mount, which is already stale by the time
+        // this callback runs.
+        setState((current) => {
+          if (current.history.length > 1 || current.finalEstimate) return current;
+          // If the saved conversation is already a completed quote, treat
+          // it like the "restored already finished" case (same as a
+          // sessionStorage restore) — show it with the View/Start-new
+          // buttons rather than auto-navigating to quote-results, which is
+          // reserved for a FRESH completion happening live in this tab.
+          if (saved.finalEstimate) restoredAlreadyFinishedRef.current = true;
+          return saved;
+        });
+      }
+      accountLoadCompleteRef.current = true;
+    });
+  }, [user]);
+
+  useEffect(() => {
+    if (!user || !accountLoadCompleteRef.current) return;
+    saveAccountChatState(user.id, state);
+  }, [user, state]);
 
   useEffect(() => {
     // When the conversation completes, route to the results page — but only
