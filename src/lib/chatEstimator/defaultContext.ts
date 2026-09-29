@@ -24,7 +24,7 @@ export function makeInitialContext(): EstimatorContext {
     foundation: 'no', exteriorWindows: 'none', exteriorWindowCount: null, overhangs: 'no',
     accessRestrictions: 'none', exteriorColorChange: '', exteriorCondition: 'good',
     prepWork: [], caulkingExtent: 'minor', drywallRepairExtent: 'minor', conditionAddressed: false,
-    renoStageAddressed: false, trimScopeAddressed: false,
+    renoStageAddressed: false, trimScopeAddressed: false, surfacesAddressed: false,
     woodRotExtent: 'minor', wallpaperRooms: null, popcornCeilingRooms: null,
     multiTripRequired: '', specialEquipment: 'none', fixtureRemoval: 'none',
     hardwareReplacement: 'no', lowVocRequested: 'no',

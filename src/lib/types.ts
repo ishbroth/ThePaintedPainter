@@ -15,6 +15,15 @@ export interface EstimatorContext {
   // Interior
   interiorScope: string; // whole_house, specific_rooms
   selectedRooms: string[];
+  // interiorWalls/Ceilings/Trim/Doors all default to "yes"-ish (the full
+  // package), so their bare values can't distinguish "customer explicitly
+  // confirmed everything" from "scope was never discussed at all" — same
+  // problem conditionAddressed solves for the condition topic. Without
+  // this, a narrative answer like "ceilings painted, walls painted, trim
+  // and doors painted" (which doesn't use "just"/"only"/"everything"
+  // phrasing) left the surfaces topic looking unanswered even though the
+  // customer had already said exactly what they wanted.
+  surfacesAddressed: boolean;
   interiorWalls: string; // yes, no
   accentWalls: string; // yes, no, skip
   interiorCeilings: string; // yes, no

@@ -200,6 +200,12 @@ export function classifyIntent(rawText: string): IntentResult {
     /\bi\s+said\s+that\s+(?:already|before)?\b/,
     /\balready\s+(?:told|said|answered)\s+(?:you|that)\b/,
     /\bi\s+(?:literally\s+)?(?:just\s+)?(?:told|said)\s+you\s+that\b/,
+    // "look at my first response, i told you exactly what i want" — no
+    // "already"/"just" needed; pointing back at an earlier message is
+    // itself the signal, not any one specific keyword.
+    /\b(?:look at|check|see|read)\s+my\s+(?:first|earlier|previous|last)\s+(?:response|message|answer|reply)\b/,
+    /\bi\s+told\s+you\s+(?:exactly\s+)?what\s+i\s+want\b/,
+    /\bi\s+(?:already\s+)?(?:gave|answered)\s+(?:that|this|you)\b/,
   )) {
     intents.push('already_answered');
   }

@@ -159,7 +159,10 @@ const UPDATE_TOOL = {
         type: 'string', enum: ['color_count', 'color_locations'],
         description: 'Set ONLY when the user mentioned something ambiguous about color scope that genuinely needs a follow-up: "color_count" for a vague count like "several different colors" (no number given). "color_locations" for "one main color with accent walls" with no indication of which wall/room. Do NOT set this if the message already gave enough detail (a number, or named rooms) — that goes in colorCount/colorChangeExcludedRoomCount/colorChangeScope instead, not here.',
       },
-      ceilingType: { type: 'string', enum: ['flat', 'popcorn', 'vaulted'] },
+      ceilingType: {
+        type: 'string', enum: ['flat', 'popcorn', 'vaulted'],
+        description: '"popcorn" means the ceiling CURRENTLY HAS popcorn/textured finish that will be PAINTED OVER as-is (harder to cut in/roll than flat). If the customer wants that texture REMOVED/SCRAPED OFF before painting, that is separate, additional labor — also set prepWorkAdd to include "popcorn_removal" (NOT "wallpaper_removal", which is for actual wallpaper on walls only) and popcornCeilingRooms to how many rooms, if stated.',
+      },
       ceilingHeight: {
         type: 'string', enum: ['nine_foot', 'ten_plus', 'vaulted_mixed'],
         description: 'A real multiplier on wall/ceiling square footage — independent of ceilingType (which is about texture, not height). Set from "9 foot ceilings", "10+ foot/high ceilings", or "vaulted/cathedral ceilings".',
@@ -239,7 +242,15 @@ const UPDATE_TOOL = {
         type: 'string', enum: ['vacant', 'furnished', 'occupied'],
         description: 'Whether the space is lived-in during the work. Set this from a bare one-word reply too ("vacant" / "furnished" / "occupied") when the bot just asked this directly — those exact words are the suggested quick-reply options, so a plain answer like that is not vague, it\'s a direct answer.',
       },
-      prepWorkAdd: { type: 'array', items: { type: 'string', enum: ['caulking', 'stain_cover', 'drywall_repair', 'wood_rot', 'wallpaper_removal', 'power_washing', 'lead_test', 'mold_treatment'] } },
+      prepWorkAdd: {
+        type: 'array',
+        items: { type: 'string', enum: ['caulking', 'stain_cover', 'drywall_repair', 'wood_rot', 'wallpaper_removal', 'popcorn_removal', 'power_washing', 'lead_test', 'mold_treatment'] },
+        description: '"wallpaper_removal" is ONLY for actual wallpaper being stripped off walls — never use it for popcorn ceiling texture being scraped off, that is "popcorn_removal" (a distinct, real line item with its own cost). Do not guess one of these for a prep task that does not clearly match any of them; leave it out instead.',
+      },
+      popcornCeilingRooms: {
+        type: 'integer',
+        description: 'Number of rooms getting popcorn ceiling texture REMOVED (not just painted over) — only set alongside prepWorkAdd including "popcorn_removal". If the customer says "throughout"/"most of the house"/"the whole house" rather than a number, estimate generously (roughly bedroom count + 3 for common areas) rather than leaving this at the default of 1 room, which would badly undercharge a whole-house removal.',
+      },
       drywallRepairExtent: { type: 'string', enum: ['minor', 'moderate', 'major'] },
       conditionAddressed: {
         type: 'boolean',
@@ -248,6 +259,14 @@ const UPDATE_TOOL = {
       renoStageAddressed: {
         type: 'boolean',
         description: 'Only relevant for a renovation/new-construction job. Set to true whenever the customer says ANYTHING about how far along the other trades are — "drywall\'s up", "everything installed, just needs paint", "still waiting on trim", "not sure" — this just needs to be true so that question isn\'t asked again.',
+      },
+      surfacesAddressed: {
+        type: 'boolean',
+        description: 'Set to true whenever the message tells you WHICH interior surfaces are in scope — walls, ceilings, trim, doors — whether that\'s an explicit limit ("just walls"), an explicit inclusion ("everything"), OR a plain narrative listing like "ceilings painted, walls painted, trim and doors painted" (this last form is easy to miss: it never uses the word "everything", but it is just as complete an answer). This exists purely to stop the surfaces question from being re-asked — interiorWalls/Ceilings/Trim/Doors already default to "the full package", so a customer confirming that IS the full package doesn\'t change any of those fields\' values, and without this flag that looks identical to the scope never having been discussed at all.',
+      },
+      trimScopeAddressed: {
+        type: 'boolean',
+        description: 'Only relevant once trim/baseboards are in scope. Set to true whenever the customer answers what "trim" covers — "just baseboards", "baseboards only", "door frames too" (also set doorFrames="yes" for that one), "all the woodwork"/"everything" (also set doorFrames="yes"), or "not sure". This exists purely to stop the trim-scope question from being re-asked — like surfacesAddressed, "just baseboards" doesn\'t change any other field\'s value (doorFrames correctly stays "no"), so without this flag that answer looks identical to the question never having been asked at all.',
       },
       multiPhaseRequested: {
         type: 'string', enum: ['yes'],

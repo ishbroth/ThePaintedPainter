@@ -255,10 +255,9 @@ function botMessage(text: string): ChatMessage {
   return { role: 'bot', text, timestamp: Date.now() };
 }
 
-function classifyResponseStyle(text: string): UserResponseStyle {
-  const len = text.trim().length;
-  if (len < 15) return 'terse';
-  if (len > 120) return 'detailed';
+function classifyResponseStyle(avgLen: number): UserResponseStyle {
+  if (avgLen < 15) return 'terse';
+  if (avgLen > 120) return 'detailed';
   return 'normal';
 }
 
@@ -365,11 +364,21 @@ async function processMessage(state: ChatState, trimmed: string): Promise<TurnRe
   }
   const newTranscript = `${state.transcript}\n${trimmed}`.trim();
   const derivations = derive(ctxWithExplicit, newTranscript);
+  const responseLengths = [...state.ctx.responseLengths, trimmed.length];
   const ctxNext = {
     ...applyDerivations(ctxWithExplicit, derivations),
     answeredQuestions: state.ctx.answeredQuestions + 1,
-    responseStyle: classifyResponseStyle(trimmed),
-    responseLengths: [...state.ctx.responseLengths, trimmed.length],
+    // Classified from the AVERAGE length across the whole conversation, not
+    // just this one message — this used to reclassify on every turn from
+    // the latest message alone, which meant finishing with "run it" (6
+    // characters, however detailed everything said before it was) always
+    // reset responseStyle to 'terse' right before pricing runs. Since
+    // that's the near-universal way a conversation ends, it silently
+    // applied a 10% "fewer details" padding surcharge — and denied the
+    // tighter high-confidence price range — to nearly every completed
+    // quote, regardless of how much detail the customer actually gave.
+    responseStyle: classifyResponseStyle(responseLengths.reduce((sum, n) => sum + n, 0) / responseLengths.length),
+    responseLengths,
   };
 
   // Photo-request triggers — a bare keyword match, run independently of
@@ -444,7 +453,13 @@ async function processMessage(state: ChatState, trimmed: string): Promise<TurnRe
     }
 
     // 4. Frustration / greeting / restart
-    if (hasIntent(intent, 'frustration')) {
+    //
+    // Skip the generic "sorry about that" when already_answered is ALSO
+    // present — that more specific handler (below) gives its own, more
+    // useful reply (either finds the answer or honestly says it can't),
+    // and showing both back-to-back as two separate bot bubbles for the
+    // same message just reads as a stutter.
+    if (hasIntent(intent, 'frustration') && !hasIntent(intent, 'already_answered')) {
       // Acknowledge, but do NOT dead-end here — nothing was actually reset,
       // so falling through to the normal topic-advance logic below keeps the
       // conversation moving instead of risking a repeated "sorry" loop if the
@@ -509,6 +524,7 @@ async function processMessage(state: ChatState, trimmed: string): Promise<TurnRe
       const fallback = metaBank.uncertainty(topic.id);
       s = {
         ...s,
+        ctx: { ...s.ctx, ...statedUncertaintyDefault(topic.id) },
         history: [
           ...s.history,
           botMessage(`I'm sorry — I don't actually see that anywhere in what you've sent so far. ${fallback}`),
@@ -521,7 +537,11 @@ async function processMessage(state: ChatState, trimmed: string): Promise<TurnRe
   }
   if (hasIntent(intent, 'express_uncertainty')) {
     const reply = metaBank.uncertainty(s.lastBotTopic?.id ?? null);
-    s = { ...s, history: [...s.history, botMessage(reply)] };
+    s = {
+      ...s,
+      ctx: { ...s.ctx, ...statedUncertaintyDefault(s.lastBotTopic?.id ?? null) },
+      history: [...s.history, botMessage(reply)],
+    };
     // Mark the topic as "answered by uncertainty" so we don't re-ask — and
     // also mark it as already retried, since the metaBank.uncertainty()
     // reply already told the user we're moving on with an assumption (e.g.
@@ -619,6 +639,24 @@ async function processMessage(state: ChatState, trimmed: string): Promise<TurnRe
 }
 
 // ===== Sub-routines =====
+
+/**
+ * metaBank.uncertainty() SAYS a specific default out loud (e.g. "most folks
+ * go with walls only, so I'll default to that" for 'surfaces') but that was
+ * previously just spoken reassurance — nothing actually changed the
+ * context, so interiorCeilings/Trim/Doors stayed at their normal
+ * defaults (which mean "everything", not "walls only"). That mismatch
+ * meant the bot could tell a customer it was defaulting to walls-only and
+ * then, moments later, still ask a trim-scope follow-up that only makes
+ * sense if trim were actually in scope. This makes the stated assumption
+ * real so what gets priced matches what the customer was told.
+ */
+function statedUncertaintyDefault(topicId: string | null): Partial<EstimatorContext> {
+  if (topicId === 'surfaces') {
+    return { interiorCeilings: 'no', interiorTrim: 'no', interiorDoors: 'none', surfacesAddressed: true };
+  }
+  return {};
+}
 
 function metaAnswer(
   intents: Intent[],

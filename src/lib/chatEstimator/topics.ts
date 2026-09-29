@@ -222,7 +222,12 @@ export const TOPICS: Topic[] = [
       // this used to require interiorWalls === 'yes' specifically, which
       // "trim only" (walls: no, ceilings: no, trim: yes, doors: none) never
       // satisfies, so the topic kept re-asking a scope the customer had
-      // already given.
+      // already given. surfacesAddressed covers the OPPOSITE gap: a
+      // narrative "everything" confirmation (e.g. "ceilings painted, walls
+      // painted, trim and doors painted") that never sets any field to
+      // "no"/"none" at all, since that IS the (identical-looking) default —
+      // see the field comments in types.ts.
+      c.surfacesAddressed ||
       c.interiorWalls === 'no' ||
       c.interiorCeilings === 'no' ||
       c.interiorTrim === 'no' ||
@@ -318,6 +323,33 @@ export const TOPICS: Topic[] = [
       "Basically: is it a clean paint job, or are there repairs needed first? Little stuff like nail holes is normal — I mean things like wallpaper to strip, popcorn ceilings to scrape, water damage.",
     example: () =>
       "E.g., 'it's in good shape, just nail holes', 'wallpaper in one room', 'popcorn ceiling in the living room', or 'some water damage in a corner'.",
+  },
+
+  // ——————————————————————————————————————————
+  // Popcorn ceiling removal extent — only asked when removal was mentioned
+  // without any indication of how much of the house it covers. If the
+  // customer already said "throughout"/"most of the house"/etc., the
+  // extractor infers a room count directly and this topic is skipped
+  // entirely — this is a follow-up for genuine ambiguity, not a redundant
+  // re-ask of something already implied.
+  // ——————————————————————————————————————————
+  {
+    id: 'popcorn_extent',
+    priority: 31,
+    relevant: (c) => c.prepWork.includes('popcorn_removal'),
+    alreadyAnswered: (c) => !!c.popcornCeilingRooms,
+    ask: (c) =>
+      pick(
+        [
+          "For the popcorn ceiling removal — about how many rooms are we talking?",
+          "How many rooms need that popcorn texture scraped off?",
+        ],
+        seed(c),
+      ),
+    clarify: () =>
+      "Just a rough count of rooms with popcorn ceiling that need the texture removed before painting — removal is real labor with its own cost, separate from just painting.",
+    example: () =>
+      "E.g., '3 rooms', 'just the living room', or 'most of the house, maybe 6 rooms'.",
   },
 
   // ——————————————————————————————————————————

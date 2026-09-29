@@ -181,6 +181,7 @@ function sanitize(raw: Record<string, unknown>, prev: EstimatorContext): Partial
   if (isEnum(raw.lowVocRequested, ['yes'] as const)) patch.lowVocRequested = raw.lowVocRequested;
   if (isEnum(raw.drywallRepairExtent, ['minor', 'moderate', 'major'] as const)) patch.drywallRepairExtent = raw.drywallRepairExtent;
   if (raw.conditionAddressed === true) patch.conditionAddressed = true;
+  if (raw.surfacesAddressed === true) patch.surfacesAddressed = true;
   if (raw.renoStageAddressed === true) patch.renoStageAddressed = true;
   if (raw.trimScopeAddressed === true) patch.trimScopeAddressed = true;
   if (isEnum(raw.multiPhaseRequested, ['yes'] as const)) patch.multiPhaseRequested = raw.multiPhaseRequested;
@@ -203,11 +204,13 @@ function sanitize(raw: Record<string, unknown>, prev: EstimatorContext): Partial
     if (merged.length !== prev.specialtyServices.length) patch.specialtyServices = merged;
   }
   if (Array.isArray(raw.prepWorkAdd)) {
-    const allowed = ['caulking', 'stain_cover', 'drywall_repair', 'wood_rot', 'wallpaper_removal', 'power_washing', 'lead_test', 'mold_treatment'];
+    const allowed = ['caulking', 'stain_cover', 'drywall_repair', 'wood_rot', 'wallpaper_removal', 'popcorn_removal', 'power_washing', 'lead_test', 'mold_treatment'];
     const add = raw.prepWorkAdd.filter((v) => allowed.includes(v));
     const merged = Array.from(new Set([...prev.prepWork, ...add]));
     if (merged.length !== prev.prepWork.length) patch.prepWork = merged;
   }
+  const popcornRooms = clampNumber(raw.popcornCeilingRooms, 1, 30);
+  if (popcornRooms) patch.popcornCeilingRooms = popcornRooms;
 
   return patch;
 }

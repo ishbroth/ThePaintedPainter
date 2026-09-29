@@ -266,6 +266,7 @@ export function extractDamageSignals(text: string): {
   rot: boolean;
   damage: boolean;
   heavyPrep: boolean;
+  popcornRemoval: boolean;
 } {
   const t = text.toLowerCase();
   return {
@@ -281,6 +282,16 @@ export function extractDamageSignals(text: string): {
     // through and the condition topic kept re-asking.
     damage: /\b(damage|damaged|cracks?|peeling|chipping|failing paint|repairs?|needs (?:fixing|work)|fixer[\s-]?upper)\b/.test(t),
     heavyPrep: /\b(needs a lot of prep|extensive prep|tons of prep|lots of repairs?)\b/.test(t),
+    // Distinct from just "popcorn ceiling" (extractCeilingType) existing —
+    // this is specifically about SCRAPING IT OFF, real prep labor with its
+    // own line item (see estimateEngine.ts's prepWork.includes('popcorn_removal')).
+    // Previously nothing ever set this — not this regex path, and not the
+    // LLM schema either (no enum value existed for it) — so "popcorn
+    // ceilings removed" was either silently dropped or, worse, sometimes
+    // mis-tagged by the LLM as the closest-sounding wrong option in its
+    // prepWork enum ("wallpaper_removal"), charging for prep work that was
+    // never requested while never charging for the real removal labor.
+    popcornRemoval: /\bpopcorn\b[^.?!]{0,30}\b(remov(?:e|ed|ing|al)|scrap(?:e|ed|ing))\b|\b(remov(?:e|ed|ing|al)|scrap(?:e|ed|ing))\b[^.?!]{0,30}\bpopcorn\b/.test(t),
   };
 }
 
@@ -1024,6 +1035,19 @@ export function extractAll(text: string, prev: EstimatorContext, lastBotTopicId:
     }
   }
 
+  if (!prev.popcornCeilingRooms && lastBotTopicId === 'popcorn_extent') {
+    const bare = text.trim().match(/^(?:about|around|roughly)?\s*(\d{1,2})\s*(?:rooms?)?\s*$/i);
+    const n = bare ? parseInt(bare[1], 10) : null;
+    if (n && n > 0 && n < 30) {
+      patch.popcornCeilingRooms = n;
+      acks.push(`${n} room${n === 1 ? '' : 's'} of popcorn removal`);
+    } else if (/\b(throughout|most of|all (?:over|of)|entire|whole house|every room)\b/i.test(text)) {
+      const bedroomEstimate = patch.bedroomCount ?? prev.bedroomCount;
+      patch.popcornCeilingRooms = (bedroomEstimate ?? 3) + 3;
+      acks.push('most of the house');
+    }
+  }
+
   const beds = extractBedroomCount(text);
   if (beds && !prev.bedroomCount) {
     patch.bedroomCount = beds;
@@ -1155,7 +1179,7 @@ export function extractAll(text: string, prev: EstimatorContext, lastBotTopicId:
   // — track that it was actually addressed separately (see EstimatorContext
   // doc comment) so the "condition" topic doesn't loop.
   if (
-    damage.wallpaper || damage.rot || damage.heavyPrep || damage.holes || damage.damage ||
+    damage.wallpaper || damage.rot || damage.heavyPrep || damage.holes || damage.damage || damage.popcornRemoval ||
     /\b(good shape|great shape|in good condition|looks good|no (?:damage|issues|problems)|clean|pristine|move[-\s]?in ready)\b/.test(text.toLowerCase())
   ) {
     patch.conditionAddressed = true;
@@ -1172,6 +1196,24 @@ export function extractAll(text: string, prev: EstimatorContext, lastBotTopicId:
   if (damage.wallpaper) {
     addPrep('wallpaper_removal');
     acks.push('wallpaper removal');
+  }
+  if (damage.popcornRemoval) {
+    addPrep('popcorn_removal');
+    acks.push('popcorn ceiling removal');
+    if (!prev.popcornCeilingRooms) {
+      const wide = /\b(throughout|most of|all (?:over|of)|entire|whole house|every room)\b/i.test(text);
+      if (wide) {
+        // "Throughout"/"most of"/"entire house" is a real scope signal —
+        // better to estimate generously (bedrooms + common areas) than
+        // silently fall back to the pricing engine's own bare default of 1
+        // room, which would badly undercharge a whole-house removal job.
+        // Refined further if the customer gives an exact count later (see
+        // the 'popcorn_extent' topic for when no such scope language is
+        // given at all).
+        const bedroomEstimate = patch.bedroomCount ?? prev.bedroomCount;
+        patch.popcornCeilingRooms = (bedroomEstimate ?? 3) + 3;
+      }
+    }
   }
   if (damage.rot) {
     addPrep('wood_rot');
@@ -1464,6 +1506,27 @@ export function extractAll(text: string, prev: EstimatorContext, lastBotTopicId:
   if (surf.closets !== undefined) patch.closets = surf.closets === 'yes' ? 'standard' : 'none';
   if (surf.everything) acks.push('whole room');
   if (surf.walls === 'yes' && surf.trim === 'no') acks.push('walls only');
+  if (
+    surf.walls !== undefined || surf.ceilings !== undefined || surf.trim !== undefined ||
+    surf.doors !== undefined || surf.everything
+  ) {
+    patch.surfacesAddressed = true;
+  } else if (!prev.surfacesAddressed) {
+    // A plain narrative listing — e.g. "ceilings painted, walls painted,
+    // trim and doors painted" — describes the full package just as clearly
+    // as the word "everything" does, but extractSurfaceScope only
+    // recognizes explicit "just"/"only"/"everything" framing. Since the
+    // default field values already ARE "everything" (interiorWalls/
+    // Ceilings/Trim default 'yes', interiorDoors defaults 'some'), no
+    // field needs to change here — this only needs to mark the topic
+    // addressed so it stops being re-asked. Require 3+ of the 4 surface
+    // words together so a passing single mention ("watch the trim on the
+    // stairs") doesn't get misread as a full scope statement.
+    const tLower = text.toLowerCase();
+    const mentionCount = [/\bwalls?\b/, /\bceilings?\b/, /\btrim\b/, /\bdoors?\b/]
+      .filter((re) => re.test(tLower)).length;
+    if (mentionCount >= 3) patch.surfacesAddressed = true;
+  }
 
   // Trim/woodwork scope — "trim" alone is ambiguous (it prices baseboards
   // only; door frames/casings, closet shelving, and built-ins each price
