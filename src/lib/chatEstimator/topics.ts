@@ -8,7 +8,6 @@
 //   - ask(ctx): primary question (multiple variants, rotated for freshness)
 //   - clarify(ctx): "like what?" / "what do you mean?" response
 //   - example(ctx): "give me an example" response
-//   - chips(ctx): optional tap-to-answer chips
 //
 // Additionally exports `metaBank` — canned answers for user questions TO the
 // bot (cost, how-it-works, real-person, booking, etc.).
@@ -24,7 +23,6 @@ export interface Topic {
   ask: (ctx: EstimatorContext) => string;
   clarify: (ctx: EstimatorContext) => string;
   example: (ctx: EstimatorContext) => string;
-  chips?: (ctx: EstimatorContext) => string[];
 }
 
 // Deterministic "rotation" based on a seed so the same ctx picks the same
@@ -95,7 +93,6 @@ export const TOPICS: Topic[] = [
       "Interior means inside the house — walls, ceilings, trim, etc. Exterior means the outside — siding, trim, fascia, that sort of thing.",
     example: () =>
       "For instance: 'interior' would be painting the bedrooms and living room. 'Exterior' would be painting the outside of the house.",
-    chips: () => ['Interior', 'Exterior', 'Both'],
   },
 
   // ——————————————————————————————————————————
@@ -129,7 +126,6 @@ export const TOPICS: Topic[] = [
       "Just give me the type of room — 'master bedroom', 'kids room', 'kitchen', 'living room'. Whatever you've got.",
     example: () =>
       "Like 'master bedroom and kids room' or 'just the kitchen' or 'living room, dining room, hallway'.",
-    chips: () => ['Bedroom', 'Living room', 'Kitchen', 'Bathroom', 'Whole house'],
   },
 
   // ——————————————————————————————————————————
@@ -162,7 +158,6 @@ export const TOPICS: Topic[] = [
       "Rough idea is fine — small is about 10×10, medium is 12×14, large is 16×18 or bigger. If you know exact dimensions that's even better.",
     example: () =>
       "You could say 'small', or '11 by 12', or '144 square feet', or 'medium size, probably 12 by 12'.",
-    chips: () => ['Small', 'Medium', 'Large', 'Not sure'],
   },
 
   // ——————————————————————————————————————————
@@ -213,7 +208,6 @@ export const TOPICS: Topic[] = [
       isCommercialLike(c)
         ? "E.g., '3000 sqft' or 'not sure, maybe 5000?'"
         : "E.g., '1500 sqft' or '4 bedrooms' or 'not sure, maybe 2000?'",
-    chips: () => ['Under 1500', '1500-2500', '2500-4000', 'Over 4000'],
   },
 
   // ——————————————————————————————————————————
@@ -264,7 +258,6 @@ export const TOPICS: Topic[] = [
       "Some folks just want walls refreshed. Others want the whole package — walls, ceiling, trim, doors, closets. Either works. You can also mix and match.",
     example: () =>
       "'Just walls' is common. Or 'walls and ceiling, no trim'. Or 'everything except the doors'.",
-    chips: () => ['Just walls', 'Walls + ceiling', 'Everything', 'Not sure'],
   },
 
   // ——————————————————————————————————————————
@@ -290,7 +283,6 @@ export const TOPICS: Topic[] = [
       "Baseboards alone is one price. Door frames/casings, closet shelving, and built-ins each add their own labor, so it helps to know which ones apply.",
     example: () =>
       "'Just baseboards' or 'baseboards and door frames' or 'everything — trim, doors, closets, all of it'.",
-    chips: () => ['Just baseboards', 'Door frames too', 'All the woodwork', 'Not sure'],
   },
 
   // ——————————————————————————————————————————
@@ -326,7 +318,6 @@ export const TOPICS: Topic[] = [
       "Basically: is it a clean paint job, or are there repairs needed first? Little stuff like nail holes is normal — I mean things like wallpaper to strip, popcorn ceilings to scrape, water damage.",
     example: () =>
       "E.g., 'it's in good shape, just nail holes', 'wallpaper in one room', 'popcorn ceiling in the living room', or 'some water damage in a corner'.",
-    chips: () => ['Good shape', 'Some repairs', 'Needs a lot of prep'],
   },
 
   // ——————————————————————————————————————————
@@ -351,7 +342,6 @@ export const TOPICS: Topic[] = [
       "Rentals usually don't need the same showroom-perfect finish a place you live in day-to-day does, so that can bring the price down a bit. Multi-unit buildings get a volume discount. Commercial space has different insurance/scheduling overhead, so it runs a bit higher.",
     example: () =>
       "E.g., 'it's our home', 'it's a rental I own', 'it's a 6-unit apartment building', or 'commercial office space'.",
-    chips: () => ['My home', 'Rental property', 'Selling', 'Commercial'],
   },
 
   // ——————————————————————————————————————————
@@ -368,7 +358,6 @@ export const TOPICS: Topic[] = [
       "After-hours or weekend work usually means a bit of a premium since it's outside a normal crew schedule — but it keeps the business running without interruption.",
     example: () =>
       "E.g., 'needs to be nights/weekends, we're open during the day' or 'daytime is fine, we're flexible'.",
-    chips: () => ['After hours/weekends', 'Daytime is fine'],
   },
 
   // ——————————————————————————————————————————
@@ -392,7 +381,6 @@ export const TOPICS: Topic[] = [
       "Going over the same color is usually one coat. A different color is typically two coats. Dark to light (or vice versa) can be three coats, which bumps the price a bit.",
     example: () =>
       "Like 'same beige going back up' / 'changing to a light gray' / 'going from dark navy to white'.",
-    chips: () => ['Same color', 'Different color', 'Dramatic change', 'Not sure yet'],
   },
 
   // ——————————————————————————————————————————
@@ -446,7 +434,6 @@ export const TOPICS: Topic[] = [
       "I just need to know what stage the space is in. If drywall and trim are still being installed, I'll assume a full prep. If everything's installed and just waiting for paint, it's less work.",
     example: () =>
       "E.g., 'drywall is up and textured, no trim yet', or 'everything installed, just needs paint', or 'honestly not sure'.",
-    chips: () => ['Drywall done, trim done', 'Still in progress', 'Not sure'],
   },
 
   // ——————————————————————————————————————————
@@ -470,7 +457,6 @@ export const TOPICS: Topic[] = [
       "Just the material of the outside walls. In SoCal most homes are stucco. Older homes often have wood siding. Newer ones use Hardie board (fiber cement).",
     example: () =>
       "Stucco, wood, Hardie, vinyl, brick, stone, or something else — just the general material.",
-    chips: () => ['Stucco', 'Wood', 'Hardie', 'Brick', 'Mixed'],
   },
 
   // ——————————————————————————————————————————
@@ -493,7 +479,6 @@ export const TOPICS: Topic[] = [
     clarify: () =>
       "Just how tall it is — 1, 2, or 3 stories. Each extra story means more ladder/scaffold time.",
     example: (c) => (isCommercialLike(c) ? "E.g., 'single story' / 'two story' / 'three-story building'." : "E.g., 'single story' / 'two story' / 'it's a three-story townhouse'."),
-    chips: () => ['1-story', '2-story', '3-story'],
   },
 
   // ——————————————————————————————————————————
@@ -581,13 +566,6 @@ export const TOPICS: Topic[] = [
       return isCommercialLike(c)
         ? "E.g., 'ASAP, we'll be closed for it' / 'next month, still open for business' / 'whenever, no rush'."
         : "E.g., 'ASAP, place is vacant' / 'next month, we'll still be living there' / 'whenever, nothing urgent'.";
-    },
-    chips: (c) => {
-      if (c.projectType === 'exterior') return ['ASAP', 'This month', 'No rush'];
-      const commercial = isCommercialLike(c);
-      if (c.occupancy && !c.timeline) return ['ASAP', 'This month', 'No rush'];
-      if (!c.occupancy && c.timeline) return commercial ? ['Still operating', 'Closed/vacant'] : ['Vacant', 'Furnished', 'Occupied'];
-      return commercial ? ['ASAP · closed for it', 'This month · still open', 'No rush'] : ['ASAP · vacant', 'This month · occupied', 'No rush'];
     },
   },
 ];

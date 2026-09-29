@@ -200,7 +200,7 @@ const CHAT_STATE_SCHEMA_VERSION = 6;
 
 /**
  * `lastBotTopic` is a `Topic` object with live function properties (ask,
- * clarify, example, chips). JSON.stringify silently drops functions, so a
+ * clarify, example). JSON.stringify silently drops functions, so a
  * naive persist/restore round-trip leaves `lastBotTopic` a hollow object
  * that throws the moment anything calls `.ask()` on it — every message
  * after a restore would fail. Store just the topic id and re-resolve the
@@ -327,9 +327,7 @@ export async function handleUserMessage(state: ChatState, userText: string): Pro
     }
     const snap = state.undoSnapshot;
     const restoredTopic = snap.lastBotTopicId ? findTopic(snap.lastBotTopicId) : null;
-    const reask = restoredTopic
-      ? restoredTopic.ask(snap.ctx) + (restoredTopic.chips ? `  (${restoredTopic.chips(snap.ctx)!.join(' · ')})` : '')
-      : "What do you need painted?";
+    const reask = restoredTopic ? restoredTopic.ask(snap.ctx) : "What do you need painted?";
     const restored: ChatState = {
       ...state,
       ctx: snap.ctx,
@@ -552,13 +550,11 @@ async function processMessage(state: ChatState, trimmed: string): Promise<TurnRe
   if (!next) {
     const retry = pickRetryTopic(ctxNext, s.askedIds, s.retriedIds);
     if (retry) {
-      const chips = retry.chips?.(ctxNext);
       const question = retry.ask(ctxNext);
       const retryPrompt =
         (acknowledgements.length > 0 ? `${ACK_LEAD_INS[s.askedIds.length % ACK_LEAD_INS.length]} ${acknowledgements.join(', ')}. ` : '') +
         (photoLinkMarker ? `${photoLinkMarker} ` : '') +
-        `Circling back — I don't think I got this one: ${question.charAt(0).toLowerCase()}${question.slice(1)}` +
-        (chips ? `  (${chips.join(' · ')})` : '');
+        `Circling back — I don't think I got this one: ${question.charAt(0).toLowerCase()}${question.slice(1)}`;
       s = {
         ...s,
         retriedIds: [...s.retriedIds, retry.id],
@@ -609,11 +605,10 @@ async function processMessage(state: ChatState, trimmed: string): Promise<TurnRe
   // 8. Ask the next topic — lead with a brief acknowledgment of what was
   //    just said so the reply doesn't read as a non-sequitur when the user
   //    volunteers detail beyond what the last question asked for.
-  const chips = next.chips?.(ctxNext);
   const ackLeadIn = acknowledgements.length > 0
     ? `${ACK_LEAD_INS[s.askedIds.length % ACK_LEAD_INS.length]} ${acknowledgements.join(', ')}. `
     : '';
-  const prompt = ackLeadIn + (photoLinkMarker ? `${photoLinkMarker} ` : '') + next.ask(ctxNext) + (chips ? `  (${chips.join(' · ')})` : '');
+  const prompt = ackLeadIn + (photoLinkMarker ? `${photoLinkMarker} ` : '') + next.ask(ctxNext);
   s = {
     ...s,
     askedIds: [...s.askedIds, next.id],
@@ -678,8 +673,7 @@ function advanceAfterUncertainty(state: ChatState): TurnResult {
     }
     return { state, done: null };
   }
-  const chips = next.chips?.(state.ctx);
-  const prompt = next.ask(state.ctx) + (chips ? `  (${chips.join(' · ')})` : '');
+  const prompt = next.ask(state.ctx);
   return {
     state: {
       ...state,
