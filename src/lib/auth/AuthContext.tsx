@@ -7,6 +7,7 @@ export interface UserProfile {
   display_name: string | null;
   avatar_url: string | null;
   phone: string | null;
+  theme_preference: 'light' | 'dark' | null;
 }
 
 export interface AuthContextType {

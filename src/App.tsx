@@ -5,6 +5,7 @@ import { ThemeProvider } from './lib/theme/index.ts';
 import Header from './components/Header';
 import ThemeToggle from './components/ThemeToggle';
 import HouseWatermark from './components/HouseWatermark';
+import { ThemeAccountSync } from './components/ThemeAccountSync';
 import AuthRedirectBanner from './components/AuthRedirectBanner';
 import Footer from './components/Footer';
 import Home from './pages/Home';
@@ -82,6 +83,7 @@ function App() {
       <ThemeProvider>
       <Router>
         <AuthProvider>
+          <ThemeAccountSync />
           <HouseWatermark />
           <div className="min-h-screen flex flex-col" style={{ position: 'relative', zIndex: 1 }}>
             <Header />

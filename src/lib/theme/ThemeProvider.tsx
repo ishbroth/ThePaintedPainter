@@ -1,7 +1,15 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { ThemeContext, type Theme } from './ThemeContext';
 
-const STORAGE_KEY = 'tpp-theme';
+// Bumped from 'tpp-theme' when the default flipped from dark to light —
+// every visit before that change had already written 'dark' into
+// localStorage under the old key (the effect below saves on every mount,
+// not just on an explicit toggle), so reusing that key would keep reading
+// back 'dark' for anyone who'd ever visited before, masking the new
+// default behind a hard refresh forever. A fresh key means everyone gets
+// the new default once, while still fully respecting any toggle they make
+// afterward (which persists under this same new key going forward).
+const STORAGE_KEY = 'tpp-theme-v2';
 
 function getInitialTheme(): Theme {
   try {
