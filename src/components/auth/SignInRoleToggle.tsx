@@ -12,8 +12,10 @@ export default function SignInRoleToggle({ active }: { active: 'customer' | 'pai
     fontSize: '0.85rem',
     fontWeight: 600,
     textDecoration: 'none',
-    borderBottom: isActive ? '2px solid var(--accent-blue)' : '2px solid var(--border-strong)',
+    borderRadius: 8,
+    borderBottom: isActive ? '2px solid var(--accent-blue)' : '2px solid transparent',
     color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
+    background: isActive ? 'color-mix(in srgb, var(--accent-blue) 15%, transparent)' : 'transparent',
   });
 
   return (
@@ -21,8 +23,7 @@ export default function SignInRoleToggle({ active }: { active: 'customer' | 'pai
       className="flex mb-6"
       style={{
         display: 'flex',
-        background: 'color-mix(in srgb, var(--accent-blue) 12%, transparent)',
-        borderRadius: 10,
+        gap: 4,
         padding: 4,
       }}
     >
