@@ -94,10 +94,16 @@
   --tint-success-border: #2d6b2d;
 }
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+/* In @layer base so Tailwind's padding/margin/box-sizing utilities (p-*,
+   m-*, box-*) can still override it — an unlayered reset would otherwise
+   always beat those utilities regardless of specificity, per the CSS
+   Cascade Layers spec, silently zeroing out every p-*/m-* class site-wide. */
+@layer base {
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
 }
 
 html {
