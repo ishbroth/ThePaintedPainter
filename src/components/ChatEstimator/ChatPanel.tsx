@@ -11,7 +11,7 @@ import {
 } from '../../lib/chatEstimator/chatEngine';
 import { hapticLight } from '../../lib/haptics';
 import { CHAT_STATE_KEY, QUOTE_EXPIRES_KEY, QUOTE_RESULT_KEY, PRICE_HOLD_MINUTES } from '../../lib/chatEstimator/persistence';
-import { isTTSSupported, speak, stopSpeaking } from '../../lib/textToSpeech';
+import { isTTSSupported, speak, stopSpeaking, setupSpeechUnlock } from '../../lib/textToSpeech';
 import { uploadQuotePhoto, analyzeQuotePhoto } from '../../lib/chatEstimator/photoUpload';
 import { loadAccountChatState, saveAccountChatState } from '../../lib/chatEstimator/accountPersistence';
 import { useAuth } from '../../lib/auth';
@@ -180,6 +180,8 @@ const ChatPanel = () => {
   }, [state.history, readAloud, ttsSupported]);
 
   useEffect(() => stopSpeaking, []);
+
+  useEffect(() => setupSpeechUnlock(), []);
 
   useEffect(() => {
     // Persist on every change so a back-button nav (or reload) back to this

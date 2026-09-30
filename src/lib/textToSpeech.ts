@@ -110,14 +110,27 @@ function pickBestVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | n
   const score = (v: SpeechSynthesisVoice): number => {
     const name = v.name.toLowerCase();
     // Modern neural/cloud voices (Edge's "Online (Natural)" voices, Google's
-    // WaveNet-backed voices) sound dramatically more human than the classic
-    // desktop TTS engines that show up as "Microsoft David/Zira Desktop" or
-    // generic "eSpeak" voices.
+    // WaveNet-backed voices, iOS/Android's higher-quality downloaded voices)
+    // sound dramatically more human than the classic compact/default
+    // system voices ("Microsoft David/Zira Desktop", plain "Samantha",
+    // generic "eSpeak"). Different platforms label their better voices
+    // differently, so check for any of the quality markers rather than a
+    // fixed name list tuned to one platform — a hardcoded desktop-voice
+    // list is exactly why this picked a worse default voice on iPhone.
     if (name.includes('natural')) return 100;
-    if (name.includes('online')) return 90;
+    if (name.includes('online')) return 95;
+    if (name.includes('premium')) return 92; // iOS's higher-quality downloadable voices
+    if (name.includes('enhanced')) return 90; // iOS's mid-tier downloadable voices
+    if (name.includes('neural')) return 88;
     if (/\b(aria|jenny|guy|ana|davis|jane|sara)\b/.test(name)) return 85; // Edge neural voice names
     if (name.includes('google')) return 80;
-    if (/\b(samantha|ava|allison|susan)\b/.test(name)) return 70; // Apple's better system voices
+    // Apple's named system voices, on both macOS and iOS — Siri-family
+    // voices generally sound better than the truly generic default.
+    if (/\b(samantha|ava|allison|susan|karen|moira|tessa|zoe|nicky|siri)\b/.test(name)) return 70;
+    // A voice not backed by a local/offline engine is usually a cloud
+    // voice, which tends to sound better than a compact on-device one,
+    // even under a name this list doesn't otherwise recognize.
+    if (v.localService === false) return 60;
     if (v.lang.toLowerCase() === 'en-us') return 40;
     if (v.lang.toLowerCase().startsWith('en')) return 30;
     return 10;
@@ -152,4 +165,44 @@ export async function speak(text: string): Promise<void> {
 export function stopSpeaking(): void {
   if (!isTTSSupported()) return;
   window.speechSynthesis.cancel();
+}
+
+let unlocked = false;
+
+/**
+ * iOS/iPadOS Safari (WebKit) only allows the FIRST speechSynthesis.speak()
+ * call to actually produce sound if it happens synchronously inside a real
+ * user gesture (a tap) — a call from an IntersectionObserver callback (the
+ * scroll-into-view autoplay) doesn't count, so it gets silently swallowed
+ * until the engine has been "unlocked" once by a real tap. This is why
+ * autoplay-on-scroll worked on desktop Chrome but needed a couple of manual
+ * mute/unmute taps on iPhone before anything was audible. Chrome and other
+ * browsers don't have this restriction, so this is a harmless no-op there.
+ * See setupSpeechUnlock() for where this gets wired to the very first touch
+ * on the page.
+ */
+function unlockSpeechSynthesis(): void {
+  if (unlocked || !isTTSSupported()) return;
+  unlocked = true;
+  const utterance = new SpeechSynthesisUtterance(' ');
+  utterance.volume = 0;
+  window.speechSynthesis.speak(utterance);
+}
+
+/**
+ * Call once, e.g. at the app root. Listens for the very first touch/click
+ * ANYWHERE on the page and uses it to unlock speech synthesis — including
+ * the touchstart that begins a scroll gesture, so by the time the user
+ * finishes scrolling the estimator into view, a moment later, the engine
+ * is already unlocked and the autoplay is actually audible.
+ */
+export function setupSpeechUnlock(): () => void {
+  if (!isTTSSupported() || typeof document === 'undefined') return () => {};
+  const handler = () => unlockSpeechSynthesis();
+  document.addEventListener('touchstart', handler, { once: true, passive: true });
+  document.addEventListener('click', handler, { once: true });
+  return () => {
+    document.removeEventListener('touchstart', handler);
+    document.removeEventListener('click', handler);
+  };
 }
