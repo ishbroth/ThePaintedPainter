@@ -72,7 +72,15 @@ export default function CustomerSignUp() {
   return (
     <div className="flex items-center justify-center min-h-[70vh] px-4">
       <div className="w-full max-w-[400px] bg-[var(--bg-surface)] rounded-lg p-8">
-        <h1 className="text-2xl font-bold text-[var(--text-primary)] text-center">Create Account</h1>
+        <h1 className="text-2xl font-bold text-[var(--text-primary)] text-center">Create Customer Profile</h1>
+        <div className="text-center mt-2">
+          <Link
+            to="/painter-signup"
+            className="inline-flex items-center gap-1 text-xs text-[var(--accent-blue)] hover:text-[var(--accent-blue-hover)]"
+          >
+            Painters this way <span aria-hidden="true">&rarr;</span>
+          </Link>
+        </div>
         <p className="text-[var(--text-secondary)] text-center mt-2 mb-6">
           Sign up to find and hire painters
         </p>
