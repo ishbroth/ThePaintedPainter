@@ -17,7 +17,15 @@ export default function SignInRoleToggle({ active }: { active: 'customer' | 'pai
   });
 
   return (
-    <div className="flex mb-6" style={{ display: 'flex' }}>
+    <div
+      className="flex mb-6"
+      style={{
+        display: 'flex',
+        background: 'color-mix(in srgb, var(--accent-blue) 12%, transparent)',
+        borderRadius: 10,
+        padding: 4,
+      }}
+    >
       <Link to="/auth/customer-sign-in" style={tabStyle(active === 'customer')}>
         Customer
       </Link>
