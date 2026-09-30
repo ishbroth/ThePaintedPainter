@@ -443,7 +443,7 @@ const ChatPanel = () => {
           <div className="chat-post-actions">
             {restoredAlreadyFinishedRef.current && (
               <button type="button" className="chat-action-button chat-action-primary" onClick={() => navigate('/quote-results')}>
-                View My Quote
+                View My Price
               </button>
             )}
             <button type="button" className="chat-action-button chat-action-secondary" onClick={startNewEstimate}>

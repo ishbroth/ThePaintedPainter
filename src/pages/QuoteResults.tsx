@@ -135,7 +135,7 @@ const QuoteResults = () => {
                 navigate('/');
               }}
             >
-              Get a fresh quote →
+              Get a fresh price →
             </button>
           ) : (
             <>Pick a painter and lock in this price before it expires.</>

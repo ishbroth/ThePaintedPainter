@@ -34,7 +34,7 @@ const fakeReviews = [
     name: 'Amy R.',
     rating: 4,
     date: 'October 2025',
-    text: 'Solid job on our bedroom and hallway. The finish is smooth and even, and they were careful around our furniture. Price was reasonable compared to other quotes we received.',
+    text: 'Solid job on our bedroom and hallway. The finish is smooth and even, and they were careful around our furniture. Price was reasonable compared to other prices we received.',
   },
 ];
 

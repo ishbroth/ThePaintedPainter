@@ -186,7 +186,7 @@ const Support = () => {
             <h2 className="text-xl font-bold mb-4">For Homeowners</h2>
             <p className="text-[var(--text-secondary)] mb-4 text-sm leading-relaxed">
               Get an instant estimate, compare options, and book a verified professional — all in one place. No phone
-              tag, no waiting days for quotes.
+              tag, no waiting days for pricing.
             </p>
             <ul className="text-[var(--text-secondary)] mb-6 list-disc ml-5 space-y-1.5 text-sm">
               <li>Instant AI-powered estimates</li>

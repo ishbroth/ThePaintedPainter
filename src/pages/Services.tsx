@@ -96,7 +96,7 @@ const Services = () => {
                 ))}
               </ul>
               <Link to="/quote" className="btn-secondary inline-flex items-center gap-2">
-                Get Commercial Quote
+                Get Commercial Price
                 <ArrowRight size={20} />
               </Link>
             </div>
@@ -130,10 +130,10 @@ const Services = () => {
         <div className="container-custom text-center">
           <h2 className="text-3xl font-bold text-white mb-4">Ready to Get Started?</h2>
           <p className="text-white/90 mb-8 max-w-xl mx-auto">
-            Get an instant quote by answering a few simple questions about your project.
+            Get an instant price by answering a few simple questions about your project.
           </p>
           <Link to="/quote" className="bg-white text-primary px-8 py-4 rounded-lg font-semibold hover:bg-gray-100 transition-colors inline-flex items-center gap-2">
-            Get Your Free Quote
+            Get Your Free Price
             <ArrowRight size={20} />
           </Link>
         </div>
