@@ -33,7 +33,7 @@ export default function CustomerSignIn() {
 
   return (
     <div className="flex items-center justify-center min-h-[70vh] px-4">
-      <div className="w-full max-w-[400px] bg-[var(--bg-surface)] rounded-lg p-8">
+      <div className="w-full max-w-[400px] bg-[var(--bg-surface)] border border-[var(--border)] rounded-xl shadow-lg p-8">
         <SignInRoleToggle active="customer" />
         <h1 className="text-2xl font-bold text-[var(--text-primary)] text-center">Customer Sign In</h1>
         <p className="text-[var(--text-secondary)] text-center mt-2 mb-6">
@@ -80,7 +80,7 @@ export default function CustomerSignIn() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2 px-4 bg-[var(--accent-blue)] hover:bg-[var(--accent-blue-hover)] disabled:opacity-50 disabled:cursor-not-allowed text-[var(--text-primary)] font-medium rounded transition-colors"
+            className="w-full py-2.5 px-4 bg-[var(--accent-blue)] hover:bg-[var(--accent-blue-hover)] disabled:opacity-50 disabled:cursor-not-allowed text-[var(--accent-blue-ink)] font-semibold rounded-lg transition-colors"
           >
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
@@ -89,14 +89,14 @@ export default function CustomerSignIn() {
         <div className="mt-6 text-center space-y-2">
           <Link
             to="/auth/customer-sign-up"
-            className="block text-[var(--accent-blue)] hover:text-[var(--accent-blue-hover)] text-sm"
+            className="block text-[var(--accent-blue)] hover:text-[var(--accent-blue-hover)] text-sm font-medium"
           >
             Create an account
           </Link>
           <button
             type="button"
             onClick={() => alert('Password reset coming soon. Please contact support.')}
-            className="text-[var(--text-secondary)] hover:text-[var(--text-secondary)] text-sm"
+            className="text-[var(--text-faint)] hover:text-[var(--text-secondary)] text-sm transition-colors"
           >
             Forgot password?
           </button>

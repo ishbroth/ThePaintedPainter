@@ -183,22 +183,6 @@ const Support = () => {
       <section className="py-12 bg-[var(--bg-surface)]">
         <div className="container-custom max-w-4xl grid md:grid-cols-2 gap-10">
           <div>
-            <h2 className="text-xl font-bold mb-4">For Painters</h2>
-            <p className="text-[var(--text-secondary)] mb-4 text-sm leading-relaxed">
-              Stop chasing leads and undercutting yourself on bidding sites. Set your rates, build your profile, and
-              get job offers that match your skills and availability.
-            </p>
-            <ul className="text-[var(--text-secondary)] mb-6 list-disc ml-5 space-y-1.5 text-sm">
-              <li>Steady stream of qualified leads in your area</li>
-              <li>Fair, transparent pricing — no race to the bottom</li>
-              <li>Dashboard to manage jobs, schedule, and earnings</li>
-              <li>Build your reputation with verified customer reviews</li>
-            </ul>
-            <Link to="/painter-signup" className="cta-button">
-              Sign Up as a Painter
-            </Link>
-          </div>
-          <div>
             <h2 className="text-xl font-bold mb-4">For Homeowners</h2>
             <p className="text-[var(--text-secondary)] mb-4 text-sm leading-relaxed">
               Get an instant estimate, compare options, and book a verified professional — all in one place. No phone
@@ -214,19 +198,20 @@ const Support = () => {
               Get Your Estimate
             </Link>
           </div>
-        </div>
-      </section>
-
-      <section className="py-12 bg-[var(--bg-chrome)] text-center">
-        <div className="container-custom">
-          <h2 className="text-2xl font-bold mb-4">Ready to Get Started?</h2>
-          <p className="text-[var(--text-secondary)] mb-8">Whether you're a homeowner or a painter, we've got you covered.</p>
-          <div className="flex flex-wrap justify-center gap-4">
-            <Link to="/" className="cta-button">
-              Get an Estimate
-            </Link>
+          <div>
+            <h2 className="text-xl font-bold mb-4">For Painters</h2>
+            <p className="text-[var(--text-secondary)] mb-4 text-sm leading-relaxed">
+              Stop chasing leads and undercutting yourself on bidding sites. Set your rates, build your profile, and
+              get job offers that match your skills and availability.
+            </p>
+            <ul className="text-[var(--text-secondary)] mb-6 list-disc ml-5 space-y-1.5 text-sm">
+              <li>Steady stream of qualified leads in your area</li>
+              <li>Fair, transparent pricing — no race to the bottom</li>
+              <li>Dashboard to manage jobs, schedule, and earnings</li>
+              <li>Build your reputation with verified customer reviews</li>
+            </ul>
             <Link to="/painter-signup" className="cta-button">
-              Join as a Painter
+              Sign Up as a Painter
             </Link>
           </div>
         </div>

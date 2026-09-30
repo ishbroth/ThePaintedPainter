@@ -439,15 +439,17 @@ const ChatPanel = () => {
           )}
         </div>
 
-        {waiting && restoredAlreadyFinishedRef.current && (
-          <button type="button" className="chat-new-estimate-link" onClick={() => navigate('/quote-results')}>
-            View my quote
-          </button>
-        )}
         {waiting && (
-          <button type="button" className="chat-new-estimate-link" onClick={startNewEstimate}>
-            Start a new estimate
-          </button>
+          <div className="chat-post-actions">
+            {restoredAlreadyFinishedRef.current && (
+              <button type="button" className="chat-action-button chat-action-primary" onClick={() => navigate('/quote-results')}>
+                View My Quote
+              </button>
+            )}
+            <button type="button" className="chat-action-button chat-action-secondary" onClick={startNewEstimate}>
+              Start a New Estimate
+            </button>
+          </div>
         )}
 
         <div className="chat-input-row">
