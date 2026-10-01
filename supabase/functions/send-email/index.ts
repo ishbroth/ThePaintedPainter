@@ -38,6 +38,17 @@ const EMAIL_TYPE_MAP: Record<string, string> = {
   job_offer_available: 'New job available in your area',
   painter_accepted_confirm_deposit: 'A painter accepted your job — confirm & pay deposit',
   job_confirmed_painter_details: 'Deposit received — job confirmed!',
+  painter_accepted_notice: 'A painter accepted your job',
+  job_taken: 'That job has been taken',
+  job_confirmed_customer: 'Your painting project is confirmed',
+  job_rescheduled: 'Your project start date changed',
+  painter_application_approved: 'Welcome to The Painted Painter — you’re approved',
+  painter_signup_confirm: 'Confirm your email to submit your painter application',
+  painter_application_reminder: 'Painter application reminder',
+  painter_application_updated: 'A painter finished their requested tasks',
+  painter_needs_info: 'More information needed for your painter application',
+  painter_rejected: 'Update on your painter application',
+  new_notification: 'You have a new notification',
 }
 
 // The sender address for all outgoing emails
@@ -76,6 +87,16 @@ function escapeHtml(value: unknown): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;')
+}
+
+function escapeStrings(value: unknown): Record<string, unknown> {
+  const out: Record<string, unknown> = {}
+  if (value && typeof value === 'object') {
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      out[k] = typeof v === 'string' ? escapeHtml(v) : v
+    }
+  }
+  return out
 }
 
 function buildEmailHtml(type: string, data: Record<string, unknown>): string {
@@ -218,7 +239,59 @@ function buildEmailHtml(type: string, data: Record<string, unknown>): string {
         ${data.serviceTypes ? `<p>Services: ${data.serviceTypes}</p>` : ''}
         <p>Years in business: ${data.yearsInBusiness ?? 'N/A'} &middot; Crew size: ${data.crewSize ?? 'N/A'}</p>
         <p>Licensed: ${data.hasLicense ?? 'N/A'} &middot; Insured: ${data.isInsured ?? 'N/A'} &middot; Bonded: ${data.isBonded ?? 'N/A'}</p>
-        <p>Log in to the admin dashboard to review and approve this application.</p>
+        ${data.reviewUrl ? `<p><a class="btn" href="${data.reviewUrl}">Review this application</a></p>
+        <p style="font-size: 13px; color: #6b7280;">From the review page you can approve them, ask for proof of license / insurance / bond / company verification (they'll see it as tasks on their profile), or decline with a reason. They're emailed automatically.</p>` : ''}
+      `)
+
+    case 'painter_signup_confirm':
+      return wrap(`
+        <p>Hi ${data.ownerName || 'there'}, thanks for applying to join The Painted Painter with <strong>${data.companyName || 'your company'}</strong>.</p>
+        <p>Confirm your email to create your account and send your application to our team for review.</p>
+        ${data.confirmUrl ? `<p><a class="btn" href="${data.confirmUrl}">Confirm email &amp; submit application</a></p>` : ''}
+        <p style="margin-top: 8px; font-size: 13px; color: #6b7280;">This link expires in 14 days. If you don't confirm, no account is created and the information you entered is deleted. Didn't apply? You can ignore this email.</p>
+      `)
+
+    case 'painter_application_reminder':
+      return wrap(`
+        <p><strong>${data.companyName || 'A painter'}</strong> is still waiting on their application and sent a reminder.</p>
+        ${data.reviewUrl ? `<p><a class="btn" href="${data.reviewUrl}">Review this application</a></p>` : ''}
+      `)
+
+    case 'painter_application_updated': {
+      const done = ((data.completedTasks as string[]) ?? []).map((t) => `<li>${escapeHtml(t)}</li>`).join('')
+      const open = ((data.openTasks as string[]) ?? []).map((t) => `<li>${escapeHtml(t)}</li>`).join('')
+      const docs = ((data.documents as { name: string; url: string }[]) ?? [])
+        .map((d) => `<li><a href="${escapeHtml(d.url)}">${escapeHtml(d.name)}</a></li>`).join('')
+      return wrap(`
+        <p><strong>${data.companyName || 'A painter'}</strong> says they've completed the tasks you asked for.</p>
+        ${done ? `<p>Marked done:</p><ul>${done}</ul>` : ''}
+        ${open ? `<p>Still open:</p><ul>${open}</ul>` : ''}
+        ${docs ? `<p>Uploaded documents (links expire in 7 days):</p><ul>${docs}</ul>` : ''}
+        ${data.reviewUrl ? `<p><a class="btn" href="${data.reviewUrl}">Review this application</a></p>` : ''}
+      `)
+    }
+
+    case 'painter_needs_info': {
+      const items = ((data.tasks as string[]) ?? []).map((t) => `<li>${escapeHtml(t)}</li>`).join('')
+      return wrap(`
+        <p>Hi ${data.ownerName || 'there'}, thanks for applying with <strong>${data.companyName || 'your company'}</strong>. Before we can approve you, we need a few things:</p>
+        <ul>${items}</ul>
+        ${data.message ? `<p>${data.message}</p>` : ''}
+        ${data.profileUrl ? `<p><a class="btn" href="${data.profileUrl}">Complete these on your profile</a></p>` : ''}
+      `)
+    }
+
+    case 'painter_rejected':
+      return wrap(`
+        <p>Hi ${data.ownerName || 'there'}, thank you for your interest in The Painted Painter. After reviewing your application for <strong>${data.companyName || 'your company'}</strong>, we're not able to approve it right now.</p>
+        ${data.message ? `<p>${data.message}</p>` : ''}
+      `)
+
+    case 'new_notification':
+      return wrap(`
+        <p><strong>${data.title || 'New notification'}</strong></p>
+        ${data.body ? `<p>${data.body}</p>` : ''}
+        ${data.link ? `<p><a class="btn" href="${data.link}">Open</a></p>` : ''}
       `)
 
     case 'job_offer_available': {
@@ -292,6 +365,45 @@ function buildEmailHtml(type: string, data: Record<string, unknown>): string {
         <p style="margin-top: 8px; font-size: 13px; color: #6b7280;">Reach out to the customer directly to confirm details.</p>
       `)
 
+    case 'painter_accepted_notice':
+      return wrap(`
+        <p>Good news — <strong>${data.painterCompanyName || 'a painter'}</strong> accepted your job at ${formatMoney(data.guaranteedPrice)}.</p>
+        <p>They're picking a start date now. We'll email you again as soon as it's set, with a link to confirm and pay your deposit.</p>
+        ${data.customerPreferredDate ? `<p>Your requested date: <strong>${data.customerPreferredDate}</strong></p>` : ''}
+        <p style="margin-top: 8px; font-size: 13px; color: #6b7280;">You can follow progress anytime under My Projects.</p>
+      `)
+
+    case 'job_taken':
+      return wrap(`
+        <p>Another painter accepted the job in ZIP ${data.zipCode || 'N/A'} before you could. Thanks for the quick look — keep an eye out for the next one.</p>
+      `)
+
+    case 'job_confirmed_customer':
+      return wrap(`
+        <p>Your deposit of <strong>${formatMoney(data.depositAmount)}</strong> was received — your project is confirmed!</p>
+        <p>
+          Painter: <strong>${data.painterCompanyName || 'N/A'}</strong> (${data.painterOwnerName || 'N/A'})<br />
+          Email: <a href="mailto:${data.painterEmail || ''}">${data.painterEmail || 'N/A'}</a><br />
+          Phone: <a href="tel:${data.painterPhone || ''}">${data.painterPhone || 'N/A'}</a>
+        </p>
+        <p>Job price: <strong>${formatMoney(data.guaranteedPrice)}</strong>${data.scheduledDate ? ` &middot; Start date: <strong>${data.scheduledDate}</strong>` : ''}</p>
+        <p style="margin-top: 8px; font-size: 13px; color: #6b7280;">Your painter has your contact details and will reach out to confirm. The remaining balance is settled directly with your painter.</p>
+      `)
+
+    case 'job_rescheduled':
+      return wrap(`
+        <p>The start date for the job at ${data.location || 'your project'} changed${data.changedBy ? ` (requested by ${data.changedBy})` : ''}.</p>
+        <p>Previous: <strong>${data.oldDate || 'not set'}</strong><br />New: <strong>${data.newDate || 'N/A'}</strong></p>
+        <p style="margin-top: 8px; font-size: 13px; color: #6b7280;">If this doesn't work for you, reply to the other party directly using the contact details from your confirmation email.</p>
+      `)
+
+    case 'painter_application_approved':
+      return wrap(`
+        <p>Hi ${data.ownerName || 'there'}, your application for <strong>${data.companyName || 'your company'}</strong> has been approved.</p>
+        <p>You'll now receive job offers by email and app notification when customers in your area claim a price.</p>
+        ${data.profileUrl ? `<p><a class="btn" href="${data.profileUrl}">Open your dashboard</a></p>` : ''}
+      `)
+
     default:
       // Fallback for unknown email types — sends a generic notification
       return wrap(`
@@ -329,7 +441,33 @@ serve(async (req: Request) => {
     //     data: { customerName: "Jane", estimatedPrice: 2500, ... }
     //   }
     // ------------------------------------------------------------------------
-    const { to, type, data } = await req.json()
+    const body = await req.json()
+    const type = body.type
+    let to = body.to
+    const rawData = body.data
+
+    // Only our own edge functions (holding the service-role key) may send
+    // arbitrary email. The one thing the browser is allowed to trigger — the
+    // admin "new painter application" notice at sign-up, when there is no
+    // session yet — always goes to the configured admin inbox, never to a
+    // caller-supplied address, so this can't be used as an open relay.
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    const bearer = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '')
+    const isInternal = !!serviceRoleKey && bearer === serviceRoleKey
+    if (!isInternal) {
+      const adminInbox = Deno.env.get('APPLICATION_NOTIFICATION_EMAIL')
+      if (type !== 'painter_application_received' || !adminInbox) {
+        return new Response(
+          JSON.stringify({ error: 'Forbidden' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        )
+      }
+      to = adminInbox
+    }
+
+    // Everything except job_offer_available (which escapes its own fields) is
+    // interpolated raw into HTML, so escape string values up front.
+    const data = type === 'job_offer_available' ? rawData : escapeStrings(rawData)
 
     if (!to || !type) {
       return new Response(
@@ -388,6 +526,7 @@ serve(async (req: Request) => {
         to: [to],
         subject: emailSubject,
         html,
+        ...(isInternal && Array.isArray(body.attachments) ? { attachments: body.attachments } : {}),
       }),
     })
 

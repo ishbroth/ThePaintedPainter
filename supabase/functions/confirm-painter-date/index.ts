@@ -19,6 +19,7 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
+import { notify } from '../_shared/notify.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -85,17 +86,27 @@ serve(async (req: Request) => {
 
       const { data: job, error: jobError } = await supabase
         .from('quote_selections')
-        .select('id, accepted_by, customer_email, customer_confirm_token, guaranteed_price, deposit_amount')
+        .select('id, status, accepted_by, customer_id, customer_email, customer_confirm_token, guaranteed_price, deposit_amount')
         .eq('claim_token', token)
         .maybeSingle()
 
       if (jobError || !job) return jsonError('Job not found', 404)
       if (job.accepted_by !== painterId) return jsonError('This job was not accepted by this painter account', 403)
 
+      // Only valid until the customer pays. After that the date is locked in
+      // and changes go through reschedule-job (which notifies both sides),
+      // so this link can't silently move a paid job or re-send a pay-now email.
+      if (job.status !== 'painter_accepted') {
+        return jsonError('This job is already confirmed. Use your dashboard to request a date change.', 409)
+      }
+      const today = new Date().toISOString().slice(0, 10)
+      if (scheduledDate < today) return jsonError('Start date cannot be in the past', 400)
+
       const { error: updateError } = await supabase
         .from('quote_selections')
         .update({ scheduled_date: scheduledDate, date_confirmed_at: new Date().toISOString() })
         .eq('id', job.id)
+        .eq('status', 'painter_accepted')
 
       if (updateError) throw updateError
 
@@ -105,13 +116,18 @@ serve(async (req: Request) => {
         .eq('id', painterId)
         .maybeSingle()
 
+      await notify(supabase, {
+        userId: job.customer_id, type: 'date_set', title: 'Start date set — confirm to lock it in',
+        body: `${painter?.company_name ?? 'Your painter'} proposed ${scheduledDate}. Pay your deposit to confirm.`, link: '/customer/projects',
+      })
+
       const frontendUrl = Deno.env.get('FRONTEND_URL') ?? 'https://thepaintedpainter.com'
       const confirmUrl = `${frontendUrl}/confirm-job?token=${job.customer_confirm_token}`
 
       try {
         await fetch(`${supabaseUrl}/functions/v1/send-email`, {
           method: 'POST',
-          headers: { Authorization: `Bearer ${anonKey}`, 'Content-Type': 'application/json' },
+          headers: { Authorization: `Bearer ${serviceRoleKey}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({
             to: job.customer_email,
             type: 'painter_accepted_confirm_deposit',

@@ -17,6 +17,7 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
+import { notify } from '../_shared/notify.ts'
 import { ZIP3_CENTROIDS } from './zip3Centroids.ts'
 
 const corsHeaders = {
@@ -28,6 +29,7 @@ const corsHeaders = {
 const SERVICE_RADIUS_MILES = 50
 const MYSTERY_BROADCAST_CAP = 25
 const COMMISSION_RATE = 0.10
+const MAX_GUARANTEED_PRICE = 250000
 
 interface ResponseQA {
   question: string
@@ -108,7 +110,7 @@ serve(async (req: Request) => {
     const body = await req.json() as ClaimRequest
     const {
       selectionType, selectedPainterId, guaranteedPrice, quoteZip, customer, timeline, timelineLabel, qa,
-      preferredDate, customerId, parentQuoteId, phaseLabel, photos,
+      preferredDate, parentQuoteId, phaseLabel, photos,
     } = body
 
     if (!selectionType || !guaranteedPrice || !customer?.name || !customer?.email || !customer?.phone || !customer?.streetAddress) {
@@ -137,17 +139,36 @@ serve(async (req: Request) => {
       auth: { autoRefreshToken: false, persistSession: false },
     })
 
+    // The price is computed client-side (the estimate engine only exists in
+    // the browser), so the best we can do server-side is reject absurd values.
+    if (typeof guaranteedPrice !== 'number' || !isFinite(guaranteedPrice) || guaranteedPrice < 100 || guaranteedPrice > MAX_GUARANTEED_PRICE) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid price' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      )
+    }
+
+    // Link the job to an account only if the caller is actually logged in as
+    // that user. Never trust a customerId from the request body: it drives
+    // loyalty points, so a spoofed id would credit someone else's account.
+    let verifiedCustomerId: string | null = null
+    const bearer = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '')
+    if (bearer && bearer !== anonKey) {
+      const { data: userData } = await supabase.auth.getUser(bearer)
+      verifiedCustomerId = userData?.user?.id ?? null
+    }
+
     // --------------------------------------------------------------------
     // Determine which painter(s) to notify
     // --------------------------------------------------------------------
-    type PainterRow = { id: string; email: string; company_name: string; owner_name: string; phone: string; zip_code: string }
+    type PainterRow = { id: string; user_id: string | null; email: string; company_name: string; owner_name: string; phone: string; zip_code: string }
 
     let notifiedPainters: PainterRow[] = []
 
     if (selectionType === 'specific_painter') {
       const { data: painter, error: painterError } = await supabase
         .from('painters')
-        .select('id, email, company_name, owner_name, phone, zip_code')
+        .select('id, user_id, email, company_name, owner_name, phone, zip_code')
         .eq('id', selectedPainterId)
         .eq('verified', true)
         .eq('status', 'approved')
@@ -163,7 +184,7 @@ serve(async (req: Request) => {
     } else {
       const { data: painters, error: paintersError } = await supabase
         .from('painters')
-        .select('id, email, company_name, owner_name, phone, zip_code')
+        .select('id, user_id, email, company_name, owner_name, phone, zip_code')
         .eq('verified', true)
         .eq('status', 'approved')
 
@@ -212,7 +233,7 @@ serve(async (req: Request) => {
         painter_payout_amount: painterPayoutAmount,
         deposit_amount: depositAmount,
         customer_preferred_date: preferredDate || null,
-        customer_id: customerId || null,
+        customer_id: verifiedCustomerId,
         parent_quote_id: parentQuoteId || null,
         phase_label: phaseLabel || null,
       })
@@ -227,11 +248,16 @@ serve(async (req: Request) => {
     const customerFirstName = customer.name.trim().split(/\s+/)[0] || 'A customer'
 
     const emailResults = await Promise.allSettled(
-      notifiedPainters.map((painter) => {
+      notifiedPainters.map(async (painter) => {
+        await notify(supabase, {
+          userId: painter.user_id, type: 'new_offer', title: 'New job offer in your area',
+          body: `Payout ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(painterPayoutAmount)} · ZIP ${quoteZip}`,
+          link: '/painter/projects',
+        })
         const acceptUrl = `${supabaseUrl}/functions/v1/claim-job?token=${inserted.claim_token}&painter_id=${painter.id}`
         return fetch(`${supabaseUrl}/functions/v1/send-email`, {
           method: 'POST',
-          headers: { 'Authorization': `Bearer ${anonKey}`, 'Content-Type': 'application/json' },
+          headers: { 'Authorization': `Bearer ${serviceRoleKey}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({
             to: painter.email,
             type: 'job_offer_available',

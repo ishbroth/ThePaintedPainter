@@ -24,6 +24,8 @@
 //   Events: checkout.session.completed
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { notify } from '../_shared/notify.ts'
+import { buildIcs, toBase64 } from '../_shared/ics.ts'
 import Stripe from 'https://esm.sh/stripe@13.10.0?target=deno'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
 
@@ -285,15 +287,15 @@ async function handleCheckoutSessionCompleted(
   if (customerEmail) {
     try {
       const supabaseUrl = Deno.env.get('SUPABASE_URL')
-      const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')
+      const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
 
-      if (supabaseUrl && supabaseAnonKey) {
+      if (supabaseUrl && supabaseServiceKey) {
         const emailResponse = await fetch(
           `${supabaseUrl}/functions/v1/send-email`,
           {
             method: 'POST',
             headers: {
-              'Authorization': `Bearer ${supabaseAnonKey}`,
+              'Authorization': `Bearer ${supabaseServiceKey}`,
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
@@ -344,7 +346,7 @@ async function handleQuoteSelectionDepositPaid(
       stripe_checkout_session_id: session.id,
     })
     .eq('id', quoteSelectionId)
-    .select('id, customer_name, customer_email, customer_phone, customer_street_address, customer_city, customer_state, quote_zip, painter_payout_amount, accepted_by, scheduled_date')
+    .select('id, customer_id, customer_name, customer_email, customer_phone, customer_street_address, customer_city, customer_state, quote_zip, painter_payout_amount, accepted_by, scheduled_date, deposit_amount, guaranteed_price')
     .maybeSingle()
 
   if (updateError || !job) {
@@ -359,7 +361,7 @@ async function handleQuoteSelectionDepositPaid(
 
   const { data: painter, error: painterError } = await supabase
     .from('painters')
-    .select('email')
+    .select('email, user_id, company_name, owner_name, phone')
     .eq('id', job.accepted_by)
     .maybeSingle()
 
@@ -368,14 +370,31 @@ async function handleQuoteSelectionDepositPaid(
     return
   }
 
+  const location = [job.customer_street_address, job.customer_city].filter(Boolean).join(', ')
+  const icsAttachments = job.scheduled_date
+    ? [{
+        filename: 'painting-project.ics',
+        content: toBase64(buildIcs({ uid: job.id, title: 'Painting project starts', date: job.scheduled_date, location })),
+      }]
+    : undefined
+
+  await notify(supabase, {
+    userId: painter.user_id, type: 'job_confirmed', title: 'Job confirmed — deposit paid',
+    body: job.scheduled_date ? `Starts ${job.scheduled_date}` : 'Open the job for customer details.', link: '/painter/projects',
+  })
+  await notify(supabase, {
+    userId: job.customer_id, type: 'job_confirmed', title: 'Your project is confirmed',
+    body: job.scheduled_date ? `Starts ${job.scheduled_date}` : undefined, link: '/customer/projects',
+  })
+
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
-    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')
-    if (!supabaseUrl || !supabaseAnonKey) return
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    if (!supabaseUrl || !supabaseServiceKey) return
 
     const emailResponse = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${supabaseAnonKey}`, 'Content-Type': 'application/json' },
+      headers: { 'Authorization': `Bearer ${supabaseServiceKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         to: painter.email,
         type: 'job_confirmed_painter_details',
@@ -390,8 +409,33 @@ async function handleQuoteSelectionDepositPaid(
           payoutAmount: job.painter_payout_amount,
           scheduledDate: job.scheduled_date,
         },
+        attachments: icsAttachments,
       }),
     })
+
+    // Receipt + scheduling confirmation to the customer, now that the painter's
+    // contact details are theirs to have.
+    if (job.customer_email) {
+      const receiptResponse = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${supabaseServiceKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: job.customer_email,
+          type: 'job_confirmed_customer',
+          data: {
+            painterCompanyName: painter.company_name,
+            painterOwnerName: painter.owner_name,
+            painterEmail: painter.email,
+            painterPhone: painter.phone,
+            depositAmount: job.deposit_amount,
+            guaranteedPrice: job.guaranteed_price,
+            scheduledDate: job.scheduled_date,
+          },
+          attachments: icsAttachments,
+        }),
+      })
+      if (!receiptResponse.ok) console.error(`Failed to send customer receipt: ${await receiptResponse.text()}`)
+    }
 
     if (emailResponse.ok) {
       console.log(`Job-confirmed email sent to painter for job ${quoteSelectionId}`)

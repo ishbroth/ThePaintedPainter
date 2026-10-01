@@ -37,7 +37,7 @@ const JOB_COLUMNS = `
   customer_name, customer_email, customer_phone,
   customer_street_address, customer_city, customer_state,
   scheduled_date, customer_preferred_date, phase_label, parent_quote_id,
-  completed_at, confirmed_at, accepted_at, offer_sent_at, project_summary, photos
+  completed_at, confirmed_at, accepted_at, offer_sent_at, project_summary, photos, claim_token
 `
 
 serve(async (req: Request) => {
@@ -105,6 +105,9 @@ serve(async (req: Request) => {
       phaseLabel: r.phase_label,
       offerSentAt: r.offer_sent_at,
       photos: r.photos ?? [],
+      // The painter is authenticated and already filtered to offers sent to them,
+      // so they can accept straight from the dashboard.
+      acceptUrl: `${supabaseUrl}/functions/v1/claim-job?token=${r.claim_token}&painter_id=${painter.id}`,
     })
 
     const shapeJob = (r: Record<string, unknown>) => ({
@@ -124,6 +127,9 @@ serve(async (req: Request) => {
       confirmedAt: r.confirmed_at,
       acceptedAt: r.accepted_at,
       photos: r.photos ?? [],
+      setDateUrl: r.status === 'painter_accepted'
+        ? `${Deno.env.get('FRONTEND_URL') ?? 'https://thepaintedpainter.com'}/painter/confirm-date?token=${r.claim_token}&painter_id=${painter.id}`
+        : null,
     })
 
     const accepted = (acceptedRes.data ?? []).map(shapeJob)

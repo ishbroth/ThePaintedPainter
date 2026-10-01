@@ -83,7 +83,7 @@ const QuoteResults = () => {
   useEffect(() => {
     if (!state) return;
     let cancelled = false;
-    fetchNearbyPainters(state.ctx).then((matches) => {
+    fetchNearbyPainters(state.ctx, state.estimate.total).then((matches) => {
       if (!cancelled) setPainterMatches(matches);
     });
     return () => {
@@ -92,7 +92,7 @@ const QuoteResults = () => {
   }, [state]);
 
   const [claimTarget, setClaimTarget] = useState<
-    { selectionType: 'specific_painter'; painter: RealPainterMatch['painter'] } | { selectionType: 'guaranteed' } | null
+    { selectionType: 'specific_painter'; painter: RealPainterMatch['painter']; price: number } | { selectionType: 'guaranteed' } | null
   >(null);
 
   if (!state) {
@@ -223,8 +223,8 @@ const QuoteResults = () => {
             <>Finding painters near you…</>
           ) : painterMatches.length > 0 ? (
             <>
-              {painterMatches.length} painter{painterMatches.length === 1 ? '' : 's'} in your area. Pick one to
-              claim your price at {currency(estimate.total)}.
+              {painterMatches.length} painter{painterMatches.length === 1 ? '' : 's'} in your area, nearest first. Pick
+              one to claim their guaranteed price.
             </>
           ) : (
             <>There are no preferred painters in your area yet — but The Painted Painter will work on finding one for your price.</>
@@ -242,7 +242,7 @@ const QuoteResults = () => {
           onClick={() => {
             if (expired) return;
             hapticMedium();
-            setClaimTarget({ selectionType: 'specific_painter', painter: m.painter });
+            setClaimTarget({ selectionType: 'specific_painter', painter: m.painter, price: m.price });
           }}
         >
           <PainterCard match={m} />
@@ -316,7 +316,7 @@ const QuoteResults = () => {
         <ClaimPriceModal
           target={claimTarget}
           ctx={ctx}
-          guaranteedPrice={estimate.total}
+          guaranteedPrice={claimTarget.selectionType === 'specific_painter' ? claimTarget.price : estimate.total}
           onClose={() => setClaimTarget(null)}
         />
       )}
@@ -349,7 +349,8 @@ const PainterCard = ({ match }: { match: RealPainterMatch }) => {
         </div>
       </div>
       <div>
-        <div className="painter-card-cta">Claim your price →</div>
+        <div style={{ fontWeight: 700, fontSize: '1.15rem', color: 'var(--accent-blue)', marginBottom: 4 }}>{currency(match.price)}</div>
+        <div className="painter-card-cta">Claim this price →</div>
       </div>
     </div>
   );
@@ -360,7 +361,7 @@ const PainterCard = ({ match }: { match: RealPainterMatch }) => {
 // ---------------------------------------------------------------------------
 
 type ClaimTarget =
-  | { selectionType: 'specific_painter'; painter: RealPainterMatch['painter'] }
+  | { selectionType: 'specific_painter'; painter: RealPainterMatch['painter']; price: number }
   | { selectionType: 'guaranteed' };
 
 const ClaimPriceModal = ({

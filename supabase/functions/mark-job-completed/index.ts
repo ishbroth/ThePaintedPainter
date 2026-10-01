@@ -18,6 +18,7 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
+import { notify } from '../_shared/notify.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -77,11 +78,16 @@ serve(async (req: Request) => {
       .eq('id', jobId)
       .eq('accepted_by', painter.id)
       .eq('status', 'confirmed')
-      .select('id, customer_email, customer_name, phase_label, guaranteed_price, selected_painter_price, review_token')
+      .select('id, customer_id, customer_email, customer_name, phase_label, guaranteed_price, selected_painter_price, review_token')
       .maybeSingle()
 
     if (updateError) throw updateError
     if (!job) return jsonError('Job not found, not yours, or not in a completable state', 404)
+
+    await notify(supabase, {
+      userId: job.customer_id, type: 'project_completed', title: 'Your project is complete',
+      body: 'Leave a quick review for your painter.', link: '/customer/projects',
+    })
 
     if (job.customer_email) {
       const frontendUrl = Deno.env.get('FRONTEND_URL') ?? 'https://thepaintedpainter.com'
@@ -89,7 +95,7 @@ serve(async (req: Request) => {
       try {
         await fetch(`${supabaseUrl}/functions/v1/send-email`, {
           method: 'POST',
-          headers: { Authorization: `Bearer ${anonKey}`, 'Content-Type': 'application/json' },
+          headers: { Authorization: `Bearer ${serviceRoleKey}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({
             to: job.customer_email,
             type: 'project_completed',

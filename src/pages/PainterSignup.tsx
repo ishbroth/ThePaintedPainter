@@ -1,10 +1,7 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { useAuth } from '../lib/auth';
-import { sendEmail } from '../lib/notifications/email';
 
-const APPLICATION_NOTIFICATION_EMAIL = 'iw@thepaintedpainter.com';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -379,8 +376,6 @@ const styles = {
 // ---------------------------------------------------------------------------
 
 const PainterSignup = () => {
-  const { signUp } = useAuth();
-  const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<PainterFormData>(initialFormData);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -520,23 +515,16 @@ const PainterSignup = () => {
     setSubmitError('');
 
     try {
-      // 1. Create Supabase auth account
-      const { error: authError, user: newUser, needsEmailConfirmation } = await signUp(
-        formData.email.trim(),
-        formData.password,
-        'painter',
-        formData.ownerName.trim(),
-      );
-
-      if (authError) throw authError;
-      if (!newUser) throw new Error('Account creation failed. Please try again.');
-
-      // 2. Insert painter row linked to the new auth user
-      const { error: insertError } = await supabase.from('painters').insert({
-        user_id: newUser.id,
+      // One server-side call creates the login AND the company record together
+      // (and rolls the login back if the record can't be saved), so a failure
+      // can never leave an account without an application behind it.
+      const { data, error: fnError } = await supabase.functions.invoke('submit-painter-application', {
+        body: {
+          email: formData.email.trim(),
+          password: formData.password,
+          ownerName: formData.ownerName.trim(),
+          painter: {
         company_name: formData.companyName.trim(),
-        owner_name: formData.ownerName.trim(),
-        email: formData.email.trim(),
         phone: formData.phone.trim(),
         street_address: formData.streetAddress.trim(),
         city: formData.city.trim(),
@@ -576,39 +564,15 @@ const PainterSignup = () => {
         price_3br_ceilings: formData.price3BRCeilings,
         price_5br_full: formData.price5BRFull,
         price_5br_cabinets: formData.price5BRCabinets,
+          },
+        },
       });
 
-      if (insertError) throw insertError;
+      if (data?.error) throw new Error(data.error);
+      if (fnError) throw new Error('We couldn\'t submit your application. Please try again.');
 
-      // 3. Notify the team of the new application (best-effort — don't block signup on it)
-      sendEmail({
-        to: APPLICATION_NOTIFICATION_EMAIL,
-        type: 'painter_application_received',
-        data: {
-          companyName: formData.companyName.trim(),
-          ownerName: formData.ownerName.trim(),
-          applicantEmail: formData.email.trim(),
-          phone: formData.phone.trim(),
-          city: formData.city.trim(),
-          state: formData.state,
-          zipCode: formData.zipCode.trim(),
-          serviceTypes: formData.serviceTypes.join(', '),
-          yearsInBusiness: formData.yearsInBusiness ?? 'N/A',
-          crewSize: formData.crewSize ?? 'N/A',
-          hasLicense: formData.hasLicense ? 'Yes' : 'No',
-          isInsured: formData.isInsured ? 'Yes' : 'No',
-          isBonded: formData.isBonded ? 'Yes' : 'No',
-        },
-      }).catch((err) => console.error('Failed to send application notification email:', err));
-
-      // 4. No active session yet if email confirmation is pending —
-      // navigating to the (protected) dashboard here would just get bounced
-      // straight back to sign-in with no explanation of what happened.
-      if (needsEmailConfirmation) {
-        setNeedsEmailConfirmation(true);
-      } else {
-        navigate('/painter/dashboard');
-      }
+      // Nothing exists yet: the account is created when they click the emailed link.
+      setNeedsEmailConfirmation(true);
     } catch (err: unknown) {
       const message =
         err instanceof Error ? err.message : 'Something went wrong. Please try again.';
@@ -1145,7 +1109,7 @@ const PainterSignup = () => {
               className="text-3xl md:text-4xl font-bold mb-3"
               style={{ fontFamily: "'Cabin', sans-serif" }}
             >
-              Application Received
+              Check Your Email
             </h1>
             <p className="text-[var(--text-secondary)]">Partner with The Painted Painter</p>
           </div>
@@ -1153,12 +1117,13 @@ const PainterSignup = () => {
         <section style={{ padding: '48px 20px', textAlign: 'center' }}>
           <div style={{ maxWidth: '520px', margin: '0 auto' }}>
             <p style={{ marginBottom: 16 }}>
-              Thanks — we've got your application and account details for{' '}
-              <strong>{formData.companyName.trim()}</strong>.
+              Thanks — we've saved your application for{' '}
+              <strong>{formData.companyName.trim()}</strong>, but it isn't submitted yet.
             </p>
             <p style={{ marginBottom: 16, color: 'var(--text-secondary)' }}>
-              We sent a confirmation link to <strong>{formData.email.trim()}</strong>. Click it to activate your
-              account, then sign in to check your application status.
+              We sent a confirmation link to <strong>{formData.email.trim()}</strong>. Click it to create your account
+              and send your application to our team for review. The link expires in 14 days; if you don't confirm, no
+              account is created and what you entered is deleted.
             </p>
             <Link
               to="/auth/painter-sign-in"

@@ -297,7 +297,7 @@ const ChatPanel = () => {
     setInput('');
     setThinking(true);
     try {
-      const result = await handleUserMessage(state, text);
+      const result = await handleUserMessage(state, text, user?.id);
       setState(result.state);
     } finally {
       setThinking(false);

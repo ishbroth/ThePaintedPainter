@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../lib/auth';
 import { supabaseUrl } from '../../lib/supabase';
+import AddToCalendar from '../../components/AddToCalendar';
 
 interface JobPhoto {
   url: string;
@@ -16,6 +17,7 @@ interface Offer {
   preferredDate: string | null;
   phaseLabel: string | null;
   photos: JobPhoto[];
+  acceptUrl: string;
 }
 
 interface Job {
@@ -33,6 +35,7 @@ interface Job {
   completedAt: string | null;
   confirmedAt: string | null;
   photos: JobPhoto[];
+  setDateUrl: string | null;
 }
 
 interface PainterProjectsData {
@@ -111,13 +114,20 @@ function OfferCard({ offer }: { offer: Offer }) {
       </div>
       <div style={{ textAlign: 'right' }}>
         <p style={{ color: 'var(--accent)', fontWeight: 700, fontSize: '1.1rem', margin: '0 0 4px' }}>{currency(offer.payoutAmount)}</p>
-        <p style={{ color: 'var(--text-faint)', fontSize: '0.75rem', margin: 0 }}>Respond from the offer email</p>
+        <a
+          href={offer.acceptUrl}
+          style={{ display: 'inline-block', padding: '8px 16px', borderRadius: 8, background: 'var(--accent)', color: 'var(--accent-ink)', fontWeight: 700, fontSize: '0.85rem', textDecoration: 'none' }}
+        >
+          Accept job
+        </a>
       </div>
     </div>
   );
 }
 
-function JobCard({ job, onMarkCompleted, marking }: { job: Job; onMarkCompleted?: (id: string) => void; marking: boolean }) {
+function JobCard({ job, onMarkCompleted, onReschedule, marking }: { job: Job; onMarkCompleted?: (id: string) => void; onReschedule?: (id: string, date: string) => Promise<void>; marking: boolean }) {
+  const [newDate, setNewDate] = useState('');
+  const [rescheduling, setRescheduling] = useState(false);
   return (
     <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 18 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
@@ -136,14 +146,35 @@ function JobCard({ job, onMarkCompleted, marking }: { job: Job; onMarkCompleted?
               ? `Completed ${job.completedAt ?? ''}`
               : `${job.scheduledDate ? `Scheduled: ${job.scheduledDate}` : job.preferredDate ? `Requested: ${job.preferredDate}` : 'Date not yet set'}`}
           </p>
+          {job.status === 'confirmed' && job.scheduledDate && (
+            <div style={{ marginTop: 8 }}>
+              <AddToCalendar
+                event={{
+                  uid: job.id,
+                  title: `Paint job${job.customerName ? ` — ${job.customerName}` : ''}`,
+                  date: job.scheduledDate,
+                  location: job.address,
+                }}
+              />
+            </div>
+          )}
           <PhotoThumbnails photos={job.photos} />
         </div>
         <div style={{ textAlign: 'right', flexShrink: 0 }}>
           <p style={{ color: 'var(--text-primary)', fontWeight: 700, margin: '0 0 4px' }}>{currency(job.payoutAmount ?? job.price)}</p>
           {job.status === 'painter_accepted' && (
-            <span style={{ display: 'inline-block', padding: '4px 10px', borderRadius: 999, background: 'var(--tint-warning-bg)', border: '1px solid var(--tint-warning-border)', color: 'var(--text-secondary)', fontSize: '0.75rem' }}>
-              Awaiting customer deposit
-            </span>
+            <>
+              <span style={{ display: 'inline-block', padding: '4px 10px', borderRadius: 999, background: 'var(--tint-warning-bg)', border: '1px solid var(--tint-warning-border)', color: 'var(--text-secondary)', fontSize: '0.75rem' }}>
+                {job.scheduledDate ? 'Awaiting customer deposit' : 'Set a start date'}
+              </span>
+              {job.setDateUrl && (
+                <div style={{ marginTop: 8 }}>
+                  <a href={job.setDateUrl} style={{ color: 'var(--accent-blue)', fontSize: '0.85rem' }}>
+                    {job.scheduledDate ? 'Change start date' : 'Choose start date'}
+                  </a>
+                </div>
+              )}
+            </>
           )}
           {job.status === 'confirmed' && onMarkCompleted && (
             <button
@@ -153,6 +184,32 @@ function JobCard({ job, onMarkCompleted, marking }: { job: Job; onMarkCompleted?
             >
               {marking ? 'Marking…' : 'Mark Completed & Paid'}
             </button>
+          )}
+          {job.status === 'confirmed' && onReschedule && (
+            <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', marginTop: 10 }}>
+              <input
+                type="date"
+                value={newDate}
+                min={new Date().toISOString().slice(0, 10)}
+                onChange={(e) => setNewDate(e.target.value)}
+                style={{ padding: '6px 8px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-surface)', color: 'var(--text-primary)', fontSize: '0.8rem' }}
+              />
+              <button
+                disabled={!newDate || rescheduling}
+                onClick={async () => {
+                  setRescheduling(true);
+                  try {
+                    await onReschedule(job.id, newDate);
+                    setNewDate('');
+                  } finally {
+                    setRescheduling(false);
+                  }
+                }}
+                style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-primary)', fontSize: '0.8rem', cursor: !newDate || rescheduling ? 'not-allowed' : 'pointer' }}
+              >
+                {rescheduling ? 'Saving…' : 'Change date'}
+              </button>
+            </div>
           )}
           {job.status === 'completed' && (
             <span style={{ display: 'inline-block', padding: '4px 10px', borderRadius: 999, background: 'var(--tint-success-bg)', border: '1px solid var(--tint-success-border)', color: 'var(--success)', fontSize: '0.75rem' }}>
@@ -208,6 +265,22 @@ export default function PainterProjects() {
     }
   };
 
+  const handleReschedule = async (jobId: string, newDate: string) => {
+    if (!session?.access_token) return;
+    try {
+      const res = await fetch(`${supabaseUrl}/functions/v1/reschedule-job`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobId, newDate }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Failed to change date');
+      load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to change date');
+    }
+  };
+
   if (loading) return <p style={{ color: 'var(--text-secondary)' }}>Loading your projects…</p>;
   if (error && !data) return <p style={{ color: 'var(--danger)' }}>{error}</p>;
   if (!data) return null;
@@ -256,7 +329,7 @@ export default function PainterProjects() {
       ) : (
         <div style={{ display: 'grid', gap: 12 }}>
           {data.confirmed.map((j) => (
-            <JobCard key={j.id} job={j} onMarkCompleted={handleMarkCompleted} marking={markingId === j.id} />
+            <JobCard key={j.id} job={j} onMarkCompleted={handleMarkCompleted} onReschedule={handleReschedule} marking={markingId === j.id} />
           ))}
         </div>
       )}

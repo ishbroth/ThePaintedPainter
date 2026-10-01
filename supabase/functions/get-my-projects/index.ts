@@ -78,10 +78,11 @@ serve(async (req: Request) => {
         id, status, guaranteed_price, selected_painter_price, quote_zip,
         customer_street_address, customer_city, customer_state,
         scheduled_date, customer_preferred_date, phase_label, parent_quote_id,
-        confirmed_at, completed_at, review_token, review_submitted_at, accepted_by
+        confirmed_at, completed_at, review_token, review_submitted_at, accepted_by,
+        customer_confirm_token, offer_sent_at, accepted_at
       `)
       .or(orFilter)
-      .in('status', ['confirmed', 'painter_accepted', 'completed'])
+      .in('status', ['offer_sent', 'painter_accepted', 'confirmed', 'completed'])
       .order('scheduled_date', { ascending: true, nullsFirst: false })
 
     if (error) throw error
@@ -107,10 +108,17 @@ serve(async (req: Request) => {
       preferredDate: r.customer_preferred_date,
       phaseLabel: r.phase_label,
       parentQuoteId: r.parent_quote_id,
+      offerSentAt: r.offer_sent_at,
+      acceptedAt: r.accepted_at,
       confirmedAt: r.confirmed_at,
       completedAt: r.completed_at,
       reviewToken: r.status === 'completed' && !r.review_submitted_at ? r.review_token : null,
       reviewSubmitted: !!r.review_submitted_at,
+      // The customer owns this row (matched by their account), so it's safe to hand them
+      // their own pay-deposit link here; only offered once a painter has set a date.
+      confirmUrl: r.status === 'painter_accepted' && r.scheduled_date
+        ? `${Deno.env.get('FRONTEND_URL') ?? 'https://thepaintedpainter.com'}/confirm-job?token=${r.customer_confirm_token}`
+        : null,
       painter: r.accepted_by ? paintersById[r.accepted_by] ?? null : null,
     }))
 

@@ -21,6 +21,7 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
+import { notify } from '../_shared/notify.ts'
 
 function htmlPage(title: string, message: string, tone: 'success' | 'error'): Response {
   const color = tone === 'success' ? '#2563eb' : '#dc2626'
@@ -78,7 +79,7 @@ serve(async (req: Request) => {
     // Look up the job to confirm the token matches and this painter was eligible.
     const { data: job, error: jobError } = await supabase
       .from('quote_selections')
-      .select('id, status, selection_type, selected_painter_id, notified_painters')
+      .select('id, status, selection_type, selected_painter_id, notified_painters, customer_id, customer_email, guaranteed_price, customer_preferred_date, quote_zip')
       .eq('claim_token', token)
       .maybeSingle()
 
@@ -111,6 +112,43 @@ serve(async (req: Request) => {
         'Another painter already accepted this job. Keep an eye out for the next one!',
         'error',
       )
+    }
+
+    // Best-effort notifications — never block the painter's redirect on them.
+    try {
+      const send = (to: string, type: string, data: Record<string, unknown>) =>
+        fetch(`${supabaseUrl}/functions/v1/send-email`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${serviceRoleKey}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ to, type, data }),
+        })
+
+      const { data: acceptedPainter } = await supabase
+        .from('painters').select('company_name').eq('id', painterId).maybeSingle()
+
+      if (job.customer_email) {
+        await send(job.customer_email, 'painter_accepted_notice', {
+          painterCompanyName: acceptedPainter?.company_name ?? 'A painter',
+          guaranteedPrice: job.guaranteed_price,
+          customerPreferredDate: job.customer_preferred_date,
+        })
+      }
+
+      await notify(supabase, {
+        userId: job.customer_id, type: 'painter_accepted', title: 'A painter accepted your job',
+        body: `${acceptedPainter?.company_name ?? 'A painter'} is picking a start date.`, link: '/customer/projects',
+      })
+
+      const otherIds = (job.notified_painters ?? []).filter((id: string) => id !== painterId)
+      if (otherIds.length > 0) {
+        const { data: others } = await supabase.from('painters').select('email, user_id').in('id', otherIds)
+        await Promise.allSettled((others ?? []).flatMap((o: { email: string; user_id: string | null }) => [
+          send(o.email, 'job_taken', { zipCode: job.quote_zip }),
+          notify(supabase, { userId: o.user_id, type: 'job_taken', title: 'That job was taken', body: `The job in ${job.quote_zip ?? 'your area'} was accepted by another painter.`, link: '/painter/projects' }),
+        ]))
+      }
+    } catch (notifyErr) {
+      console.error('Failed to send claim notifications:', notifyErr)
     }
 
     const dateConfirmUrl = `${frontendUrl}/painter/confirm-date?token=${token}&painter_id=${painterId}`

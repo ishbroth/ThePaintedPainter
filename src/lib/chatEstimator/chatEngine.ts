@@ -19,6 +19,7 @@
 
 import type { EstimatorContext, EstimateBreakdown, EstimateLineItem, UserResponseStyle } from '../types';
 import { calculateEstimate } from '../estimateEngine';
+import { supabase } from '../supabase';
 import { extractAll, extractPhotoTriggers } from './extractors';
 import { defaultAssumptions, applyAssumptions, type Assumption } from './defaultAssumptions';
 import {
@@ -309,7 +310,7 @@ function snapshotOf(state: ChatState): ChatSnapshot {
   };
 }
 
-export async function handleUserMessage(state: ChatState, userText: string): Promise<TurnResult> {
+export async function handleUserMessage(state: ChatState, userText: string, customerId?: string): Promise<TurnResult> {
   const trimmed = userText.trim();
   if (!trimmed) return { state, done: null };
 
@@ -343,11 +344,11 @@ export async function handleUserMessage(state: ChatState, userText: string): Pro
   }
 
   const preTurnSnapshot = snapshotOf(state);
-  const result = await processMessage(state, trimmed);
+  const result = await processMessage(state, trimmed, customerId);
   return { ...result, state: { ...result.state, undoSnapshot: preTurnSnapshot } };
 }
 
-async function processMessage(state: ChatState, trimmed: string): Promise<TurnResult> {
+async function processMessage(state: ChatState, trimmed: string, customerId?: string): Promise<TurnResult> {
   // 1. Understand the message (LLM first, local rules engine as fallback),
   //    then apply derivations against the full transcript
   const { intent, patch, acknowledgements } = await understand(trimmed, state);
@@ -422,7 +423,7 @@ async function processMessage(state: ChatState, trimmed: string): Promise<TurnRe
   // the user clearly signaling they're ready to see a price.
   if (hasIntent(intent, 'ready_to_finish')) {
     if (readyToQuote(ctxNext)) {
-      return finalizeTurn(s);
+      return await finalizeTurn(s, customerId);
     }
     // Not ready — acknowledge, then fall through to actually ASK the missing
     // topic below instead of just describing it. Without this, a user who
@@ -533,7 +534,7 @@ async function processMessage(state: ChatState, trimmed: string): Promise<TurnRe
     }
     if (!s.askedIds.includes(topic.id)) s = { ...s, askedIds: [...s.askedIds, topic.id] };
     if (!s.retriedIds.includes(topic.id)) s = { ...s, retriedIds: [...s.retriedIds, topic.id] };
-    return advanceAfterUncertainty(s);
+    return await advanceAfterUncertainty(s, customerId);
   }
   if (hasIntent(intent, 'express_uncertainty')) {
     const reply = metaBank.uncertainty(s.lastBotTopic?.id ?? null);
@@ -555,12 +556,12 @@ async function processMessage(state: ChatState, trimmed: string): Promise<TurnRe
     if (s.lastBotTopic && !s.retriedIds.includes(s.lastBotTopic.id)) {
       s = { ...s, retriedIds: [...s.retriedIds, s.lastBotTopic.id] };
     }
-    return advanceAfterUncertainty(s);
+    return await advanceAfterUncertainty(s, customerId);
   }
 
   // 6. If we're ready to quote and we already asked the wrap-up, finalize
   if (s.wrapupAsked && readyToQuote(ctxNext)) {
-    return finalizeTurn(s);
+    return await finalizeTurn(s, customerId);
   }
 
   // 7. Pick the next topic; if none, try circling back to anything asked but
@@ -619,7 +620,7 @@ async function processMessage(state: ChatState, trimmed: string): Promise<TurnRe
       return { state: s, done: null };
     }
     // We're here because wrapup was asked and there's nothing new — finalize.
-    return finalizeTurn(s);
+    return await finalizeTurn(s, customerId);
   }
 
   // 8. Ask the next topic — lead with a brief acknowledgment of what was
@@ -702,12 +703,12 @@ function metaAnswer(
   return null;
 }
 
-function advanceAfterUncertainty(state: ChatState): TurnResult {
+async function advanceAfterUncertainty(state: ChatState, customerId?: string): Promise<TurnResult> {
   const next = pickNextTopic(state.ctx, state.askedIds);
   if (!next) {
     // If nothing left, go to wrap-up/finalize path
     if (readyToQuote(state.ctx)) {
-      return finalizeTurn(state);
+      return await finalizeTurn(state, customerId);
     }
     return { state, done: null };
   }
@@ -755,8 +756,23 @@ function whatsMissing(ctx: EstimatorContext): string {
   return "just the ZIP code.";
 }
 
-function finalizeTurn(state: ChatState): TurnResult {
-  const result = finalize(state.ctx, state.transcript);
+/** Registered customers can carry a loyalty discount into their next
+ * estimate; guests (no customerId) never get one. Failure here (RPC down,
+ * network hiccup) must never block the estimate itself — worst case the
+ * customer just doesn't see a discount they're entitled to this one time. */
+async function fetchLoyaltyDiscountPercent(customerId: string): Promise<number> {
+  try {
+    const { data, error } = await supabase.rpc('sync_loyalty_decay', { p_customer_id: customerId });
+    if (error || !data || !data[0]) return 0;
+    return data[0].discount_percent ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
+async function finalizeTurn(state: ChatState, customerId?: string): Promise<TurnResult> {
+  const loyaltyDiscountPercent = customerId ? await fetchLoyaltyDiscountPercent(customerId) : 0;
+  const result = finalize(state.ctx, state.transcript, loyaltyDiscountPercent);
   const s = {
     ...state,
     history: [...state.history, botMessage(result.summary)],
@@ -807,19 +823,20 @@ function lineItemNotes(ctx: EstimatorContext, lineItems: EstimateLineItem[]): st
   return notes;
 }
 
-function finalize(ctx: EstimatorContext, transcript: string): ChatResult {
+function finalize(ctx: EstimatorContext, transcript: string, loyaltyDiscountPercent: number = 0): ChatResult {
   const assumptions = defaultAssumptions(ctx);
   const withAssumptions = applyAssumptions(ctx, assumptions);
 
   const matched = matchSituations(transcript, withAssumptions);
   const situationMultiplier = stackedMultiplier(matched);
   const situationAddend = stackedAddend(matched);
+  const loyaltyFactor = loyaltyDiscountPercent > 0 ? 1 - loyaltyDiscountPercent / 100 : 1;
 
   const estimate = calculateEstimate(withAssumptions);
 
-  const adjustedTotal = Math.round(estimate.total * situationMultiplier + situationAddend);
-  const adjustedLow = Math.round(estimate.lowRange * situationMultiplier + situationAddend);
-  const adjustedHigh = Math.round(estimate.highRange * situationMultiplier + situationAddend);
+  const adjustedTotal = Math.round(estimate.total * situationMultiplier * loyaltyFactor + situationAddend);
+  const adjustedLow = Math.round(estimate.lowRange * situationMultiplier * loyaltyFactor + situationAddend);
+  const adjustedHigh = Math.round(estimate.highRange * situationMultiplier * loyaltyFactor + situationAddend);
 
   const finalEstimate: EstimateBreakdown = {
     ...estimate,
@@ -832,6 +849,7 @@ function finalize(ctx: EstimatorContext, transcript: string): ChatResult {
         label: `Situation: ${m.situation.title}`,
         factor: m.situation.adjust.multiplier ?? 1,
       })),
+      ...(loyaltyDiscountPercent > 0 ? [{ label: 'Loyalty Discount', factor: loyaltyFactor }] : []),
     ],
   };
 
@@ -850,6 +868,9 @@ function finalize(ctx: EstimatorContext, transcript: string): ChatResult {
     ...matched
       .filter((m) => m.situation.adjust.explainToUser)
       .map((m) => m.situation.userNote ?? m.situation.narrative),
+    ...(loyaltyDiscountPercent > 0
+      ? [`I also applied a ${loyaltyDiscountPercent}% loyalty discount for your account.`]
+      : []),
   ];
   if (priceNotes.length > 0) {
     pieces.push(priceNotes.join(' '));
