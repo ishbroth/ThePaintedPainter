@@ -49,6 +49,8 @@ export async function notify(supabase: Supabase, input: NotifyInput): Promise<vo
 
   try {
     if (!configureVapid()) return
+    const { data: prefsRow } = await supabase.from('profiles').select('notification_prefs').eq('id', input.userId).maybeSingle()
+    if (prefsRow?.notification_prefs?.push === false) return
     const { data: subs } = await supabase
       .from('push_subscriptions')
       .select('id, endpoint, p256dh, auth')

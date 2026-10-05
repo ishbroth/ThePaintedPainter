@@ -1,6 +1,7 @@
 import { Navigate } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import { useAuth } from './AuthContext.tsx';
+import { dashboardPathForRole } from './roleRoutes.ts';
 
 interface ProtectedRouteProps {
   children: ReactNode;
@@ -19,25 +20,22 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
   }
 
   if (!user) {
-    // Not authenticated — redirect to the appropriate sign-in page
-    const signInPath = requiredRole === 'painter'
-      ? '/auth/painter-sign-in'
-      : '/auth/customer-sign-in';
-    return <Navigate to={signInPath} replace />;
+    // Not authenticated — one sign-in page for everyone; their account's role decides where they land.
+    return <Navigate to="/auth/sign-in" replace />;
   }
 
-  if (requiredRole && profile?.role !== requiredRole) {
+  // Signed in but the profile row hasn't arrived yet (it loads just after the session).
+  if (!profile) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-white mb-2">Access Denied</h2>
-          <p className="text-gray-400">
-            You do not have permission to view this page.
-            This area is restricted to <span className="font-semibold text-amber-400">{requiredRole}</span> accounts.
-          </p>
-        </div>
+        <div className="text-white text-lg">Loading...</div>
       </div>
     );
+  }
+
+  // Right account, wrong area: send them to their own dashboard rather than refusing.
+  if (requiredRole && profile.role !== requiredRole) {
+    return <Navigate to={dashboardPathForRole(profile.role)} replace />;
   }
 
   return <>{children}</>;

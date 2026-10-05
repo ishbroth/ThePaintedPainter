@@ -465,6 +465,27 @@ serve(async (req: Request) => {
       to = adminInbox
     }
 
+    // Optional emails respect the recipient's "email notifications" setting.
+    // Anything transactional (deposit/confirmation/receipts, approval decisions,
+    // sign-up confirmation) is always sent.
+    const OPTIONAL_TYPES = ['job_offer_available', 'job_taken', 'project_reminder', 'new_notification', 'painter_accepted_notice']
+    if (isInternal && OPTIONAL_TYPES.includes(type) && serviceRoleKey) {
+      try {
+        const prefRes = await fetch(`${Deno.env.get('SUPABASE_URL')}/rest/v1/rpc/email_notifications_enabled`, {
+          method: 'POST',
+          headers: { apikey: serviceRoleKey, Authorization: `Bearer ${serviceRoleKey}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ p_email: to }),
+        })
+        if (prefRes.ok && (await prefRes.json()) === false) {
+          return new Response(JSON.stringify({ success: true, skipped: 'recipient turned off email notifications' }), {
+            status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          })
+        }
+      } catch (prefErr) {
+        console.error('preference lookup failed, sending anyway:', prefErr)
+      }
+    }
+
     // Everything except job_offer_available (which escapes its own fields) is
     // interpolated raw into HTML, so escape string values up front.
     const data = type === 'job_offer_available' ? rawData : escapeStrings(rawData)

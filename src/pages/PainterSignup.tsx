@@ -1140,10 +1140,10 @@ const PainterSignup = () => {
               account is created and what you entered is deleted.
             </p>
             <Link
-              to="/auth/painter-sign-in"
+              to="/auth/sign-in"
               style={{ color: 'var(--accent-blue)', textDecoration: 'underline' }}
             >
-              Go to painter sign in
+              Go to sign in
             </Link>
           </div>
         </section>
@@ -1358,7 +1358,7 @@ const PainterSignup = () => {
             <p style={{ margin: '0 0 6px', color: 'var(--text-primary)', fontWeight: 600 }}>
               It looks like you have an account with us already.
             </p>
-            <Link to="/auth/painter-sign-in" style={{ color: 'var(--accent-blue)', textDecoration: 'underline' }}>Log in</Link>
+            <Link to="/auth/sign-in" style={{ color: 'var(--accent-blue)', textDecoration: 'underline' }}>Log in</Link>
             {' · '}
             <Link
               to={`/auth/forgot-password?role=painter&email=${encodeURIComponent(formData.email.trim())}`}

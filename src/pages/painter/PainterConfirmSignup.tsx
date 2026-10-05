@@ -57,8 +57,8 @@ export default function PainterConfirmSignup() {
             <p style={{ color: 'var(--text-secondary)', margin: '0 0 24px' }}>
               Your email is confirmed and your account is created. Sign in to see your application status — we'll email you when it's been reviewed.
             </p>
-            <Link to="/auth/painter-sign-in" style={{ color: 'var(--accent-blue)', textDecoration: 'underline' }}>
-              Go to painter sign in
+            <Link to="/auth/sign-in" style={{ color: 'var(--accent-blue)', textDecoration: 'underline' }}>
+              Go to sign in
             </Link>
           </>
         )}

@@ -43,7 +43,7 @@ serve(async (req: Request) => {
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) return json({ error: 'Missing Authorization header' }, 401)
     const authClient = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authHeader } } })
-    const { data: userData, error: userError } = await authClient.auth.getUser()
+    const { data: userData, error: userError } = await authClient.auth.getUser(authHeader.replace('Bearer ', ''))
     if (userError || !userData.user) return json({ error: 'Not authenticated' }, 401)
     const userId = userData.user.id
     const userEmail = userData.user.email

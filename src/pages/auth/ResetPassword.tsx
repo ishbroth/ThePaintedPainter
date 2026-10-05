@@ -36,7 +36,7 @@ export default function ResetPassword() {
     setDone(true);
     // They're signed in via the recovery session; sign out so they log in fresh with the new password.
     await supabase.auth.signOut();
-    setTimeout(() => navigate('/auth/customer-sign-in'), 2500);
+    setTimeout(() => navigate('/auth/sign-in'), 2500);
   };
 
   return (

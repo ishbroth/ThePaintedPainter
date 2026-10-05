@@ -6,7 +6,6 @@ import { supabase } from '../../lib/supabase';
 // which lands on /auth/reset-password.
 export default function ForgotPassword() {
   const [params] = useSearchParams();
-  const role = params.get('role') === 'painter' ? 'painter' : 'customer';
   const [email, setEmail] = useState(params.get('email') ?? '');
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -25,7 +24,6 @@ export default function ForgotPassword() {
     else setSent(true);
   };
 
-  const signInPath = role === 'painter' ? '/auth/painter-sign-in' : '/auth/customer-sign-in';
 
   return (
     <div className="flex items-center justify-center min-h-[70vh] px-4">
@@ -67,7 +65,7 @@ export default function ForgotPassword() {
         )}
 
         <div className="mt-6 text-center">
-          <Link to={signInPath} className="text-[var(--accent-blue)] hover:text-[var(--accent-blue-hover)] text-sm font-medium">
+          <Link to="/auth/sign-in" className="text-[var(--accent-blue)] hover:text-[var(--accent-blue-hover)] text-sm font-medium">
             Back to sign in
           </Link>
         </div>

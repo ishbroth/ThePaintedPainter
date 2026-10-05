@@ -16,7 +16,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const fetchProfile = useCallback(async (userId: string) => {
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, role, display_name, avatar_url, phone, theme_preference, loyalty_points_balance, loyalty_points_lifetime, loyalty_discount_percent')
+      .select('id, role, display_name, avatar_url, phone, theme_preference, loyalty_points_balance, loyalty_points_lifetime, loyalty_discount_percent, notification_prefs')
       .eq('id', userId)
       .single();
 
@@ -115,6 +115,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
       signIn,
       signUp,
       signOut,
+      refreshProfile: async () => {
+        if (user) await fetchProfile(user.id);
+      },
     }}>
       {children}
     </AuthContext>

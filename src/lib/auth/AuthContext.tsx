@@ -11,6 +11,7 @@ export interface UserProfile {
   loyalty_points_balance: number;
   loyalty_points_lifetime: number;
   loyalty_discount_percent: number;
+  notification_prefs: { email: boolean; push: boolean } | null;
 }
 
 export interface AuthContextType {
@@ -21,6 +22,8 @@ export interface AuthContextType {
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, role: 'painter' | 'customer', displayName?: string) => Promise<{ error: Error | null; user: User | null; needsEmailConfirmation: boolean }>;
   signOut: () => Promise<void>;
+  /** Re-read the signed-in user's profile row (call after saving changes to it). */
+  refreshProfile: () => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);

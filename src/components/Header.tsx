@@ -71,7 +71,7 @@ const Header = () => {
               </button>
             </>
           ) : (
-            <Link to="/auth/customer-sign-in" onClick={closeMenu} className="nav-cta">
+            <Link to="/auth/sign-in" onClick={closeMenu} className="nav-cta">
               Sign In
             </Link>
           )}

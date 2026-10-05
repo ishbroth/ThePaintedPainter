@@ -1,191 +1,273 @@
-import { useState } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
+import { Link } from 'react-router-dom';
+import { useAuth } from '../../lib/auth';
+import { supabase } from '../../lib/supabase';
+import { PRICING_SCENARIOS, PROJECT_SIZE_OPTIONS, SERVICE_TYPE_OPTIONS } from '../../lib/painterOptions';
 
-interface ProfileForm {
-  companyName: string;
-  ownerName: string;
+interface PainterRow {
+  id: string;
+  company_name: string;
+  owner_name: string;
   phone: string;
+  street_address: string;
   city: string;
   state: string;
-  zip: string;
-  bio: string;
-  licenseNumber: string;
-  insured: boolean;
-  bonded: boolean;
+  zip_code: string;
+  website: string | null;
+  bio: string | null;
+  years_in_business: number | null;
+  crew_size: number | null;
+  service_types: string[] | null;
+  service_area_zips: string | null;
+  max_project_size: string | null;
+  offers_estimates: boolean | null;
+  offers_warranty: boolean | null;
+  warranty_length: string | null;
+  status: string;
+  has_license: boolean | null;
+  license_number: string | null;
+  is_insured: boolean | null;
+  is_bonded: boolean | null;
+  has_workers_comp: boolean | null;
+  [price: string]: unknown;
 }
 
-const initialProfile: ProfileForm = {
-  companyName: 'Pro Painters Co.',
-  ownerName: 'John Smith',
-  phone: '(555) 123-4567',
-  city: 'Dallas',
-  state: 'TX',
-  zip: '75201',
-  bio: 'Professional painting company with over 15 years of experience serving the Dallas-Fort Worth area. We specialize in interior and exterior residential and commercial painting.',
-  licenseNumber: 'TX-PAINT-2024-0042',
-  insured: true,
-  bonded: true,
-};
+const COLUMNS =
+  'id, company_name, owner_name, phone, street_address, city, state, zip_code, website, bio, years_in_business, crew_size, service_types, service_area_zips, max_project_size, offers_estimates, offers_warranty, warranty_length, status, has_license, license_number, is_insured, is_bonded, has_workers_comp, ' +
+  PRICING_SCENARIOS.map((p) => p.column).join(', ');
+
+const inputClass =
+  'w-full px-3 py-2 bg-[var(--bg-page)] border border-[var(--input-border)] rounded-lg text-[var(--text-primary)] placeholder-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)] transition-colors';
+const card = 'bg-[var(--bg-surface)] border border-[var(--border)] rounded-xl p-6 space-y-4';
+const label = 'block text-sm text-[var(--text-secondary)] mb-1';
+
+const numberOrNull = (v: string): number | null => (v.trim() === '' ? null : Number(v));
 
 export default function PainterProfile() {
-  const [form, setForm] = useState<ProfileForm>(initialProfile);
-  const [saved, setSaved] = useState(false);
+  const { user } = useAuth();
+  const [form, setForm] = useState<PainterRow | null>(null);
+  const [loadError, setLoadError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
 
-  const update = (field: keyof ProfileForm, value: string | boolean) => {
-    setForm((prev) => ({ ...prev, [field]: value }));
-    setSaved(false);
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from('painters')
+      .select(COLUMNS)
+      .eq('user_id', user.id)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (error || !data) setLoadError('We couldn\'t load your company profile.');
+        else setForm(data as unknown as PainterRow);
+      });
+  }, [user]);
+
+  const set = <K extends keyof PainterRow>(key: K, value: PainterRow[K]) => {
+    setForm((prev) => (prev ? { ...prev, [key]: value } : prev));
+    setMessage(null);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const toggleService = (service: string) => {
+    if (!form) return;
+    const current = form.service_types ?? [];
+    set('service_types', current.includes(service) ? current.filter((s) => s !== service) : [...current, service]);
+  };
+
+  const handleSave = async (e: FormEvent) => {
     e.preventDefault();
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+    if (!form) return;
+
+    if (!form.company_name.trim() || !form.owner_name.trim()) return setMessage({ kind: 'error', text: 'Company and owner name are required.' });
+    if (!form.phone.trim()) return setMessage({ kind: 'error', text: 'A phone number is required.' });
+    if (!/^\d{5}$/.test(form.zip_code.trim())) return setMessage({ kind: 'error', text: 'ZIP code must be 5 digits.' });
+    if ((form.service_types ?? []).length === 0) return setMessage({ kind: 'error', text: 'Select at least one service.' });
+
+    setSaving(true);
+    setMessage(null);
+    const update: Record<string, unknown> = {
+      company_name: form.company_name.trim(),
+      owner_name: form.owner_name.trim(),
+      phone: form.phone.trim(),
+      street_address: form.street_address.trim(),
+      city: form.city.trim(),
+      state: form.state.trim(),
+      zip_code: form.zip_code.trim(),
+      website: form.website?.trim() || null,
+      bio: form.bio?.trim() || null,
+      years_in_business: form.years_in_business,
+      crew_size: form.crew_size,
+      service_types: form.service_types,
+      service_area_zips: form.service_area_zips?.trim() ?? '',
+      max_project_size: form.max_project_size,
+      offers_estimates: form.offers_estimates,
+      offers_warranty: form.offers_warranty,
+      warranty_length: form.offers_warranty ? form.warranty_length?.trim() || null : null,
+    };
+    for (const p of PRICING_SCENARIOS) update[p.column] = form[p.column];
+
+    const { error } = await supabase.from('painters').update(update).eq('id', form.id);
+    setSaving(false);
+    if (error) setMessage({ kind: 'error', text: 'We couldn\'t save your changes. Please try again.' });
+    else setMessage({ kind: 'ok', text: 'Profile saved.' });
   };
 
-  const inputClass =
-    'w-full px-3 py-2 bg-[var(--bg-page)] border border-[var(--input-border)] rounded-lg text-[var(--text-primary)] placeholder-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)] transition-colors';
+  if (loadError) return <p className="text-[var(--danger)]">{loadError}</p>;
+  if (!form) return <p className="text-[var(--text-secondary)]">Loading your profile…</p>;
+
+  const yesNo = (v: boolean | null) => (v ? 'Yes' : 'No');
 
   return (
     <div className="max-w-3xl mx-auto">
       <h1 className="text-2xl font-bold text-[var(--text-primary)] mb-6">Edit Profile</h1>
 
-      {saved && (
-        <div className="bg-[var(--tint-success-bg)] border border-[var(--tint-success-border)] text-[var(--success)] px-4 py-3 rounded-lg mb-6 text-sm">
-          Profile saved successfully!
-        </div>
-      )}
-
       <form onSubmit={handleSave} className="space-y-6">
-        {/* Company info */}
-        <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-xl p-6 space-y-4">
-          <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-2">Company Information</h2>
-
+        <div className={card}>
+          <h2 className="text-lg font-semibold text-[var(--text-primary)]">Company information</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm text-[var(--text-secondary)] mb-1">Company Name</label>
-              <input
-                type="text"
-                value={form.companyName}
-                onChange={(e) => update('companyName', e.target.value)}
-                className={inputClass}
-              />
+              <label className={label}>Company name</label>
+              <input className={inputClass} value={form.company_name} onChange={(e) => set('company_name', e.target.value)} />
             </div>
             <div>
-              <label className="block text-sm text-[var(--text-secondary)] mb-1">Owner Name</label>
-              <input
-                type="text"
-                value={form.ownerName}
-                onChange={(e) => update('ownerName', e.target.value)}
-                className={inputClass}
-              />
+              <label className={label}>Owner name</label>
+              <input className={inputClass} value={form.owner_name} onChange={(e) => set('owner_name', e.target.value)} />
             </div>
           </div>
-
-          <div>
-            <label className="block text-sm text-[var(--text-secondary)] mb-1">Phone</label>
-            <input
-              type="tel"
-              value={form.phone}
-              onChange={(e) => update('phone', e.target.value)}
-              className={inputClass}
-            />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className={label}>Phone</label>
+              <input type="tel" className={inputClass} value={form.phone} onChange={(e) => set('phone', e.target.value)} />
+            </div>
+            <div>
+              <label className={label}>Website</label>
+              <input className={inputClass} value={form.website ?? ''} onChange={(e) => set('website', e.target.value)} placeholder="https://" />
+            </div>
           </div>
-
+          <div>
+            <label className={label}>Street address</label>
+            <input className={inputClass} value={form.street_address} onChange={(e) => set('street_address', e.target.value)} />
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm text-[var(--text-secondary)] mb-1">City</label>
-              <input
-                type="text"
-                value={form.city}
-                onChange={(e) => update('city', e.target.value)}
-                className={inputClass}
-              />
+              <label className={label}>City</label>
+              <input className={inputClass} value={form.city} onChange={(e) => set('city', e.target.value)} />
             </div>
             <div>
-              <label className="block text-sm text-[var(--text-secondary)] mb-1">State</label>
-              <input
-                type="text"
-                value={form.state}
-                onChange={(e) => update('state', e.target.value)}
-                className={inputClass}
-              />
+              <label className={label}>State</label>
+              <input className={inputClass} value={form.state} onChange={(e) => set('state', e.target.value)} maxLength={2} />
             </div>
             <div>
-              <label className="block text-sm text-[var(--text-secondary)] mb-1">ZIP Code</label>
-              <input
-                type="text"
-                value={form.zip}
-                onChange={(e) => update('zip', e.target.value)}
-                className={inputClass}
-              />
+              <label className={label}>ZIP code</label>
+              <input className={inputClass} value={form.zip_code} onChange={(e) => set('zip_code', e.target.value)} inputMode="numeric" maxLength={5} />
             </div>
           </div>
-
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className={label}>Years in business</label>
+              <input type="number" min={0} className={inputClass} value={form.years_in_business ?? ''} onChange={(e) => set('years_in_business', numberOrNull(e.target.value))} />
+            </div>
+            <div>
+              <label className={label}>Crew size</label>
+              <input type="number" min={1} className={inputClass} value={form.crew_size ?? ''} onChange={(e) => set('crew_size', numberOrNull(e.target.value))} />
+            </div>
+          </div>
           <div>
-            <label className="block text-sm text-[var(--text-secondary)] mb-1">Bio</label>
-            <textarea
-              value={form.bio}
-              onChange={(e) => update('bio', e.target.value)}
-              rows={4}
-              className={inputClass + ' resize-vertical'}
-            />
+            <label className={label}>About your company</label>
+            <textarea rows={4} className={inputClass + ' resize-y'} value={form.bio ?? ''} onChange={(e) => set('bio', e.target.value)} placeholder="What should customers know about you?" />
           </div>
         </div>
 
-        {/* License & credentials */}
-        <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-xl p-6 space-y-4">
-          <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-2">Credentials</h2>
-
-          <div>
-            <label className="block text-sm text-[var(--text-secondary)] mb-1">License Number</label>
-            <input
-              type="text"
-              value={form.licenseNumber}
-              onChange={(e) => update('licenseNumber', e.target.value)}
-              className={inputClass}
-            />
+        <div className={card}>
+          <h2 className="text-lg font-semibold text-[var(--text-primary)]">Services &amp; coverage</h2>
+          <div className="flex flex-wrap gap-2">
+            {SERVICE_TYPE_OPTIONS.map((s) => {
+              const on = (form.service_types ?? []).includes(s);
+              return (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => toggleService(s)}
+                  className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${on ? 'bg-[var(--accent)] text-[var(--accent-ink)] border-[var(--accent)]' : 'border-[var(--input-border)] text-[var(--text-secondary)]'}`}
+                >
+                  {s}
+                </button>
+              );
+            })}
           </div>
-
+          <div>
+            <label className={label}>ZIP codes you serve (comma separated)</label>
+            <input className={inputClass} value={form.service_area_zips ?? ''} onChange={(e) => set('service_area_zips', e.target.value)} />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className={label}>Largest project you take</label>
+              <select className={inputClass} value={form.max_project_size ?? ''} onChange={(e) => set('max_project_size', e.target.value)}>
+                <option value="">Select…</option>
+                {PROJECT_SIZE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className={label}>Warranty length</label>
+              <input className={inputClass} disabled={!form.offers_warranty} value={form.warranty_length ?? ''} onChange={(e) => set('warranty_length', e.target.value)} placeholder="e.g. 2 years" />
+            </div>
+          </div>
           <div className="flex flex-col sm:flex-row gap-6">
-            <label className="flex items-center gap-3 cursor-pointer">
-              <div
-                className={`w-12 h-6 rounded-full relative transition-colors ${
-                  form.insured ? 'bg-[var(--accent)]' : 'bg-[var(--input-border)]'
-                }`}
-                onClick={() => update('insured', !form.insured)}
-              >
-                <div
-                  className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform ${
-                    form.insured ? 'translate-x-6' : 'translate-x-0.5'
-                  }`}
-                />
-              </div>
-              <span className="text-sm text-[var(--text-secondary)]">Insured</span>
+            <label className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+              <input type="checkbox" checked={!!form.offers_estimates} onChange={(e) => set('offers_estimates', e.target.checked)} /> Offer free estimates
             </label>
-
-            <label className="flex items-center gap-3 cursor-pointer">
-              <div
-                className={`w-12 h-6 rounded-full relative transition-colors ${
-                  form.bonded ? 'bg-[var(--accent)]' : 'bg-[var(--input-border)]'
-                }`}
-                onClick={() => update('bonded', !form.bonded)}
-              >
-                <div
-                  className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform ${
-                    form.bonded ? 'translate-x-6' : 'translate-x-0.5'
-                  }`}
-                />
-              </div>
-              <span className="text-sm text-[var(--text-secondary)]">Bonded</span>
+            <label className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+              <input type="checkbox" checked={!!form.offers_warranty} onChange={(e) => set('offers_warranty', e.target.checked)} /> Offer a warranty
             </label>
           </div>
         </div>
 
-        <button
-          type="submit"
-          className="w-full sm:w-auto px-8 py-3 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-ink)] font-semibold rounded-lg transition-colors"
-        >
-          Save Profile
-        </button>
+        <div className={card}>
+          <h2 className="text-lg font-semibold text-[var(--text-primary)]">Your pricing</h2>
+          <p className="text-sm text-[var(--text-faint)]">
+            What you'd charge for these reference projects. We use them to estimate where you fall among nearby painters, which sets the price shown next to your name.
+          </p>
+          {PRICING_SCENARIOS.map((p) => (
+            <div key={p.column}>
+              <label className={label}>{p.label}</label>
+              <div className="relative">
+                <span className="absolute left-3 top-2 text-[var(--text-faint)]">$</span>
+                <input
+                  type="number"
+                  min={0}
+                  className={inputClass + ' pl-7'}
+                  value={(form[p.column] as number | null) ?? ''}
+                  onChange={(e) => set(p.column, numberOrNull(e.target.value))}
+                />
+              </div>
+              <p className="text-xs text-[var(--text-faint)] mt-1">{p.description}</p>
+            </div>
+          ))}
+        </div>
+
+        <div className={card}>
+          <h2 className="text-lg font-semibold text-[var(--text-primary)]">Credentials</h2>
+          <p className="text-sm text-[var(--text-secondary)]">
+            Licensed: {yesNo(form.has_license)}{form.license_number ? ` (#${form.license_number})` : ''} · Insured: {yesNo(form.is_insured)} · Bonded: {yesNo(form.is_bonded)} · Workers' comp: {yesNo(form.has_workers_comp)}
+          </p>
+          <p className="text-xs text-[var(--text-faint)]">
+            These were verified when you were approved, so they can't be edited here. If something changes (a renewed license or new policy),{' '}
+            <Link to="/support" className="text-[var(--accent-blue)] underline">contact support</Link> and we'll update it.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-4">
+          <button
+            type="submit"
+            disabled={saving}
+            className="px-8 py-3 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 text-[var(--accent-ink)] font-semibold rounded-lg transition-colors"
+          >
+            {saving ? 'Saving…' : 'Save profile'}
+          </button>
+          {message && (
+            <span className={`text-sm ${message.kind === 'ok' ? 'text-[var(--success)]' : 'text-[var(--danger)]'}`}>{message.text}</span>
+          )}
+        </div>
       </form>
     </div>
   );

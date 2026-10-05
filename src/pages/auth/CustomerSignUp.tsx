@@ -59,7 +59,7 @@ export default function CustomerSignUp() {
             account, then sign in.
           </p>
           <Link
-            to="/auth/customer-sign-in"
+            to="/auth/sign-in"
             className="inline-block mt-6 text-[var(--accent-blue)] hover:text-[var(--accent-blue-hover)] text-sm"
           >
             Go to sign in
@@ -163,7 +163,7 @@ export default function CustomerSignUp() {
 
         <div className="mt-6 text-center">
           <Link
-            to="/auth/customer-sign-in"
+            to="/auth/sign-in"
             className="text-[var(--accent-blue)] hover:text-[var(--accent-blue-hover)] text-sm"
           >
             Already have an account?

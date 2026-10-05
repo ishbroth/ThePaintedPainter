@@ -56,7 +56,7 @@ serve(async (req: Request) => {
     const authClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
     })
-    const { data: userData, error: userError } = await authClient.auth.getUser()
+    const { data: userData, error: userError } = await authClient.auth.getUser(authHeader.replace('Bearer ', ''))
     if (userError || !userData.user) {
       return new Response(JSON.stringify({ error: 'Not authenticated' }), {
         status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },

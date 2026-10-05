@@ -23,15 +23,13 @@ import PainterReview from './pages/admin/PainterReview.tsx';
 import PainterConfirmSignup from './pages/painter/PainterConfirmSignup.tsx';
 import ForgotPassword from './pages/auth/ForgotPassword.tsx';
 import ResetPassword from './pages/auth/ResetPassword.tsx';
-import CustomerSignIn from './pages/auth/CustomerSignIn';
+import SignIn from './pages/auth/SignIn';
 import CustomerSignUp from './pages/auth/CustomerSignUp';
-import PainterSignIn from './pages/auth/PainterSignIn';
 import PainterSignUp from './pages/auth/PainterSignUp';
 import DashboardLayout from './components/ui/DashboardLayout.tsx';
 import PainterDashboard from './pages/painter/PainterDashboard.tsx';
 import PainterProfile from './pages/painter/PainterProfile.tsx';
 import PainterPortfolio from './pages/painter/PainterPortfolio.tsx';
-import PainterDeals from './pages/painter/PainterDeals.tsx';
 import PainterProjects from './pages/painter/PainterProjects.tsx';
 import PainterReviews from './pages/painter/PainterReviews.tsx';
 import PainterSettings from './pages/painter/PainterSettings.tsx';
@@ -52,7 +50,6 @@ const painterSidebarItems: SidebarItem[] = [
   { label: 'Dashboard', icon: '\u{1F3E0}', path: '/painter/dashboard' },
   { label: 'Profile', icon: '\u{1F464}', path: '/painter/dashboard/profile' },
   { label: 'Portfolio', icon: '\u{1F5BC}', path: '/painter/dashboard/portfolio' },
-  { label: 'Deals', icon: '\u{1F3F7}', path: '/painter/dashboard/deals' },
   { label: 'My Projects', icon: '\u{1F4CB}', path: '/painter/dashboard/projects' },
   { label: 'Reviews', icon: '\u2B50', path: '/painter/dashboard/reviews' },
   { label: 'Settings', icon: '\u2699', path: '/painter/dashboard/settings' },
@@ -116,11 +113,13 @@ function App() {
                 <Route path="/painter/confirm-signup" element={<PainterConfirmSignup />} />
 
                 {/* Auth routes */}
-                <Route path="/auth/painter-sign-in" element={<PainterSignIn />} />
+                <Route path="/auth/sign-in" element={<SignIn />} />
+                {/* Old per-role sign-in URLs (bookmarks, old emails) land on the single sign-in. */}
+                <Route path="/auth/painter-sign-in" element={<Navigate to="/auth/sign-in" replace />} />
                 <Route path="/auth/forgot-password" element={<ForgotPassword />} />
                 <Route path="/auth/reset-password" element={<ResetPassword />} />
                 <Route path="/auth/painter-sign-up" element={<PainterSignUp />} />
-                <Route path="/auth/customer-sign-in" element={<CustomerSignIn />} />
+                <Route path="/auth/customer-sign-in" element={<Navigate to="/auth/sign-in" replace />} />
                 <Route path="/auth/customer-sign-up" element={<CustomerSignUp />} />
 
                 {/* Painter dashboard (protected) */}
@@ -135,7 +134,6 @@ function App() {
                   <Route index element={<PainterDashboard />} />
                   <Route path="profile" element={<PainterProfile />} />
                   <Route path="portfolio" element={<PainterPortfolio />} />
-                  <Route path="deals" element={<PainterDeals />} />
                   <Route path="projects" element={<PainterProjects />} />
                   <Route path="reviews" element={<PainterReviews />} />
                   <Route path="settings" element={<PainterSettings />} />
