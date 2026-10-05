@@ -382,6 +382,7 @@ const PainterSignup = () => {
   const [submitting, setSubmitting] = useState(false);
   const [needsEmailConfirmation, setNeedsEmailConfirmation] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  const [accountExists, setAccountExists] = useState(false);
   const [slideDirection, setSlideDirection] = useState<'left' | 'right'>('right');
 
   // ---- helpers ----
@@ -513,6 +514,7 @@ const PainterSignup = () => {
     if (!validateStep(currentStep)) return;
     setSubmitting(true);
     setSubmitError('');
+    setAccountExists(false);
 
     try {
       // One server-side call creates the login AND the company record together
@@ -568,8 +570,20 @@ const PainterSignup = () => {
         },
       });
 
+      if (fnError) {
+        // invoke() hides the response body on non-2xx; read it so we can tell "you already have an account" from a real failure.
+        const res = (fnError as { context?: Response }).context;
+        if (res && typeof res.json === 'function') {
+          const body = await res.json().catch(() => null);
+          if (res.status === 409) {
+            setAccountExists(true);
+            return;
+          }
+          if (body?.error) throw new Error(body.error);
+        }
+        throw new Error('We couldn\'t submit your application. Please try again.');
+      }
       if (data?.error) throw new Error(data.error);
-      if (fnError) throw new Error('We couldn\'t submit your application. Please try again.');
 
       // Nothing exists yet: the account is created when they click the emailed link.
       setNeedsEmailConfirmation(true);
@@ -1338,6 +1352,22 @@ const PainterSignup = () => {
             </button>
           )}
         </div>
+
+        {accountExists && (
+          <div style={{ textAlign: 'center', fontSize: '0.9rem', marginTop: '16px', color: 'var(--text-secondary)' }}>
+            <p style={{ margin: '0 0 6px', color: 'var(--text-primary)', fontWeight: 600 }}>
+              It looks like you have an account with us already.
+            </p>
+            <Link to="/auth/painter-sign-in" style={{ color: 'var(--accent-blue)', textDecoration: 'underline' }}>Log in</Link>
+            {' · '}
+            <Link
+              to={`/auth/forgot-password?role=painter&email=${encodeURIComponent(formData.email.trim())}`}
+              style={{ color: 'var(--accent-blue)', textDecoration: 'underline' }}
+            >
+              Reset your password
+            </Link>
+          </div>
+        )}
 
         {submitError && (
           <p

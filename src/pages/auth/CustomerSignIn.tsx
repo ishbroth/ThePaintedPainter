@@ -93,13 +93,12 @@ export default function CustomerSignIn() {
           >
             Create an account
           </Link>
-          <button
-            type="button"
-            onClick={() => alert('Password reset coming soon. Please contact support.')}
-            className="text-[var(--text-faint)] hover:text-[var(--text-secondary)] text-sm transition-colors"
+          <Link
+            to="/auth/forgot-password?role=customer"
+            className="block text-[var(--text-faint)] hover:text-[var(--text-secondary)] text-sm transition-colors"
           >
             Forgot password?
-          </button>
+          </Link>
         </div>
       </div>
     </div>

@@ -66,6 +66,9 @@ serve(async (req: Request) => {
       return json({ error: 'An account with this email already exists. Try signing in instead.' }, 409)
     }
 
+    // A stale never-confirmed account (e.g. an abandoned customer sign-up) must not block this address.
+    await supabase.rpc('drop_unconfirmed_auth_user', { p_email: request.email })
+
     const payload = request.payload as Record<string, unknown>
     const ownerName = String(payload.owner_name ?? '')
 

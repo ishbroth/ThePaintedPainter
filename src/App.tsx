@@ -21,6 +21,8 @@ import LeaveReview from './pages/LeaveReview';
 import PainterConfirmDate from './pages/painter/PainterConfirmDate.tsx';
 import PainterReview from './pages/admin/PainterReview.tsx';
 import PainterConfirmSignup from './pages/painter/PainterConfirmSignup.tsx';
+import ForgotPassword from './pages/auth/ForgotPassword.tsx';
+import ResetPassword from './pages/auth/ResetPassword.tsx';
 import CustomerSignIn from './pages/auth/CustomerSignIn';
 import CustomerSignUp from './pages/auth/CustomerSignUp';
 import PainterSignIn from './pages/auth/PainterSignIn';
@@ -115,6 +117,8 @@ function App() {
 
                 {/* Auth routes */}
                 <Route path="/auth/painter-sign-in" element={<PainterSignIn />} />
+                <Route path="/auth/forgot-password" element={<ForgotPassword />} />
+                <Route path="/auth/reset-password" element={<ResetPassword />} />
                 <Route path="/auth/painter-sign-up" element={<PainterSignUp />} />
                 <Route path="/auth/customer-sign-in" element={<CustomerSignIn />} />
                 <Route path="/auth/customer-sign-up" element={<CustomerSignUp />} />
