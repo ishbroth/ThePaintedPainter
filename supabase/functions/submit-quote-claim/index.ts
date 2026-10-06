@@ -18,7 +18,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
 import { notify } from '../_shared/notify.ts'
-import { ZIP3_CENTROIDS } from './zip3Centroids.ts'
+import { zipDistanceMiles } from '../_shared/geo.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -69,29 +69,6 @@ interface ClaimRequest {
   phaseLabel?: string
   /** Photos the customer uploaded during the chat estimate — forwarded to the painter. */
   photos?: QuotePhoto[]
-}
-
-function coordsForZip(zip: string): [number, number] | null {
-  if (!/^\d{5}$/.test(zip)) return null
-  return ZIP3_CENTROIDS[zip.slice(0, 3)] ?? null
-}
-
-function haversineMiles(a: [number, number], b: [number, number]): number {
-  const R = 3958.8
-  const toRad = (deg: number) => (deg * Math.PI) / 180
-  const dLat = toRad(b[0] - a[0])
-  const dLng = toRad(b[1] - a[1])
-  const lat1 = toRad(a[0])
-  const lat2 = toRad(b[0])
-  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2
-  return R * 2 * Math.asin(Math.sqrt(h))
-}
-
-function zipDistanceMiles(zipA: string, zipB: string): number | null {
-  const a = coordsForZip(zipA)
-  const b = coordsForZip(zipB)
-  if (!a || !b) return null
-  return haversineMiles(a, b)
 }
 
 serve(async (req: Request) => {
@@ -254,7 +231,9 @@ serve(async (req: Request) => {
           body: `Payout ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(painterPayoutAmount)} · ZIP ${quoteZip}`,
           link: '/painter/projects',
         })
-        const acceptUrl = `${supabaseUrl}/functions/v1/claim-job?token=${inserted.claim_token}&painter_id=${painter.id}`
+        const frontendUrl = Deno.env.get('FRONTEND_URL') ?? 'https://thepaintedpainter.com'
+        // The app page (not the function) so merely opening the link in an email scanner can't accept the job.
+        const acceptUrl = `${frontendUrl}/painter/accept-job?token=${inserted.claim_token}&painter_id=${painter.id}`
         return fetch(`${supabaseUrl}/functions/v1/send-email`, {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${serviceRoleKey}`, 'Content-Type': 'application/json' },
@@ -275,6 +254,24 @@ serve(async (req: Request) => {
         })
       }),
     )
+
+    // Confirm to the customer what they requested, the price, and what happens next.
+    await fetch(`${supabaseUrl}/functions/v1/send-email`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${serviceRoleKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        to: customer.email,
+        type: 'claim_received',
+        data: {
+          customerName: customer.name.trim().split(/\s+/)[0],
+          guaranteedPrice,
+          depositAmount,
+          painterName: selectionType === 'specific_painter' ? notifiedPainters[0]?.company_name : null,
+          preferredDate: preferredDate || null,
+          projectsUrl: verifiedCustomerId ? `${Deno.env.get('FRONTEND_URL') ?? 'https://thepaintedpainter.com'}/customer/dashboard/projects` : null,
+        },
+      }),
+    }).catch((err) => console.error('claim_received email failed:', err))
 
     const notifiedCount = emailResults.filter((r) => r.status === 'fulfilled').length
 

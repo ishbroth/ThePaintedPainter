@@ -2,7 +2,10 @@
 //
 // Supabase Edge Function: Painter clicks "Accept" in the job-offer email
 //
-// A plain GET link (so it works directly from an email client). Atomically
+// New emails link to /painter/accept-job in the app, which POSTs here when the
+// painter presses the button — a GET that changes state gets triggered by mail
+// link scanners that open links in advance. The plain GET still works so offer
+// emails already sent keep working. Atomically
 // flips the job to painter_accepted — the UPDATE's WHERE status='offer_sent'
 // clause is what makes this race-safe: if two painters click at once, only
 // one UPDATE matches a row and returns it; the loser gets 0 rows back and
@@ -50,18 +53,42 @@ function htmlPage(title: string, message: string, tone: 'success' | 'error'): Re
   return new Response(html, { status: 200, headers: { 'Content-Type': 'text/html' } })
 }
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+}
+
 serve(async (req: Request) => {
-  if (req.method !== 'GET') {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
+  if (req.method !== 'GET' && req.method !== 'POST') {
     return new Response('Method not allowed', { status: 405 })
   }
 
+  const isPost = req.method === 'POST'
+  const json = (body: unknown, status = 200) =>
+    new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+  // Same outcomes, shaped for the caller: JSON for the app, a page for old email links.
+  const fail = (title: string, message: string, status = 400) =>
+    isPost ? json({ error: message, title }, status) : htmlPage(title, message, 'error')
+
   try {
-    const url = new URL(req.url)
-    const token = url.searchParams.get('token')
-    const painterId = url.searchParams.get('painter_id')
+    let token: string | null
+    let painterId: string | null
+    let previewOnly = false
+    if (isPost) {
+      const body = await req.json() as { token?: string; painterId?: string; preview?: boolean }
+      token = body.token ?? null
+      painterId = body.painterId ?? null
+      previewOnly = !!body.preview
+    } else {
+      const url = new URL(req.url)
+      token = url.searchParams.get('token')
+      painterId = url.searchParams.get('painter_id')
+    }
 
     if (!token || !painterId) {
-      return htmlPage('Invalid link', 'This link is missing required information. Please check your email and try again.', 'error')
+      return fail('Invalid link', 'This link is missing required information. Please check your email and try again.')
     }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
@@ -79,12 +106,12 @@ serve(async (req: Request) => {
     // Look up the job to confirm the token matches and this painter was eligible.
     const { data: job, error: jobError } = await supabase
       .from('quote_selections')
-      .select('id, status, selection_type, selected_painter_id, notified_painters, customer_id, customer_email, guaranteed_price, customer_preferred_date, quote_zip')
+      .select('id, status, selection_type, selected_painter_id, notified_painters, customer_id, customer_email, guaranteed_price, customer_preferred_date, quote_zip, painter_payout_amount, project_summary, photos')
       .eq('claim_token', token)
       .maybeSingle()
 
     if (jobError || !job) {
-      return htmlPage('Link not found', 'This job offer link is invalid or has expired.', 'error')
+      return fail('Link not found', 'This job offer link is invalid or has expired.', 404)
     }
 
     const eligible = job.selection_type === 'specific_painter'
@@ -92,7 +119,27 @@ serve(async (req: Request) => {
       : (job.notified_painters ?? []).includes(painterId)
 
     if (!eligible) {
-      return htmlPage('Not available', 'This job offer was not sent to this painter account.', 'error')
+      return fail('Not available', 'This job offer was not sent to this painter account.', 403)
+    }
+
+    // A painter who's been paused (or isn't approved) can't take new jobs, even from an offer sent earlier.
+    const { data: claimer } = await supabase.from('painters').select('status, verified').eq('id', painterId).maybeSingle()
+    if (!claimer || claimer.status !== 'approved' || !claimer.verified) {
+      return fail('Not available right now', 'Your account is paused while we re-verify it, so you can\'t accept new jobs yet. Check your profile for next steps.', 403)
+    }
+
+    // Preview: what the accept page shows before the painter presses the button (nothing changes).
+    if (previewOnly) {
+      const summary = (job.project_summary ?? {}) as { timelineLabel?: string; qa?: { question: string; answer: string }[] }
+      return json({
+        open: job.status === 'offer_sent',
+        zip: job.quote_zip,
+        payoutAmount: job.painter_payout_amount,
+        timelineLabel: summary.timelineLabel ?? null,
+        preferredDate: job.customer_preferred_date,
+        qa: summary.qa ?? [],
+        photos: job.photos ?? [],
+      })
     }
 
     // Atomic claim: only succeeds if the job is still open.
@@ -107,11 +154,7 @@ serve(async (req: Request) => {
     if (updateError) throw updateError
 
     if (!updated) {
-      return htmlPage(
-        'Already claimed',
-        'Another painter already accepted this job. Keep an eye out for the next one!',
-        'error',
-      )
+      return fail('Already claimed', 'Another painter already accepted this job. Keep an eye out for the next one!', 409)
     }
 
     // Best-effort notifications — never block the painter's redirect on them.
@@ -152,9 +195,10 @@ serve(async (req: Request) => {
     }
 
     const dateConfirmUrl = `${frontendUrl}/painter/confirm-date?token=${token}&painter_id=${painterId}`
+    if (isPost) return json({ success: true, dateConfirmUrl })
     return new Response(null, { status: 302, headers: { Location: dateConfirmUrl } })
   } catch (error) {
     console.error('Error claiming job:', error)
-    return htmlPage('Something went wrong', 'Please try again or contact support.', 'error')
+    return fail('Something went wrong', 'Please try again or contact support.', 500)
   }
 })

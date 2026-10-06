@@ -67,7 +67,7 @@ serve(async (req: Request) => {
 
     const { data: painter, error: painterError } = await supabase
       .from('painters')
-      .select('id, company_name')
+      .select('id, company_name, status, verified')
       .eq('user_id', userData.user.id)
       .maybeSingle()
 
@@ -107,7 +107,7 @@ serve(async (req: Request) => {
       photos: r.photos ?? [],
       // The painter is authenticated and already filtered to offers sent to them,
       // so they can accept straight from the dashboard.
-      acceptUrl: `${supabaseUrl}/functions/v1/claim-job?token=${r.claim_token}&painter_id=${painter.id}`,
+      acceptUrl: `${Deno.env.get('FRONTEND_URL') ?? 'https://thepaintedpainter.com'}/painter/accept-job?token=${r.claim_token}&painter_id=${painter.id}`,
     })
 
     const shapeJob = (r: Record<string, unknown>) => ({
@@ -141,7 +141,8 @@ serve(async (req: Request) => {
     return new Response(
       JSON.stringify({
         companyName: painter.company_name,
-        offers: (offersRes.data ?? []).map(shapeOffer),
+        // Paused / unapproved painters see no new offers.
+        offers: painter.status === 'approved' && painter.verified ? (offersRes.data ?? []).map(shapeOffer) : [],
         confirmed,
         completed,
         totalEarnings,

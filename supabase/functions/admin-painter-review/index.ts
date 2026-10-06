@@ -87,7 +87,7 @@ serve(async (req: Request) => {
     if (body.action === 'approve') {
       const { error: upErr } = await supabase
         .from('painters')
-        .update({ status: 'approved', verified: true, reviewed_at: now, admin_message: message || null })
+        .update({ status: 'approved', verified: true, reviewed_at: now, admin_message: message || null, application_tasks: [] })
         .eq('id', id)
       if (upErr) throw upErr
       await send('painter_application_approved', { ownerName: painter.owner_name, companyName: painter.company_name, profileUrl })
@@ -109,7 +109,7 @@ serve(async (req: Request) => {
       })
       const { error: upErr } = await supabase
         .from('painters')
-        .update({ status: 'needs_info', verified: false, application_tasks: tasks, admin_message: message || null, reviewed_at: now })
+        .update({ status: painter.status === 'suspended' ? 'suspended' : 'needs_info', verified: false, application_tasks: tasks, admin_message: message || null, reviewed_at: now })
         .eq('id', id)
       if (upErr) throw upErr
       await send('painter_needs_info', {

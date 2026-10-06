@@ -1,8 +1,10 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { Link } from 'react-router-dom';
 import { useAuth } from '../../lib/auth';
 import { supabase } from '../../lib/supabase';
 import { PRICING_SCENARIOS, PROJECT_SIZE_OPTIONS, SERVICE_TYPE_OPTIONS } from '../../lib/painterOptions';
+import ExternalReviewsFields from '../../components/painter/ExternalReviewsFields';
+import { emptyExternalForm, fromExternalForm, toExternalForm, validateExternalForm, type ExternalFormValue } from '../../lib/externalReviews';
+import CredentialsEditor, { CREDENTIAL_COLUMNS, toCredentials } from '../../components/painter/CredentialsEditor';
 
 interface PainterRow {
   id: string;
@@ -15,6 +17,7 @@ interface PainterRow {
   zip_code: string;
   website: string | null;
   bio: string | null;
+  external_reviews: unknown;
   years_in_business: number | null;
   crew_size: number | null;
   service_types: string[] | null;
@@ -24,16 +27,12 @@ interface PainterRow {
   offers_warranty: boolean | null;
   warranty_length: string | null;
   status: string;
-  has_license: boolean | null;
-  license_number: string | null;
-  is_insured: boolean | null;
-  is_bonded: boolean | null;
-  has_workers_comp: boolean | null;
   [price: string]: unknown;
 }
 
 const COLUMNS =
-  'id, company_name, owner_name, phone, street_address, city, state, zip_code, website, bio, years_in_business, crew_size, service_types, service_area_zips, max_project_size, offers_estimates, offers_warranty, warranty_length, status, has_license, license_number, is_insured, is_bonded, has_workers_comp, ' +
+  'id, company_name, owner_name, phone, street_address, city, state, zip_code, website, bio, external_reviews, years_in_business, crew_size, service_types, service_area_zips, max_project_size, offers_estimates, offers_warranty, warranty_length, status, ' +
+  CREDENTIAL_COLUMNS + ', ' +
   PRICING_SCENARIOS.map((p) => p.column).join(', ');
 
 const inputClass =
@@ -47,6 +46,8 @@ export default function PainterProfile() {
   const { user } = useAuth();
   const [form, setForm] = useState<PainterRow | null>(null);
   const [loadError, setLoadError] = useState('');
+  const [savedCrew, setSavedCrew] = useState(0);
+  const [external, setExternal] = useState<ExternalFormValue>(emptyExternalForm());
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
 
@@ -59,7 +60,11 @@ export default function PainterProfile() {
       .maybeSingle()
       .then(({ data, error }) => {
         if (error || !data) setLoadError('We couldn\'t load your company profile.');
-        else setForm(data as unknown as PainterRow);
+        else {
+          setForm(data as unknown as PainterRow);
+          setSavedCrew((data as unknown as PainterRow).crew_size ?? 0);
+          setExternal(toExternalForm((data as unknown as PainterRow).external_reviews));
+        }
       });
   }, [user]);
 
@@ -82,6 +87,8 @@ export default function PainterProfile() {
     if (!form.phone.trim()) return setMessage({ kind: 'error', text: 'A phone number is required.' });
     if (!/^\d{5}$/.test(form.zip_code.trim())) return setMessage({ kind: 'error', text: 'ZIP code must be 5 digits.' });
     if ((form.service_types ?? []).length === 0) return setMessage({ kind: 'error', text: 'Select at least one service.' });
+    const reviewsProblem = validateExternalForm(external);
+    if (reviewsProblem) return setMessage({ kind: 'error', text: reviewsProblem });
 
     setSaving(true);
     setMessage(null);
@@ -95,6 +102,7 @@ export default function PainterProfile() {
       zip_code: form.zip_code.trim(),
       website: form.website?.trim() || null,
       bio: form.bio?.trim() || null,
+      external_reviews: fromExternalForm(external),
       years_in_business: form.years_in_business,
       crew_size: form.crew_size,
       service_types: form.service_types,
@@ -109,13 +117,14 @@ export default function PainterProfile() {
     const { error } = await supabase.from('painters').update(update).eq('id', form.id);
     setSaving(false);
     if (error) setMessage({ kind: 'error', text: 'We couldn\'t save your changes. Please try again.' });
-    else setMessage({ kind: 'ok', text: 'Profile saved.' });
+    else {
+      setSavedCrew(form.crew_size ?? 0);
+      setMessage({ kind: 'ok', text: 'Profile saved.' });
+    }
   };
 
   if (loadError) return <p className="text-[var(--danger)]">{loadError}</p>;
   if (!form) return <p className="text-[var(--text-secondary)]">Loading your profile…</p>;
-
-  const yesNo = (v: boolean | null) => (v ? 'Yes' : 'No');
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -176,6 +185,11 @@ export default function PainterProfile() {
             <label className={label}>About your company</label>
             <textarea rows={4} className={inputClass + ' resize-y'} value={form.bio ?? ''} onChange={(e) => set('bio', e.target.value)} placeholder="What should customers know about you?" />
           </div>
+        </div>
+
+        <div className={card}>
+          <h2 className="text-lg font-semibold text-[var(--text-primary)]">Reviews on other sites</h2>
+          <ExternalReviewsFields value={external} onChange={(next) => { setExternal(next); setMessage(null); }} inputClass={inputClass} labelClass={label} />
         </div>
 
         <div className={card}>
@@ -245,17 +259,6 @@ export default function PainterProfile() {
           ))}
         </div>
 
-        <div className={card}>
-          <h2 className="text-lg font-semibold text-[var(--text-primary)]">Credentials</h2>
-          <p className="text-sm text-[var(--text-secondary)]">
-            Licensed: {yesNo(form.has_license)}{form.license_number ? ` (#${form.license_number})` : ''} · Insured: {yesNo(form.is_insured)} · Bonded: {yesNo(form.is_bonded)} · Workers' comp: {yesNo(form.has_workers_comp)}
-          </p>
-          <p className="text-xs text-[var(--text-faint)]">
-            These were verified when you were approved, so they can't be edited here. If something changes (a renewed license or new policy),{' '}
-            <Link to="/support" className="text-[var(--accent-blue)] underline">contact support</Link> and we'll update it.
-          </p>
-        </div>
-
         <div className="flex items-center gap-4">
           <button
             type="submit"
@@ -269,6 +272,14 @@ export default function PainterProfile() {
           )}
         </div>
       </form>
+
+      <div className="mt-6">
+        <CredentialsEditor
+          initial={toCredentials(form)}
+          status={form.status}
+          compPauses={savedCrew > 1}
+        />
+      </div>
     </div>
   );
 }

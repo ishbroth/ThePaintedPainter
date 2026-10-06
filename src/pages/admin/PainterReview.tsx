@@ -54,6 +54,7 @@ export default function PainterReview() {
   const id = params.get('id');
   const exp = params.get('exp');
   const sig = params.get('sig');
+  const intent = params.get('action'); // which button in the email was pressed
 
   const [painter, setPainter] = useState<Painter | null>(null);
   const [error, setError] = useState('');
@@ -129,6 +130,26 @@ export default function PainterReview() {
         <div style={card}><p style={{ color: 'var(--text-primary)', margin: 0 }}>{done}</p></div>
       ) : (
         <>
+          {intent === 'approve' && (
+            <div style={{ ...card, borderColor: 'var(--success)' }}>
+              <p style={{ color: 'var(--text-primary)', fontWeight: 700, margin: '0 0 6px' }}>Approve {painter.company_name}?</p>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: '0 0 12px' }}>
+                Check their details below, then confirm. They'll be emailed and start receiving job offers right away.
+              </p>
+              <button style={btn('var(--success)')} disabled={busy} onClick={() => act('approve')}>Yes, approve</button>
+            </div>
+          )}
+          {intent === 'request' && (
+            <div style={card}>
+              <p style={{ color: 'var(--text-primary)', fontWeight: 700, margin: 0 }}>Tick what you need from {painter.company_name} below, then press "Request these items".</p>
+            </div>
+          )}
+          {intent === 'reject' && (
+            <div style={card}>
+              <p style={{ color: 'var(--text-primary)', fontWeight: 700, margin: 0 }}>Write the reason below (they'll see it), then press "Decline".</p>
+            </div>
+          )}
+
           <div style={card}>
             <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: 1.7 }}>
               <div><strong>{painter.owner_name}</strong> · {painter.email} · {painter.phone}</div>

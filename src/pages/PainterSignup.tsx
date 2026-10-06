@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import ExternalReviewsFields from '../components/painter/ExternalReviewsFields';
+import { emptyExternalForm, fromExternalForm, validateExternalForm, type ExternalFormValue } from '../lib/externalReviews';
 
 
 // ---------------------------------------------------------------------------
@@ -20,6 +22,7 @@ interface PainterFormData {
   state: string;
   zipCode: string;
   website: string;
+  externalReviews: ExternalFormValue;
   yearsInBusiness: number | null;
   crewSize: number | null;
 
@@ -212,6 +215,7 @@ const initialFormData: PainterFormData = {
   state: '',
   zipCode: '',
   website: '',
+  externalReviews: emptyExternalForm(),
   yearsInBusiness: null,
   crewSize: null,
 
@@ -443,6 +447,8 @@ const PainterSignup = () => {
       if (formData.yearsInBusiness === null)
         newErrors.yearsInBusiness = 'Required';
       if (formData.crewSize === null) newErrors.crewSize = 'Required';
+      const reviewsProblem = validateExternalForm(formData.externalReviews);
+      if (reviewsProblem) newErrors.externalReviews = reviewsProblem;
     }
 
     if (step === 2) {
@@ -533,6 +539,7 @@ const PainterSignup = () => {
         state: formData.state,
         zip_code: formData.zipCode.trim(),
         website: formData.website.trim() || null,
+        external_reviews: fromExternalForm(formData.externalReviews),
         years_in_business: formData.yearsInBusiness,
         crew_size: formData.crewSize,
 
@@ -795,6 +802,20 @@ const PainterSignup = () => {
           required: true,
           placeholder: '1',
         })}
+      </div>
+
+      <div style={{ marginTop: 28 }}>
+        <h3 style={{ fontSize: '1rem', fontWeight: 700, margin: '0 0 6px' }}>Reviews on other sites (optional)</h3>
+        <ExternalReviewsFields
+          value={formData.externalReviews}
+          onChange={(next) => {
+            setFormData((prev) => ({ ...prev, externalReviews: next }));
+            if (errors.externalReviews) setErrors((prev) => ({ ...prev, externalReviews: '' }));
+          }}
+          inputStyle={styles.input}
+          labelStyle={styles.label}
+        />
+        {errors.externalReviews && <p style={styles.errorText}>{errors.externalReviews}</p>}
       </div>
     </div>
   );
@@ -1131,19 +1152,17 @@ const PainterSignup = () => {
         <section style={{ padding: '48px 20px', textAlign: 'center' }}>
           <div style={{ maxWidth: '520px', margin: '0 auto' }}>
             <p style={{ marginBottom: 16 }}>
-              Thanks — we've saved your application for{' '}
-              <strong>{formData.companyName.trim()}</strong>, but it isn't submitted yet.
+              Thanks, check your email for the verification link to create your account. Your application will be
+              reviewed and you will be notified once you are approved to join The Painted Painter's network!
             </p>
-            <p style={{ marginBottom: 16, color: 'var(--text-secondary)' }}>
-              We sent a confirmation link to <strong>{formData.email.trim()}</strong>. Click it to create your account
-              and send your application to our team for review. The link expires in 14 days; if you don't confirm, no
-              account is created and what you entered is deleted.
+            <p style={{ marginBottom: 24, color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+              We sent the link to <strong>{formData.email.trim()}</strong>. It expires in 14 days.
             </p>
             <Link
               to="/auth/sign-in"
               style={{ color: 'var(--accent-blue)', textDecoration: 'underline' }}
             >
-              Go to sign in
+              Sign in
             </Link>
           </div>
         </section>

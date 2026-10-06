@@ -21,6 +21,7 @@ import LeaveReview from './pages/LeaveReview';
 import PainterConfirmDate from './pages/painter/PainterConfirmDate.tsx';
 import PainterReview from './pages/admin/PainterReview.tsx';
 import PainterConfirmSignup from './pages/painter/PainterConfirmSignup.tsx';
+import AcceptJob from './pages/painter/AcceptJob.tsx';
 import ForgotPassword from './pages/auth/ForgotPassword.tsx';
 import ResetPassword from './pages/auth/ResetPassword.tsx';
 import SignIn from './pages/auth/SignIn';
@@ -111,6 +112,7 @@ function App() {
                 <Route path="/painter/confirm-date" element={<PainterConfirmDate />} />
                 <Route path="/admin/painter-review" element={<PainterReview />} />
                 <Route path="/painter/confirm-signup" element={<PainterConfirmSignup />} />
+                <Route path="/painter/accept-job" element={<AcceptJob />} />
 
                 {/* Auth routes */}
                 <Route path="/auth/sign-in" element={<SignIn />} />

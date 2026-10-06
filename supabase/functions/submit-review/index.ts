@@ -15,6 +15,7 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
+import { notify } from '../_shared/notify.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -51,7 +52,7 @@ serve(async (req: Request) => {
 
     const { data: job, error: jobError } = await supabase
       .from('quote_selections')
-      .select('id, customer_id, customer_name, accepted_by, review_submitted_at')
+      .select('id, customer_id, customer_name, customer_city, accepted_by, review_submitted_at, completed_at')
       .eq('review_token', token)
       .maybeSingle()
 
@@ -61,7 +62,7 @@ serve(async (req: Request) => {
 
     const { data: painter, error: painterError } = await supabase
       .from('painters')
-      .select('user_id')
+      .select('user_id, email, owner_name, company_name')
       .eq('id', job.accepted_by)
       .maybeSingle()
 
@@ -90,6 +91,50 @@ serve(async (req: Request) => {
       .from('quote_selections')
       .update({ review_submitted_at: new Date().toISOString() })
       .eq('id', job.id)
+
+    // Tell the painter: email + in-app/push. Best effort — the review is already saved.
+    try {
+      const { data: all } = await supabase.from('reviews').select('rating').eq('painter_id', painter.user_id)
+      const count = all?.length ?? 0
+      const avg = count ? all!.reduce((sum, r) => sum + r.rating, 0) / count : rating
+
+      // First name + last initial only ("Jane D."), so the painter isn't handed more than the review needs.
+      const parts = String(job.customer_name ?? '').trim().split(/\s+/).filter(Boolean)
+      const reviewerName = parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1][0]}.` : parts[0] || 'A customer'
+      const frontendUrl = Deno.env.get('FRONTEND_URL') ?? 'https://thepaintedpainter.com'
+
+      if (painter.email) {
+        await fetch(`${supabaseUrl}/functions/v1/send-email`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${serviceRoleKey}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            to: painter.email,
+            type: 'new_review',
+            data: {
+              subject: `New ${rating}-star review from ${reviewerName}`,
+              reviewerName,
+              rating,
+              title: title?.trim() || null,
+              body: body?.trim() || null,
+              projectLocation: job.customer_city || null,
+              completedDate: job.completed_at ? String(job.completed_at).slice(0, 10) : null,
+              avgRating: Math.round(avg * 10) / 10,
+              reviewCount: count,
+              reviewsUrl: `${frontendUrl}/painter/dashboard/reviews`,
+            },
+          }),
+        })
+      }
+      await notify(supabase, {
+        userId: painter.user_id,
+        type: 'new_review',
+        title: `New ${rating}-star review from ${reviewerName}`,
+        body: body?.trim() ? body.trim().slice(0, 120) : undefined,
+        link: '/painter/dashboard/reviews',
+      })
+    } catch (notifyErr) {
+      console.error('Failed to notify painter of review:', notifyErr)
+    }
 
     return new Response(JSON.stringify({ success: true }), {
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },

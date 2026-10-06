@@ -54,7 +54,7 @@ serve(async (req: Request) => {
     const supabase = createClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
     const { data: painter } = await supabase
       .from('painters')
-      .select('id, company_name, status, application_tasks, admin_message, last_reminder_at')
+      .select('id, company_name, email, status, application_tasks, admin_message, last_reminder_at')
       .eq('user_id', userId)
       .maybeSingle()
     if (!painter) return json({ error: 'No painter application found for this account' }, 404)
@@ -76,7 +76,7 @@ serve(async (req: Request) => {
       await fetch(`${supabaseUrl}/functions/v1/send-email`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${serviceRoleKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ to: ADMIN_EMAIL(), type, data: { companyName: painter.company_name, reviewUrl, ...data } }),
+        body: JSON.stringify({ to: ADMIN_EMAIL(), type, data: { companyName: painter.company_name, applicantEmail: painter.email, reviewUrl, ...data } }),
       })
     }
 
@@ -89,7 +89,7 @@ serve(async (req: Request) => {
     }
 
     if (body.action === 'submit_tasks') {
-      if (painter.status !== 'needs_info') return json({ error: 'There are no open tasks on your application.' }, 409)
+      if (painter.status !== 'needs_info' && painter.status !== 'suspended') return json({ error: 'There are no open tasks on your account.' }, 409)
       const doneIds = new Set(body.doneTaskIds ?? [])
       const updated = tasks.map((t) => ({ ...t, done: t.done || doneIds.has(t.id) }))
 
@@ -103,7 +103,7 @@ serve(async (req: Request) => {
 
       const { error } = await supabase
         .from('painters')
-        .update({ application_tasks: updated, status: 'pending', last_reminder_at: new Date().toISOString() })
+        .update({ application_tasks: updated, status: painter.status === 'suspended' ? 'suspended' : 'pending', last_reminder_at: new Date().toISOString() })
         .eq('id', painter.id)
       if (error) throw error
 

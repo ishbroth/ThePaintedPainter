@@ -3,7 +3,8 @@ import { useLocation, Navigate, useNavigate } from 'react-router-dom';
 import type { EstimatorContext, EstimateBreakdown } from '../lib/types';
 import type { Assumption } from '../lib/chatEstimator/defaultAssumptions';
 import type { MatchedSituation } from '../lib/pricing/situations';
-import { fetchNearbyPainters, type RealPainterMatch } from '../lib/realPainterMatcher';
+import { fetchPainterResults, type PainterResult } from '../lib/realPainterMatcher';
+import PainterResultCard from '../components/results/PainterResultCard';
 import { buildResponseSummary, timelineLabel } from '../lib/chatEstimator/responseSummary';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
@@ -78,12 +79,12 @@ const QuoteResults = () => {
     ? 'var(--accent)'
     : 'var(--accent-blue)';
 
-  const [painterMatches, setPainterMatches] = useState<RealPainterMatch[] | null>(null);
+  const [painterMatches, setPainterMatches] = useState<PainterResult[] | null>(null);
 
   useEffect(() => {
     if (!state) return;
     let cancelled = false;
-    fetchNearbyPainters(state.ctx, state.estimate.total).then((matches) => {
+    fetchPainterResults(state.ctx, state.estimate.total).then((matches) => {
       if (!cancelled) setPainterMatches(matches);
     });
     return () => {
@@ -92,7 +93,7 @@ const QuoteResults = () => {
   }, [state]);
 
   const [claimTarget, setClaimTarget] = useState<
-    { selectionType: 'specific_painter'; painter: RealPainterMatch['painter']; price: number } | { selectionType: 'guaranteed' } | null
+    { selectionType: 'specific_painter'; painter: { id: string; company_name: string }; price: number } | { selectionType: 'guaranteed' } | null
   >(null);
 
   if (!state) {
@@ -233,20 +234,16 @@ const QuoteResults = () => {
       </div>
 
       {(painterMatches ?? []).map((m) => (
-        <div
-          key={m.painter.id}
-          style={{
-            cursor: expired ? 'not-allowed' : 'pointer',
-            opacity: expired ? 0.55 : 1,
-          }}
-          onClick={() => {
+        <PainterResultCard
+          key={m.id}
+          result={m}
+          disabled={expired}
+          onSelect={() => {
             if (expired) return;
             hapticMedium();
-            setClaimTarget({ selectionType: 'specific_painter', painter: m.painter, price: m.price });
+            setClaimTarget({ selectionType: 'specific_painter', painter: { id: m.id, company_name: m.companyName }, price: m.price });
           }}
-        >
-          <PainterCard match={m} />
-        </div>
+        />
       ))}
 
       {/* Mystery painter */}
@@ -324,44 +321,12 @@ const QuoteResults = () => {
   );
 };
 
-const PainterCard = ({ match }: { match: RealPainterMatch }) => {
-  const { painter, reasons } = match;
-  return (
-    <div className="painter-card">
-      <div>
-        <div className="painter-card-name">
-          {painter.company_name}
-          {painter.reviewCount > 0 && (
-            <span style={{ marginLeft: 8, fontSize: '0.8rem', fontWeight: 600, color: 'var(--accent)' }}>
-              ★ {painter.avgRating.toFixed(1)} <span style={{ color: 'var(--text-faint)', fontWeight: 400 }}>({painter.reviewCount})</span>
-            </span>
-          )}
-        </div>
-        <div className="painter-card-meta">
-          <span>{painter.city}, {painter.state}</span>
-          <span>{painter.years_in_business ?? '?'} yrs</span>
-          <span>Crew of {painter.crew_size ?? '?'}</span>
-        </div>
-        <div className="painter-card-tags">
-          {reasons.slice(0, 3).map((r, i) => (
-            <span key={i} className="painter-card-tag">{r}</span>
-          ))}
-        </div>
-      </div>
-      <div>
-        <div style={{ fontWeight: 700, fontSize: '1.15rem', color: 'var(--accent-blue)', marginBottom: 4 }}>{currency(match.price)}</div>
-        <div className="painter-card-cta">Claim this price →</div>
-      </div>
-    </div>
-  );
-};
-
 // ---------------------------------------------------------------------------
 // Claim Your Price modal
 // ---------------------------------------------------------------------------
 
 type ClaimTarget =
-  | { selectionType: 'specific_painter'; painter: RealPainterMatch['painter']; price: number }
+  | { selectionType: 'specific_painter'; painter: { id: string; company_name: string }; price: number }
   | { selectionType: 'guaranteed' };
 
 const ClaimPriceModal = ({

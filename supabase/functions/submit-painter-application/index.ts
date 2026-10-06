@@ -16,6 +16,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
 import bcrypt from 'https://esm.sh/bcryptjs@2.4.3'
 import { sha256Hex } from '../_shared/hash.ts'
+import { cleanExternalReviews, toStored } from '../_shared/externalReviews.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -30,7 +31,7 @@ function json(body: unknown, status = 200) {
 // Only these columns may be set from the form. Notably NOT status/verified/
 // application_tasks/user_id — those are set server-side or by the reviewer.
 export const ALLOWED_COLUMNS = [
-  'company_name', 'owner_name', 'phone', 'street_address', 'city', 'state', 'zip_code', 'website',
+  'company_name', 'owner_name', 'phone', 'street_address', 'city', 'state', 'zip_code', 'website', 'external_reviews',
   'years_in_business', 'crew_size',
   'has_license', 'license_number', 'license_state', 'license_expiration',
   'is_bonded', 'bonding_company', 'bond_amount',
@@ -74,6 +75,8 @@ serve(async (req: Request) => {
       if (key in form) payload[key] = form[key]
     }
     payload.owner_name = ownerName
+    // Links are painter-typed and shown to the public: keep only https links on the right site, ratings in range.
+    payload.external_reviews = toStored(cleanExternalReviews(payload.external_reviews))
 
     // A fresh submission replaces any earlier pending one for the same email,
     // so only the newest link works.

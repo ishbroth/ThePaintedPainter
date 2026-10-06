@@ -29,3 +29,5 @@ export const PRICING_SCENARIOS: { column: string; label: string; description: st
   { column: 'price_5br_full', label: '5BR Large Home - Full Interior', description: 'A large 5-bedroom, 3,500 sq ft home — walls, ceilings, trim, and doors.' },
   { column: 'price_5br_cabinets', label: '5BR Large Home - Kitchen Cabinets Only', description: 'The kitchen cabinets in that same large 5-bedroom, 3,500 sq ft home.' },
 ];
+
+export const CERTIFICATION_OPTIONS = ['EPA Lead-Safe Certified', 'OSHA Certified', 'Master Painter Certified', 'Other'];

@@ -53,12 +53,15 @@ export default function PainterConfirmSignup() {
 
         {state === 'done' && (
           <>
-            <h1 style={{ fontSize: '1.75rem', fontWeight: 700, margin: '0 0 12px' }}>You're in — application submitted</h1>
+            <h1 style={{ fontSize: '1.75rem', fontWeight: 700, margin: '0 0 12px' }}>Your account is created</h1>
             <p style={{ color: 'var(--text-secondary)', margin: '0 0 24px' }}>
-              Your email is confirmed and your account is created. Sign in to see your application status — we'll email you when it's been reviewed.
+              Thanks, we've created your account and your application is being reviewed. You will be notified when you're approved to join The Painted Painter's network!
             </p>
-            <Link to="/auth/sign-in" style={{ color: 'var(--accent-blue)', textDecoration: 'underline' }}>
-              Go to sign in
+            <Link
+              to="/auth/sign-in"
+              style={{ display: 'inline-block', padding: '12px 24px', borderRadius: 8, background: 'var(--accent)', color: 'var(--accent-ink)', fontWeight: 700, textDecoration: 'none' }}
+            >
+              Sign in to profile
             </Link>
           </>
         )}

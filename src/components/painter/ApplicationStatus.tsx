@@ -9,7 +9,7 @@ interface Task {
 }
 
 interface ApplicationData {
-  status: 'pending' | 'needs_info' | 'approved' | 'rejected';
+  status: 'pending' | 'needs_info' | 'approved' | 'rejected' | 'suspended';
   tasks: Task[];
   adminMessage: string | null;
   nextReminderAt: string | null;
@@ -70,6 +70,13 @@ export default function ApplicationStatus() {
     refresh();
     refreshUploads();
   }, [refresh, refreshUploads]);
+
+  // The profile's credentials editor fires this after a save that may have paused the account.
+  useEffect(() => {
+    const onChange = () => refresh();
+    window.addEventListener('painter-application-changed', onChange);
+    return () => window.removeEventListener('painter-application-changed', onChange);
+  }, [refresh]);
 
   if (!data || data.status === 'approved') return null;
 
@@ -151,11 +158,13 @@ export default function ApplicationStatus() {
         </>
       )}
 
-      {data.status === 'needs_info' && (
+      {(data.status === 'needs_info' || data.status === 'suspended') && (
         <>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6, flexWrap: 'wrap' }}>
-            {badge('Action needed', 'var(--tint-warning-bg)')}
-            <strong style={{ color: 'var(--text-primary)' }}>Complete these to finish your application</strong>
+            {badge(data.status === 'suspended' ? 'Leads paused' : 'Action needed', 'var(--tint-warning-bg)')}
+            <strong style={{ color: 'var(--text-primary)' }}>
+              {data.status === 'suspended' ? 'We\'re re-verifying your account (usually 1–3 days)' : 'Complete these to finish your application'}
+            </strong>
           </div>
           {data.adminMessage && (
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: '0 0 12px' }}>{data.adminMessage}</p>

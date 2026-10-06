@@ -1,4 +1,9 @@
-import type { EstimatorContext, EstimateBreakdown } from './types';
+// deno-lint-ignore-file no-explicit-any
+// Server-side copy of the painter pricing engine: a painter's six sign-up pricing answers never leave
+// the server, so the price shown for each painter in results is computed here (painter-results).
+// The request's estimator context is client JSON, so it is typed loosely and every call is guarded.
+type EstimatorContext = any;
+type EstimateBreakdown = any;
 
 // ===== Painter Baseline Prices =====
 
@@ -252,85 +257,3 @@ function interpolateExteriorPrice(
   return price;
 }
 
-// ===== Generate Painter Matches =====
-
-export interface PainterMatch {
-  painter: PainterProfile;
-  estimatedPrice: number;
-  priceRange: { low: number; high: number };
-  matchScore: number;
-}
-
-export function generatePainterMatches(
-  painters: PainterProfile[],
-  ctx: EstimatorContext,
-  aiEstimate: EstimateBreakdown
-): PainterMatch[] {
-  return painters
-    .map((painter) => {
-      const price = estimatePainterPrice(painter, ctx, aiEstimate);
-
-      let score = 50;
-
-      if (painter.zipCode.substring(0, 3) === ctx.zipCode.substring(0, 3)) {
-        score += 20;
-      }
-      if (painter.serviceTypes.some((s) => {
-        if (ctx.projectType === 'interior' || ctx.projectType === 'both') {
-          return s.includes('Interior');
-        }
-        if (ctx.projectType === 'exterior' || ctx.projectType === 'both') {
-          return s.includes('Exterior');
-        }
-        return false;
-      })) {
-        score += 15;
-      }
-
-      if (painter.yearsInBusiness >= 10) score += 10;
-      else if (painter.yearsInBusiness >= 5) score += 5;
-
-      if (painter.hasLicense) score += 5;
-      if (painter.isInsured) score += 5;
-      if (painter.isBonded) score += 3;
-      if (painter.offersWarranty) score += 2;
-
-      score = Math.min(score, 100);
-
-      return {
-        painter,
-        estimatedPrice: price,
-        priceRange: {
-          low: Math.round(price * 0.92),
-          high: Math.round(price * 1.08),
-        },
-        matchScore: score,
-      };
-    })
-    .sort((a, b) => b.matchScore - a.matchScore);
-}
-
-// ===== Guaranteed Price Calculation =====
-
-export function calculateGuaranteedPrice(
-  matches: PainterMatch[],
-  aiEstimate: EstimateBreakdown
-): { guaranteedPrice: number; eligiblePainterCount: number } {
-  if (matches.length === 0) {
-    return { guaranteedPrice: aiEstimate.total, eligiblePainterCount: 0 };
-  }
-
-  const prices = matches.map((m) => m.estimatedPrice).sort((a, b) => a - b);
-  const medianIdx = Math.floor(prices.length / 2);
-  const medianPrice = prices[medianIdx];
-  const guaranteedPrice = Math.round(medianPrice * 0.95);
-
-  const eligible = matches.filter(
-    (m) => guaranteedPrice >= m.priceRange.low && guaranteedPrice <= m.priceRange.high * 1.1
-  ).length;
-
-  return {
-    guaranteedPrice: Math.max(guaranteedPrice, aiEstimate.lowRange),
-    eligiblePainterCount: Math.max(eligible, 1),
-  };
-}

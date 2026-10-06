@@ -49,6 +49,9 @@ const EMAIL_TYPE_MAP: Record<string, string> = {
   painter_needs_info: 'More information needed for your painter application',
   painter_rejected: 'Update on your painter application',
   new_notification: 'You have a new notification',
+  claim_received: 'We received your request — your price is locked',
+  painter_suspended: 'A painter was paused — needs re-verification',
+  painter_suspended_notice: 'New leads are paused while we re-verify you',
 }
 
 // The sender address for all outgoing emails
@@ -89,6 +92,53 @@ function escapeHtml(value: unknown): string {
     .replace(/'/g, '&#39;')
 }
 
+const FONT = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+
+// All styling is inline and layout is table-based: <style> blocks and CSS classes
+// are stripped or ignored by many mail apps (Outlook, some Gmail/Android modes),
+// which is what made buttons show up as plain links. `href` must already be
+// HTML-escaped by the caller.
+function button(href: unknown, label: string, color = '#2563eb', full = false): string {
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" ${full ? 'width="100%"' : ''} style="margin:10px 0;"><tr><td align="center" bgcolor="${color}" style="border-radius:6px;background:${color};"><a href="${href}" target="_blank" style="display:block;padding:14px 26px;font-family:${FONT};font-size:16px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:6px;text-align:center;">${label}</a></td></tr></table>`
+}
+
+function detailTable(title: string, rows: [string, unknown][]): string {
+  const shown = rows.filter(([, v]) => v !== null && v !== undefined && String(v).trim() !== '')
+  if (shown.length === 0) return ''
+  const cells = shown
+    .map(([k, v]) => `<tr><td style="padding:7px 12px 7px 0;border-bottom:1px solid #eef0f3;font-size:14px;color:#6b7280;width:38%;vertical-align:top;">${escapeHtml(k)}</td><td style="padding:7px 0;border-bottom:1px solid #eef0f3;font-size:14px;color:#1a1a1a;vertical-align:top;">${escapeHtml(v)}</td></tr>`)
+    .join('')
+  return `<p style="margin:24px 0 6px;font-size:12px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#6b7280;">${escapeHtml(title)}</p><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-top:1px solid #e5e7eb;">${cells}</table>`
+}
+
+// Approve / request more / decline, straight from the email. Each opens the review
+// page with that action ready; one confirming click finishes it (so a mail
+// scanner opening the link can't approve anyone by itself).
+function approvalButtons(reviewUrl: unknown): string {
+  const base = String(reviewUrl)
+  return button(`${base}&amp;action=approve`, 'Approve this painter', '#16a34a', true)
+    + button(`${base}&amp;action=request`, 'Ask for more info / documents', '#2563eb', true)
+    + button(`${base}&amp;action=reject`, 'Decline', '#b91c1c', true)
+}
+
+const yn = (v: unknown) => (v === true ? 'Yes' : v === false ? 'No' : '')
+const listOf = (v: unknown) => (Array.isArray(v) ? v.join(', ') : v)
+const moneyOrEmpty = (v: unknown) => (v === null || v === undefined || v === '' ? '' : formatMoney(v))
+
+// Plain-text twin of the HTML, sent as the text/plain part: improves delivery and
+// is what shows in notification previews and text-only clients.
+function htmlToText(html: string): string {
+  return html
+    .replace(/<head[\s\S]*?<\/head>/gi, '')
+    .replace(/<a [^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/gi, (_m, href, label) => `${label.replace(/<[^>]+>/g, '').trim()} (${href.replace(/&amp;/g, '&')})`)
+    .replace(/<\/(p|tr|table|h\d|li)>/gi, '\n')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/td>/gi, '  ')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&middot;/g, '·').replace(/&copy;/g, '©')
+    .replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim()
+}
+
 function escapeStrings(value: unknown): Record<string, unknown> {
   const out: Record<string, unknown> = {}
   if (value && typeof value === 'object') {
@@ -104,38 +154,28 @@ function buildEmailHtml(type: string, data: Record<string, unknown>): string {
   const projectName = (data.projectName as string) || 'your painting project'
 
   // Base wrapper for consistent branding across all email types
-  const wrap = (body: string) => `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="utf-8" />
-      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-      <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1a1a1a; line-height: 1.6; margin: 0; padding: 0; }
-        .container { max-width: 600px; margin: 0 auto; padding: 40px 20px; }
-        .header { text-align: center; margin-bottom: 32px; }
-        .header h1 { color: #2563eb; font-size: 24px; margin: 0; }
-        .content { background: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 32px; }
-        .footer { text-align: center; margin-top: 32px; font-size: 12px; color: #6b7280; }
-        .btn { display: inline-block; background: #2563eb; color: #ffffff; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: 600; margin-top: 16px; }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <div class="header">
-          <h1>The Painted Painter</h1>
-        </div>
-        <div class="content">
-          ${body}
-        </div>
-        <div class="footer">
-          <p>&copy; ${new Date().getFullYear()} The Painted Painter. All rights reserved.</p>
-          <p>Questions? Reply to this email or visit thepaintedpainter.com</p>
-        </div>
-      </div>
-    </body>
-    </html>
-  `
+  const wrap = (body: string) => `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="color-scheme" content="light" />
+<title>The Painted Painter</title>
+</head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:${FONT};color:#1a1a1a;line-height:1.6;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f3f4f6;">
+<tr><td align="center" style="padding:24px 12px;">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;">
+<tr><td align="center" style="padding:6px 0 18px;font-family:${FONT};font-size:24px;font-weight:700;color:#2563eb;">The Painted Painter</td></tr>
+<tr><td style="background:#ffffff;border:1px solid #e5e7eb;border-radius:8px;padding:28px;font-family:${FONT};font-size:16px;line-height:1.6;color:#1a1a1a;">
+${body}
+</td></tr>
+<tr><td align="center" style="padding:20px 8px;font-family:${FONT};font-size:12px;color:#6b7280;">&copy; ${new Date().getFullYear()} The Painted Painter. Questions? Just reply to this email.</td></tr>
+</table>
+</td></tr>
+</table>
+</body>
+</html>`
 
   // Build type-specific content
   switch (type) {
@@ -144,7 +184,7 @@ function buildEmailHtml(type: string, data: Record<string, unknown>): string {
         <p>Hi ${customerName},</p>
         <p>Great news! Your painting estimate for <strong>${projectName}</strong> is ready.</p>
         <p>Estimated price: <strong>$${data.estimatedPrice || 'N/A'}</strong></p>
-        ${data.estimateUrl ? `<p><a class="btn" href="${data.estimateUrl}">View Your Estimate</a></p>` : ''}
+        ${data.estimateUrl ? `${button(data.estimateUrl, `View Your Estimate`)}` : ''}
         <p>This estimate is valid for 30 days. If you have any questions, just reply to this email.</p>
       `)
 
@@ -170,7 +210,7 @@ function buildEmailHtml(type: string, data: Record<string, unknown>): string {
         <p>Hi ${customerName},</p>
         <p>Your project <strong>${projectName}</strong> has been marked as complete!</p>
         <p>We hope you love the results. Your feedback helps us and our painters improve.</p>
-        ${data.reviewUrl ? `<p><a class="btn" href="${data.reviewUrl}">Leave a Review</a></p>` : ''}
+        ${data.reviewUrl ? `${button(data.reviewUrl, `Leave a Review`)}` : ''}
         <p>Thank you for choosing The Painted Painter!</p>
       `)
 
@@ -179,7 +219,7 @@ function buildEmailHtml(type: string, data: Record<string, unknown>): string {
         <p>Hi ${customerName},</p>
         <p>We have received your payment of <strong>$${data.amount || 'N/A'}</strong> for <strong>${projectName}</strong>.</p>
         <p>Your painter is now secured and will be in touch to confirm the schedule.</p>
-        ${data.receiptUrl ? `<p><a class="btn" href="${data.receiptUrl}">View Receipt</a></p>` : ''}
+        ${data.receiptUrl ? `${button(data.receiptUrl, `View Receipt`)}` : ''}
         <p>Thank you for your business!</p>
       `)
 
@@ -189,7 +229,7 @@ function buildEmailHtml(type: string, data: Record<string, unknown>): string {
         <p>A new job offer is available in your area!</p>
         <p>Project: <strong>${projectName}</strong></p>
         ${data.estimatedPay ? `<p>Estimated pay: <strong>$${data.estimatedPay}</strong></p>` : ''}
-        ${data.offerUrl ? `<p><a class="btn" href="${data.offerUrl}">View Offer Details</a></p>` : ''}
+        ${data.offerUrl ? `${button(data.offerUrl, `View Offer Details`)}` : ''}
         <p>Act fast — offers are accepted on a first-come, first-served basis.</p>
       `)
 
@@ -201,20 +241,33 @@ function buildEmailHtml(type: string, data: Record<string, unknown>): string {
         <p>Next steps will be shared shortly. You can track everything in your dashboard.</p>
       `)
 
-    case 'new_review':
+    case 'new_review': {
+      const rating = Math.max(1, Math.min(5, Math.round(Number(data.rating) || 0)))
+      const stars = '<span style="font-size:30px;letter-spacing:3px;color:#f59e0b;">' + '\u2605'.repeat(rating) + '</span><span style="font-size:30px;letter-spacing:3px;color:#d1d5db;">' + '\u2605'.repeat(5 - rating) + '</span>'
+      const body = data.body ? String(data.body).replace(/\n/g, '<br />') : ''
+      const avg = Number(data.avgRating)
+      const count = Number(data.reviewCount)
       return wrap(`
-        <p>Hi ${customerName},</p>
-        <p>You received a new review${data.rating ? ` — <strong>${data.rating}/5 stars</strong>` : ''}!</p>
-        ${data.reviewText ? `<blockquote style="border-left: 3px solid #2563eb; padding-left: 12px; margin: 16px 0; color: #4b5563;">"${data.reviewText}"</blockquote>` : ''}
-        ${data.reviewerName ? `<p>— ${data.reviewerName}</p>` : ''}
-        <p>Keep up the great work!</p>
+        <p style="margin:0 0 4px;font-size:18px;"><strong>${data.reviewerName || 'A customer'}</strong> reviewed your work${data.projectLocation ? ` at <strong>${data.projectLocation}</strong>` : ''}.</p>
+        <p style="margin:14px 0 4px;">${stars}</p>
+        <p style="margin:0 0 14px;color:#6b7280;font-size:14px;">${rating} out of 5</p>
+        ${data.title ? `<p style="margin:0 0 8px;font-size:17px;font-weight:700;">${data.title}</p>` : ''}
+        ${body ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="background:#f9fafb;border-left:4px solid #f59e0b;border-radius:4px;padding:14px 16px;font-size:15px;color:#374151;">${body}</td></tr></table>` : '<p style="color:#6b7280;font-size:14px;margin:0;">They left a rating without a written comment.</p>'}
+        ${detailTable('Your rating', [
+          ['Average', isFinite(avg) && avg > 0 ? `${avg.toFixed(1)} out of 5` : ''],
+          ['Total reviews', isFinite(count) && count > 0 ? String(count) : ''],
+          ['Job completed', data.completedDate],
+        ])}
+        ${data.reviewsUrl ? button(data.reviewsUrl, 'See all your reviews') : ''}
+        <p style="margin:6px 0 0;font-size:13px;color:#6b7280;">Your average rating is shown to customers when they compare painters.${rating <= 3 ? " If anything about this review looks wrong, reply to this email and we'll take a look." : ''}</p>
       `)
+    }
 
     case 'payment_received':
       return wrap(`
         <p>Hi ${customerName},</p>
         <p>A payment of <strong>$${data.amount || 'N/A'}</strong> has been processed for <strong>${projectName}</strong>.</p>
-        ${data.receiptUrl ? `<p><a class="btn" href="${data.receiptUrl}">View Receipt</a></p>` : ''}
+        ${data.receiptUrl ? `${button(data.receiptUrl, `View Receipt`)}` : ''}
         <p>Thank you!</p>
       `)
 
@@ -223,38 +276,66 @@ function buildEmailHtml(type: string, data: Record<string, unknown>): string {
         <p>Hi ${customerName},</p>
         <p>Your deal for <strong>${projectName}</strong> is expiring soon${data.expiresAt ? ` on <strong>${data.expiresAt}</strong>` : ''}.</p>
         <p>Don't miss out — lock in your price before it expires.</p>
-        ${data.dealUrl ? `<p><a class="btn" href="${data.dealUrl}">Secure Your Deal</a></p>` : ''}
+        ${data.dealUrl ? `${button(data.dealUrl, `Secure Your Deal`)}` : ''}
       `)
 
-    case 'painter_application_received':
+    case 'painter_application_received': {
+      const a = (data.application ?? {}) as Record<string, unknown>
+      const address = [a.street_address, [a.city, a.state].filter(Boolean).join(', '), a.zip_code].filter(Boolean).join(' · ')
       return wrap(`
-        <p>A new painter has applied to join the network.</p>
-        <p>
-          <strong>${data.companyName || 'Unknown Company'}</strong><br />
-          Owner: ${data.ownerName || 'N/A'}<br />
-          Email: ${data.applicantEmail || 'N/A'}<br />
-          Phone: ${data.phone || 'N/A'}<br />
-          Location: ${data.city || 'N/A'}, ${data.state || 'N/A'} ${data.zipCode || ''}
-        </p>
-        ${data.serviceTypes ? `<p>Services: ${data.serviceTypes}</p>` : ''}
-        <p>Years in business: ${data.yearsInBusiness ?? 'N/A'} &middot; Crew size: ${data.crewSize ?? 'N/A'}</p>
-        <p>Licensed: ${data.hasLicense ?? 'N/A'} &middot; Insured: ${data.isInsured ?? 'N/A'} &middot; Bonded: ${data.isBonded ?? 'N/A'}</p>
-        ${data.reviewUrl ? `<p><a class="btn" href="${data.reviewUrl}">Review this application</a></p>
-        <p style="font-size: 13px; color: #6b7280;">From the review page you can approve them, ask for proof of license / insurance / bond / company verification (they'll see it as tasks on their profile), or decline with a reason. They're emailed automatically.</p>` : ''}
+        <p style="margin:0 0 4px;font-size:20px;"><strong>${escapeHtml(a.company_name) || 'A painter'}</strong> applied to join the network</p>
+        <p style="margin:0 0 6px;color:#6b7280;font-size:14px;">Review below, then decide right from this email.</p>
+        ${data.reviewUrl ? approvalButtons(data.reviewUrl) : ''}
+        ${detailTable('Company', [
+          ['Company', a.company_name], ['Owner', a.owner_name], ['Email', a.email], ['Phone', a.phone],
+          ['Address', address], ['Website', a.website],
+          ['Years in business', a.years_in_business], ['Crew size', a.crew_size],
+        ])}
+        ${detailTable('Reviews elsewhere (as reported by the painter)', (['google', 'yelp', 'facebook'] as const).map((src): [string, string] => {
+          const e = ((a.external_reviews ?? {}) as Record<string, { url?: string; rating?: number | null; count?: number | null }>)[src]
+          if (!e?.url) return [src[0].toUpperCase() + src.slice(1), '']
+          const stats = [e.rating != null ? `${e.rating} stars` : '', e.count != null ? `${e.count} reviews` : ''].filter(Boolean).join(', ')
+          return [src[0].toUpperCase() + src.slice(1), `${e.url}${stats ? ` — ${stats}` : ''}`]
+        }))}
+        ${detailTable('Licensing & insurance', [
+          ['Licensed', yn(a.has_license)], ['License #', a.license_number], ['License state', a.license_state], ['License expires', a.license_expiration],
+          ['Insured', yn(a.is_insured)], ['Insurance company', a.insurance_company], ['Policy #', a.policy_number], ['Coverage', a.coverage_amount],
+          ['Bonded', yn(a.is_bonded)], ['Bonding company', a.bonding_company], ['Bond amount', a.bond_amount],
+          ["Workers' comp", yn(a.has_workers_comp)], ['Carrier', a.workers_comp_carrier],
+          ['Certifications', [listOf(a.certifications), a.other_certification].filter((x) => x && String(x).length).join(', ')],
+        ])}
+        ${detailTable('Services & coverage', [
+          ['Services', listOf(a.service_types)], ['Service-area ZIPs', a.service_area_zips],
+          ['Largest project', ({ small: 'Small (1-2 rooms)', medium: 'Medium (whole house interior)', large: 'Large (full interior + exterior)', commercial: 'Commercial' } as Record<string, string>)[String(a.max_project_size)] ?? a.max_project_size], ['Projects per month', a.projects_per_month],
+          ['Free estimates', yn(a.offers_estimates)], ['Warranty', a.offers_warranty ? (a.warranty_length || 'Yes') : yn(a.offers_warranty)],
+        ])}
+        ${detailTable('Pricing answers', [
+          ['1BR rental, full interior + cabinets', moneyOrEmpty(a.price_1br_full)],
+          ['3BR home, walls only', moneyOrEmpty(a.price_3br_walls)],
+          ['3BR home, trim & doors only', moneyOrEmpty(a.price_3br_trim_doors)],
+          ['3BR home, ceilings only', moneyOrEmpty(a.price_3br_ceilings)],
+          ['5BR large home, full interior', moneyOrEmpty(a.price_5br_full)],
+          ['5BR large home, kitchen cabinets only', moneyOrEmpty(a.price_5br_cabinets)],
+        ])}
+        <p style="margin:26px 0 4px;font-size:14px;"><strong>Decide:</strong></p>
+        ${data.reviewUrl ? approvalButtons(data.reviewUrl) : ''}
+        <p style="margin:14px 0 0;font-size:13px;color:#6b7280;">"Ask for more info" lets you tick what you need (license, insurance, bond, company verification…) — it shows as tasks on their profile and they're emailed. Replying to this email writes to the applicant directly.</p>
       `)
+    }
 
     case 'painter_signup_confirm':
       return wrap(`
         <p>Hi ${data.ownerName || 'there'}, thanks for applying to join The Painted Painter with <strong>${data.companyName || 'your company'}</strong>.</p>
         <p>Confirm your email to create your account and send your application to our team for review.</p>
-        ${data.confirmUrl ? `<p><a class="btn" href="${data.confirmUrl}">Confirm email &amp; submit application</a></p>` : ''}
+        ${data.confirmUrl ? `${button(data.confirmUrl, `Confirm email &amp; submit application`)}` : ''}
         <p style="margin-top: 8px; font-size: 13px; color: #6b7280;">This link expires in 14 days. If you don't confirm, no account is created and the information you entered is deleted. Didn't apply? You can ignore this email.</p>
       `)
 
     case 'painter_application_reminder':
       return wrap(`
-        <p><strong>${data.companyName || 'A painter'}</strong> is still waiting on their application and sent a reminder.</p>
-        ${data.reviewUrl ? `<p><a class="btn" href="${data.reviewUrl}">Review this application</a></p>` : ''}
+        <p style="margin-top:0;"><strong>${data.companyName || 'A painter'}</strong> is still waiting on their application and sent a reminder.</p>
+        ${data.reviewUrl ? approvalButtons(data.reviewUrl) : ''}
+        <p style="margin:14px 0 0;font-size:13px;color:#6b7280;">Replying to this email writes to the applicant directly.</p>
       `)
 
     case 'painter_application_updated': {
@@ -267,7 +348,7 @@ function buildEmailHtml(type: string, data: Record<string, unknown>): string {
         ${done ? `<p>Marked done:</p><ul>${done}</ul>` : ''}
         ${open ? `<p>Still open:</p><ul>${open}</ul>` : ''}
         ${docs ? `<p>Uploaded documents (links expire in 7 days):</p><ul>${docs}</ul>` : ''}
-        ${data.reviewUrl ? `<p><a class="btn" href="${data.reviewUrl}">Review this application</a></p>` : ''}
+        ${data.reviewUrl ? `${button(data.reviewUrl, `Review this application`)}` : ''}
       `)
     }
 
@@ -277,7 +358,7 @@ function buildEmailHtml(type: string, data: Record<string, unknown>): string {
         <p>Hi ${data.ownerName || 'there'}, thanks for applying with <strong>${data.companyName || 'your company'}</strong>. Before we can approve you, we need a few things:</p>
         <ul>${items}</ul>
         ${data.message ? `<p>${data.message}</p>` : ''}
-        ${data.profileUrl ? `<p><a class="btn" href="${data.profileUrl}">Complete these on your profile</a></p>` : ''}
+        ${data.profileUrl ? `${button(data.profileUrl, `Complete these on your profile`)}` : ''}
       `)
     }
 
@@ -291,7 +372,7 @@ function buildEmailHtml(type: string, data: Record<string, unknown>): string {
       return wrap(`
         <p><strong>${data.title || 'New notification'}</strong></p>
         ${data.body ? `<p>${data.body}</p>` : ''}
-        ${data.link ? `<p><a class="btn" href="${data.link}">Open</a></p>` : ''}
+        ${data.link ? `${button(data.link, `Open`)}` : ''}
       `)
 
     case 'job_offer_available': {
@@ -327,7 +408,7 @@ function buildEmailHtml(type: string, data: Record<string, unknown>): string {
         <p style="font-size: 22px; font-weight: 700; color: #2563eb; margin: 20px 0;">
           You'd be paid: ${formatMoney(data.payoutAmount)}
         </p>
-        ${data.acceptUrl ? `<p><a class="btn" href="${data.acceptUrl}">Accept This Job</a></p>` : ''}
+        ${data.acceptUrl ? `${button(escapeHtml(data.acceptUrl), `Accept this job`, '#16a34a')}` : ''}
         <p style="margin-top: 8px; font-size: 13px; color: #6b7280;">This job is offered on a first-come, first-served basis — the first painter to accept gets it.</p>
         <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
         <p style="font-weight: 600; margin-bottom: 12px;">Job details</p>
@@ -338,31 +419,35 @@ function buildEmailHtml(type: string, data: Record<string, unknown>): string {
 
     case 'painter_accepted_confirm_deposit':
       return wrap(`
-        <p>Good news — <strong>${data.painterCompanyName || 'A painter'}</strong> has accepted your job!</p>
-        <p>
-          Painter: <strong>${data.painterCompanyName || 'N/A'}</strong> (${data.painterOwnerName || 'N/A'})<br />
-          Email: <a href="mailto:${data.painterEmail || ''}">${data.painterEmail || 'N/A'}</a><br />
-          Phone: <a href="tel:${data.painterPhone || ''}">${data.painterPhone || 'N/A'}</a>
-        </p>
-        <p>Job price: <strong>${formatMoney(data.guaranteedPrice)}</strong></p>
-        ${data.scheduledDate ? `<p>Start date: <strong>${data.scheduledDate}</strong></p>` : ''}
-        <p>Deposit due now: <strong>${formatMoney(data.depositAmount)}</strong></p>
-        ${data.confirmUrl ? `<p><a class="btn" href="${data.confirmUrl}">Confirm &amp; Pay Deposit</a></p>` : ''}
-        <p style="margin-top: 8px; font-size: 13px; color: #6b7280;">Once you confirm and pay the deposit, we'll share your contact details with the painter so you can coordinate directly.</p>
+        <p style="margin-top:0;">Good news — <strong>${data.painterCompanyName || 'a painter'}</strong> accepted your job and picked a start date. Confirm it and pay your deposit to lock it in.</p>
+        ${detailTable('Your painter', [
+          ['Company', data.painterCompanyName], ['Contact', data.painterOwnerName], ['Email', data.painterEmail], ['Phone', data.painterPhone],
+        ])}
+        ${detailTable('The job', [
+          ['Start date', data.scheduledDate],
+          ['Guaranteed price', formatMoney(data.guaranteedPrice)],
+          ['Deposit due now', formatMoney(data.depositAmount)],
+          ['Balance, paid directly to your painter', formatMoney(Number(data.guaranteedPrice) - Number(data.depositAmount))],
+        ])}
+        ${data.confirmUrl ? button(data.confirmUrl, 'Confirm &amp; pay deposit', '#16a34a', true) : ''}
+        <p style="margin:6px 0 0;font-size:13px;color:#6b7280;">Your deposit secures the date. Once it's paid we share your contact details with the painter so you can coordinate directly. Need a different date? Reply to this email.</p>
       `)
 
     case 'job_confirmed_painter_details':
       return wrap(`
-        <p>The deposit has been paid — this job is confirmed!</p>
-        <p>
-          Customer: <strong>${data.customerName || 'N/A'}</strong><br />
-          Address: ${data.customerStreetAddress || ''}, ${data.customerCity || ''}, ${data.customerState || ''} ${data.customerZip || ''}<br />
-          Email: <a href="mailto:${data.customerEmail || ''}">${data.customerEmail || 'N/A'}</a><br />
-          Phone: <a href="tel:${data.customerPhone || ''}">${data.customerPhone || 'N/A'}</a>
-        </p>
-        ${data.scheduledDate ? `<p>Start date: <strong>${data.scheduledDate}</strong></p>` : ''}
-        <p>Your payout: <strong>${formatMoney(data.payoutAmount)}</strong></p>
-        <p style="margin-top: 8px; font-size: 13px; color: #6b7280;">Reach out to the customer directly to confirm details.</p>
+        <p style="margin-top:0;">The deposit has been paid — this job is confirmed! A calendar invite is attached.</p>
+        ${detailTable('Customer', [
+          ['Name', data.customerName],
+          ['Address', [data.customerStreetAddress, data.customerCity, [data.customerState, data.customerZip].filter(Boolean).join(' ')].filter(Boolean).join(', ')],
+          ['Email', data.customerEmail], ['Phone', data.customerPhone],
+        ])}
+        ${detailTable('The job', [
+          ['Start date', data.scheduledDate],
+          ['Job price', moneyOrEmpty(data.guaranteedPrice)],
+          ['Deposit paid to us (our fee)', moneyOrEmpty(data.depositAmount)],
+          ['Balance to collect from the customer', formatMoney(data.payoutAmount)],
+        ])}
+        <p style="margin:18px 0 0;font-size:13px;color:#6b7280;">Reach out to the customer to confirm details. You collect the balance from them directly. Need to move the date? Change it from your dashboard and they're notified.</p>
       `)
 
     case 'painter_accepted_notice':
@@ -380,14 +465,18 @@ function buildEmailHtml(type: string, data: Record<string, unknown>): string {
 
     case 'job_confirmed_customer':
       return wrap(`
-        <p>Your deposit of <strong>${formatMoney(data.depositAmount)}</strong> was received — your project is confirmed!</p>
-        <p>
-          Painter: <strong>${data.painterCompanyName || 'N/A'}</strong> (${data.painterOwnerName || 'N/A'})<br />
-          Email: <a href="mailto:${data.painterEmail || ''}">${data.painterEmail || 'N/A'}</a><br />
-          Phone: <a href="tel:${data.painterPhone || ''}">${data.painterPhone || 'N/A'}</a>
-        </p>
-        <p>Job price: <strong>${formatMoney(data.guaranteedPrice)}</strong>${data.scheduledDate ? ` &middot; Start date: <strong>${data.scheduledDate}</strong>` : ''}</p>
-        <p style="margin-top: 8px; font-size: 13px; color: #6b7280;">Your painter has your contact details and will reach out to confirm. The remaining balance is settled directly with your painter.</p>
+        <p style="margin-top:0;">Your deposit of <strong>${formatMoney(data.depositAmount)}</strong> was received — your project is confirmed! A calendar invite is attached.</p>
+        ${detailTable('Your painter', [
+          ['Company', data.painterCompanyName], ['Contact', data.painterOwnerName], ['Email', data.painterEmail], ['Phone', data.painterPhone],
+        ])}
+        ${detailTable('Your project', [
+          ['Start date', data.scheduledDate],
+          ['Guaranteed price', formatMoney(data.guaranteedPrice)],
+          ['Deposit paid', formatMoney(data.depositAmount)],
+          ['Remaining balance, due to your painter', formatMoney(Number(data.guaranteedPrice) - Number(data.depositAmount))],
+        ])}
+        ${data.projectsUrl ? button(data.projectsUrl, 'View My Projects') : ''}
+        <p style="margin:6px 0 0;font-size:13px;color:#6b7280;">Your painter has your contact details and will reach out to confirm. You pay the remaining balance directly to them. To change the date, use My Projects or reply here.</p>
       `)
 
     case 'job_rescheduled':
@@ -401,8 +490,49 @@ function buildEmailHtml(type: string, data: Record<string, unknown>): string {
       return wrap(`
         <p>Hi ${data.ownerName || 'there'}, your application for <strong>${data.companyName || 'your company'}</strong> has been approved.</p>
         <p>You'll now receive job offers by email and app notification when customers in your area claim a price.</p>
-        ${data.profileUrl ? `<p><a class="btn" href="${data.profileUrl}">Open your dashboard</a></p>` : ''}
+        ${data.profileUrl ? `${button(data.profileUrl, `Open your dashboard`)}` : ''}
       `)
+
+    case 'claim_received':
+      return wrap(`
+        <p style="margin-top:0;">Hi ${data.customerName || 'there'}, we've got your request and your price is locked in.</p>
+        ${detailTable('Your request', [
+          ['Guaranteed price', formatMoney(data.guaranteedPrice)],
+          ['Painter', data.painterName || 'First available painter near you'],
+          ['Deposit (due after your painter picks a date)', formatMoney(data.depositAmount)],
+          ['Balance, paid directly to your painter', formatMoney(Number(data.guaranteedPrice) - Number(data.depositAmount))],
+          ['Requested start date', data.preferredDate],
+        ])}
+        <p style="margin:24px 0 6px;font-weight:700;">What happens next</p>
+        <ol style="margin:0 0 0 20px;padding:0;">
+          <li>${data.painterName ? 'Your painter has' : 'Painters near you have'} been notified. Nothing is charged yet.</li>
+          <li>When a painter accepts and picks a start date, we'll email you to confirm and pay the deposit.</li>
+          <li>After the deposit, we share contact details so you can coordinate directly.</li>
+        </ol>
+        ${data.projectsUrl ? button(data.projectsUrl, 'Track this in My Projects') : '<p style="font-size:13px;color:#6b7280;">Tip: create an account with this email to track your project, get reminders and earn loyalty points.</p>'}
+      `)
+
+    case 'painter_suspended': {
+      const items = (Array.isArray(data.turnedOff) ? (data.turnedOff as string[]) : []).map((t) => `<li>${escapeHtml(t)}</li>`).join('')
+      return wrap(`
+        <p style="margin-top:0;"><strong>${data.companyName || 'A painter'}</strong> turned off a credential, so they've been <strong>paused from new leads</strong> until you re-verify them.</p>
+        <p style="margin:0 0 4px;">They turned off:</p>
+        <ul style="margin:0 0 8px 20px;padding:0;">${items}</ul>
+        ${data.reviewUrl ? button(`${data.reviewUrl}&amp;action=approve`, 'Re-verified — reinstate them', '#16a34a', true) + button(`${data.reviewUrl}&amp;action=request`, 'Ask for proof', '#2563eb', true) : ''}
+        <p style="margin:6px 0 0;font-size:13px;color:#6b7280;">They've been told to expect 1\u20133 days and can upload proof from their profile; you'll get another email when they do. Jobs they already accepted aren't affected. Replying to this email writes to the painter directly.</p>
+      `)
+    }
+
+    case 'painter_suspended_notice': {
+      const items = (Array.isArray(data.turnedOff) ? (data.turnedOff as string[]) : []).map((t) => `<li>${escapeHtml(t)}</li>`).join('')
+      return wrap(`
+        <p style="margin-top:0;">You turned off your:</p>
+        <ul style="margin:0 0 12px 20px;padding:0;">${items}</ul>
+        <p>Because customers rely on those, <strong>new leads are paused</strong> until we re-verify your account. This usually takes 1\u20133 days. Jobs you've already accepted aren't affected.</p>
+        <p>To speed it up, upload proof from your profile and press <strong>Submit for review</strong>. If this was a mistake, tell us by replying to this email.</p>
+        ${data.profileUrl ? button(data.profileUrl, 'Open your profile') : ''}
+      `)
+    }
 
     default:
       // Fallback for unknown email types — sends a generic notification
@@ -468,7 +598,7 @@ serve(async (req: Request) => {
     // Optional emails respect the recipient's "email notifications" setting.
     // Anything transactional (deposit/confirmation/receipts, approval decisions,
     // sign-up confirmation) is always sent.
-    const OPTIONAL_TYPES = ['job_offer_available', 'job_taken', 'project_reminder', 'new_notification', 'painter_accepted_notice']
+    const OPTIONAL_TYPES = ['job_offer_available', 'job_taken', 'project_reminder', 'new_notification', 'painter_accepted_notice', 'new_review']
     if (isInternal && OPTIONAL_TYPES.includes(type) && serviceRoleKey) {
       try {
         const prefRes = await fetch(`${Deno.env.get('SUPABASE_URL')}/rest/v1/rpc/email_notifications_enabled`, {
@@ -514,12 +644,21 @@ serve(async (req: Request) => {
     if (!subject) {
       console.warn(`Unknown email type: "${type}". Using fallback subject.`)
     }
-    const emailSubject = subject || 'Update from The Painted Painter'
+    const emailSubject = isInternal && type === 'new_review' && rawData?.subject
+      ? String(rawData.subject).slice(0, 150)
+      : subject || 'Update from The Painted Painter'
 
     // ------------------------------------------------------------------------
     // Step 4: Build the HTML email body from the type and data
     // ------------------------------------------------------------------------
     const html = buildEmailHtml(type, data || {})
+
+    // Replies go somewhere real (the From address is no-reply). For application
+    // emails to the admin, replying writes straight to the applicant.
+    const applicantEmail = rawData?.application?.email ?? rawData?.applicantEmail
+    const replyTo = ['painter_application_received', 'painter_application_reminder', 'painter_application_updated', 'painter_suspended'].includes(type) && applicantEmail
+      ? String(applicantEmail)
+      : (Deno.env.get('REPLY_TO_EMAIL') ?? 'iw@thepaintedpainter.com')
 
     // ------------------------------------------------------------------------
     // Step 5: Retrieve the Resend API key from environment
@@ -547,6 +686,8 @@ serve(async (req: Request) => {
         to: [to],
         subject: emailSubject,
         html,
+        text: htmlToText(html),
+        reply_to: replyTo,
         ...(isInternal && Array.isArray(body.attachments) ? { attachments: body.attachments } : {}),
       }),
     })

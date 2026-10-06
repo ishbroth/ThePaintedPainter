@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../lib/auth/index.ts';
 import { dashboardPathForRole } from '../../lib/auth/roleRoutes.ts';
+import { supabaseAnonKey, supabaseUrl } from '../../lib/supabase';
 
 /**
  * One sign-in for everyone. There's no customer/painter choice to make: the
@@ -17,6 +18,9 @@ export default function SignIn() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // Credentials that match a painter application still waiting on the emailed verification link.
+  const [awaitingVerification, setAwaitingVerification] = useState(false);
+  const [resendMsg, setResendMsg] = useState('');
 
   // Once the session and profile are loaded (right after signing in, or if
   // they were already signed in), send them to the right place.
@@ -29,16 +33,39 @@ export default function SignIn() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
+    setAwaitingVerification(false);
+    setResendMsg('');
     setSubmitting(true);
     try {
       const { error: signInError } = await signIn(email, password);
-      if (signInError) setError(signInError.message);
+      if (signInError) {
+        // No account yet? They may have applied as a painter but not clicked the verification link.
+        if ((await callPending(false)).pending) setAwaitingVerification(true);
+        else setError(signInError.message);
+      }
       // On success the effect above redirects as soon as the profile loads.
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unexpected error occurred');
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const callPending = async (resend: boolean) => {
+    const res = await fetch(`${supabaseUrl}/functions/v1/check-pending-signup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: supabaseAnonKey, Authorization: `Bearer ${supabaseAnonKey}` },
+      body: JSON.stringify({ email: email.trim(), password, resend }),
+    });
+    return res.ok ? await res.json() : { pending: false };
+  };
+
+  const resend = async () => {
+    setResendMsg('');
+    const result = await callPending(true);
+    if (result.resent) setResendMsg('We sent a new verification link to your email.');
+    else if (result.retryInSeconds) setResendMsg(`Please wait ${result.retryInSeconds} seconds before asking for another email.`);
+    else setResendMsg('We couldn\'t send the email just now. Please try again in a moment.');
   };
 
   const signedInButNoProfile = !authLoading && user && !profile;
@@ -52,6 +79,18 @@ export default function SignIn() {
         {error && (
           <div className="bg-[var(--tint-critical-bg)] border border-[var(--tint-critical-border)] text-[var(--danger)] px-4 py-3 rounded mb-4 text-sm">
             {error}
+          </div>
+        )}
+        {awaitingVerification && (
+          <div className="bg-[var(--bg-page)] border border-[var(--border)] text-[var(--text-primary)] px-4 py-3 rounded mb-4 text-sm">
+            <p className="font-semibold mb-1">Almost there — check your email.</p>
+            <p className="text-[var(--text-secondary)]">
+              We sent a verification link to <strong>{email.trim()}</strong>. Click it to create your account, then sign in here.
+            </p>
+            <button type="button" onClick={resend} className="mt-2 text-[var(--accent-blue)] underline">
+              Didn't get it? Send it again
+            </button>
+            {resendMsg && <p className="mt-2 text-[var(--text-secondary)]">{resendMsg}</p>}
           </div>
         )}
         {signedInButNoProfile && (
