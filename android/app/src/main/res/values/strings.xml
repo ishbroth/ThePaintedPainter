@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">The Painted Painter</string>
+    <string name="title_activity_main">The Painted Painter</string>
+    <string name="package_name">com.thepaintedpainter.app</string>
+    <string name="custom_url_scheme">com.thepaintedpainter.app</string>
+</resources>

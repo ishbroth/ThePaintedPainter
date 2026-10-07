@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { publicSiteUrl } from '../../lib/platform';
 
 // Step 1 of password reset: ask for the email and send Supabase's reset link,
 // which lands on /auth/reset-password.
@@ -16,7 +17,7 @@ export default function ForgotPassword() {
     setError(null);
     setLoading(true);
     const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: `${window.location.origin}/auth/reset-password`,
+      redirectTo: `${publicSiteUrl()}/auth/reset-password`,
     });
     setLoading(false);
     // Don't reveal whether the address has an account; only surface real failures (e.g. rate limiting).

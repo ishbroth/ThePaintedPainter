@@ -1,4 +1,5 @@
 import { supabase } from '../supabase';
+import { isNativeApp } from '../platform';
 
 // Public half of the VAPID key pair; the private half is a Supabase secret
 // used by the send side (supabase/functions/_shared/notify.ts).
@@ -17,7 +18,8 @@ const isStandalone = () =>
   window.matchMedia?.('(display-mode: standalone)').matches || (navigator as unknown as { standalone?: boolean }).standalone === true;
 
 export function registerServiceWorker(): void {
-  if ('serviceWorker' in navigator) {
+  // The service worker is only for web push; the native apps will use native push (not set up yet).
+  if (!isNativeApp() && 'serviceWorker' in navigator) {
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('/sw.js').catch((err) => console.error('SW registration failed:', err));
     });
@@ -25,6 +27,8 @@ export function registerServiceWorker(): void {
 }
 
 export function getPushState(): PushState {
+  // Web push doesn't apply inside the iOS/Android app. Hiding the card avoids a wrong "Add to Home Screen" prompt.
+  if (isNativeApp()) return 'unsupported';
   // iOS only exposes web push to sites installed to the Home Screen.
   if (isIos() && !isStandalone()) return 'needs-install';
   if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) return 'unsupported';
