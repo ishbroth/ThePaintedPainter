@@ -7,6 +7,8 @@ export interface CalendarEvent {
   title: string;
   /** YYYY-MM-DD */
   date: string;
+  /** Last day of a multi-day job (YYYY-MM-DD). Defaults to a single day. */
+  endDate?: string | null;
   location?: string;
   description?: string;
 }
@@ -29,7 +31,7 @@ export function buildIcs(e: CalendarEvent): string {
     `UID:${e.uid}@thepaintedpainter.com`,
     `DTSTAMP:${stamp}`,
     `DTSTART;VALUE=DATE:${e.date.replace(/-/g, '')}`,
-    `DTEND;VALUE=DATE:${nextDay(e.date)}`,
+    `DTEND;VALUE=DATE:${nextDay(e.endDate && e.endDate >= e.date ? e.endDate : e.date)}`,
     `SUMMARY:${esc(e.title)}`,
     e.location ? `LOCATION:${esc(e.location)}` : '',
     e.description ? `DESCRIPTION:${esc(e.description)}` : '',
@@ -61,7 +63,7 @@ export function googleCalendarUrl(e: CalendarEvent): string {
   const params = new URLSearchParams({
     action: 'TEMPLATE',
     text: e.title,
-    dates: `${e.date.replace(/-/g, '')}/${nextDay(e.date)}`,
+    dates: `${e.date.replace(/-/g, '')}/${nextDay(e.endDate && e.endDate >= e.date ? e.endDate : e.date)}`,
     ...(e.location ? { location: e.location } : {}),
     ...(e.description ? { details: e.description } : {}),
   });

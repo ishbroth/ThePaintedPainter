@@ -337,6 +337,33 @@ async function handleQuoteSelectionDepositPaid(
   session: Stripe.Checkout.Session,
   supabase: ReturnType<typeof createClient>,
 ): Promise<void> {
+  // Only confirm a job that is actually waiting on this deposit, and only for the amount we asked for.
+  // (The amount is set by create-checkout-session from the database, so a mismatch means something is
+  // wrong — we log it loudly and do NOT confirm the job.) Stripe retries and replays are harmless:
+  // the status condition on the update below means a second delivery changes nothing and re-sends nothing.
+  const { data: pending } = await supabase
+    .from('quote_selections')
+    .select('id, status, deposit_status, deposit_amount, date_state')
+    .eq('id', quoteSelectionId)
+    .maybeSingle()
+  if (!pending) {
+    console.error(`Deposit paid for unknown job ${quoteSelectionId} (session ${session.id})`)
+    return
+  }
+  if (pending.status !== 'painter_accepted' || pending.deposit_status === 'paid') {
+    console.log(`Ignoring deposit event for job ${quoteSelectionId}: already ${pending.status}/${pending.deposit_status}`)
+    return
+  }
+  const expectedCents = Math.round(Number(pending.deposit_amount) * 100)
+  if (session.payment_status !== 'paid' || session.amount_total !== expectedCents) {
+    console.error(`DEPOSIT MISMATCH for job ${quoteSelectionId}: paid ${session.amount_total} (${session.payment_status}), expected ${expectedCents}. Not confirming. Session ${session.id}`)
+    return
+  }
+  if (pending.date_state !== 'agreed') {
+    console.error(`Deposit paid for job ${quoteSelectionId} before dates were agreed (state ${pending.date_state}). Not confirming; needs manual review. Session ${session.id}`)
+    return
+  }
+
   const { data: job, error: updateError } = await supabase
     .from('quote_selections')
     .update({
@@ -346,7 +373,8 @@ async function handleQuoteSelectionDepositPaid(
       stripe_checkout_session_id: session.id,
     })
     .eq('id', quoteSelectionId)
-    .select('id, customer_id, customer_name, customer_email, customer_phone, customer_street_address, customer_city, customer_state, quote_zip, painter_payout_amount, accepted_by, scheduled_date, deposit_amount, guaranteed_price')
+    .eq('status', 'painter_accepted')
+    .select('id, customer_id, customer_name, customer_email, customer_phone, customer_street_address, customer_city, customer_state, quote_zip, painter_payout_amount, accepted_by, scheduled_date, scheduled_end_date, deposit_amount, guaranteed_price')
     .maybeSingle()
 
   if (updateError || !job) {
@@ -374,7 +402,7 @@ async function handleQuoteSelectionDepositPaid(
   const icsAttachments = job.scheduled_date
     ? [{
         filename: 'painting-project.ics',
-        content: toBase64(buildIcs({ uid: job.id, title: 'Painting project starts', date: job.scheduled_date, location })),
+        content: toBase64(buildIcs({ uid: job.id, title: 'Painting project starts', date: job.scheduled_date, endDate: job.scheduled_end_date, location })),
       }]
     : undefined
 
@@ -410,6 +438,8 @@ async function handleQuoteSelectionDepositPaid(
           guaranteedPrice: job.guaranteed_price,
           depositAmount: job.deposit_amount,
           scheduledDate: job.scheduled_date,
+          scheduledEndDate: job.scheduled_end_date,
+          dashboardUrl: `${Deno.env.get('FRONTEND_URL') ?? 'https://thepaintedpainter.com'}/painter/dashboard/projects`,
         },
         attachments: icsAttachments,
       }),
@@ -432,6 +462,7 @@ async function handleQuoteSelectionDepositPaid(
             depositAmount: job.deposit_amount,
             guaranteedPrice: job.guaranteed_price,
             scheduledDate: job.scheduled_date,
+            scheduledEndDate: job.scheduled_end_date,
             projectsUrl: job.customer_id ? `${Deno.env.get('FRONTEND_URL') ?? 'https://thepaintedpainter.com'}/customer/dashboard/projects` : null,
           },
           attachments: icsAttachments,

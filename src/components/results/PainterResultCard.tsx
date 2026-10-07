@@ -271,6 +271,12 @@ export default function PainterResultCard({
               <p style={{ color: 'var(--text-faint)', fontSize: '0.7rem', margin: '4px 0 0' }}>Other-site ratings are reported by the painter.</p>
             )}
 
+            {result.availableFrom && (
+              <p style={{ margin: '6px 0 0', fontSize: '0.8rem', color: 'var(--accent)' }}>
+                Booked until {new Date(`${result.availableFrom}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · available from then
+              </p>
+            )}
+
             {result.reasons.slice(1).length > 0 && (
               <div className="flex flex-wrap gap-2 mt-2">
                 {result.reasons.slice(1).map((r) => (

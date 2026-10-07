@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../../lib/auth';
 import { supabase, supabaseUrl } from '../../lib/supabase';
 import AddToCalendar from '../../components/AddToCalendar';
+import { fmtRange } from '../../lib/dates';
 
 interface Project {
   id: string;
@@ -10,6 +11,9 @@ interface Project {
   price: number | null;
   address: string;
   scheduledDate: string | null;
+  scheduledEndDate?: string | null;
+  dateState?: 'awaiting_painter_dates' | 'painter_offered' | 'customer_countered' | 'agreed';
+  needsNewPainter?: { expiresAt: string; resumeUrl: string } | null;
   preferredDate: string | null;
   phaseLabel: string | null;
   parentQuoteId: string | null;
@@ -20,13 +24,17 @@ interface Project {
   confirmUrl: string | null;
   reviewToken: string | null;
   reviewSubmitted: boolean;
-  painter: { company_name: string; owner_name: string; email: string; phone: string } | null;
+  // email/phone/owner_name arrive only once the deposit is paid
+  painter: { company_name: string; owner_name?: string; email?: string; phone?: string } | null;
 }
 
 const currency = (n: number | null) =>
   n == null ? 'Pending' : new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n);
 
 const statusLabels: Record<string, string> = {
+  needs_new_painter: 'Pick Another Painter',
+  cancelled: 'Cancelled',
+  expired: 'Expired',
   offer_sent: 'Finding a Painter',
   painter_accepted: 'Awaiting Deposit',
   confirmed: 'Confirmed',
@@ -34,6 +42,7 @@ const statusLabels: Record<string, string> = {
 };
 
 const statusColors: Record<string, string> = {
+  needs_new_painter: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/40',
   offer_sent: 'bg-gray-500/20 text-[var(--text-secondary)] border-gray-500/40',
   painter_accepted: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/40',
   confirmed: 'bg-green-500/20 text-green-400 border-green-500/40',
@@ -128,10 +137,16 @@ function ProjectCard({ project }: { project: Project }) {
         {project.painter && (
           <p>
             <span className="text-[var(--text-faint)]">Painter:</span> {project.painter.company_name}
-            {' — '}
-            <a href={`mailto:${project.painter.email}`} className="text-[var(--accent-blue)] hover:text-[var(--accent-blue-hover)]">{project.painter.email}</a>
-            {' · '}
-            <a href={`tel:${project.painter.phone}`} className="text-[var(--accent-blue)] hover:text-[var(--accent-blue-hover)]">{project.painter.phone}</a>
+            {project.painter.email ? (
+              <>
+                {' — '}
+                <a href={`mailto:${project.painter.email}`} className="text-[var(--accent-blue)] hover:text-[var(--accent-blue-hover)]">{project.painter.email}</a>
+                {' · '}
+                <a href={`tel:${project.painter.phone}`} className="text-[var(--accent-blue)] hover:text-[var(--accent-blue-hover)]">{project.painter.phone}</a>
+              </>
+            ) : (
+              <span className="text-[var(--text-faint)]"> (contact details are shared once your deposit is paid)</span>
+            )}
           </p>
         )}
         <p><span className="text-[var(--text-faint)]">Price:</span> <span className="text-[var(--text-primary)]">{currency(project.price)}</span></p>
@@ -141,7 +156,7 @@ function ProjectCard({ project }: { project: Project }) {
           </span>{' '}
           {project.status === 'completed'
             ? (project.completedAt ? new Date(project.completedAt).toLocaleDateString() : 'Recently')
-            : (project.scheduledDate || project.preferredDate || 'Not yet set')}
+            : (project.scheduledDate ? fmtRange(project.scheduledDate, project.scheduledEndDate) : project.preferredDate || 'Not yet set')}
         </p>
       </div>
 
@@ -151,6 +166,26 @@ function ProjectCard({ project }: { project: Project }) {
         </p>
       )}
 
+      {project.status === 'needs_new_painter' && (
+        <div className="mt-4 pt-4 border-t border-[var(--border)]">
+          {project.needsNewPainter ? (
+            <>
+              <p className="text-sm text-[var(--text-secondary)] mb-3">
+                Your painter couldn't take this job. Pick another from your matches before {new Date(project.needsNewPainter.expiresAt).toLocaleString()}.
+              </p>
+              <a
+                href={project.needsNewPainter.resumeUrl}
+                className="inline-block px-4 py-2 bg-[var(--accent)] text-[var(--accent-ink)] text-sm font-semibold rounded-lg hover:bg-[var(--accent-hover)] transition-colors"
+              >
+                See my matching painters
+              </a>
+            </>
+          ) : (
+            <p className="text-sm text-[var(--text-faint)]">The window to pick another painter has ended.</p>
+          )}
+        </div>
+      )}
+
       {project.status === 'painter_accepted' && (
         <div className="mt-4 pt-4 border-t border-[var(--border)]">
           {project.confirmUrl ? (
@@ -158,11 +193,11 @@ function ProjectCard({ project }: { project: Project }) {
               href={project.confirmUrl}
               className="inline-block px-4 py-2 bg-[var(--accent)] text-[var(--accent-ink)] text-sm font-semibold rounded-lg hover:bg-[var(--accent-hover)] transition-colors"
             >
-              Confirm date &amp; pay deposit
+              {project.dateState === 'agreed' ? 'Pay deposit & confirm' : project.dateState === 'customer_countered' ? 'View your dates' : 'Confirm dates & pay deposit'}
             </a>
           ) : (
             <p className="text-sm text-[var(--text-faint)]">
-              Your painter is choosing a start date. We'll email you when it's ready to confirm.
+              Your painter is choosing when they can start. We'll email you when their dates are ready.
             </p>
           )}
         </div>
@@ -176,6 +211,7 @@ function ProjectCard({ project }: { project: Project }) {
                 uid: project.id,
                 title: `Painting project${project.painter ? ` — ${project.painter.company_name}` : ''}`,
                 date: project.scheduledDate,
+                endDate: project.scheduledEndDate,
                 location: project.address,
               }}
             />

@@ -36,7 +36,10 @@ const EMAIL_TYPE_MAP: Record<string, string> = {
   deal_expiring:     'Your deal is expiring soon',
   painter_application_received: 'New painter application received',
   job_offer_available: 'New job available in your area',
-  painter_accepted_confirm_deposit: 'A painter accepted your job — confirm & pay deposit',
+  painter_offered_dates: 'Your painter sent their available dates — confirm to lock it in',
+  customer_counter_dates: 'The customer suggested different dates',
+  dates_agreed: 'Dates agreed — pay your deposit to lock it in',
+  painter_declined_suggestions: 'Your painter can\'t take the job — here are your next best matches',
   job_confirmed_painter_details: 'Deposit received — job confirmed!',
   painter_accepted_notice: 'A painter accepted your job',
   job_taken: 'That job has been taken',
@@ -120,6 +123,13 @@ function approvalButtons(reviewUrl: unknown): string {
     + button(`${base}&amp;action=request`, 'Ask for more info / documents', '#2563eb', true)
     + button(`${base}&amp;action=reject`, 'Decline', '#b91c1c', true)
 }
+
+function fmtDate(v: unknown): string {
+  const s = String(v ?? '')
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return s
+  return new Date(`${s}T00:00:00Z`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
+}
+const dateRange = (a: unknown, b: unknown) => (b && String(b) !== String(a) ? `${fmtDate(a)} – ${fmtDate(b)}` : fmtDate(a))
 
 const yn = (v: unknown) => (v === true ? 'Yes' : v === false ? 'No' : '')
 const listOf = (v: unknown) => (Array.isArray(v) ? v.join(', ') : v)
@@ -402,36 +412,20 @@ ${body}
         <p>
           Customer: <strong>${escapeHtml(data.customerFirstName) || 'A customer'}</strong><br />
           ZIP code: <strong>${escapeHtml(data.zipCode) || 'N/A'}</strong><br />
-          Desired schedule: <strong>${escapeHtml(data.timelineLabel) || 'Not specified'}</strong>
-          ${data.customerPreferredDate ? `<br />Requested start date: <strong>${escapeHtml(data.customerPreferredDate)}</strong>` : ''}
+          Customer's timing: <strong>${escapeHtml(data.datesText ?? data.timelineLabel) || 'Not specified'}</strong>
+          ${data.estimatedDays ? `<br />Estimated time on site: <strong>about ${escapeHtml(data.estimatedDays)} working day${Number(data.estimatedDays) === 1 ? '' : 's'}</strong>` : ''}
         </p>
         <p style="font-size: 22px; font-weight: 700; color: #2563eb; margin: 20px 0;">
           You'd be paid: ${formatMoney(data.payoutAmount)}
         </p>
-        ${data.acceptUrl ? `${button(escapeHtml(data.acceptUrl), `Accept this job`, '#16a34a')}` : ''}
-        <p style="margin-top: 8px; font-size: 13px; color: #6b7280;">This job is offered on a first-come, first-served basis — the first painter to accept gets it.</p>
+        ${data.acceptUrl ? `${button(escapeHtml(data.acceptUrl), `View job &amp; respond`, '#16a34a')}` : ''}
+        <p style="margin-top: 8px; font-size: 13px; color: #6b7280;">This job is offered on a first-come, first-served basis — the first painter to accept gets it. Not a fit (booked, too far, wrong type of job)? You can decline on the same page and we'll offer the customer other painters.</p>
         <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
         <p style="font-weight: 600; margin-bottom: 12px;">Job details</p>
         ${qaHtml}
         ${photosHtml}
       `)
     }
-
-    case 'painter_accepted_confirm_deposit':
-      return wrap(`
-        <p style="margin-top:0;">Good news — <strong>${data.painterCompanyName || 'a painter'}</strong> accepted your job and picked a start date. Confirm it and pay your deposit to lock it in.</p>
-        ${detailTable('Your painter', [
-          ['Company', data.painterCompanyName], ['Contact', data.painterOwnerName], ['Email', data.painterEmail], ['Phone', data.painterPhone],
-        ])}
-        ${detailTable('The job', [
-          ['Start date', data.scheduledDate],
-          ['Guaranteed price', formatMoney(data.guaranteedPrice)],
-          ['Deposit due now', formatMoney(data.depositAmount)],
-          ['Balance, paid directly to your painter', formatMoney(Number(data.guaranteedPrice) - Number(data.depositAmount))],
-        ])}
-        ${data.confirmUrl ? button(data.confirmUrl, 'Confirm &amp; pay deposit', '#16a34a', true) : ''}
-        <p style="margin:6px 0 0;font-size:13px;color:#6b7280;">Your deposit secures the date. Once it's paid we share your contact details with the painter so you can coordinate directly. Need a different date? Reply to this email.</p>
-      `)
 
     case 'job_confirmed_painter_details':
       return wrap(`
@@ -442,11 +436,12 @@ ${body}
           ['Email', data.customerEmail], ['Phone', data.customerPhone],
         ])}
         ${detailTable('The job', [
-          ['Start date', data.scheduledDate],
+          ['Work happens', dateRange(data.scheduledDate, data.scheduledEndDate)],
           ['Job price', moneyOrEmpty(data.guaranteedPrice)],
           ['Deposit paid to us (our fee)', moneyOrEmpty(data.depositAmount)],
           ['Balance to collect from the customer', formatMoney(data.payoutAmount)],
         ])}
+        ${data.dashboardUrl ? button(data.dashboardUrl, 'Open this job in your dashboard') : ''}
         <p style="margin:18px 0 0;font-size:13px;color:#6b7280;">Reach out to the customer to confirm details. You collect the balance from them directly. Need to move the date? Change it from your dashboard and they're notified.</p>
       `)
 
@@ -455,7 +450,7 @@ ${body}
         <p>Good news — <strong>${data.painterCompanyName || 'a painter'}</strong> accepted your job at ${formatMoney(data.guaranteedPrice)}.</p>
         <p>They're picking a start date now. We'll email you again as soon as it's set, with a link to confirm and pay your deposit.</p>
         ${data.customerPreferredDate ? `<p>Your requested date: <strong>${data.customerPreferredDate}</strong></p>` : ''}
-        <p style="margin-top: 8px; font-size: 13px; color: #6b7280;">You can follow progress anytime under My Projects.</p>
+        ${data.projectsUrl ? button(data.projectsUrl, 'View my project') : '<p style="margin-top: 8px; font-size: 13px; color: #6b7280;">Create an account with this email to follow your project, get reminders and earn loyalty points.</p>'}
       `)
 
     case 'job_taken':
@@ -470,7 +465,7 @@ ${body}
           ['Company', data.painterCompanyName], ['Contact', data.painterOwnerName], ['Email', data.painterEmail], ['Phone', data.painterPhone],
         ])}
         ${detailTable('Your project', [
-          ['Start date', data.scheduledDate],
+          ['Work happens', dateRange(data.scheduledDate, data.scheduledEndDate)],
           ['Guaranteed price', formatMoney(data.guaranteedPrice)],
           ['Deposit paid', formatMoney(data.depositAmount)],
           ['Remaining balance, due to your painter', formatMoney(Number(data.guaranteedPrice) - Number(data.depositAmount))],
@@ -482,7 +477,7 @@ ${body}
     case 'job_rescheduled':
       return wrap(`
         <p>The start date for the job at ${data.location || 'your project'} changed${data.changedBy ? ` (requested by ${data.changedBy})` : ''}.</p>
-        <p>Previous: <strong>${data.oldDate || 'not set'}</strong><br />New: <strong>${data.newDate || 'N/A'}</strong></p>
+        <p>Previous: <strong>${dateRange(data.oldDate, data.oldEndDate) || 'not set'}</strong><br />New: <strong>${dateRange(data.newDate, data.newEndDate) || 'N/A'}</strong></p>
         <p style="margin-top: 8px; font-size: 13px; color: #6b7280;">If this doesn't work for you, reply to the other party directly using the contact details from your confirmation email.</p>
       `)
 
@@ -531,6 +526,64 @@ ${body}
         <p>Because customers rely on those, <strong>new leads are paused</strong> until we re-verify your account. This usually takes 1\u20133 days. Jobs you've already accepted aren't affected.</p>
         <p>To speed it up, upload proof from your profile and press <strong>Submit for review</strong>. If this was a mistake, tell us by replying to this email.</p>
         ${data.profileUrl ? button(data.profileUrl, 'Open your profile') : ''}
+      `)
+    }
+
+    case 'painter_offered_dates': {
+      const windows = (Array.isArray(data.windows) ? (data.windows as { start: string; end: string }[]) : [])
+      const rows: [string, string][] = data.mode === 'flexible'
+        ? [['Availability', `Flexible: around ${fmtDate(data.around)}, give or take ${data.flexDays} days`], ['What you do next', 'Pick the exact start date that works for you']]
+        : windows.map((w, i): [string, string] => [windows.length > 1 ? `Option ${i + 1}` : 'Available', dateRange(w.start, w.end)])
+      return wrap(`
+        <p style="margin-top:0;"><strong>${data.painterCompanyName || 'Your painter'}</strong> accepted your job and sent their dates. Confirm yours and pay your deposit to lock it in.</p>
+        ${detailTable('Their availability', rows)}
+        ${detailTable('The job', [
+          ['Guaranteed price', formatMoney(data.guaranteedPrice)],
+          ['Estimated time on site', data.estimatedDays ? `about ${data.estimatedDays} working day${Number(data.estimatedDays) === 1 ? '' : 's'}` : ''],
+        ])}
+        ${data.note ? `<p style="margin:14px 0 0;font-size:14px;"><strong>Note from your painter:</strong> ${data.note}</p>` : ''}
+        ${data.confirmUrl ? button(data.confirmUrl, data.mode === 'flexible' ? 'Pick my dates &amp; pay deposit' : 'Confirm dates &amp; pay deposit', '#16a34a', true) : ''}
+        <p style="margin:6px 0 0;font-size:13px;color:#6b7280;">None of these dates work? Open the page above and suggest a different timeframe; your painter will accept it or offer other dates. Your painter's contact details are shared once your deposit is paid.</p>
+      `)
+    }
+
+    case 'customer_counter_dates':
+      return wrap(`
+        <p style="margin-top:0;"><strong>${data.customerFirstName || 'The customer'}</strong> can't make the dates you offered and suggested a different timeframe.</p>
+        ${detailTable('Their suggestion', [['Dates', dateRange(data.start, data.end)], ['Note', data.note]])}
+        ${data.reviewUrl ? button(data.reviewUrl, 'Accept or offer other dates', '#2563eb', true) : ''}
+        <p style="margin:6px 0 0;font-size:13px;color:#6b7280;">Accepting sends them a link to pay the deposit and lock it in.</p>
+      `)
+
+    case 'dates_agreed':
+      return wrap(`
+        <p style="margin-top:0;"><strong>${data.painterCompanyName || 'Your painter'}</strong> accepted your dates. Pay your deposit to lock them in.</p>
+        ${detailTable('Agreed dates', [['Work happens', dateRange(data.startDate, data.endDate)]])}
+        ${data.confirmUrl ? button(data.confirmUrl, 'Pay deposit &amp; confirm', '#16a34a', true) : ''}
+      `)
+
+    case 'painter_declined_suggestions': {
+      const list = (Array.isArray(data.suggestions) ? (data.suggestions as Record<string, unknown>[]) : [])
+      const expires = data.expiresAt ? new Date(String(data.expiresAt)).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'UTC' }) + ' UTC' : ''
+      const intro = data.mystery
+        ? "None of the painters we sent your job to were able to take it."
+        : `<strong>${data.declinedName || 'Your painter'}</strong> can't take your job.`
+      const cards = list.map((p) => {
+        const rating = (p.rating as { average: number | null; count: number } | undefined)
+        return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #e5e7eb;border-radius:8px;margin:12px 0;"><tr><td style="padding:14px 16px;">
+          <p style="margin:0;font-size:17px;font-weight:700;">${escapeHtml(p.companyName)}</p>
+          <p style="margin:2px 0 6px;font-size:13px;color:#6b7280;">${escapeHtml(p.city)}, ${escapeHtml(p.state)} · about ${escapeHtml(p.distanceMiles)} mi${rating && rating.average != null ? ` · ★ ${escapeHtml(rating.average)} (${escapeHtml(rating.count)} reviews)` : ' · new on The Painted Painter'}</p>
+          <p style="margin:0 0 4px;font-size:20px;font-weight:700;color:#2563eb;">${formatMoney(p.price)} <span style="font-size:12px;font-weight:400;color:#6b7280;">guaranteed price</span></p>
+          ${p.availableFrom ? `<p style="margin:0 0 4px;font-size:12px;color:#6b7280;">Available from ${fmtDate(p.availableFrom)}</p>` : ''}
+          ${button(escapeHtml(p.chooseUrl), `Choose ${escapeHtml(p.companyName)}`, '#16a34a')}
+        </td></tr></table>`
+      }).join('')
+      return wrap(`
+        <p style="margin-top:0;">Hi ${data.customerName || 'there'}, ${intro}</p>
+        ${list.length > 0 ? `<p style="margin:0 0 4px;">Here are your next best matches. Pick one right from this email and we'll send them your job:</p>${cards}` : '<p>We don\'t have another matching painter available right now, but new painters join often. You can reload your search below.</p>'}
+        ${data.resumeUrl ? button(data.resumeUrl, 'See all my matching painters', '#2563eb', true) : ''}
+        ${data.cancelUrl ? button(data.cancelUrl, 'No thanks, cancel my request', '#6b7280', true) : ''}
+        <p style="margin:10px 0 0;font-size:13px;color:#6b7280;">${expires ? `These links and prices expire on <strong>${expires}</strong> (72 hours from now). After that your request closes and you can start a new search any time.` : ''} "See all my matching painters" asks you to sign in to The Painted Painter first, then reloads your search results.</p>
       `)
     }
 

@@ -19,6 +19,10 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
 import { notify } from '../_shared/notify.ts'
 import { zipDistanceMiles } from '../_shared/geo.ts'
+import { verifyPrice } from '../_shared/priceToken.ts'
+import { evaluateAvailability, isIsoDate } from '../_shared/availability.ts'
+import { estimateWorkingDays } from '../_shared/duration.ts'
+import { describeTiming } from '../_shared/offers.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -69,6 +73,14 @@ interface ClaimRequest {
   phaseLabel?: string
   /** Photos the customer uploaded during the chat estimate — forwarded to the painter. */
   photos?: QuotePhoto[]
+  /** Signed proof the price came from painter-results (painter id, or 'mystery'). Required. */
+  priceToken?: string
+  /** What the customer said about timing in the chat. */
+  timing?: { startDate?: string | null; endDate?: string | null; flexible?: boolean; timeline?: string | null }
+  /** Set when this claim is made from a reloaded search after a painter declined; the old request is closed. */
+  resumeToken?: string
+  /** The estimate + context behind this search, kept so the results can be reloaded if the painter declines. */
+  resumeState?: unknown
 }
 
 serve(async (req: Request) => {
@@ -87,7 +99,7 @@ serve(async (req: Request) => {
     const body = await req.json() as ClaimRequest
     const {
       selectionType, selectedPainterId, guaranteedPrice, quoteZip, customer, timeline, timelineLabel, qa,
-      preferredDate, parentQuoteId, phaseLabel, photos,
+      preferredDate, parentQuoteId, phaseLabel, photos, priceToken, timing, resumeState, resumeToken,
     } = body
 
     if (!selectionType || !guaranteedPrice || !customer?.name || !customer?.email || !customer?.phone || !customer?.streetAddress) {
@@ -125,6 +137,22 @@ serve(async (req: Request) => {
       )
     }
 
+    // The price must be one painter-results produced, for this painter (or the Mystery baseline) and ZIP,
+    // and still within its hold time. Prices can't be edited, swapped between painters, or used late.
+    const priceCheck = await verifyPrice(selectionType === 'specific_painter' ? String(selectedPainterId) : 'mystery', guaranteedPrice, String(quoteZip ?? ''), priceToken)
+    if (priceCheck === 'expired') {
+      return new Response(
+        JSON.stringify({ error: 'This price has expired. Please refresh your results to see current prices.', code: 'price_expired' }),
+        { status: 410, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      )
+    }
+    if (priceCheck !== 'ok') {
+      return new Response(
+        JSON.stringify({ error: 'We couldn\'t verify that price. Please refresh your results and try again.', code: 'price_invalid' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      )
+    }
+
     // Link the job to an account only if the caller is actually logged in as
     // that user. Never trust a customerId from the request body: it drives
     // loyalty points, so a spoofed id would credit someone else's account.
@@ -138,14 +166,23 @@ serve(async (req: Request) => {
     // --------------------------------------------------------------------
     // Determine which painter(s) to notify
     // --------------------------------------------------------------------
-    type PainterRow = { id: string; user_id: string | null; email: string; company_name: string; owner_name: string; phone: string; zip_code: string }
+    const claimTiming = {
+      startDate: isIsoDate(timing?.startDate) ? timing!.startDate : null,
+      endDate: isIsoDate(timing?.endDate) ? timing!.endDate : null,
+      flexible: timing?.flexible === true,
+      timeline: typeof timing?.timeline === 'string' ? timing!.timeline : (typeof timeline === 'string' ? timeline : null),
+    }
+    const durationDays = estimateWorkingDays(guaranteedPrice)
+    const resumeJson = resumeState && JSON.stringify(resumeState).length < 200_000 ? resumeState : null
+
+    type PainterRow = { id: string; user_id: string | null; email: string; company_name: string; owner_name: string; phone: string; zip_code: string; leads_paused: boolean | null; paused_until: string | null; blackout_dates: unknown }
 
     let notifiedPainters: PainterRow[] = []
 
     if (selectionType === 'specific_painter') {
       const { data: painter, error: painterError } = await supabase
         .from('painters')
-        .select('id, user_id, email, company_name, owner_name, phone, zip_code')
+        .select('id, user_id, email, company_name, owner_name, phone, zip_code, leads_paused, paused_until, blackout_dates')
         .eq('id', selectedPainterId)
         .eq('verified', true)
         .eq('status', 'approved')
@@ -157,11 +194,17 @@ serve(async (req: Request) => {
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
         )
       }
+      if (!evaluateAvailability(painter, claimTiming, durationDays).show) {
+        return new Response(
+          JSON.stringify({ error: 'That painter isn\'t available for your dates. Please pick another painter or adjust your dates.' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        )
+      }
       notifiedPainters = [painter]
     } else {
       const { data: painters, error: paintersError } = await supabase
         .from('painters')
-        .select('id, user_id, email, company_name, owner_name, phone, zip_code')
+        .select('id, user_id, email, company_name, owner_name, phone, zip_code, leads_paused, paused_until, blackout_dates')
         .eq('verified', true)
         .eq('status', 'approved')
 
@@ -170,6 +213,7 @@ serve(async (req: Request) => {
       notifiedPainters = (painters ?? [])
         .map((p) => ({ ...p, distance: quoteZip ? zipDistanceMiles(quoteZip, p.zip_code) : null }))
         .filter((p) => p.distance !== null && p.distance <= SERVICE_RADIUS_MILES)
+        .filter((p) => evaluateAvailability(p, claimTiming, durationDays).show)
         .sort((a, b) => (a.distance ?? Infinity) - (b.distance ?? Infinity))
         .slice(0, MYSTERY_BROADCAST_CAP)
     }
@@ -209,7 +253,13 @@ serve(async (req: Request) => {
         commission_rate: COMMISSION_RATE,
         painter_payout_amount: painterPayoutAmount,
         deposit_amount: depositAmount,
-        customer_preferred_date: preferredDate || null,
+        customer_preferred_date: preferredDate || claimTiming.startDate || null,
+        customer_start_date: claimTiming.startDate,
+        customer_end_date: claimTiming.endDate,
+        dates_flexible: claimTiming.flexible,
+        timeline: claimTiming.timeline,
+        estimated_days: durationDays,
+        resume_state: resumeJson,
         customer_id: verifiedCustomerId,
         parent_quote_id: parentQuoteId || null,
         phase_label: phaseLabel || null,
@@ -218,6 +268,15 @@ serve(async (req: Request) => {
       .single()
 
     if (insertError || !inserted) throw insertError ?? new Error('Failed to create job record')
+
+    // A claim made from a reloaded search replaces the request the declined painter left open.
+    if (resumeToken) {
+      await supabase
+        .from('quote_selections')
+        .update({ status: 'cancelled', fallback_token: null, fallback_expires_at: null, fallback_suggestions: null })
+        .eq('fallback_token', resumeToken)
+        .eq('status', 'needs_new_painter')
+    }
 
     // --------------------------------------------------------------------
     // Email each notified painter the masked job offer
@@ -244,6 +303,8 @@ serve(async (req: Request) => {
               customerFirstName,
               zipCode: quoteZip,
               timelineLabel,
+              datesText: describeTiming({ customer_start_date: claimTiming.startDate, customer_end_date: claimTiming.endDate, dates_flexible: claimTiming.flexible, timeline: claimTiming.timeline, customer_preferred_date: preferredDate || null }),
+              estimatedDays: durationDays,
               customerPreferredDate: preferredDate || null,
               payoutAmount: painterPayoutAmount,
               acceptUrl,

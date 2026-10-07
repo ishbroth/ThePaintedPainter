@@ -79,10 +79,12 @@ serve(async (req: Request) => {
         customer_street_address, customer_city, customer_state,
         scheduled_date, customer_preferred_date, phase_label, parent_quote_id,
         confirmed_at, completed_at, review_token, review_submitted_at, accepted_by,
-        customer_confirm_token, offer_sent_at, accepted_at
+        customer_confirm_token, offer_sent_at, accepted_at,
+        scheduled_end_date, date_state, painter_availability, customer_counter, estimated_days,
+        fallback_token, fallback_expires_at, fallback_suggestions
       `)
       .or(orFilter)
-      .in('status', ['offer_sent', 'painter_accepted', 'confirmed', 'completed'])
+      .in('status', ['offer_sent', 'painter_accepted', 'confirmed', 'completed', 'needs_new_painter'])
       .order('scheduled_date', { ascending: true, nullsFirst: false })
 
     if (error) throw error
@@ -116,10 +118,26 @@ serve(async (req: Request) => {
       reviewSubmitted: !!r.review_submitted_at,
       // The customer owns this row (matched by their account), so it's safe to hand them
       // their own pay-deposit link here; only offered once a painter has set a date.
-      confirmUrl: r.status === 'painter_accepted' && r.scheduled_date
+      confirmUrl: r.status === 'painter_accepted' && ['painter_offered', 'agreed', 'customer_countered'].includes(r.date_state)
         ? `${Deno.env.get('FRONTEND_URL') ?? 'https://thepaintedpainter.com'}/confirm-job?token=${r.customer_confirm_token}`
         : null,
-      painter: r.accepted_by ? paintersById[r.accepted_by] ?? null : null,
+      // Painter contact details (email, phone, owner) only once the deposit is paid; before that, just the company name.
+      painter: r.accepted_by
+        ? (() => {
+            const p = paintersById[r.accepted_by]
+            if (!p) return null
+            return r.status === 'confirmed' || r.status === 'completed' ? p : { company_name: p.company_name }
+          })()
+        : null,
+      scheduledEndDate: r.scheduled_end_date,
+      dateState: r.date_state,
+      availability: r.painter_availability,
+      counter: r.customer_counter,
+      estimatedDays: r.estimated_days,
+      // After a decline: pick another painter within 72 hours (link dies when it expires).
+      needsNewPainter: r.status === 'needs_new_painter' && !!r.fallback_expires_at && new Date(r.fallback_expires_at).getTime() > Date.now()
+        ? { expiresAt: r.fallback_expires_at, resumeUrl: `${Deno.env.get('FRONTEND_URL') ?? 'https://thepaintedpainter.com'}/resume-search?token=${r.fallback_token}` }
+        : null,
     }))
 
     return new Response(JSON.stringify({ projects }), {

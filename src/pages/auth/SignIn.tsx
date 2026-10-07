@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../lib/auth/index.ts';
 import { dashboardPathForRole } from '../../lib/auth/roleRoutes.ts';
 import { supabaseAnonKey, supabaseUrl } from '../../lib/supabase';
@@ -13,6 +13,11 @@ import { supabaseAnonKey, supabaseUrl } from '../../lib/supabase';
 export default function SignIn() {
   const { signIn, user, profile, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  // Where to go after signing in (e.g. back to a reloaded search). Only same-site paths.
+  const nextParam = searchParams.get('next');
+  const next = nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//') ? nextParam : null;
+  const resuming = searchParams.get('reason') === 'resume';
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -26,9 +31,9 @@ export default function SignIn() {
   // they were already signed in), send them to the right place.
   useEffect(() => {
     if (!authLoading && user && profile) {
-      navigate(dashboardPathForRole(profile.role), { replace: true });
+      navigate(next ?? dashboardPathForRole(profile.role), { replace: true });
     }
-  }, [authLoading, user, profile, navigate]);
+  }, [authLoading, user, profile, navigate, next]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -74,7 +79,9 @@ export default function SignIn() {
     <div className="flex items-center justify-center min-h-[70vh] px-4">
       <div className="w-full max-w-[400px] bg-[var(--bg-surface)] border border-[var(--border)] rounded-xl shadow-lg p-8">
         <h1 className="text-2xl font-bold text-[var(--text-primary)] text-center">Sign In</h1>
-        <p className="text-[var(--text-secondary)] text-center mt-2 mb-6">Welcome back</p>
+        <p className="text-[var(--text-secondary)] text-center mt-2 mb-6">
+          {resuming ? 'Sign in to reload your search results. Use the email you used for your request.' : 'Welcome back'}
+        </p>
 
         {error && (
           <div className="bg-[var(--tint-critical-bg)] border border-[var(--tint-critical-border)] text-[var(--danger)] px-4 py-3 rounded mb-4 text-sm">

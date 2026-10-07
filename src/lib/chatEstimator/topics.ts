@@ -551,10 +551,10 @@ export const TOPICS: Topic[] = [
       const exteriorOnly = c.projectType === 'exterior';
       const commercial = isCommercialLike(c);
       if (exteriorOnly) {
-        return pick(["Last thing — when would you like this done?", "And what's the timeline on this — any rush, or flexible?"], seed(c));
+        return pick(["Last thing — when would you like this done? (a specific date or range, ASAP, or tell me your dates are flexible)", "And what's the timeline on this — specific dates, any rush, or are your dates flexible?"], seed(c));
       }
       if (c.occupancy && !c.timeline) {
-        return pick(["Last thing — when would you like this done?", "And what's the timeline — any rush, or flexible?"], seed(c));
+        return pick(["Last thing — when would you like this done? (a specific date or range, ASAP, or tell me your dates are flexible)", "And what's the timeline — specific dates, any rush, or are your dates flexible?"], seed(c));
       }
       if (!c.occupancy && c.timeline) {
         if (commercial) {
@@ -581,7 +581,7 @@ export const TOPICS: Topic[] = [
       }
       return pick(
         [
-          "Last thing — when would you like this done, and will it be occupied / furnished / or empty when we work?",
+          "Last thing — when would you like this done (specific dates, ASAP, or flexible?), and will it be occupied / furnished / or empty when we work?",
           "Two quick ones to wrap up — timeline, and will the place be occupied, furnished, or empty while we work?",
         ],
         seed(c),

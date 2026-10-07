@@ -30,6 +30,10 @@ export interface PainterResult {
   distanceMiles: number;
   /** Guaranteed price shown for (and charged if the customer picks) this painter. */
   price: number;
+  /** Signed proof that this price came from us; a claim is only accepted with it. */
+  priceToken: string;
+  /** Set when the painter is booked until later: the date they're next free. */
+  availableFrom: string | null;
   /** Rating from reviews on The Painted Painter. */
   rating: { average: number | null; count: number };
   external: ExternalReview[];
@@ -71,14 +75,27 @@ export interface PainterDetail {
   reviews: PainterReview[];
 }
 
-/** Approved painters near the job, nearest first, each with their own price. */
-export async function fetchPainterResults(ctx: EstimatorContext, baseTotal: number): Promise<PainterResult[]> {
-  const { data, error } = await supabase.functions.invoke('painter-results', { body: { ctx, baseTotal } });
+export interface PainterResults {
+  painters: PainterResult[];
+  /** Mystery Painter: the baseline price and its signed token. */
+  mystery: { price: number; priceToken: string };
+  /** When the displayed prices stop being claimable (ms since epoch) — enforced by the server. */
+  holdUntil: number;
+  /** Estimated working days for the job. */
+  duration: { days: number; low: number; high: number };
+}
+
+/**
+ * Approved, available painters near the job, nearest first, each with their own signed price.
+ * `resumeToken` reloads a search from a "your painter declined" email.
+ */
+export async function fetchPainterResults(ctx: EstimatorContext, baseTotal: number, resumeToken?: string): Promise<PainterResults | null> {
+  const { data, error } = await supabase.functions.invoke('painter-results', { body: { ctx, baseTotal, resumeToken } });
   if (error || !data?.painters) {
     console.error('Failed to fetch painters:', error ?? data);
-    return [];
+    return null;
   }
-  return data.painters as PainterResult[];
+  return data as PainterResults;
 }
 
 export async function fetchPainterDetail(painterId: string): Promise<PainterDetail | null> {

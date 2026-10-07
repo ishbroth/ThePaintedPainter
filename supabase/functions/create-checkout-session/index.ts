@@ -1,98 +1,69 @@
 // supabase/functions/create-checkout-session/index.ts
 //
-// Supabase Edge Function: Create Stripe Checkout Session
+// Supabase Edge Function: start the Stripe Checkout for a job's deposit
 //
-// Receives a POST request with project details and creates a Stripe Checkout
-// Session so the customer can pay a deposit or full amount for their painting
-// project. Returns the Checkout Session URL for client-side redirect.
+// POST { confirmToken }
 //
-// Environment variables required:
-//   STRIPE_SECRET_KEY - Your Stripe secret key (sk_live_... or sk_test_...)
+// The browser used to send the amount, and this accepted any amount for any job,
+// so a customer could pay $1 and still confirm the job. Now the browser sends only
+// the customer's confirm token; everything else is decided here from the database:
+//   * the job must be waiting on its deposit (painter accepted, dates agreed,
+//     not yet paid);
+//   * the amount is the job's stored deposit (10% of the guaranteed price);
+//   * the return URLs are built from our own site address.
+// The webhook then re-checks the amount actually paid before confirming anything.
+//
+// Required secrets: STRIPE_SECRET_KEY. Optional: FRONTEND_URL.
 //
 // Deploy:
 //   supabase functions deploy create-checkout-session --no-verify-jwt
-//
-// Set secret:
-//   supabase secrets set STRIPE_SECRET_KEY=sk_live_...
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
 import Stripe from 'https://esm.sh/stripe@13.10.0?target=deno'
 
-// CORS headers to allow requests from the frontend app
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
-serve(async (req: Request) => {
-  // --------------------------------------------------------------------------
-  // Step 1: Handle CORS preflight requests
-  // Browsers send an OPTIONS request before the actual POST to check CORS.
-  // --------------------------------------------------------------------------
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
-  }
+function json(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+}
 
-  // Only accept POST requests
-  if (req.method !== 'POST') {
-    return new Response(
-      JSON.stringify({ error: 'Method not allowed' }),
-      { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-    )
-  }
+serve(async (req: Request) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
+  if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
 
   try {
-    // ------------------------------------------------------------------------
-    // Step 2: Parse the request body
-    // The client sends the project ID, amount, description, and redirect URLs.
-    // ------------------------------------------------------------------------
-    const { projectId, amount, description, successUrl, cancelUrl, kind } = await req.json()
-
-    // Validate required fields
-    if (!projectId || !amount || !successUrl || !cancelUrl) {
-      return new Response(
-        JSON.stringify({
-          error: 'Missing required fields: projectId, amount, successUrl, cancelUrl',
-        }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-      )
-    }
-
-    // Validate amount is a positive number
-    if (typeof amount !== 'number' || amount <= 0) {
-      return new Response(
-        JSON.stringify({ error: 'Amount must be a positive number (in dollars)' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-      )
-    }
-
-    // ------------------------------------------------------------------------
-    // Step 3: Initialize the Stripe client
-    // The secret key is stored as a Supabase Edge Function secret and accessed
-    // via Deno.env. Never hard-code the key in source.
-    // ------------------------------------------------------------------------
     const stripeSecretKey = Deno.env.get('STRIPE_SECRET_KEY')
-    if (!stripeSecretKey) {
-      throw new Error('STRIPE_SECRET_KEY is not set in environment')
-    }
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    if (!stripeSecretKey || !supabaseUrl || !serviceRoleKey) throw new Error('Server is not configured')
+    const frontendUrl = Deno.env.get('FRONTEND_URL') ?? 'https://thepaintedpainter.com'
 
-    const stripe = new Stripe(stripeSecretKey, {
-      apiVersion: '2023-10-16',
-      // Use the Deno HTTP client (fetch-based) instead of Node's http module
-      httpClient: Stripe.createFetchHttpClient(),
-    })
+    const { confirmToken } = await req.json() as { confirmToken?: string }
+    if (!confirmToken) return json({ error: 'Missing confirmToken' }, 400)
 
-    // ------------------------------------------------------------------------
-    // Step 4: Create the Stripe Checkout Session
-    //
-    // - mode: 'payment' for one-time charges (deposits or full payment)
-    // - line_items: a single item representing the painting project charge
-    // - metadata: stores the projectId so we can link the payment back to
-    //   the project when we receive the webhook
-    // - success_url / cancel_url: where Stripe redirects the customer after
-    //   completing or cancelling the payment
-    // ------------------------------------------------------------------------
+    const supabase = createClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
+    const { data: job } = await supabase
+      .from('quote_selections')
+      .select('id, status, date_state, deposit_status, deposit_amount, scheduled_date, accepted_by')
+      .eq('customer_confirm_token', confirmToken)
+      .maybeSingle()
+
+    if (!job) return json({ error: 'This link is invalid.' }, 404)
+    if (job.deposit_status === 'paid' || job.status === 'confirmed') return json({ error: 'This deposit has already been paid.' }, 409)
+    if (job.status !== 'painter_accepted' || !job.accepted_by) return json({ error: 'This job isn\'t ready for a deposit.' }, 409)
+    if (job.date_state !== 'agreed' || !job.scheduled_date) return json({ error: 'Confirm your dates before paying the deposit.' }, 409)
+
+    const depositCents = Math.round(Number(job.deposit_amount) * 100)
+    if (!Number.isFinite(depositCents) || depositCents < 50) return json({ error: 'This job has no valid deposit amount.' }, 409)
+
+    const { data: painter } = await supabase.from('painters').select('company_name').eq('id', job.accepted_by).maybeSingle()
+
+    const stripe = new Stripe(stripeSecretKey, { apiVersion: '2023-10-16', httpClient: Stripe.createFetchHttpClient() })
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
       payment_method_types: ['card'],
@@ -101,57 +72,22 @@ serve(async (req: Request) => {
           price_data: {
             currency: 'usd',
             product_data: {
-              name: description || 'Painting Project Deposit',
-              description: `Project ID: ${projectId}`,
+              name: `10% deposit for painting project with ${painter?.company_name ?? 'your painter'}`,
+              description: `Project ID: ${job.id}`,
             },
-            // Stripe expects the amount in cents
-            unit_amount: Math.round(amount * 100),
+            unit_amount: depositCents,
           },
           quantity: 1,
         },
       ],
-      // Store the project ID in metadata so the stripe-webhook function can
-      // look up and update the correct project when payment completes.
-      // `kind` tells the webhook which table this projectId belongs to
-      // ('quote_selection' for the job-claim deposit flow, unset/legacy
-      // for customer_projects) since the two share no ID space.
-      metadata: {
-        projectId,
-        ...(kind ? { kind } : {}),
-      },
-      success_url: successUrl,
-      cancel_url: cancelUrl,
+      metadata: { projectId: job.id, kind: 'quote_selection', depositCents: String(depositCents) },
+      success_url: `${frontendUrl}/confirm-job?token=${confirmToken}&payment=success`,
+      cancel_url: `${frontendUrl}/confirm-job?token=${confirmToken}&payment=cancelled`,
     })
 
-    // ------------------------------------------------------------------------
-    // Step 5: Return the Checkout Session URL
-    // The client redirects the user to this URL to complete payment on
-    // Stripe's hosted checkout page.
-    // ------------------------------------------------------------------------
-    return new Response(
-      JSON.stringify({ url: session.url }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      },
-    )
+    return json({ url: session.url })
   } catch (error) {
-    // ------------------------------------------------------------------------
-    // Error handling: return a structured error response
-    // In production, consider logging to an external service instead of
-    // exposing internal error messages.
-    // ------------------------------------------------------------------------
     console.error('Error creating checkout session:', error)
-
-    const message = error instanceof Error ? error.message : 'Internal server error'
-    const status = message.includes('Missing required') ? 400 : 500
-
-    return new Response(
-      JSON.stringify({ error: message }),
-      {
-        status,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      },
-    )
+    return json({ error: 'Could not start checkout. Please try again.' }, 500)
   }
 })

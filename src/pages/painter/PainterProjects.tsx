@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../../lib/auth';
 import { supabaseUrl } from '../../lib/supabase';
 import AddToCalendar from '../../components/AddToCalendar';
+import { fmtRange } from '../../lib/dates';
 
 interface JobPhoto {
   url: string;
@@ -14,6 +15,8 @@ interface Offer {
   zip: string | null;
   payoutAmount: number | null;
   timelineLabel: string | null;
+  customerTiming?: string;
+  estimatedDays?: number | null;
   preferredDate: string | null;
   phaseLabel: string | null;
   photos: JobPhoto[];
@@ -30,6 +33,9 @@ interface Job {
   customerPhone: string | null;
   address: string;
   scheduledDate: string | null;
+  scheduledEndDate?: string | null;
+  dateState?: 'awaiting_painter_dates' | 'painter_offered' | 'customer_countered' | 'agreed';
+  estimatedDays?: number | null;
   preferredDate: string | null;
   phaseLabel: string | null;
   completedAt: string | null;
@@ -107,8 +113,8 @@ function OfferCard({ offer }: { offer: Offer }) {
           {offer.phaseLabel || 'Painting job'} {offer.zip ? `— ${offer.zip}` : ''}
         </p>
         <p style={{ color: 'var(--text-faint)', fontSize: '0.85rem', margin: 0 }}>
-          {offer.timelineLabel || 'Timeline not specified'}
-          {offer.preferredDate ? ` · Requested start: ${offer.preferredDate}` : ''}
+          Customer's timing: {offer.customerTiming || offer.timelineLabel || 'Not specified'}
+          {offer.estimatedDays ? ` · about ${offer.estimatedDays} working day${offer.estimatedDays === 1 ? '' : 's'} on site` : ''}
         </p>
         <PhotoThumbnails photos={offer.photos} />
       </div>
@@ -144,7 +150,7 @@ function JobCard({ job, onMarkCompleted, onReschedule, marking }: { job: Job; on
           <p style={{ color: 'var(--text-faint)', fontSize: '0.8rem', margin: 0 }}>
             {job.status === 'completed'
               ? `Completed ${job.completedAt ?? ''}`
-              : `${job.scheduledDate ? `Scheduled: ${job.scheduledDate}` : job.preferredDate ? `Requested: ${job.preferredDate}` : 'Date not yet set'}`}
+              : `${job.scheduledDate ? `Scheduled: ${fmtRange(job.scheduledDate, job.scheduledEndDate)}` : job.preferredDate ? `Customer asked for: ${job.preferredDate}` : 'Dates not set yet'}`}
           </p>
           {job.status === 'confirmed' && job.scheduledDate && (
             <div style={{ marginTop: 8 }}>
@@ -153,6 +159,7 @@ function JobCard({ job, onMarkCompleted, onReschedule, marking }: { job: Job; on
                   uid: job.id,
                   title: `Paint job${job.customerName ? ` — ${job.customerName}` : ''}`,
                   date: job.scheduledDate,
+                  endDate: job.scheduledEndDate,
                   location: job.address,
                 }}
               />
@@ -165,12 +172,17 @@ function JobCard({ job, onMarkCompleted, onReschedule, marking }: { job: Job; on
           {job.status === 'painter_accepted' && (
             <>
               <span style={{ display: 'inline-block', padding: '4px 10px', borderRadius: 999, background: 'var(--tint-warning-bg)', border: '1px solid var(--tint-warning-border)', color: 'var(--text-secondary)', fontSize: '0.75rem' }}>
-                {job.scheduledDate ? 'Awaiting customer deposit' : 'Set a start date'}
+                {job.dateState === 'agreed' ? 'Awaiting customer deposit'
+                  : job.dateState === 'painter_offered' ? 'Waiting for customer to confirm dates'
+                  : job.dateState === 'customer_countered' ? 'Customer suggested new dates'
+                  : 'Send your available dates'}
               </span>
               {job.setDateUrl && (
                 <div style={{ marginTop: 8 }}>
                   <a href={job.setDateUrl} style={{ color: 'var(--accent-blue)', fontSize: '0.85rem' }}>
-                    {job.scheduledDate ? 'Change start date' : 'Choose start date'}
+                    {job.dateState === 'customer_countered' ? 'Review their dates'
+                      : job.dateState === 'awaiting_painter_dates' ? 'Send my availability'
+                      : 'Change what I offered'}
                   </a>
                 </div>
               )}

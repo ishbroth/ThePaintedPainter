@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { PRICING_SCENARIOS, PROJECT_SIZE_OPTIONS, SERVICE_TYPE_OPTIONS } from '../../lib/painterOptions';
 import ExternalReviewsFields from '../../components/painter/ExternalReviewsFields';
 import { emptyExternalForm, fromExternalForm, toExternalForm, validateExternalForm, type ExternalFormValue } from '../../lib/externalReviews';
+import AvailabilityCard from '../../components/painter/AvailabilityCard';
 import CredentialsEditor, { CREDENTIAL_COLUMNS, toCredentials } from '../../components/painter/CredentialsEditor';
 
 interface PainterRow {
@@ -129,6 +130,10 @@ export default function PainterProfile() {
   return (
     <div className="max-w-3xl mx-auto">
       <h1 className="text-2xl font-bold text-[var(--text-primary)] mb-6">Edit Profile</h1>
+
+      <div className="mb-6">
+        <AvailabilityCard />
+      </div>
 
       <form onSubmit={handleSave} className="space-y-6">
         <div className={card}>

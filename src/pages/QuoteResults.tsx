@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { useLocation, Navigate, useNavigate } from 'react-router-dom';
 import type { EstimatorContext, EstimateBreakdown } from '../lib/types';
 import type { Assumption } from '../lib/chatEstimator/defaultAssumptions';
 import type { MatchedSituation } from '../lib/pricing/situations';
-import { fetchPainterResults, type PainterResult } from '../lib/realPainterMatcher';
+import { fetchPainterResults, type PainterResult, type PainterResults } from '../lib/realPainterMatcher';
+import { estimateDayRange } from '../lib/duration';
 import PainterResultCard from '../components/results/PainterResultCard';
 import { buildResponseSummary, timelineLabel } from '../lib/chatEstimator/responseSummary';
 import { supabase } from '../lib/supabase';
@@ -18,6 +19,8 @@ interface LocationState {
   matchedSituations: MatchedSituation[];
   transcript: string;
   expiresAt?: number;
+  /** Set when reloaded from a "your painter declined" email: ties claims to that 72-hour window. */
+  resumeToken?: string;
 }
 
 /** Falls back to the persisted quote if location.state is missing — e.g. a
@@ -40,6 +43,17 @@ const currency = (n: number) =>
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(n);
+
+/** "Nov 3 – Nov 7", "Flexible", "As soon as possible"... for the line under the price. */
+function timingSummary(ctx: EstimatorContext): string {
+  const fmt = (iso: string) => new Date(`${iso}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  if (ctx.startDate) {
+    const span = ctx.endDate && ctx.endDate !== ctx.startDate ? `${fmt(ctx.startDate)} – ${fmt(ctx.endDate)}` : `starting ${fmt(ctx.startDate)}`;
+    return ctx.datesFlexible ? `flexible, around ${span}` : span;
+  }
+  if (ctx.datesFlexible) return 'dates are flexible';
+  return timelineLabel(ctx.timeline);
+}
 
 const QuoteResults = () => {
   const location = useLocation();
@@ -79,21 +93,34 @@ const QuoteResults = () => {
     ? 'var(--accent)'
     : 'var(--accent-blue)';
 
-  const [painterMatches, setPainterMatches] = useState<PainterResult[] | null>(null);
+  const [results, setResults] = useState<PainterResults | null>(null);
+  const [resultsFailed, setResultsFailed] = useState(false);
+  const painterMatches: PainterResult[] | null = results ? results.painters : resultsFailed ? [] : null;
 
-  useEffect(() => {
-    if (!state) return;
+  const loadResults = useCallback(() => {
+    if (!state) return () => {};
     let cancelled = false;
-    fetchPainterResults(state.ctx, state.estimate.total).then((matches) => {
-      if (!cancelled) setPainterMatches(matches);
+    fetchPainterResults(state.ctx, state.estimate.total, state.resumeToken).then((r) => {
+      if (cancelled) return;
+      if (!r) return setResultsFailed(true);
+      setResults(r);
+      // The server decides how long these prices can be claimed; the countdown follows it.
+      expiresAtRef.current = r.holdUntil;
+      try {
+        sessionStorage.setItem(QUOTE_EXPIRES_KEY, String(r.holdUntil));
+      } catch {
+        // ignore
+      }
     });
     return () => {
       cancelled = true;
     };
   }, [state]);
 
+  useEffect(() => loadResults(), [loadResults]);
+
   const [claimTarget, setClaimTarget] = useState<
-    { selectionType: 'specific_painter'; painter: { id: string; company_name: string }; price: number } | { selectionType: 'guaranteed' } | null
+    { selectionType: 'specific_painter'; painter: { id: string; company_name: string }; price: number; priceToken: string } | { selectionType: 'guaranteed' } | null
   >(null);
 
   if (!state) {
@@ -101,6 +128,7 @@ const QuoteResults = () => {
   }
 
   const { estimate, ctx, assumptions } = state;
+  const duration = results?.duration ?? estimateDayRange(estimate.total);
 
   // Group line items by category
   const grouped: Record<string, typeof estimate.lineItems> = {};
@@ -154,7 +182,17 @@ const QuoteResults = () => {
         <div className="quote-results-range">
           Likely range: {currency(estimate.lowRange)} – {currency(estimate.highRange)}
         </div>
+        <div style={{ marginTop: 10, color: 'var(--text-secondary)', fontSize: '0.88rem' }}>
+          Estimated time on site: <strong>about {duration.low === duration.high ? duration.low : `${duration.low}–${duration.high}`} working day{duration.high === 1 ? '' : 's'}</strong>
+          {' · '}Your timing: <strong>{timingSummary(ctx)}</strong>
+        </div>
       </div>
+
+      {state.resumeToken && (
+        <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--accent-blue)', borderRadius: 10, padding: '12px 16px', margin: '0 0 16px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+          Your previous painter couldn't take this job. Pick another painter below before the countdown ends.
+        </div>
+      )}
 
       {/* Collapsed breakdown */}
       <button
@@ -241,7 +279,7 @@ const QuoteResults = () => {
           onSelect={() => {
             if (expired) return;
             hapticMedium();
-            setClaimTarget({ selectionType: 'specific_painter', painter: { id: m.id, company_name: m.companyName }, price: m.price });
+            setClaimTarget({ selectionType: 'specific_painter', painter: { id: m.id, company_name: m.companyName }, price: m.price, priceToken: m.priceToken });
           }}
         />
       ))}
@@ -313,7 +351,11 @@ const QuoteResults = () => {
         <ClaimPriceModal
           target={claimTarget}
           ctx={ctx}
-          guaranteedPrice={claimTarget.selectionType === 'specific_painter' ? claimTarget.price : estimate.total}
+          guaranteedPrice={claimTarget.selectionType === 'specific_painter' ? claimTarget.price : (results?.mystery.price ?? Math.round(estimate.total))}
+          priceToken={claimTarget.selectionType === 'specific_painter' ? claimTarget.priceToken : (results?.mystery.priceToken ?? '')}
+          resumeToken={state.resumeToken}
+          resumeState={{ ctx, estimate, assumptions }}
+          onPriceExpired={() => { setClaimTarget(null); setResults(null); loadResults(); }}
           onClose={() => setClaimTarget(null)}
         />
       )}
@@ -326,18 +368,26 @@ const QuoteResults = () => {
 // ---------------------------------------------------------------------------
 
 type ClaimTarget =
-  | { selectionType: 'specific_painter'; painter: { id: string; company_name: string }; price: number }
+  | { selectionType: 'specific_painter'; painter: { id: string; company_name: string }; price: number; priceToken: string }
   | { selectionType: 'guaranteed' };
 
 const ClaimPriceModal = ({
   target,
   ctx,
   guaranteedPrice,
+  priceToken,
+  resumeToken,
+  resumeState,
+  onPriceExpired,
   onClose,
 }: {
   target: ClaimTarget;
   ctx: EstimatorContext;
   guaranteedPrice: number;
+  priceToken: string;
+  resumeToken?: string;
+  resumeState: unknown;
+  onPriceExpired: () => void;
   onClose: () => void;
 }) => {
   const [name, setName] = useState(ctx.contactName || '');
@@ -373,11 +423,24 @@ const ClaimPriceModal = ({
           preferredDate: preferredDate || undefined,
           customerId: user?.id,
           photos: ctx.photos.length > 0 ? ctx.photos : undefined,
+          priceToken,
+          resumeToken,
+          resumeState,
+          timing: { startDate: ctx.startDate || null, endDate: ctx.endDate || null, flexible: ctx.datesFlexible, timeline: ctx.timeline || null },
         },
       });
 
       if (invokeError || data?.error) {
-        setError(data?.error || invokeError?.message || 'Something went wrong. Please try again.');
+        // supabase-js hides the body of non-2xx responses; read it so the customer sees the real reason.
+        let body: { error?: string; code?: string } | null = data ?? null;
+        const res = (invokeError as { context?: Response } | null)?.context;
+        if (!body && res && typeof res.json === 'function') body = await res.json().catch(() => null);
+        if (body?.code === 'price_expired') {
+          setError('This price has expired, so we\'re refreshing your results.');
+          setTimeout(onPriceExpired, 1200);
+          return;
+        }
+        setError(body?.error || invokeError?.message || 'Something went wrong. Please try again.');
         return;
       }
 

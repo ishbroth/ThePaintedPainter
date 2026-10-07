@@ -10,7 +10,9 @@
 //   week_before     confirmed job starts in 7 days            -> both (push/in-app)
 //   day_before      confirmed job starts tomorrow             -> both (push/in-app + email)
 //   deposit_nudge   date set, deposit unpaid after 24h        -> customer
-//   date_nudge      painter accepted, no date after 24h       -> painter
+//   date_nudge      painter accepted, hasn't sent dates (24h) -> painter
+//   confirm_nudge   painter sent dates, customer silent (24h) -> customer
+//   suggestions_expired  72-hour "pick another painter" window ended -> job closed, customer told
 //   complete_nudge  confirmed job started 2+ days ago         -> painter ("mark completed")
 //
 // Deploy:
@@ -111,11 +113,53 @@ serve(async (req: Request) => {
     }
   }
 
+  // ---- confirm_nudge: painter offered dates, customer hasn't responded for 24h ----
+  {
+    const { data: jobs } = await supabase
+      .from('quote_selections').select(`${cols}, painter_availability`)
+      .eq('status', 'painter_accepted').eq('date_state', 'painter_offered')
+    for (const j of jobs ?? []) {
+      const offeredAt = (j.painter_availability as { offeredAt?: string } | null)?.offeredAt
+      if (!offeredAt || Date.now() - new Date(offeredAt).getTime() < DAY) continue
+      if (!(await claim(j.id, 'confirm_nudge'))) continue
+      await notify(supabase, {
+        userId: j.customer_id, type: 'dates_reminder', title: 'Confirm your dates',
+        body: 'Your painter sent their available dates. Confirm and pay your deposit to lock them in.', link: '/customer/projects',
+      })
+      await email(j.customer_email, 'new_notification', {
+        title: 'Your painter is waiting on your dates', body: 'Pick your dates and pay your deposit to lock the job in.', link: `${frontendUrl}/customer/projects`,
+      })
+      counts.confirm_nudge = (counts.confirm_nudge ?? 0) + 1
+    }
+  }
+
+  // ---- suggestions_expired: the 72-hour "pick another painter" window has ended ----
+  {
+    const { data: jobs } = await supabase
+      .from('quote_selections').select('id, customer_id, customer_email')
+      .eq('status', 'needs_new_painter')
+      .lt('fallback_expires_at', new Date().toISOString())
+    for (const j of jobs ?? []) {
+      const { error } = await supabase.from('quote_selections')
+        .update({ status: 'expired', fallback_token: null, fallback_expires_at: null, fallback_suggestions: null })
+        .eq('id', j.id).eq('status', 'needs_new_painter')
+      if (error) continue
+      await notify(supabase, {
+        userId: j.customer_id, type: 'request_expired', title: 'Your painter request expired',
+        body: 'The 72 hours to pick another painter ended. Start a new search any time.', link: '/',
+      })
+      await email(j.customer_email, 'new_notification', {
+        title: 'Your painter request expired', body: 'The 72 hours to choose another painter have ended. You can start a new search any time.', link: frontendUrl,
+      })
+      counts.suggestions_expired = (counts.suggestions_expired ?? 0) + 1
+    }
+  }
+
   // ---- date_nudge: accepted, no date after 24h ----
   {
     const { data: jobs } = await supabase
       .from('quote_selections').select(`${cols}, claim_token`)
-      .eq('status', 'painter_accepted').is('scheduled_date', null)
+      .eq('status', 'painter_accepted').in('date_state', ['awaiting_painter_dates', 'customer_countered'])
       .lt('accepted_at', new Date(Date.now() - DAY).toISOString())
     for (const j of jobs ?? []) {
       if (!(await claim(j.id, 'date_nudge'))) continue

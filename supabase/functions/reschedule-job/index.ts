@@ -19,6 +19,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
 import { notify } from '../_shared/notify.ts'
 import { buildIcs, toBase64 } from '../_shared/ics.ts'
+import { addWorkingDays, workingDaysBetween } from '../_shared/availability.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -57,7 +58,7 @@ serve(async (req: Request) => {
 
     const { data: job } = await supabase
       .from('quote_selections')
-      .select('id, status, accepted_by, customer_id, customer_email, customer_street_address, customer_city, scheduled_date')
+      .select('id, status, accepted_by, customer_id, customer_email, customer_street_address, customer_city, scheduled_date, scheduled_end_date')
       .eq('id', jobId)
       .maybeSingle()
     if (!job) return json({ error: 'Job not found' }, 404)
@@ -83,16 +84,19 @@ serve(async (req: Request) => {
     const location = [job.customer_street_address, job.customer_city].filter(Boolean).join(', ')
 
     if (isPainter) {
+      // Move the whole job, not just its first day: keep the same number of working days.
+      const span = job.scheduled_date && job.scheduled_end_date ? workingDaysBetween(job.scheduled_date, job.scheduled_end_date) : 0
+      const newEnd = span > 0 ? addWorkingDays(newDate, span) : null
       const { error } = await supabase
         .from('quote_selections')
-        .update({ scheduled_date: newDate, date_confirmed_at: new Date().toISOString() })
+        .update({ scheduled_date: newDate, scheduled_end_date: newEnd, date_confirmed_at: new Date().toISOString() })
         .eq('id', job.id)
         .eq('status', 'confirmed')
       if (error) throw error
       if (job.customer_email) {
-        const ics = buildIcs({ uid: job.id, title: 'Painting project starts', date: newDate, location })
+        const ics = buildIcs({ uid: job.id, title: 'Painting project starts', date: newDate, endDate: newEnd, location })
         await send(job.customer_email, 'job_rescheduled', {
-          location, oldDate: job.scheduled_date, newDate, changedBy: painter?.company_name ?? 'your painter',
+          location, oldDate: job.scheduled_date, oldEndDate: job.scheduled_end_date, newDate, newEndDate: newEnd, changedBy: painter?.company_name ?? 'your painter',
         }, [{ filename: 'painting-project.ics', content: toBase64(ics) }])
       }
       await notify(supabase, {

@@ -13,7 +13,7 @@ function nextDay(date: string): string {
   return d.toISOString().slice(0, 10).replace(/-/g, '')
 }
 
-export function buildIcs(opts: { uid: string; title: string; date: string; location?: string; description?: string }): string {
+export function buildIcs(opts: { uid: string; title: string; date: string; endDate?: string | null; location?: string; description?: string }): string {
   const start = opts.date.replace(/-/g, '')
   const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')
   return [
@@ -26,7 +26,7 @@ export function buildIcs(opts: { uid: string; title: string; date: string; locat
     `UID:${opts.uid}@thepaintedpainter.com`,
     `DTSTAMP:${stamp}`,
     `DTSTART;VALUE=DATE:${start}`,
-    `DTEND;VALUE=DATE:${nextDay(opts.date)}`,
+    `DTEND;VALUE=DATE:${nextDay(opts.endDate && opts.endDate >= opts.date ? opts.endDate : opts.date)}`,
     `SUMMARY:${esc(opts.title)}`,
     opts.location ? `LOCATION:${esc(opts.location)}` : '',
     opts.description ? `DESCRIPTION:${esc(opts.description)}` : '',

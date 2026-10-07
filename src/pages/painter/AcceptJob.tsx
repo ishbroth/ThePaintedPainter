@@ -8,6 +8,8 @@ interface Preview {
   payoutAmount: number | null;
   timelineLabel: string | null;
   preferredDate: string | null;
+  timing: string;
+  estimatedDays: number;
   qa: { question: string; answer: string }[];
   photos: { url: string; description: string; label: string }[];
 }
@@ -29,6 +31,8 @@ export default function AcceptJob() {
   const [preview, setPreview] = useState<Preview | null>(null);
   const [error, setError] = useState('');
   const [accepting, setAccepting] = useState(false);
+  const [declined, setDeclined] = useState(false);
+  const [confirmingDecline, setConfirmingDecline] = useState(false);
 
   const endpoint = `${supabaseUrl}/functions/v1/claim-job`;
   const headers = { 'Content-Type': 'application/json', apikey: supabaseAnonKey, Authorization: `Bearer ${supabaseAnonKey}` };
@@ -47,6 +51,21 @@ export default function AcceptJob() {
       .catch((e) => setError(e instanceof Error ? e.message : 'Could not load this job.'));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, painterId]);
+
+  const decline = async () => {
+    setAccepting(true);
+    setError('');
+    try {
+      const res = await fetch(`${supabaseUrl}/functions/v1/decline-job`, { method: 'POST', headers, body: JSON.stringify({ token, painterId }) });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Could not decline this job.');
+      setDeclined(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not decline this job.');
+    } finally {
+      setAccepting(false);
+    }
+  };
 
   const accept = async () => {
     setAccepting(true);
@@ -78,8 +97,10 @@ export default function AcceptJob() {
             <p style={{ color: 'var(--text-secondary)', margin: '0 0 4px' }}>Near ZIP {preview.zip ?? 'N/A'}</p>
             <p style={{ color: 'var(--accent)', fontSize: '1.75rem', fontWeight: 700, margin: '0 0 8px' }}>You'd be paid {money(preview.payoutAmount)}</p>
             <p style={{ color: 'var(--text-faint)', fontSize: '0.9rem', margin: 0 }}>
-              {preview.timelineLabel || 'Timeline not specified'}
-              {preview.preferredDate ? ` · Requested start: ${preview.preferredDate}` : ''}
+              Customer's timing: <strong>{preview.timing || preview.timelineLabel || 'Not specified'}</strong>
+            </p>
+            <p style={{ color: 'var(--text-faint)', fontSize: '0.9rem', margin: '6px 0 0' }}>
+              Estimated time on site: about {preview.estimatedDays} working day{preview.estimatedDays === 1 ? '' : 's'} for your crew.
             </p>
           </div>
 
@@ -104,18 +125,44 @@ export default function AcceptJob() {
             </div>
           )}
 
-          {preview.open ? (
+          {declined ? (
+            <div style={card}>
+              <p style={{ margin: 0, color: 'var(--text-primary)' }}>Thanks for letting us know. We'll offer this job to other painters, and you'll keep getting new offers.</p>
+            </div>
+          ) : preview.open ? (
             <>
               <button
                 onClick={accept}
                 disabled={accepting}
                 style={{ width: '100%', padding: '14px 20px', borderRadius: 8, border: 'none', background: 'var(--success)', color: '#fff', fontWeight: 700, fontSize: '1rem', cursor: accepting ? 'not-allowed' : 'pointer', opacity: accepting ? 0.6 : 1 }}
               >
-                {accepting ? 'Accepting…' : 'Accept this job'}
+                {accepting ? 'Working…' : 'Accept this job'}
               </button>
               <p style={{ color: 'var(--text-faint)', fontSize: '0.8rem', marginTop: 10 }}>
-                First come, first served. After accepting you'll choose a start date; the customer then confirms and pays their deposit.
+                First come, first served. After accepting you'll tell the customer when you're available (exact dates, or "my dates are flexible"); they then confirm and pay their deposit.
               </p>
+              {confirmingDecline ? (
+                <div style={{ ...card, marginTop: 16 }}>
+                  <p style={{ margin: '0 0 10px', color: 'var(--text-primary)', fontSize: '0.92rem' }}>
+                    Decline this job? We'll let the customer know and suggest other painters.
+                  </p>
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                    <button onClick={decline} disabled={accepting} style={{ padding: '10px 18px', borderRadius: 8, border: 'none', background: 'var(--danger)', color: '#fff', fontWeight: 700, cursor: 'pointer' }}>
+                      Yes, decline
+                    </button>
+                    <button onClick={() => setConfirmingDecline(false)} style={{ padding: '10px 18px', borderRadius: 8, border: '1px solid var(--border-strong)', background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer' }}>
+                      Keep it
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setConfirmingDecline(true)}
+                  style={{ width: '100%', marginTop: 12, padding: '12px 20px', borderRadius: 8, border: '1px solid var(--border-strong)', background: 'transparent', color: 'var(--text-secondary)', fontWeight: 600, cursor: 'pointer' }}
+                >
+                  Decline this job
+                </button>
+              )}
             </>
           ) : (
             <p style={{ color: 'var(--danger)' }}>This job has already been taken. Keep an eye out for the next one!</p>

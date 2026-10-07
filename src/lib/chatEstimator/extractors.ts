@@ -345,6 +345,8 @@ export function extractPropertyType(text: string): 'residential' | 'rental' | 'm
   return null;
 }
 
+import { extractTiming, timelineFromStart } from './dateParsing';
+
 /** Timeline urgency — rush jobs command a scheduling premium. */
 export function extractTimeline(text: string): 'asap' | 'this_month' | 'no_rush' | null {
   const t = text.toLowerCase();
@@ -1245,6 +1247,24 @@ export function extractAll(text: string, prev: EstimatorContext, lastBotTopicId:
   if (timeline && !prev.timeline) {
     patch.timeline = timeline;
     if (timeline === 'asap') acks.push('ASAP');
+  }
+
+  // Specific dates and "my dates are flexible" — kept as real dates so they can be matched to painters' availability.
+  const timing = extractTiming(text);
+  if (timing.flexible && !prev.datesFlexible) {
+    patch.datesFlexible = true;
+    acks.push('flexible dates');
+    if (!prev.timeline && !patch.timeline) patch.timeline = 'no_rush';
+  }
+  if (timing.startDate && !prev.startDate) {
+    patch.startDate = timing.startDate;
+    if (timing.endDate) patch.endDate = timing.endDate;
+    acks.push(timing.endDate ? `dates ${timing.startDate} to ${timing.endDate}` : `start around ${timing.startDate}`);
+    // A concrete date also answers the old "how urgent?" question.
+    if (!prev.timeline && !patch.timeline) patch.timeline = timelineFromStart(timing.startDate);
+  } else if (timing.endDate && !prev.endDate) {
+    patch.endDate = timing.endDate; // a deadline ("done by Dec 15"); the customer is otherwise flexible
+    if (!prev.timeline && !patch.timeline) patch.timeline = 'this_month';
   }
 
   const afterHours = extractAfterHoursRequired(text);

@@ -25,6 +25,8 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
 import { notify } from '../_shared/notify.ts'
+import { describeTiming } from '../_shared/offers.ts'
+import { estimateWorkingDays } from '../_shared/duration.ts'
 
 function htmlPage(title: string, message: string, tone: 'success' | 'error'): Response {
   const color = tone === 'success' ? '#2563eb' : '#dc2626'
@@ -106,7 +108,7 @@ serve(async (req: Request) => {
     // Look up the job to confirm the token matches and this painter was eligible.
     const { data: job, error: jobError } = await supabase
       .from('quote_selections')
-      .select('id, status, selection_type, selected_painter_id, notified_painters, customer_id, customer_email, guaranteed_price, customer_preferred_date, quote_zip, painter_payout_amount, project_summary, photos')
+      .select('id, status, selection_type, selected_painter_id, notified_painters, customer_id, customer_email, guaranteed_price, customer_preferred_date, quote_zip, painter_payout_amount, project_summary, photos, customer_start_date, customer_end_date, dates_flexible, timeline, customer_preferred_date, estimated_days')
       .eq('claim_token', token)
       .maybeSingle()
 
@@ -123,7 +125,7 @@ serve(async (req: Request) => {
     }
 
     // A painter who's been paused (or isn't approved) can't take new jobs, even from an offer sent earlier.
-    const { data: claimer } = await supabase.from('painters').select('status, verified').eq('id', painterId).maybeSingle()
+    const { data: claimer } = await supabase.from('painters').select('status, verified, crew_size').eq('id', painterId).maybeSingle()
     if (!claimer || claimer.status !== 'approved' || !claimer.verified) {
       return fail('Not available right now', 'Your account is paused while we re-verify it, so you can\'t accept new jobs yet. Check your profile for next steps.', 403)
     }
@@ -137,6 +139,8 @@ serve(async (req: Request) => {
         payoutAmount: job.painter_payout_amount,
         timelineLabel: summary.timelineLabel ?? null,
         preferredDate: job.customer_preferred_date,
+        timing: describeTiming(job),
+        estimatedDays: estimateWorkingDays(Number(job.guaranteed_price) || 0, claimer.crew_size),
         qa: summary.qa ?? [],
         photos: job.photos ?? [],
       })
@@ -174,6 +178,7 @@ serve(async (req: Request) => {
           painterCompanyName: acceptedPainter?.company_name ?? 'A painter',
           guaranteedPrice: job.guaranteed_price,
           customerPreferredDate: job.customer_preferred_date,
+          projectsUrl: job.customer_id ? `${frontendUrl}/customer/dashboard/projects` : null,
         })
       }
 
@@ -194,7 +199,7 @@ serve(async (req: Request) => {
       console.error('Failed to send claim notifications:', notifyErr)
     }
 
-    const dateConfirmUrl = `${frontendUrl}/painter/confirm-date?token=${token}&painter_id=${painterId}`
+    const dateConfirmUrl = `${frontendUrl}/painter/availability?token=${token}&painter_id=${painterId}`
     if (isPost) return json({ success: true, dateConfirmUrl })
     return new Response(null, { status: 302, headers: { Location: dateConfirmUrl } })
   } catch (error) {

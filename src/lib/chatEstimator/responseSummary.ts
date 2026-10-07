@@ -18,6 +18,9 @@ const EXCLUDED_KEYS = new Set<keyof EstimatorContext>([
   'contactNotes',
   'zipCode', // shown separately, at the top of the email
   'timeline', // shown separately, at the top of the email
+  'startDate', // timing is described separately (see describeTiming on the server)
+  'endDate',
+  'datesFlexible',
   'answeredQuestions',
   'responseStyle',
   'responseLengths',

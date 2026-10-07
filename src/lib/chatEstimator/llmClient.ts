@@ -19,6 +19,7 @@ import { supabase } from '../supabase';
 import type { EstimatorContext } from '../types';
 import type { Intent } from './intents';
 import { makeInitialContext } from './defaultContext';
+import { timelineFromStart } from './dateParsing';
 
 const DEFAULT_CONTEXT = makeInitialContext();
 
@@ -100,6 +101,19 @@ function sanitize(raw: Record<string, unknown>, prev: EstimatorContext): Partial
 
   if (isEnum(raw.propertyType, ['residential', 'rental', 'multi_unit', 'commercial'] as const)) patch.propertyType = raw.propertyType;
   if (isEnum(raw.timeline, ['asap', 'this_month', 'no_rush'] as const)) patch.timeline = raw.timeline;
+  const isoDate = (v: unknown): v is string => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && !isNaN(Date.parse(`${v}T00:00:00Z`));
+  const todayIso = new Date().toISOString().slice(0, 10);
+  if (isoDate(raw.startDate) && raw.startDate >= todayIso) {
+    patch.startDate = raw.startDate;
+    if (isoDate(raw.endDate) && raw.endDate >= raw.startDate) patch.endDate = raw.endDate;
+    if (!patch.timeline) patch.timeline = timelineFromStart(raw.startDate);
+  } else if (isoDate(raw.endDate) && raw.endDate >= todayIso) {
+    patch.endDate = raw.endDate;
+  }
+  if (raw.datesFlexible === true) {
+    patch.datesFlexible = true;
+    if (!patch.timeline) patch.timeline = 'no_rush';
+  }
   if (isEnum(raw.afterHoursRequired, ['yes', 'no'] as const)) patch.afterHoursRequired = raw.afterHoursRequired;
   if (isEnum(raw.accessRestrictions, ['some', 'significant'] as const)) patch.accessRestrictions = raw.accessRestrictions;
   if (isEnum(raw.hoa, ['yes', 'no'] as const)) patch.hoa = raw.hoa;

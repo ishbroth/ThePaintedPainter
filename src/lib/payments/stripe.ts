@@ -31,46 +31,19 @@ export function getStripe(): Promise<Stripe | null> {
 }
 
 /**
- * Create a checkout session for a job claim's 10% deposit payment.
+ * Starts Stripe Checkout for a job's deposit and returns the hosted-checkout URL.
  *
- * Flow:
- * 1. A painter accepts the customer's job (claim-job function)
- * 2. The customer gets an email with a /confirm-job?token=... link
- * 3. That page calls this function with the quote_selections id + confirm token
- * 4. This calls the create-checkout-session Edge Function, tagging the
- *    session metadata with kind: 'quote_selection' so the webhook knows
- *    which table to update
- * 5. Customer is redirected to Stripe Checkout
- * 6. On success, the webhook marks quote_selections.deposit_status = 'paid'
- *    and emails the painter the customer's full contact details
- *
- * @param quoteSelectionId - The quote_selections row id (Stripe metadata key)
- * @param confirmToken - The customer_confirm_token, so success/cancel redirects land back on the same job
- * @param totalAmount - The guaranteed price (deposit is 10% of this)
- * @param painterName - Name of the painter (for checkout description)
- * @returns The Stripe Checkout Session URL to redirect to
+ * The browser sends ONLY the customer's confirm token. The server looks up the job, requires it to be waiting on
+ * its deposit with dates agreed, and uses the deposit amount stored in the database (10% of the guaranteed price),
+ * so the amount can't be changed from here. See supabase/functions/create-checkout-session.
  */
-export async function createDepositCheckout(
-  quoteSelectionId: string,
-  confirmToken: string,
-  totalAmount: number,
-  painterName: string
-): Promise<string | null> {
-  const depositAmount = calculateDeposit(totalAmount); // 10%, in dollars — create-checkout-session converts to cents itself
-
+export async function createDepositCheckout(confirmToken: string): Promise<string | null> {
   const { data, error } = await supabase.functions.invoke('create-checkout-session', {
-    body: {
-      projectId: quoteSelectionId,
-      amount: depositAmount,
-      description: `10% deposit for painting project with ${painterName}`,
-      kind: 'quote_selection',
-      successUrl: `${window.location.origin}/confirm-job?token=${confirmToken}&payment=success`,
-      cancelUrl: `${window.location.origin}/confirm-job?token=${confirmToken}&payment=cancelled`,
-    },
+    body: { confirmToken },
   });
 
   if (error || !data?.url) {
-    console.error('Failed to create checkout session:', error);
+    console.error('Failed to create checkout session:', error ?? data);
     return null;
   }
 

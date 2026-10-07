@@ -96,6 +96,18 @@ const UPDATE_TOOL = {
         type: 'string', enum: ['asap', 'this_month', 'no_rush'],
         description: '"asap" = rush job, needed urgently — this adds a rush-scheduling premium since it usually means pulling a crew off another job. "no_rush" = flexible, no discount but no premium either. "this_month" = normal near-term timing.',
       },
+      startDate: {
+        type: 'string',
+        description: 'A SPECIFIC start date the customer wants the work to begin, as YYYY-MM-DD, resolving relative phrases ("next Monday", "June 3rd", "in two weeks") against today\'s date given in the instructions. Only when they actually name or clearly imply a date; never guess. If they give a range, this is the first day.',
+      },
+      endDate: {
+        type: 'string',
+        description: 'The last day of a date RANGE the customer gave, or a deadline ("done by Dec 15"), as YYYY-MM-DD. Only when stated.',
+      },
+      datesFlexible: {
+        type: 'boolean',
+        description: 'true if the customer says their dates are flexible / open to any dates / no particular dates. This is about flexibility on WHEN, not about price.',
+      },
       afterHoursRequired: {
         type: 'string', enum: ['yes', 'no'],
         description: 'For a COMMERCIAL job: "yes" if the work needs to happen after hours/nights/weekends so it doesn\'t disrupt business operations — this is a real scheduling premium, like any off-hours labor. "no" if daytime/normal hours are fine.',
@@ -427,7 +439,7 @@ serve(async (req: Request) => {
           model: MODEL,
           max_tokens: 1024,
           temperature: 0,
-          system: SYSTEM_PROMPT,
+          system: `${SYSTEM_PROMPT}\n\nToday's date is ${new Date().toISOString().slice(0, 10)}. Use it to resolve relative dates into startDate/endDate.`,
           messages: [
             { role: 'user', content: buildUserPrompt(message, history ?? [], ctx ?? {}, lastBotQuestion ?? null) },
           ],
