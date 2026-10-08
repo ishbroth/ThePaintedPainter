@@ -107,7 +107,7 @@ export default function CustomerDashboard() {
           to="/"
           className="px-6 py-3 bg-[var(--accent)] text-[var(--accent-ink)] font-semibold rounded-lg hover:bg-[var(--accent-hover)] transition-colors"
         >
-          Get New Estimate
+          Get a New Price
         </Link>
         <Link
           to="/painters-map"

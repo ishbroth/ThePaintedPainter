@@ -68,6 +68,21 @@ export interface EstimatorContext {
   // offered the option to split their claim into separately-scheduled
   // phases (see QuoteResults' claim flow), not a mandatory question.
   multiPhaseRequested: string; // '' (no signal), yes
+  // Customer-supplied measurements and scope trims. Left null/empty unless the customer said them.
+  trimLinearFeet: number | null; // "about 300 linear feet of baseboard"
+  crownLinearFeet: number | null;
+  accentWallCount: number | null; // how many accent walls ("two accent walls", "one per bedroom")
+  stairRailFeet: number | null; // length of stair railing, when given
+  popcornCeilingSqft: number | null; // ceiling area to de-texture, when given
+  cabinetDoorCount: number | null; // kitchen doors + drawer fronts, when given
+  deckSqft: number | null; // deck area, when given
+  overhangSqft: number | null; // porch ceiling / patio cover area, when given
+  pressureWashSqft: number | null; // area to pressure wash, when it isn't just the house
+  /** Whether the house body itself (siding/stucco/brick) is part of an exterior job. 'no' = only the listed features (fence, deck, shutters, doors, trim, washing...). */
+  exteriorBody: string; // '' (not discussed), yes, no
+  /** Price editing: rooms and main items the customer took off the price after seeing it. */
+  excludedRooms: string[];
+  excludedItems: string[];
 
   // Exterior
   exteriorScope: string; // full, partial
@@ -221,6 +236,8 @@ export interface EstimateLineItem {
   category: string;
   description: string;
   amount: number;
+  /** Stable id for main items the customer can take off / add back (undefined = not removable: surcharges, prep, adjustments). */
+  key?: string;
 }
 
 export interface EstimateBreakdown {
@@ -232,6 +249,8 @@ export interface EstimateBreakdown {
   highRange: number;
   confidence: 'low' | 'medium' | 'high';
   confidenceNote: string;
+  /** Set when a multi-room job earned a volume rate (e.g. 0.82 = about 18% off per-square-foot interior pricing). */
+  volumeEfficiency?: number;
 }
 
 // ===== Supabase Expanded Quote =====

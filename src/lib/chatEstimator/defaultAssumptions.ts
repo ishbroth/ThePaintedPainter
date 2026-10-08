@@ -86,16 +86,16 @@ export function defaultAssumptions(ctx: EstimatorContext): Assumption[] {
 
   // Exterior-specific baked-in scope
   if (ctx.projectType === 'exterior' || ctx.projectType === 'both') {
-    out.push({
+    if (ctx.exteriorBody !== 'no') out.push({
       label: 'Power wash prior to paint',
       reason: 'All exterior surfaces pressure-washed to remove chalk, dust, cobwebs before painting.',
       prepWork: ['power_washing'],
     });
-    out.push({
+    if (ctx.exteriorBody !== 'no') out.push({
       label: 'Spot-prime bare wood / failing paint',
       reason: 'Any areas of bare wood or peeling paint get spot primer before finish coats.',
     });
-    if (ctx.sidingType === 'stucco' || !ctx.sidingType) {
+    if (ctx.exteriorBody !== 'no' && (ctx.sidingType === 'stucco' || !ctx.sidingType)) {
       out.push({
         label: 'Hairline crack fill on stucco',
         reason: 'Typical hairline stucco cracks get caulk-filled before paint.',

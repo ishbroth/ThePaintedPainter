@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { useLocation, Navigate, useNavigate } from 'react-router-dom';
 import type { EstimatorContext, EstimateBreakdown } from '../lib/types';
 import type { Assumption } from '../lib/chatEstimator/defaultAssumptions';
@@ -6,6 +6,8 @@ import type { MatchedSituation } from '../lib/pricing/situations';
 import { fetchPainterResults, type PainterResult, type PainterResults } from '../lib/realPainterMatcher';
 import { estimateDayRange } from '../lib/duration';
 import PainterResultCard from '../components/results/PainterResultCard';
+import PriceBreakdown from '../components/results/PriceBreakdown';
+import { baseFromResult, buildPriceEditor } from '../lib/priceEditing';
 import { buildResponseSummary, timelineLabel } from '../lib/chatEstimator/responseSummary';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
@@ -18,6 +20,7 @@ interface LocationState {
   assumptions: Assumption[];
   matchedSituations: MatchedSituation[];
   transcript: string;
+  loyaltyDiscountPercent?: number;
   expiresAt?: number;
   /** Set when reloaded from a "your painter declined" email: ties claims to that 72-hour window. */
   resumeToken?: string;
@@ -61,6 +64,37 @@ const QuoteResults = () => {
   const state = loadState(location.state as LocationState | null);
   const [breakdownOpen, setBreakdownOpen] = useState(false);
 
+  // Price editing: rooms and main items the customer takes off (and adds back) after seeing the price.
+  const [edits, setEdits] = useState<{ rooms: string[]; items: string[] }>({
+    rooms: state?.ctx.excludedRooms ?? [],
+    items: state?.ctx.excludedItems ?? [],
+  });
+  const editBase = useMemo(
+    () => (state && state.transcript ? baseFromResult({ ctx: state.ctx, transcript: state.transcript, loyaltyDiscountPercent: state.loyaltyDiscountPercent }) : null),
+    // the saved price never changes underneath the editor; edits are tracked separately
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [state?.transcript],
+  );
+  const view = useMemo(() => (editBase ? buildPriceEditor(editBase, edits.rooms, edits.items) : null), [editBase, edits]);
+  // Older saved prices don't carry the wording they were built from, so they show as before and can't be edited.
+  const shownView = useMemo(
+    () =>
+      view ??
+      (state
+        ? {
+            current: { estimate: state.estimate, ctx: state.ctx, assumptions: state.assumptions, matchedSituations: state.matchedSituations ?? [], summary: '' },
+            originalTotal: state.estimate.total,
+            rows: [],
+            rooms: [],
+            canRemoveMore: false,
+          }
+        : null),
+    [view, state],
+  );
+  const liveEstimate: EstimateBreakdown | undefined = view?.current.estimate ?? state?.estimate;
+  const liveCtx: EstimatorContext | undefined = view?.current.ctx ?? state?.ctx;
+  const edited = edits.rooms.length > 0 || edits.items.length > 0;
+
   // Reuse the persisted expiry rather than resetting the clock on every
   // mount — otherwise a back/forward navigation back to this page would
   // quietly grant a fresh 45 minutes instead of counting down the real hold.
@@ -97,10 +131,12 @@ const QuoteResults = () => {
   const [resultsFailed, setResultsFailed] = useState(false);
   const painterMatches: PainterResult[] | null = results ? results.painters : resultsFailed ? [] : null;
 
+  const liveTotal = liveEstimate?.total ?? 0;
+  const resumeTokenForFetch = state?.resumeToken;
   const loadResults = useCallback(() => {
-    if (!state) return () => {};
+    if (!liveCtx) return () => {};
     let cancelled = false;
-    fetchPainterResults(state.ctx, state.estimate.total, state.resumeToken).then((r) => {
+    fetchPainterResults(liveCtx, liveTotal, resumeTokenForFetch).then((r) => {
       if (cancelled) return;
       if (!r) return setResultsFailed(true);
       setResults(r);
@@ -115,9 +151,32 @@ const QuoteResults = () => {
     return () => {
       cancelled = true;
     };
-  }, [state]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveTotal, edits, resumeTokenForFetch]);
 
-  useEffect(() => loadResults(), [loadResults]);
+  // A price edit refreshes the painters' prices after a short pause (so several quick taps make one request).
+  const firstLoad = useRef(true);
+  useEffect(() => {
+    if (firstLoad.current) {
+      firstLoad.current = false;
+      return loadResults();
+    }
+    setResults(null);
+    setResultsFailed(false);
+    let cancel: (() => void) | undefined;
+    const t = setTimeout(() => { cancel = loadResults(); }, 350);
+    return () => { clearTimeout(t); cancel?.(); };
+  }, [loadResults]);
+
+  // Keep an edited price if the page is reloaded.
+  useEffect(() => {
+    if (!state || !edited || !liveEstimate || !liveCtx) return;
+    try {
+      sessionStorage.setItem(QUOTE_RESULT_KEY, JSON.stringify({ ...state, estimate: liveEstimate, ctx: liveCtx, expiresAt: expiresAtRef.current }));
+    } catch {
+      // storage unavailable: the edit just won't survive a reload
+    }
+  }, [state, edited, liveEstimate, liveCtx]);
 
   const [claimTarget, setClaimTarget] = useState<
     { selectionType: 'specific_painter'; painter: { id: string; company_name: string }; price: number; priceToken: string } | { selectionType: 'guaranteed' } | null
@@ -127,15 +186,11 @@ const QuoteResults = () => {
     return <Navigate to="/" replace />;
   }
 
-  const { estimate, ctx, assumptions } = state;
+  const estimate = liveEstimate ?? state.estimate;
+  const ctx = liveCtx ?? state.ctx;
+  const { assumptions } = state;
   const duration = results?.duration ?? estimateDayRange(estimate.total);
 
-  // Group line items by category
-  const grouped: Record<string, typeof estimate.lineItems> = {};
-  for (const li of estimate.lineItems) {
-    grouped[li.category] = grouped[li.category] ?? [];
-    grouped[li.category].push(li);
-  }
 
   return (
     <div className="quote-results-page">
@@ -174,7 +229,7 @@ const QuoteResults = () => {
 
       {/* Hero / price */}
       <div className="quote-results-hero">
-        <h1>Your Estimate</h1>
+        <h1>Your Price</h1>
         <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
           {describeJob(ctx)}
         </p>
@@ -183,7 +238,7 @@ const QuoteResults = () => {
           Likely range: {currency(estimate.lowRange)} – {currency(estimate.highRange)}
         </div>
         <div style={{ marginTop: 10, color: 'var(--text-secondary)', fontSize: '0.88rem' }}>
-          Estimated time on site: <strong>about {duration.low === duration.high ? duration.low : `${duration.low}–${duration.high}`} working day{duration.high === 1 ? '' : 's'}</strong>
+          Expected time on site: <strong>about {duration.low === duration.high ? duration.low : `${duration.low}–${duration.high}`} working day{duration.high === 1 ? '' : 's'}</strong>
           {' · '}Your timing: <strong>{timingSummary(ctx)}</strong>
         </div>
       </div>
@@ -206,52 +261,17 @@ const QuoteResults = () => {
         <span className={`breakdown-caret ${breakdownOpen ? 'open' : ''}`}>▶</span>
       </button>
 
-      {breakdownOpen && (
-        <div className="breakdown-panel">
-          {Object.entries(grouped).map(([category, items]) => (
-            <div key={category} className="breakdown-section">
-              <h3>{category}</h3>
-              {items.map((li, i) => (
-                <div key={i} className="breakdown-line">
-                  <span className="breakdown-line-desc">{li.description}</span>
-                  <span className="breakdown-line-amt">{currency(li.amount)}</span>
-                </div>
-              ))}
-            </div>
-          ))}
-
-          {estimate.multipliers.length > 0 && (
-            <div className="breakdown-section">
-              <h3>Adjustments</h3>
-              {estimate.multipliers.map((m, i) => (
-                <div key={i} className="breakdown-line">
-                  <span className="breakdown-line-desc">{m.label}</span>
-                  <span className="breakdown-line-amt">×{m.factor.toFixed(2)}</span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {assumptions.length > 0 && (
-            <div className="breakdown-section">
-              <h3>What's Automatically Included</h3>
-              {assumptions.map((a, i) => (
-                <div key={i} className="breakdown-assumption">
-                  <span className="breakdown-assumption-label">✓ {a.label}</span>
-                  {a.reason}
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div className="breakdown-section">
-            <h3>Total</h3>
-            <div className="breakdown-line" style={{ fontWeight: 700, fontSize: '1.05rem' }}>
-              <span>Guaranteed price (10% below market)</span>
-              <span style={{ color: 'var(--accent-blue)' }}>{currency(estimate.total)}</span>
-            </div>
-          </div>
-        </div>
+      {breakdownOpen && shownView && (
+        <PriceBreakdown
+          view={shownView}
+          assumptions={assumptions}
+          canEdit={!!editBase}
+          edited={edited}
+          disabled={expired}
+          onToggleItem={(key) => { hapticMedium(); setEdits((e) => ({ ...e, items: e.items.includes(key) ? e.items.filter((k) => k !== key) : [...e.items, key] })); }}
+          onToggleRoom={(key) => { hapticMedium(); setEdits((e) => ({ ...e, rooms: e.rooms.includes(key) ? e.rooms.filter((k) => k !== key) : [...e.rooms, key] })); }}
+          onReset={() => setEdits({ rooms: [], items: [] })}
+        />
       )}
 
       {/* Real painter list */}
@@ -354,7 +374,7 @@ const QuoteResults = () => {
           guaranteedPrice={claimTarget.selectionType === 'specific_painter' ? claimTarget.price : (results?.mystery.price ?? Math.round(estimate.total))}
           priceToken={claimTarget.selectionType === 'specific_painter' ? claimTarget.priceToken : (results?.mystery.priceToken ?? '')}
           resumeToken={state.resumeToken}
-          resumeState={{ ctx, estimate, assumptions }}
+          resumeState={{ ctx, estimate, assumptions, transcript: state.transcript, loyaltyDiscountPercent: state.loyaltyDiscountPercent }}
           onPriceExpired={() => { setClaimTarget(null); setResults(null); loadResults(); }}
           onClose={() => setClaimTarget(null)}
         />

@@ -74,7 +74,7 @@ export default function CustomerSignUp() {
       <div className="w-full max-w-[400px] bg-[var(--bg-surface)] rounded-lg p-8">
         <h1 className="text-2xl font-bold text-[var(--text-primary)] text-center">Create Customer Profile</h1>
         <p className="text-[var(--text-secondary)] text-center mt-2">
-          Sign up to save your estimates, track your projects, and earn points
+          Sign up to save your prices, track your projects, and earn points
         </p>
         <div className="text-center mt-2 mb-6">
           <Link

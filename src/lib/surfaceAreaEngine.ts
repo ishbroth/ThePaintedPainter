@@ -50,6 +50,14 @@ export const STANDARD_ROOMS: Record<string, RoomSpec> = {
     trimLinearFt: 36,
     doors: 1, windows: 1, closets: 1,
   },
+  bedroom_5: {
+    label: 'Bedroom',
+    widthFt: 12, lengthFt: 12,
+    wallSqFt: 336,
+    ceilingSqFt: 144,
+    trimLinearFt: 44,
+    doors: 1, windows: 1, closets: 1,
+  },
   living_room: {
     label: 'Living Room',
     widthFt: 16, lengthFt: 20,
@@ -321,10 +329,15 @@ export interface HouseLayout {
   totalClosets: number;
 }
 
-export function estimateHouseLayout(sqft: number, bedrooms?: number): HouseLayout {
+export function estimateHouseLayout(sqft: number, bedrooms?: number, excludedRooms: string[] = []): HouseLayout {
   const beds = bedrooms || estimateBedroomCount(sqft);
   const rooms: string[] = [];
 
+  // A studio (small, no bedroom count) is one main room, a kitchen and a bath — not a house layout with halls and a foyer.
+  const isStudio = sqft <= 600 && !bedrooms;
+  if (isStudio) {
+    rooms.push('living_room', 'kitchen', 'bathroom_2');
+  } else {
   // Always have these
   rooms.push('living_room', 'kitchen', 'hallway', 'entryway');
 
@@ -333,7 +346,7 @@ export function estimateHouseLayout(sqft: number, bedrooms?: number): HouseLayou
   if (beds >= 2) rooms.push('bedroom_2');
   if (beds >= 3) rooms.push('bedroom_3');
   if (beds >= 4) rooms.push('bedroom_4');
-  if (beds >= 5) rooms.push('bedroom_2'); // extra bedrooms use standard size
+  if (beds >= 5) rooms.push('bedroom_5'); // extra bedrooms use standard size
 
   // Bathrooms scale with bedrooms
   rooms.push('bathroom_master');
@@ -351,11 +364,22 @@ export function estimateHouseLayout(sqft: number, bedrooms?: number): HouseLayou
 
   // Laundry
   if (sqft >= 1200) rooms.push('laundry');
+  }
 
-  // Aggregate
+  // Aggregate. The template floor area always comes from the FULL room list (the customer's square footage
+  // describes the whole home); rooms the customer took off the price only drop out of the totals.
   let totalWall = 0, totalCeiling = 0, totalTrim = 0, totalDoors = 0, totalWindows = 0, totalClosets = 0;
   let templateFloorSqFt = 0;
+  const remaining = [...excludedRooms];
   for (const r of rooms) {
+    const spec = STANDARD_ROOMS[r];
+    if (spec) templateFloorSqFt += spec.widthFt * spec.lengthFt;
+  }
+  const keptRooms: string[] = [];
+  for (const r of rooms) {
+    const at = remaining.indexOf(r);
+    if (at >= 0) { remaining.splice(at, 1); continue; }
+    keptRooms.push(r);
     const spec = STANDARD_ROOMS[r];
     if (spec) {
       totalWall += spec.wallSqFt;
@@ -364,7 +388,6 @@ export function estimateHouseLayout(sqft: number, bedrooms?: number): HouseLayou
       totalDoors += spec.doors;
       totalWindows += spec.windows;
       totalClosets += spec.closets;
-      templateFloorSqFt += spec.widthFt * spec.lengthFt;
     }
   }
 
@@ -384,7 +407,7 @@ export function estimateHouseLayout(sqft: number, bedrooms?: number): HouseLayou
   const clampedScale = Math.min(2, Math.max(0.5, scale));
 
   return {
-    rooms,
+    rooms: keptRooms,
     totalWallSqFt: Math.round(totalWall * clampedScale),
     totalCeilingSqFt: Math.round(totalCeiling * clampedScale),
     totalTrimLinFt: Math.round(totalTrim * clampedScale),

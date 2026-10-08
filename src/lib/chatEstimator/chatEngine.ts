@@ -20,7 +20,9 @@
 import type { EstimatorContext, EstimateBreakdown, EstimateLineItem, UserResponseStyle } from '../types';
 import { calculateEstimate } from '../estimateEngine';
 import { supabase } from '../supabase';
-import { extractAll, extractPhotoTriggers } from './extractors';
+import { extractAll, extractPhotoTriggers, extractTimeline, extractPropertyType, extractAccessSignals, extractZip, extractSquareFeet } from './extractors';
+import { getStateFromZip } from '../zipCodeData';
+import { extractTiming, timelineFromStart } from './dateParsing';
 import { defaultAssumptions, applyAssumptions, type Assumption } from './defaultAssumptions';
 import {
   matchSituations,
@@ -87,6 +89,9 @@ export interface ChatResult {
   assumptions: Assumption[];
   matchedSituations: MatchedSituation[];
   summary: string;
+  /** Kept so the price can be recalculated when the customer takes items or rooms off it. */
+  transcript?: string;
+  loyaltyDiscountPercent?: number;
 }
 
 // ===== Initial state =====
@@ -351,7 +356,10 @@ export async function handleUserMessage(state: ChatState, userText: string, cust
 async function processMessage(state: ChatState, trimmed: string, customerId?: string): Promise<TurnResult> {
   // 1. Understand the message (LLM first, local rules engine as fallback),
   //    then apply derivations against the full transcript
-  const { intent, patch, acknowledgements } = await understand(trimmed, state);
+  const understood = await understand(trimmed, state);
+  const { intent, patch } = understood;
+  // the same fact can come back from more than one reader ("450 sqft, 450 sqft"): say each once
+  const acknowledgements = understood.acknowledgements.filter((a, i, all) => all.findIndex((b) => b.replace(/,/g, '') === a.replace(/,/g, '')) === i);
   const ctxWithExplicit: EstimatorContext = { ...state.ctx, ...patch };
 
   // Safety backstop (covers both the LLM path and the local fallback):
@@ -364,6 +372,56 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
     ctxWithExplicit.selectedRooms = state.ctx.selectedRooms;
   }
   const newTranscript = `${state.transcript}\n${trimmed}`.trim();
+  // Corrections ("actually the zip is 98101", "it's closer to 2,400 sq ft", "change my dates to ..."): the extractors only
+  // fill empty fields, so without this a later correction would be silently ignored.
+  if (/\b(actually|correction|correct that|oh wait|wait,|sorry,|i meant|make that|change (?:it|that|the|my)|should (?:be|say)|instead|not [\w ]{0,20} but)\b/i.test(trimmed)) {
+    const zipFix = extractZip(trimmed);
+    if (zipFix && zipFix !== ctxWithExplicit.zipCode) {
+      ctxWithExplicit.zipCode = zipFix;
+      const st = getStateFromZip(zipFix);
+      if (st) ctxWithExplicit.state = st;
+      acknowledgements.push(`updated the ZIP to ${zipFix}`);
+    }
+    const sqftFix = extractSquareFeet(trimmed);
+    if (sqftFix && sqftFix !== ctxWithExplicit.squareFeet) {
+      ctxWithExplicit.squareFeet = sqftFix;
+      acknowledgements.push(`updated the size to ${sqftFix.toLocaleString()} sqft`);
+    }
+    const dateFix = extractTiming(trimmed);
+    if (dateFix.startDate && dateFix.startDate !== ctxWithExplicit.startDate) {
+      ctxWithExplicit.startDate = dateFix.startDate;
+      ctxWithExplicit.endDate = dateFix.endDate ?? '';
+      ctxWithExplicit.timeline = timelineFromStart(dateFix.startDate);
+      acknowledgements.push(`updated your dates to ${dateFix.startDate}${dateFix.endDate ? ` – ${dateFix.endDate}` : ''}`);
+    }
+  }
+
+  // Timing safety net (LLM path and local fallback alike): dates, "my dates are flexible", "sometime in March" and
+  // "no rush" are also read with plain rules, so a miss by the language model can't leave the question unanswered.
+  const timing = extractTiming(trimmed);
+  if (timing.flexible && !ctxWithExplicit.datesFlexible) ctxWithExplicit.datesFlexible = true;
+  if (timing.startDate && !ctxWithExplicit.startDate) {
+    ctxWithExplicit.startDate = timing.startDate;
+    if (timing.endDate && !ctxWithExplicit.endDate) ctxWithExplicit.endDate = timing.endDate;
+  } else if (timing.endDate && !ctxWithExplicit.endDate) {
+    ctxWithExplicit.endDate = timing.endDate;
+  }
+  if (!ctxWithExplicit.timeline) {
+    const urgency =
+      extractTimeline(trimmed) ??
+      (ctxWithExplicit.startDate ? timelineFromStart(ctxWithExplicit.startDate) : null) ??
+      (ctxWithExplicit.datesFlexible ? 'no_rush' : null);
+    if (urgency) ctxWithExplicit.timeline = urgency;
+  }
+  if (!ctxWithExplicit.propertyType) {
+    const owner = extractPropertyType(trimmed);
+    if (owner) ctxWithExplicit.propertyType = owner;
+  }
+  if (!ctxWithExplicit.occupancy) {
+    const access = extractAccessSignals(trimmed);
+    if (access.vacant) ctxWithExplicit.occupancy = 'vacant';
+    else if (access.furnished || access.occupied) ctxWithExplicit.occupancy = 'furnished';
+  }
   const derivations = derive(ctxWithExplicit, newTranscript);
   const responseLengths = [...state.ctx.responseLengths, trimmed.length];
   const ctxNext = {
@@ -575,7 +633,10 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
       const retryPrompt =
         (acknowledgements.length > 0 ? `${ACK_LEAD_INS[s.askedIds.length % ACK_LEAD_INS.length]} ${acknowledgements.join(', ')}. ` : '') +
         (photoLinkMarker ? `${photoLinkMarker} ` : '') +
-        `Circling back — I don't think I got this one: ${question.charAt(0).toLowerCase()}${question.slice(1)}`;
+        // when half of a two-part question was answered, just ask for the missing half instead of claiming it wasn't understood
+        (retry.id === 'timeline_and_access' && (ctxNext.occupancy || ctxNext.timeline || ctxNext.startDate || ctxNext.datesFlexible)
+          ? `One more thing — ${question.charAt(0).toLowerCase()}${question.slice(1)}`
+          : `Circling back — I don't think I got this one: ${question.charAt(0).toLowerCase()}${question.slice(1)}`);
       s = {
         ...s,
         retriedIds: [...s.retriedIds, retry.id],
@@ -890,5 +951,19 @@ function finalize(ctx: EstimatorContext, transcript: string, loyaltyDiscountPerc
     assumptions,
     matchedSituations: matched,
     summary: pieces.join('\n\n'),
+    transcript,
+    loyaltyDiscountPercent,
   };
+}
+
+/**
+ * Recalculate the price with rooms and main items taken off (or added back), using the same assumptions,
+ * situations, surcharges and discounts as the original price, so the customer never has to redo the chat.
+ */
+export function repriceWithEdits(
+  base: { ctx: EstimatorContext; transcript: string; loyaltyDiscountPercent?: number },
+  excludedRooms: string[],
+  excludedItems: string[],
+): ChatResult {
+  return finalize({ ...base.ctx, excludedRooms, excludedItems }, base.transcript, base.loyaltyDiscountPercent ?? 0);
 }

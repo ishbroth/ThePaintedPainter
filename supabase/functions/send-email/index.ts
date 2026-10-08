@@ -192,10 +192,10 @@ ${body}
     case 'estimate_ready':
       return wrap(`
         <p>Hi ${customerName},</p>
-        <p>Great news! Your painting estimate for <strong>${projectName}</strong> is ready.</p>
+        <p>Great news! Your painting price for <strong>${projectName}</strong> is ready.</p>
         <p>Estimated price: <strong>$${data.estimatedPrice || 'N/A'}</strong></p>
-        ${data.estimateUrl ? `${button(data.estimateUrl, `View Your Estimate`)}` : ''}
-        <p>This estimate is valid for 30 days. If you have any questions, just reply to this email.</p>
+        ${data.estimateUrl ? `${button(data.estimateUrl, `View Your Price`)}` : ''}
+        <p>This price is valid for 30 days. If you have any questions, just reply to this email.</p>
       `)
 
     case 'painter_assigned':

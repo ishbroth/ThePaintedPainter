@@ -39,7 +39,7 @@ const Header = () => {
         </Link>
         <nav className={`nav ${isMenuOpen ? 'active' : ''}`} id="nav">
           <Link to="/#estimator" onClick={closeMenu}>
-            Get Estimate
+            Get Your Price
           </Link>
           <Link to="/painter-signup" onClick={closeMenu}>
             For Painters

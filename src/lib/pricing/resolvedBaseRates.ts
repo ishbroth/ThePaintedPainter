@@ -32,6 +32,9 @@ const e = BASE_RATES.exterior;
 const p = BASE_RATES.prep;
 const m = BASE_RATES.materials;
 
+/** Minimum charge for a very small job (national, guaranteed basis); the engine scales it by region. */
+export const MIN_JOB_CHARGE = resolve(RATE_KEYS.min_job_charge, 300);
+
 export const RESOLVED_BASE_RATES: typeof BASE_RATES = {
   interior: {
     walls_repaint: resolve(RATE_KEYS.interior_walls_repaint_good, i.walls_repaint),
@@ -79,10 +82,16 @@ export const RESOLVED_BASE_RATES: typeof BASE_RATES = {
     bathroom_vanity: resolve(RATE_KEYS.cabinet_bathroom_vanity, c.bathroom_vanity),
     laundry: resolve(RATE_KEYS.cabinet_laundry, c.laundry),
     per_sqft: c.per_sqft,
+    per_door: c.per_door,
+    kitchen_setup: c.kitchen_setup,
   },
   closets: { ...cl },
-  stairs: { ...st },
-  specialty: { ...sp },
+  stairs: {
+    ...st,
+    railing_simple_per_ft: resolve(RATE_KEYS.stairs_railing_simple, st.railing_simple_per_ft),
+    railing_spindles_per_ft: resolve(RATE_KEYS.stairs_railing_spindles, st.railing_spindles_per_ft),
+  },
+  specialty: { ...sp, shutter_exterior: resolve(RATE_KEYS.exterior_shutter_each, sp.shutter_exterior) },
   exterior: {
     siding_stucco: resolve(RATE_KEYS.exterior_siding_stucco, e.siding_stucco),
     siding_wood: resolve(RATE_KEYS.exterior_siding_wood, e.siding_wood),
@@ -91,20 +100,20 @@ export const RESOLVED_BASE_RATES: typeof BASE_RATES = {
     siding_brick: resolve(RATE_KEYS.exterior_siding_brick, e.siding_brick),
     siding_stone: resolve(RATE_KEYS.exterior_siding_stone, e.siding_stone),
     siding_aluminum: resolve(RATE_KEYS.exterior_siding_aluminum, e.siding_aluminum),
-    fascia_per_linft: e.fascia_per_linft,
+    fascia_per_linft: resolve(RATE_KEYS.exterior_fascia, e.fascia_per_linft),
     soffit_per_sqft: e.soffit_per_sqft,
-    gutter_per_linft: e.gutter_per_linft,
+    gutter_per_linft: resolve(RATE_KEYS.exterior_gutter, e.gutter_per_linft),
     corner_board_per_linft: e.corner_board_per_linft,
     railing_simple_per_linft: e.railing_simple_per_linft,
     railing_spindle_per_linft: e.railing_spindle_per_linft,
     railing_cable_per_linft: e.railing_cable_per_linft,
-    deck_stain_per_sqft: e.deck_stain_per_sqft,
-    deck_paint_per_sqft: e.deck_paint_per_sqft,
-    fence_per_linft_6ft: e.fence_per_linft_6ft,
-    fence_per_linft_4ft: e.fence_per_linft_4ft,
+    deck_stain_per_sqft: resolve(RATE_KEYS.exterior_deck_stain, e.deck_stain_per_sqft),
+    deck_paint_per_sqft: resolve(RATE_KEYS.exterior_deck_paint, e.deck_paint_per_sqft),
+    fence_per_linft_6ft: resolve(RATE_KEYS.exterior_fence_6ft, e.fence_per_linft_6ft),
+    fence_per_linft_4ft: resolve(RATE_KEYS.exterior_fence_4ft, e.fence_per_linft_4ft),
     fence_per_linft_chain: e.fence_per_linft_chain,
     foundation_per_linft: e.foundation_per_linft,
-    window_trim_each: e.window_trim_each,
+    window_trim_each: resolve(RATE_KEYS.exterior_window_trim_each, e.window_trim_each),
     overhang_per_sqft: e.overhang_per_sqft,
   },
   prep: {

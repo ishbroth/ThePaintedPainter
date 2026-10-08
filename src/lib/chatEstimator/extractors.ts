@@ -88,8 +88,18 @@ export function extractProjectCondition(
  */
 function stripQuantifiedBedBath(text: string): string {
   const NUM = '(?:\\d+(?:\\.\\d)?|one|two|three|four|five|six|seven|eight|nine|ten)';
-  const re = new RegExp(`\\b${NUM}\\s*(?:-|\\s)?\\s*(?:bed(?:room)?s?|br|bd|bath(?:room)?s?|ba)\\b`, 'gi');
-  return text.replace(re, ' ');
+  const BED = '(?:bed(?:room)?s?|br|bd)';
+  const BATH = '(?:bath(?:room)?s?|ba)';
+  const hasBedCount = new RegExp('\\b' + NUM + '\\s*(?:-|\\s)?\\s*' + BED + '\\b', 'i').test(text);
+  const homeWords = /\b(house|home|apartment|condo|townhouse|townhome|unit|place|sq\.?\s?ft|square f)/i.test(text);
+  // "Two bathrooms (one 5x8, one 8x10)" is two rooms, not a size description; likewise "one bedroom 12x14" is one room.
+  const keepBaths = !hasBedCount && !homeWords;
+  const oneRoomWithDims = new RegExp('\\b(?:one|1)\\s*(?:-|\\s)?\\s*bed(?:room)?\\s+\\d{1,2}\\s*(?:x|by|×)\\s*\\d{1,2}\\b', 'i').test(text) && !homeWords;
+  const parts: string[] = [];
+  if (!oneRoomWithDims) parts.push(BED);
+  if (!keepBaths) parts.push(BATH);
+  if (parts.length === 0) return text;
+  return text.replace(new RegExp('\\b' + NUM + '\\s*(?:-|\\s)?\\s*(?:' + parts.join('|') + ')\\b', 'gi'), ' ');
 }
 
 export function extractRooms(text: string): string[] {
@@ -100,6 +110,11 @@ export function extractRooms(text: string): string[] {
     [/\b(?:second|2nd|guest|kids?)\s+bed(?:room)?\b/, 'bedroom_2'],
     [/\b(?:third|3rd)\s+bed(?:room)?\b/, 'bedroom_3'],
     [/\bliving\s+(?:room|area)\b/, 'living_room'],
+    [/\b(?:two|2|both|three|3)\s+(?:full\s+)?bath(?:room)?s\b/, 'bathroom_master'],
+    [/\b(?:two|2|both|three|3)\s+(?:full\s+)?bath(?:room)?s\b/, 'bathroom_2'],
+    [/\bnursery\b|\bbaby(?:'s)?\s+room\b|\bkid'?s?\s+room\b|\bplay\s*room\b/, 'bedroom_3'],
+    [/\bguest\s+room\b/, 'bedroom_2'],
+    [/\bsun\s*room\b|\bfour[\s-]season\b|\bscreened[\s-]in\b|\brec(?:reation)?\s+room\b|\bbasement\b|\battic\b|\bloft\b|\bman\s*cave\b|\bgame\s+room\b|\bhome\s+theat(?:er|re)\b/, 'bonus_room'],
     [/\bfamily\s+room\b/, 'bonus_room'],
     [/\bbonus\s+room\b/, 'bonus_room'],
     [/\bdining\s+room\b/, 'dining_room'],
@@ -128,21 +143,23 @@ export function extractRooms(text: string): string[] {
 
 export function extractCabinets(text: string): { yes: boolean; locations: string[] } {
   const t = text.toLowerCase();
-  const mentioned = /\bcabinet/.test(t);
+  // "no cabinets", "not the cabinets", "without the vanity" rule them out
+  const negated = /\b(?:no|not|without|except|excluding|skip|don'?t (?:paint|do|need)(?: the)?)\s+(?:the\s+|any\s+|our\s+)?(?:\w+\s+)?(?:cabinets?|cabinetry|vanit(?:y|ies))\b/.test(t);
+  const mentioned = /\bcabinet|\bvanit(?:y|ies)/.test(t) && !negated;
   if (!mentioned) return { yes: false, locations: [] };
   const locations: string[] = [];
   if (/\bkitchen\b/.test(t)) locations.push('kitchen');
-  if (/\bbath(?:room)?\s+(?:vanit|cabinet)/.test(t) || /\bvanity\b/.test(t)) locations.push('bathroom');
+  if (/\bbath(?:room)?\s+(?:vanit|cabinet)/.test(t) || /\bvanit(?:y|ies)\b/.test(t)) locations.push('bathroom');
   if (/\blaundry\b.*\bcabinet/.test(t)) locations.push('laundry');
-  if (locations.length === 0) locations.push('kitchen'); // default assumption when cabinets mentioned
+  if (locations.length === 0) locations.push(/\bbath/.test(t) ? 'bathroom' : 'kitchen'); // default assumption when cabinets mentioned
   return { yes: true, locations };
 }
 
 export function extractColorChange(text: string): 'same' | 'different' | 'dramatic' | null {
   const t = text.toLowerCase();
   if (/\b(dark\s+to\s+light|light\s+to\s+dark|black\s+to\s+white|white\s+to\s+black|dramatic(?:ally)?\s+(?:change|different))\b/.test(t)) return 'dramatic';
-  if (/\b(different\s+color|new\s+color|change\s+the\s+color|changing\s+color)\b/.test(t)) return 'different';
-  if (/\b(same\s+color|match(?:ing)?\s+(?:the\s+)?existing)\b/.test(t)) return 'same';
+  if (/\b(different\s+color|new\s+color|change\s+the\s+color|changing\s+color|different\s+one|something\s+(?:new|different)|a\s+(?:new|different)\s+(?:shade|one|paint)|going\s+(?:from\s+[\w\s-]{2,30}\s+)?to\s+(?:a\s+|an\s+)?(?:\w+\s+)?(?:white|grey|gray|beige|tan|blue|green|navy|black|red|yellow|cream|color|shade|dark|light|darker|lighter|bold|brighter)|changing\s+(?:it\s+)?(?:from\s+[\w\s-]{2,30}\s+)?to|switching\s+to|painting\s+it\s+(?:a\s+)?(?:new|different)|repainting\s+(?:it\s+)?(?:a\s+)?(?:new|different))\b/.test(t)) return 'different';
+  if (/\b(same\s+(?:\w+\s+)?colou?r|same\s+(?:white|beige|grey|gray|tan|cream)|match(?:ing)?\s+(?:the\s+)?(?:existing|current)|keep(?:ing)?\s+(?:the\s+)?(?:same|current|existing)|no\s+colou?r\s+change|not\s+changing\s+(?:the\s+)?colou?r|staying\s+(?:the\s+)?same|just\s+(?:a\s+)?(?:fresh coat|refresh|touch[\s-]?up))\b/.test(t)) return 'same';
   return null;
 }
 
@@ -307,7 +324,7 @@ export function extractAccessSignals(text: string): {
     // literally one of this topic's own suggested chip labels ("Vacant" /
     // "Furnished" / "Occupied"), so a customer just answering with that
     // exact word must register, not just longer phrases like "we live here".
-    occupied: /\b(occupied|we live|living here|we'?re still (?:here|in)|kids at home|pets at home)\b/.test(t),
+    occupied: /\b(occupied|we live|i live|living here|lived[\s-]?in|live in it|we'?re still (?:here|in)|kids at home|pets at home|people living)\b/.test(t),
     furnished: /\b(furnished|furniture in|moved in|all our stuff)\b/.test(t),
     vacant: /\b(vacant|empty|no one lives|not moved in|before we move)\b/.test(t),
     asap: /\b(asap|urgent|as soon as possible|this week|by (?:next )?weekend|rush)\b/.test(t),
@@ -322,8 +339,11 @@ export function extractAccessSignals(text: string): {
  */
 export function extractPropertyType(text: string): 'residential' | 'rental' | 'multi_unit' | 'commercial' | null {
   const t = text.toLowerCase();
-  if (/\b(multi[\s-]?unit|apartment (?:complex|building)|\d+[\s-]?unit building|several units|multiple units)\b/.test(t)) {
+  if (/\b(multi[\s-]?unit|apartment (?:complex|building)|\d+[\s-]?unit building|several units|multiple units|(?:[2-9]|\d{2,3})\s+(?:(?!bed)\w+[\s-]+){0,3}units?\b|property manager)\b/.test(t)) {
     return 'multi_unit';
+  }
+  if (/\b(restaurant|cafe|coffee shop|bakery|salon|barber ?shop|spa|gym|fitness|church|chapel|clinic|dental|dentist|medical (?:office|practice)|warehouse|retail|storefront|boutique|showroom|brewery|daycare|day care|our business|my business|our store|my store|our shop|my shop|our office|my office suite)\b/.test(t)) {
+    return 'commercial';
   }
   if (/\b(commercial (?:space|property|building)|office (?:space|building|park|tower|suite|complex)|retail (?:store|space)|warehouse|storefront)\b/.test(t)) {
     return 'commercial';
@@ -339,26 +359,32 @@ export function extractPropertyType(text: string): 'residential' | 'rental' | 'm
   ) {
     return 'rental';
   }
-  if (/\b(my home|our house|we live (?:here|there|in it)|owner[\s-]?occupied|primary residence|our (?:forever )?home)\b/.test(t)) {
+  if (/\b(my home|our house|my house|my condo|my townhome|my townhouse|my place|we live (?:here|there|in it)|i live (?:here|there|in it)|owner[\s-]?occupied|primary residence|our (?:forever )?home|i own (?:it|the (?:house|home|condo|place))|we own (?:it|the (?:house|home|condo|place)))\b/.test(t)) {
     return 'residential';
   }
   return null;
 }
 
 import { extractTiming, timelineFromStart } from './dateParsing';
+import { hasScopeLimiter } from './scopeWords';
 
 /** Timeline urgency — rush jobs command a scheduling premium. */
 export function extractTimeline(text: string): 'asap' | 'this_month' | 'no_rush' | null {
   const t = text.toLowerCase();
-  if (/\b(asap|urgent|as soon as possible|this week|next week|by (?:next )?weekend|rush|need(?:s|ed)? (?:it |this )?done (?:now|immediately|next week)|right away)\b/.test(t)) {
-    return 'asap';
-  }
-  if (/\b(no rush|whenever|not urgent|flexible timeline|no hurry|nothing urgent)\b/.test(t)) {
+  if (/\b(no rush|not (?:in )?a rush|whenever|not urgent|flexible timeline|no hurry|nothing urgent|no deadline|take your time|any ?time)\b/.test(t)) {
     return 'no_rush';
   }
-  if (/\b(this month|within a month|next few weeks|couple weeks)\b/.test(t)) {
+  if (/\b(asap|urgent|as soon as possible|this week|next week|(?:this|next) weekend|by (?:next )?weekend|rush|need(?:s|ed)? (?:it |this )?done (?:now|immediately|next week)|right away)\b/.test(t)) {
+    return 'asap';
+  }
+  if (/\b(this month|within a month|next few weeks|couple weeks|next month|mid[\s-]?(?:month|\w+)|end of the month|before (?:the )?holidays?|before (?:thanksgiving|christmas))\b/.test(t)) {
     return 'this_month';
   }
+  // a named month with no day (like sometime in March) is a loose window, not a rush
+  if (/\b(?:in|during|sometime in|early|late|around)\s+(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sept?(?:ember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b/.test(t)) {
+    return 'no_rush';
+  }
+  if (/\b(?:spring|summer|fall|autumn|winter)\b/.test(t)) return 'no_rush';
   return null;
 }
 
@@ -531,7 +557,8 @@ export function extractSpecialtyServices(text: string): {
     if (/\bvaulted\b/.test(t)) out.beamLocation = 'vaulted';
   }
 
-  if (/\bbuilt[\s-]?ins?\b|\bbuilt[\s-]?in (?:bookshelf|bookshelves|shelving|cabinetry)\b/.test(t)) out.builtIns = true;
+  // "no built-ins" / "without the built-ins" is the opposite of asking for them
+  if (/\bbuilt[\s-]?ins?\b|\bbuilt[\s-]?in (?:bookshelf|bookshelves|shelving|cabinetry)\b/.test(t) && !/\b(?:no|not|without|except|excluding|skip|don'?t need|not including)\s+(?:the\s+|any\s+|our\s+)?built[\s-]?ins?\b/.test(t)) out.builtIns = true;
 
   if (/\bepoxy\b.{0,20}\bgarage\b|\bgarage floor\b.{0,20}\bepoxy\b|\bepoxy (?:the )?(?:garage )?floor\b/.test(t)) out.epoxy = true;
 
@@ -771,7 +798,7 @@ export function extractExteriorFeatures(text: string): {
 
   if (/\bfoundation\b/.test(t)) out.foundation = true;
 
-  if (/\boverhangs?\b|\bpatio\s*cover\b|\bporch\s*roof\b|\bpatios?\b/.test(t)) out.overhangs = true;
+  if (/\boverhangs?\b|\bpatio\s*cover\b|\bporch\s*roof\b|\bpatios?\b(?!\s*(?:furniture|set|table|chairs?|umbrella|cushions?|loungers?))/.test(t)) out.overhangs = true;
 
   if (/\bsoffits?\b|\beaves\b/.test(t)) out.soffitsEaves = true;
 
@@ -1050,6 +1077,42 @@ export function extractAll(text: string, prev: EstimatorContext, lastBotTopicId:
     }
   }
 
+  // Any reply to "how are the walls / what shape is it in?" is an answer ("it's fine", "good", "a few cracks"); the
+  // damage extractors below pick out specifics, but a plain "fine" must still close the question.
+  if (lastBotTopicId === 'condition' && !prev.conditionAddressed && text.trim().length > 0 && !text.trim().endsWith('?')) {
+    patch.conditionAddressed = true;
+  }
+  if (lastBotTopicId === 'trim_scope' && !prev.trimScopeAddressed && text.trim().length > 0 && !text.trim().endsWith('?')) {
+    patch.trimScopeAddressed = true;
+  }
+
+  // Short replies are answers to the question just asked: "two" to "how many stories?", "nights" to "after hours?",
+  // "commercial" to "is this your home?". The sentence-style extractors below need the full phrasing.
+  if (lastBotTopicId === 'stories' && !prev.stories) {
+    const low = text.toLowerCase().trim();
+    const n = /^(?:about |around )?(?:one|1|single|ground level|ranch)\b/.test(low) ? 1 : /^(?:about |around )?(?:two|2|double)\b/.test(low) ? 2 : /^(?:about |around )?(?:three|3|triple)\b/.test(low) ? 3 : null;
+    if (n) {
+      patch.stories = n;
+      acks.push(n + '-story');
+    }
+  }
+  if (lastBotTopicId === 'commercial_access' && !prev.afterHoursRequired) {
+    const low = text.toLowerCase();
+    if (/\b(nights?|overnight|evenings?|after[\s-]?hours|weekends?|early (?:morning|mornings)|before (?:we )?open|mondays?|closed (?:on|mondays?)|outside (?:of )?business hours)\b/.test(low)) {
+      patch.afterHoursRequired = 'yes';
+      acks.push('after-hours scheduling');
+    } else if (/\b(weekdays?|daytime|during the day|any ?time|anytime|business hours|doesn'?t matter|no preference|we can close|closed (?:for|during)|closed is fine|closed)\b/.test(low)) {
+      patch.afterHoursRequired = 'no';
+    }
+  }
+  if (lastBotTopicId === 'property_ownership' && !prev.propertyType && !patch.propertyType) {
+    const low = text.toLowerCase();
+    if (/\b(commercial|business|company|store|shop|restaurant|office|church|clinic|warehouse|salon|cafe|gym)\b/.test(low)) {
+      patch.propertyType = 'commercial';
+      acks.push('commercial');
+    }
+  }
+
   const beds = extractBedroomCount(text);
   if (beds && !prev.bedroomCount) {
     patch.bedroomCount = beds;
@@ -1079,7 +1142,14 @@ export function extractAll(text: string, prev: EstimatorContext, lastBotTopicId:
   const roomsSourceText = stripQuantifiedBedBath(text);
   const quantifiedBedBathMention = roomsSourceText !== text;
   const rooms = extractRooms(roomsSourceText);
-  if (rooms.length > 0 && prev.selectedRooms.length === 0 && prev.interiorScope !== 'whole_house') {
+  // "4 bedroom house, 2,400 sq ft ... kitchen cabinets too" describes the whole home; one room named along the way
+  // (the kitchen the cabinets are in) must not shrink the job to that room.
+  const describesWholeHome =
+    (quantifiedBedBathMention || (!!sqft && /\b(house|home|apartment|condo|townhouse|townhome|unit|whole)\b/i.test(text))) &&
+    !hasScopeLimiter(text);
+  if (rooms.length > 0 && describesWholeHome && prev.selectedRooms.length === 0 && !prev.interiorScope && !patch.interiorScope) {
+    patch.interiorScope = 'whole_house';
+  } else if (rooms.length > 0 && prev.selectedRooms.length === 0 && prev.interiorScope !== 'whole_house') {
     // A room mentioned in passing ("the kitchen has some grease stains")
     // must never narrow an already-established whole-house scope down to
     // just that room — that silently collapses the whole quote.
@@ -1096,6 +1166,22 @@ export function extractAll(text: string, prev: EstimatorContext, lastBotTopicId:
     patch.interiorScope = 'whole_house';
   }
 
+  if (
+    lastBotTopicId === 'which_rooms' &&
+    rooms.length === 0 &&
+    !prev.interiorScope &&
+    !patch.interiorScope &&
+    prev.selectedRooms.length === 0 &&
+    text.trim().length > 0 &&
+    !/\b(whole|entire|all|every(?:thing)?|throughout)\b/i.test(text) &&
+    !text.trim().endsWith('?')
+  ) {
+    // a room we don't have a template for ("the studio", "sewing room"): price it as one ordinary room and say so
+    patch.selectedRooms = ['bedroom_2'];
+    patch.interiorScope = 'specific_rooms';
+    acks.push('1 room');
+  }
+
   const cab = extractCabinets(text);
   if (cab.yes && prev.cabinets === 'none') {
     patch.cabinets = cab.locations.length > 1 ? 'multiple' : cab.locations[0] || 'kitchen';
@@ -1103,7 +1189,14 @@ export function extractAll(text: string, prev: EstimatorContext, lastBotTopicId:
     acks.push('cabinets');
   }
 
-  const color = extractColorChange(text);
+  let color = extractColorChange(text);
+  if (!color && lastBotTopicId === 'color_change') {
+    // A terse reply to "same color or a different one?" ("different, light", "keep it", "going grey") is an answer to that question.
+    const lower = text.toLowerCase();
+    if (/\b(same|keep|keeping|existing|current|match|no change|unchanged|stay)\b/.test(lower)) color = 'same';
+    else if (/\b(dark|black|navy|charcoal)\b/.test(lower) && /\b(light|white|cream)\b/.test(lower)) color = 'dramatic';
+    else if (/\b(different|new|change|changing|switch|go(?:ing)?|lighter|darker|light|dark|grey|gray|white|blue|green|red|navy|beige|black|bold|bright|color|colour)\b/.test(lower)) color = 'different';
+  }
   if (color && !prev.interiorColorChange) {
     patch.interiorColorChange = color;
     if (color === 'dramatic') acks.push(`dramatic color change ${colorScopeAckPhrase(prev)}`);
@@ -1517,8 +1610,24 @@ export function extractAll(text: string, prev: EstimatorContext, lastBotTopicId:
     acks.push('French doors');
   }
 
-  // Surface scope limiters
-  const surf = extractSurfaceScope(text);
+  // Surface scope limiters. Skipped when the reply is answering a different question: "just regular trim" to the trim
+  // question means baseboards, not "paint only the trim".
+  const scopeBlockedBy = ['trim_scope', 'condition', 'property_ownership', 'color_change', 'location', 'timeline_and_access', 'commercial_access', 'siding', 'stories', 'house_size', 'room_size', 'reno_context', 'popcorn_extent'];
+  const surf = lastBotTopicId && scopeBlockedBy.includes(lastBotTopicId) ? ({} as ReturnType<typeof extractSurfaceScope>) : extractSurfaceScope(text);
+  // A plain list as the answer to "which surfaces?" ("walls", "walls and ceilings", "walls ceilings trim") means exactly those.
+  if (lastBotTopicId === 'surfaces' && surf.walls === undefined && surf.ceilings === undefined && surf.trim === undefined && surf.doors === undefined) {
+    const low = text.toLowerCase();
+    const w = /\bwalls?\b/.test(low), c = /\bceilings?\b/.test(low), tr = /\b(trim|baseboards?|casings?|molding|moulding)\b/.test(low), d = /\bdoors?\b/.test(low);
+    if (/\b(everything|all of it|the works|full (?:package|scope)|the whole (?:thing|room)|the usual|standard)\b/.test(low)) {
+      surf.everything = true;
+      surf.walls = 'yes'; surf.ceilings = 'yes'; surf.trim = 'yes'; surf.doors = 'yes';
+    } else if (w || c || tr || d) {
+      surf.walls = w ? 'yes' : 'no';
+      surf.ceilings = c ? 'yes' : 'no';
+      surf.trim = tr ? 'yes' : 'no';
+      surf.doors = d ? 'yes' : 'no';
+    }
+  }
   if (surf.walls !== undefined) patch.interiorWalls = surf.walls;
   if (surf.ceilings !== undefined) patch.interiorCeilings = surf.ceilings;
   if (surf.trim !== undefined) patch.interiorTrim = surf.trim;

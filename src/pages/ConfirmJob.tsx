@@ -180,7 +180,7 @@ const ConfirmJob = () => {
             <h2 style={{ marginTop: 0 }}>{job.painter?.companyName}</h2>
             <p style={{ margin: '0 0 4px' }}>Job price: <strong>{currency(job.guaranteedPrice)}</strong> · Deposit due: <strong>{currency(job.depositAmount)}</strong></p>
             <p style={{ margin: '0 0 4px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-              Your timing: {job.customerTiming}{estimate ? ` · Estimated time on site: ${estimate}` : ''}
+              Your timing: {job.customerTiming}{estimate ? ` · Expected time on site: ${estimate}` : ''}
             </p>
             <p style={{ margin: 0, color: 'var(--text-faint)', fontSize: '0.8rem' }}>Your painter's contact details are shared once your deposit is paid.</p>
           </div>

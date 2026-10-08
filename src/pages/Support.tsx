@@ -7,7 +7,7 @@ const faqs = [
   {
     question: 'How does The Painted Painter work?',
     answer:
-      'Think of us as the Hotwire for painting. You get an instant AI-powered estimate for your project, then choose how you want to proceed: accept a guaranteed price for the best deal, or browse individual painters and pick the one you like best. Painters compete for your job, which means better pricing and faster service for you.',
+      'Think of us as the Hotwire for painting. You get an instant AI-powered price for your project, then choose how you want to proceed: accept a guaranteed price for the best deal, or browse individual painters and pick the one you like best. Painters compete for your job, which means better pricing and faster service for you.',
   },
   {
     question: 'How is the guaranteed price calculated?',
@@ -37,7 +37,7 @@ const faqs = [
   {
     question: 'What areas do you serve?',
     answer:
-      'We serve all 50 US states. Availability depends on painter coverage in your area. As our network grows, more areas gain full coverage. Enter your zip code when getting an estimate to see available painters near you.',
+      'We serve all 50 US states. Availability depends on painter coverage in your area. As our network grows, more areas gain full coverage. Enter your zip code when getting your price to see available painters near you.',
   },
   {
     question: 'How do I contact support?',
@@ -152,7 +152,7 @@ const Support = () => {
           <p className="text-[var(--text-secondary)] leading-relaxed text-center">
             Painters sign up, set their rates, and start receiving job offers — no bidding wars, no chasing leads.
             The platform handles pricing, matching, and reviews so painters can focus on the work, and customers get
-            transparent pricing with a simple way to track a project from estimate to completion.
+            transparent pricing with a simple way to track a project from price to completion.
           </p>
         </div>
       </section>
@@ -162,7 +162,7 @@ const Support = () => {
           <h2 className="text-2xl font-bold mb-8 text-center">How It Works</h2>
           <div className="grid md:grid-cols-5 gap-6 max-w-4xl mx-auto">
             {[
-              { num: '1', title: 'Get an Estimate', desc: 'Answer a few questions and get an instant AI-powered estimate.' },
+              { num: '1', title: 'Get Your Price', desc: 'Answer a few questions and get an instant AI-powered price.' },
               { num: '2', title: 'Choose Your Option', desc: 'Take the guaranteed price, or pick a specific painter by profile and reviews.' },
               { num: '3', title: 'Secure Your Painter', desc: 'A 10% deposit locks in your price and painter.' },
               { num: '4', title: 'Get It Done', desc: 'Your painter handles prep through final coat. Track progress on the platform.' },
@@ -189,13 +189,13 @@ const Support = () => {
               tag, no waiting days for pricing.
             </p>
             <ul className="text-[var(--text-secondary)] mb-6 list-disc ml-5 space-y-1.5 text-sm">
-              <li>Instant AI-powered estimates</li>
+              <li>Instant AI-powered prices</li>
               <li>Verified, licensed, and insured painters</li>
               <li>Transparent pricing with no hidden fees</li>
               <li>Only pay the balance when the work is done</li>
             </ul>
             <Link to="/" className="cta-button">
-              Get Your Estimate
+              Get Your Price
             </Link>
           </div>
           <div>

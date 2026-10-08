@@ -18,6 +18,8 @@
 // ============================================================================
 
 import type { EstimatorContext } from '../types';
+import { estimateHouseLayout } from '../surfaceAreaEngine';
+import { hasScopeLimiter } from './scopeWords';
 
 export interface Derivation {
   /** Fields to merge into the context. */
@@ -45,7 +47,7 @@ export function derive(ctx: EstimatorContext, transcript: string): Derivation[] 
   // ceilings, exterior trim, deck railings), so those stay ambiguous on
   // purpose and are deliberately NOT in this list.
   const mentionsIndoorRoom =
-    /\b(room|rooms|bedroom|bathroom|kitchen|living room|dining|hallway|closet|pantry|nursery|den|foyer|mudroom|laundry room|apartment|apt\.?|condo(?:minium)?|duplex|rental unit|the unit|my unit|staircase|stairway|door frames?|door jambs?|cabinets?|cabinet interiors?|vanity|vanities|wainscoting|crown molding|chair rail|baseboards?|fireplace|mantel|built[\s-]?ins?|attic|basement|popcorn ceiling)\b/.test(
+    /\b(room|rooms|bedroom|bathroom|kitchen|living room|dining|hallway|closet|pantry|nursery|den|foyer|mudroom|laundry room|apartment|apt\.?|condo(?:minium)?|duplex|rental unit|the unit|my unit|staircase|stairway|stairs|stairwell|door frames?|door jambs?|cabinets?|cabinet interiors?|vanity|vanities|wainscoting|crown molding|chair rail|baseboards?|fireplace|mantel|built[\s-]?ins?|attic|basement|popcorn ceiling)\b/.test(
       t,
     ) || mentionsHomeOffice;
   const mentionsExteriorSurface =
@@ -242,6 +244,218 @@ export function derive(ctx: EstimatorContext, transcript: string): Derivation[] 
     out.push({
       patch: { interiorScope: 'whole_house' },
       reason: 'Square footage given without naming specific rooms → whole-space scope',
+    });
+  }
+
+  // ——————————————————————————————————————————
+  // Measurements the customer volunteered ("300 linear feet of baseboard", "25 doors and drawers",
+  // "two accent walls"...) — logged exactly instead of being replaced by a house-size guess.
+  // ——————————————————————————————————————————
+  const num = (s: string) => parseInt(s.replace(/,/g, ''), 10);
+  const wordNum: Record<string, number> = { a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
+  let m: RegExpMatchArray | null;
+
+  if (ctx.trimLinearFeet == null) {
+    m = t.match(/(\d[\d,]*)\s*(?:linear\s*|lin\.?\s*)?(?:feet|foot|ft\.?|lf)\s*(?:of\s*)?(?:the\s*)?(?:baseboards?|base\s*boards?|trim|casings?|moulding|molding)\b/) ||
+      t.match(/\b(?:baseboards?|base\s*boards?|trim)\b[^.]{0,30}?(\d[\d,]*)\s*(?:linear\s*|lin\.?\s*)?(?:feet|foot|ft\.?|lf)\b/);
+    if (m && !/crown/.test(m[0])) {
+      const n = num(m[1]);
+      if (n >= 10 && n <= 20000) out.push({ patch: { trimLinearFeet: n, interiorTrim: 'yes' }, reason: 'Customer gave linear feet of trim' });
+    }
+  }
+  if (ctx.crownLinearFeet == null) {
+    m = t.match(/(\d[\d,]*)\s*(?:linear\s*|lin\.?\s*)?(?:feet|foot|ft\.?|lf)\s*(?:of\s*)?crown/);
+    if (m) {
+      const n = num(m[1]);
+      if (n >= 10 && n <= 20000) out.push({ patch: { crownLinearFeet: n, crownMolding: 'yes' }, reason: 'Customer gave linear feet of crown molding' });
+    }
+  }
+  if (ctx.popcornCeilingSqft == null && /popcorn|acoustic ceiling|textured ceiling|cottage cheese/.test(t)) {
+    m = t.match(/(\d[\d,]*)\s*(?:sq\.?\s*ft\.?|sqft|square\s*f(?:ee|oo)t)\s*(?:of\s*)?(?:the\s*)?(?:popcorn|acoustic|textured)/) ||
+      t.match(/(?:popcorn|acoustic|textured)[^.]{0,40}?(\d[\d,]*)\s*(?:sq\.?\s*ft\.?|sqft|square\s*f(?:ee|oo)t)/);
+    if (m) {
+      const n = num(m[1]);
+      if (n >= 50 && n <= 30000) out.push({ patch: { popcornCeilingSqft: n }, reason: 'Customer gave the ceiling area' });
+    }
+  }
+  if (ctx.cabinetDoorCount == null && /cabinet|vanit/.test(t)) {
+    m = t.match(/(\d{1,3})\s*(?:cabinet\s*)?(?:doors?|drawers?|fronts?)\b/);
+    if (m) {
+      const n = num(m[1]);
+      if (n >= 2 && n <= 150) out.push({ patch: { cabinetDoorCount: n }, reason: 'Customer gave the cabinet door and drawer count' });
+    }
+  }
+  if (ctx.deckSqft == null && /\bdeck\b/.test(t)) {
+    m = t.match(/(\d{1,3})\s*(?:x|by|×)\s*(\d{1,3})\s*(?:foot\s*|ft\.?\s*)?(?:wood(?:en)?\s*)?deck/) ||
+      t.match(/deck[^.]{0,25}?(\d{1,3})\s*(?:x|by|×)\s*(\d{1,3})/);
+    if (m) {
+      const n = parseInt(m[1], 10) * parseInt(m[2], 10);
+      if (n >= 20 && n <= 5000) out.push({ patch: { deckSqft: n }, reason: 'Deck dimensions given' });
+    } else if ((m = t.match(/(\d[\d,]*)\s*(?:sq\.?\s*ft\.?|sqft|square\s*f(?:ee|oo)t)\s*(?:wood(?:en)?\s*)?deck|deck[^.]{0,30}?(\d[\d,]*)\s*(?:sq\.?\s*ft\.?|sqft|square\s*f(?:ee|oo)t)/))) {
+      const n = num(m[1] || m[2]);
+      if (n >= 20 && n <= 5000) out.push({ patch: { deckSqft: n }, reason: 'Deck area given' });
+    }
+  }
+  if (ctx.accentWallCount == null && /accent wall/.test(t)) {
+    m = t.match(/\b(one|two|three|four|five|an?|\d)\s+(?:\w+\s+)?accent\s+walls?/);
+    let n: number | null = m ? (wordNum[m[1]] ?? parseInt(m[1], 10)) : null;
+    if (n == null && /accent walls? (?:in|for|on) (?:each|every)\b/.test(t)) n = ctx.bedroomCount || 3;
+    if (n == null && /accent walls\b/.test(t)) n = 2;
+    if (n && n <= 20) out.push({ patch: { accentWallCount: n, accentWalls: 'yes' }, reason: 'Accent wall count' });
+  }
+  if (ctx.stairRailFeet == null && /rail|banister|bannister|balustrade|handrail/.test(t)) {
+    m = t.match(/(\d{1,3})\s*(?:linear\s*)?(?:feet|foot|ft\.?)\s*(?:of\s*)?(?:stair\s*)?(?:railing|banister|bannister|handrail|balustrade)/);
+    if (m) {
+      const n = num(m[1]);
+      if (n >= 4 && n <= 500) out.push({ patch: { stairRailFeet: n }, reason: 'Railing length given' });
+    }
+  }
+  if (ctx.pressureWashSqft == null && /pressure wash|power wash|soft wash/.test(t)) {
+    m = t.match(/(\d[\d,]*)\s*(?:sq\.?\s*ft\.?|sqft|square\s*f(?:ee|oo)t)\s*(?:of\s*)?(?:the\s*)?(?:driveway|patio|walkway|sidewalk|concrete|deck|fence)/) ||
+      t.match(/(?:driveway|patio|walkway|sidewalk|concrete)[^.]{0,30}?(\d[\d,]*)\s*(?:sq\.?\s*ft\.?|sqft|square\s*f(?:ee|oo)t)/);
+    if (m) {
+      const n = num(m[1]);
+      if (n >= 50 && n <= 50000) out.push({ patch: { pressureWashSqft: n }, reason: 'Pressure-wash area given' });
+    }
+  }
+
+  // ——————————————————————————————————————————
+  // Scope the customer narrowed to one thing ("just the stair rail", "popcorn removal only",
+  // "pressure washing only", "kitchen cabinets", "fence only"...). The house-wide defaults
+  // (walls, ceilings, trim, doors, siding) must switch off or a one-item job is priced as a house.
+  // ——————————————————————————————————————————
+  const interiorOff: Partial<EstimatorContext> = {
+    interiorWalls: 'no', interiorCeilings: 'no', interiorTrim: 'no', interiorDoors: 'none', surfacesAddressed: true, trimScopeAddressed: true, conditionAddressed: true,
+  };
+  // Surfaces the customer ruled out ("no walls, no ceilings", "without the doors", "skip the trim").
+  const negated = new Set<string>();
+  const negRe = /\b(?:no|without|skip|excluding|except(?: for)?|not (?:the )?|don'?t (?:paint|do|need)(?: the)?|leave out)\s+((?:(?:walls?|ceilings?|trim|baseboards?|doors?|windows?)\b(?:\s*(?:,|or|and|nor|\/)\s*)?)+)/g;
+  for (const nm of t.matchAll(negRe)) {
+    for (const w of nm[1].split(/[^a-z]+/).filter(Boolean)) negated.add(w.replace(/s$/, ''));
+  }
+  if (negated.size > 0) {
+    const neg: Partial<EstimatorContext> = {};
+    if (negated.has('wall') && ctx.interiorWalls !== 'no') neg.interiorWalls = 'no';
+    if (negated.has('ceiling') && ctx.interiorCeilings !== 'no') neg.interiorCeilings = 'no';
+    if ((negated.has('trim') || negated.has('baseboard')) && ctx.interiorTrim !== 'no') neg.interiorTrim = 'no';
+    if (negated.has('door') && ctx.interiorDoors !== 'none') neg.interiorDoors = 'none';
+    if (negated.has('window') && ctx.interiorWindows !== 'none') neg.interiorWindows = 'none';
+    if (Object.keys(neg).length > 0) out.push({ patch: { ...neg, surfacesAddressed: true }, reason: 'Customer ruled out surfaces' });
+  }
+  const tNeg = t.replace(negRe, ' ');
+  const hasOnly = hasScopeLimiter(t);
+  const mentionsSurfaceWords = /\b(walls?|ceilings?|whole|entire|every room|all (?:the )?rooms|throughout|bedrooms?|living room|kitchen walls)\b/.test(tNeg);
+  const railWords = /\b(stair(?:s|case|way)?\s*(?:rail(?:ing)?s?|banisters?)|banisters?|bannisters?|balusters?|spindles?|handrails?|stair rail)\b/.test(t);
+
+  if (railWords && !/\b(deck|porch|balcon|patio|exterior|outside|outdoor)\b/.test(t) && !/\bwalls?\b/.test(t) && ctx.stairwayDetails !== 'railings_only') {
+    out.push({
+      patch: { ...interiorOff, projectType: ctx.projectType || 'interior', interiorScope: 'specific_rooms', stairways: 'yes', stairwayDetails: 'railings_only', railingType: /\b(spindles?|balusters?)\b/.test(t) ? 'spindles' : 'simple', stairwayCount: ctx.stairwayCount || 1 },
+      reason: 'Only the stair railing → price the railing, not the walls',
+    });
+  } else if (/\bpopcorn\b|\bacoustic ceiling/.test(t) && /\b(removal|remove|scrape|scraping|get rid of|take off|strip)\b/.test(t) && !/\b(walls?|trim|baseboards?)\b/.test(t.replace(/no walls?/g, '')) && (ctx.interiorCeilings !== 'no' || ctx.interiorWalls !== 'no' || ctx.interiorTrim !== 'no')) {
+    const noPaint = /\b(?:paint (?:it|them|the ceilings?) (?:ourselves|myself)|(?:we|i)(?:'ll| will| can)? paint|no paint(?:ing)?|without paint(?:ing)?|not (?:paint|painting)|removal only|just the removal|diy the paint)/.test(t);
+    const repaint = !noPaint && /\b(repaint|paint(?:ed|ing)?|new paint|refinish)\b/.test(t.replace(/popcorn ceilings? (?:that is|is|are) painted/, ''));
+    out.push({
+      patch: { ...interiorOff, interiorCeilings: repaint ? 'yes' : 'no', projectType: ctx.projectType || 'interior', prepWork: ctx.prepWork.includes('popcorn_removal') ? ctx.prepWork : [...ctx.prepWork, 'popcorn_removal'] },
+      reason: 'Popcorn ceiling removal only → no wall, trim or door painting',
+    });
+  } else if (/\b(baseboards?|base\s*boards?|trim|casings?|crown)\b/.test(t) && !mentionsSurfaceWords && (ctx.projectType === 'interior' || /\b(interior|inside|baseboards?|casings?|crown)\b/.test(t)) && !/\b(exterior|outside|fascia|soffit)\b/.test(t) && (hasOnly || ctx.trimLinearFeet != null || /\blinear (?:feet|foot)\b/.test(t)) && ctx.interiorWalls !== 'no') {
+    out.push({
+      patch: { ...interiorOff, interiorTrim: 'yes', projectType: ctx.projectType || 'interior', interiorScope: ctx.interiorScope || 'whole_house' },
+      reason: 'Trim only → no walls, ceilings or doors',
+    });
+  } else if (/\b(cabinets?|vanit(?:y|ies))\b/.test(t) && !/\b(walls?|ceilings?|baseboards?|trim|doors? (?:and|&) trim|whole|entire|every room|bedrooms?|living|house|apartment|condo)\b/.test(t) && ctx.interiorWalls !== 'no' && !/\b(exterior|outside)\b/.test(t)) {
+    out.push({
+      patch: { ...interiorOff, projectType: ctx.projectType || 'interior', interiorScope: ctx.interiorScope || 'specific_rooms' },
+      reason: 'Cabinets (or a vanity) only → no wall, ceiling or trim painting',
+    });
+  }
+
+  // A business or apartment building isn't priced room by room ("the sanctuary and hall" is not one hallway): it's the whole
+  // space, sized by square footage, unless the customer limited it ("just the lobby").
+  if ((ctx.propertyType === 'commercial' || ctx.propertyType === 'multi_unit') && ctx.interiorScope === 'specific_rooms' && ctx.stairwayDetails !== 'railings_only' && !/\b(?:just|only)\s+(?:the\s+)?(?:lobby|reception|front|dining|kitchen|bar|office|suite|unit|room|hall|bathroom|restroom|entrance)\b/.test(t)) {
+    out.push({ patch: { interiorScope: 'whole_house', selectedRooms: [] }, reason: 'Commercial space → whole-space scope' });
+  }
+
+  // A studio is a one-room apartment: don't price it as a typical house, and don't make the customer measure it.
+  if (!ctx.squareFeet && !ctx.bedroomCount && /\bstudio(?:\s+(?:apartment|apt|unit|condo|flat))?\b/.test(t) && !/\bstudio\s+(?:space|business|photography)\b/.test(t)) {
+    out.push({ patch: { squareFeet: 500 }, reason: 'Studio apartment → about 500 sq ft' });
+  }
+
+  // One room given by its dimensions ("10x12", "12 by 14") is sized from them, not from a template room.
+  if (!ctx.squareFeet && ctx.interiorScope === 'specific_rooms' && ctx.selectedRooms.length === 1) {
+    const dm = t.match(/\b(\d{1,2})\s*(?:x|by|×)\s*(\d{1,2})\b/);
+    if (dm) {
+      const area = parseInt(dm[1], 10) * parseInt(dm[2], 10);
+      if (area >= 25 && area <= 600) out.push({ patch: { squareFeet: area }, reason: 'Room dimensions given' });
+    }
+  }
+
+  // Several units at an stated size each ("10 one-bedroom units, 700 sq ft each") → the total, as multi-unit work
+  if (!ctx.squareFeet) {
+    const um = t.match(/(\d{1,3})\s+(?:\w+[\s-]+){0,3}?(?:apartments?|units?|condos?|townhomes?)\b[^.]{0,60}?(\d[\d,]*)\s*(?:sq\.?\s*ft\.?|sqft|square\s*f(?:ee|oo)t)\s*(?:each|apiece|per unit)/);
+    if (um) {
+      const units = parseInt(um[1], 10), each = num(um[2]);
+      if (units >= 2 && units <= 500 && each >= 200 && each <= 5000) {
+        out.push({ patch: { squareFeet: units * each, propertyType: 'multi_unit', interiorScope: 'whole_house', selectedRooms: [], multiPhaseRequested: /\b(one at a time|as (?:tenants?|units?) (?:leave|turn)|staggered|phases?)\b/.test(t) ? 'yes' : ctx.multiPhaseRequested }, reason: units + ' units at ' + each + ' sq ft each' });
+      }
+    }
+  }
+  if (!mentionsSurfaceWords && /\bclosets?\b/.test(t) && /\b(\d{1,2}|one|two|three|four|five|six)\s+(?:\w+\s+)?closets?\b/.test(t) && ctx.closets === 'none') {
+    const cm = t.match(/\b(\d{1,2}|one|two|three|four|five|six)\s+(?:\w+\s+)?closets?\b/);
+    const nn = cm ? (wordNum[cm[1]] ?? parseInt(cm[1], 10)) : 1;
+    out.push({ patch: { ...interiorOff, closets: /walk[\s-]?in/.test(t) ? 'both' : 'standard', closetCount: nn, interiorScope: 'specific_rooms' }, reason: 'Closets only' });
+  }
+
+  // Exterior jobs that are about features, not the house body
+  if (ctx.exteriorBody === '' && (ctx.projectType === 'exterior' || ctx.projectType === 'both' || (!ctx.projectType && !mentionsIndoorRoom))) {
+    const features = /\b(fence|fences|deck|shutters?|garage door|front door|entry door|porch|railings?|gutters?|fascia|soffits?|eaves|exterior trim|window trim|patio furniture|outdoor furniture|patio set|pressure wash|power wash|soft wash|driveway|patio)\b/.test(t);
+    const bodyWords = /\b(siding|stucco|brick|clapboard|hardie|shingles?|whole (?:house|exterior)|entire (?:house|exterior|outside)|(?:exterior|outside) of (?:my|the|our|a) (?:house|home)|house exterior|(?:exterior|outside) (?:paint|repaint|painting)|repaint (?:the )?(?:house|exterior|outside)|victorian|colonial|ranch|bungalow|barn|shed|two[- ]story|three[- ]story|\d\s*stor(?:y|ies))\b/.test(t);
+    const washOnly = /\b(pressure|power|soft)\s*wash/.test(t) && !/\b(paint|repaint|stain|coat|seal)/.test(t);
+    if (washOnly) {
+      out.push({ patch: { exteriorBody: 'no', projectType: 'exterior', prepWork: ctx.prepWork.includes('power_washing') ? ctx.prepWork : [...ctx.prepWork, 'power_washing'], exteriorTrim: 'no' }, reason: 'Pressure washing only → no painting of the house body' });
+    } else if (features && (hasOnly || !bodyWords)) {
+      out.push({ patch: { exteriorBody: 'no', projectType: ctx.projectType || 'exterior' }, reason: 'Only specific exterior features → no house-body painting' });
+    } else if (features && bodyWords) {
+      out.push({ patch: { exteriorBody: 'yes' }, reason: 'Whole exterior including features' });
+    }
+  }
+
+  // Porch work: the ceiling is an overhang, the floor is deck-type surface
+  if (/\bporch\b/.test(t) && ctx.overhangSqft == null) {
+    const ceilingM = t.match(/(\d[\d,]*)\s*(?:sq\.?\s*ft\.?|sqft|square\s*f(?:ee|oo)t)[^.]{0,30}ceiling|ceiling[^.]{0,40}?(\d[\d,]*)\s*(?:sq\.?\s*ft\.?|sqft|square\s*f(?:ee|oo)t)/);
+    const porchArea = ceilingM ? num(ceilingM[1] || ceilingM[2]) : 0;
+    const patch: Partial<EstimatorContext> = {};
+    if (/\bceiling\b/.test(t)) { patch.overhangs = 'yes'; if (porchArea >= 20 && porchArea <= 3000) patch.overhangSqft = porchArea; }
+    if (/\b(floor|decking|steps?)\b/.test(t) && ctx.deck !== 'yes') { patch.deck = 'yes'; if (porchArea >= 20 && ctx.deckSqft == null) patch.deckSqft = porchArea; }
+    if (Object.keys(patch).length > 0) out.push({ patch, reason: 'Porch ceiling and floor' });
+  }
+
+  // Patio furniture: count the pieces so each is priced
+  if (/\b(patio|outdoor|garden|deck)\s*(furniture|set|chairs?|table)|\bloungers?\b|\bchaise\b|\bwrought iron (?:set|chairs?|table)/.test(t) && ctx.furnitureItems.length === 0) {
+    const items: string[] = [];
+    const count = (re: RegExp) => { const mm = t.match(re); return mm ? (wordNum[mm[1]] ?? parseInt(mm[1], 10)) : 0; };
+    const chairs = count(/\b(\d{1,2}|one|two|three|four|five|six|seven|eight)\s+(?:\w+\s+)?(?:patio\s+)?chairs?\b/) || (/\bchairs?\b/.test(t) ? 4 : 0);
+    const loungers = count(/\b(\d{1,2}|one|two|three|four)\s+(?:\w+\s+)?(?:loungers?|chaises?|lounge chairs?)\b/) || (/\bloungers?\b|\bchaise\b/.test(t) ? 1 : 0);
+    const benches = count(/\b(\d{1,2}|one|two|three)\s+(?:\w+\s+)?benches\b/) || (/\bbench\b/.test(t) ? 1 : 0);
+    const tables = count(/\b(\d{1,2}|one|two|three)\s+(?:\w+\s+)?tables\b/) || (/\btable\b|\bpatio set\b|\bdining set\b/.test(t) ? 1 : 0);
+    for (let i = 0; i < tables; i++) items.push('table_dining');
+    for (let i = 0; i < chairs; i++) items.push('chair');
+    for (let i = 0; i < loungers; i++) items.push('lounger');
+    for (let i = 0; i < benches; i++) items.push('bench');
+    if (items.length === 0) items.push('table_dining', 'chair', 'chair', 'chair', 'chair');
+    out.push({
+      patch: { overhangs: /\b(patio cover|overhang|porch roof|pergola)\b/.test(t) ? ctx.overhangs : 'no', furnitureItems: items, specialtyServices: ctx.specialtyServices.includes('furniture') ? ctx.specialtyServices : [...ctx.specialtyServices, 'furniture'], exteriorBody: 'no', projectType: ctx.projectType || 'exterior' },
+      reason: 'Patio furniture pieces counted',
+    });
+  }
+
+  // "Each room a different color" → one color per room
+  if (ctx.colorChangeScope === '' && /\b(each|every)\s+(?:room|bedroom)\b[^.]{0,40}\b(different|own|separate|unique)\b[^.]{0,15}colou?r|\b(different|separate|unique|own)\s+colou?rs?\s+(?:in|for|on)\s+(?:each|every)\b|\bevery room (?:is|a|gets|has) (?:a )?different/.test(t)) {
+    const rooms = estimateHouseLayout(ctx.squareFeet || 1500, ctx.bedroomCount || undefined).rooms.length;
+    out.push({
+      patch: { colorChangeScope: 'multiple_colors', colorCount: ctx.colorCount || Math.min(10, rooms), interiorColorChange: ctx.interiorColorChange || 'different' },
+      reason: 'Each room its own color',
     });
   }
 

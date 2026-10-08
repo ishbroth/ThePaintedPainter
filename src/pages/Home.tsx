@@ -149,7 +149,7 @@ const Home = () => {
       <section className="about-text fade-in">
         <h2>The Ultimate Painter Booking Site</h2>
         <p>
-          The Painted Painter is the Priceline of house painting. Get an instant AI-powered estimate
+          The Painted Painter is the Priceline of house painting. Get an instant AI-powered price
           for your project, then choose a guaranteed price for the best deal or browse and select from
           vetted, licensed painters in your area. Painters compete to offer you the best price and
           service — you pick the option that works for you, lock it in with a small deposit, and your

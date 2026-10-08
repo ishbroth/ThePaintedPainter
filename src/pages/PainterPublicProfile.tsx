@@ -372,10 +372,10 @@ const PainterPublicProfile = () => {
       <section className="py-12 bg-[var(--bg-chrome)] text-center border-t border-[var(--border)]">
         <div className="container-custom">
           <h2 className="text-2xl font-bold mb-4">Interested in {painter.company_name}?</h2>
-          <p className="text-[var(--text-secondary)] mb-8">Get a free estimate or browse more painters in your area.</p>
+          <p className="text-[var(--text-secondary)] mb-8">Get a free price or browse more painters in your area.</p>
           <div className="flex flex-wrap justify-center gap-4">
             <Link to="/" className="cta-button">
-              Get an Estimate
+              Get a Price
             </Link>
             <Link
               to="/painters-map"

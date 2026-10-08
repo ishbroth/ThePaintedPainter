@@ -1,6 +1,6 @@
 import type { EstimatorContext, EstimateBreakdown, EstimateLineItem } from './types';
 import { getRegionalMultiplier } from './marketPricingData';
-import { RESOLVED_BASE_RATES as BASE_RATES } from './pricing/resolvedBaseRates';
+import { RESOLVED_BASE_RATES as BASE_RATES, MIN_JOB_CHARGE } from './pricing/resolvedBaseRates';
 import {
   STANDARD_ROOMS,
   CEILING_HEIGHTS,
@@ -14,13 +14,23 @@ import {
 
 export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
   const lineItems: EstimateLineItem[] = [];
+  let volumeEfficiencyUsed = 1;
   const sqft = ctx.squareFeet || estimateSqftFromBedrooms(ctx.bedroomCount) || 1500;
   const { multiplier: regionalMult } = getRegionalMultiplier(ctx.zipCode);
   const ceilingHeight = CEILING_HEIGHTS[ctx.ceilingHeight] || 8;
 
+  // Main items and rooms the customer took off the price after seeing it (price editing).
+  const off = (key: string) => ctx.excludedItems.includes(key);
+
   // Get room layout for surface area calculations
   const layout = getLayout(ctx, sqft);
+  const fullLayout = ctx.excludedRooms.length > 0 ? getLayout({ ...ctx, excludedRooms: [] }, sqft) : layout;
   const roomFraction = getRoomFraction(ctx);
+  // Share of the whole home's trim that's still in scope — scales a customer-given linear-foot figure when rooms come off.
+  const trimShare = fullLayout.totalTrimLinFt > 0 ? layout.totalTrimLinFt / fullLayout.totalTrimLinFt : 1;
+  const roomShare = fullLayout.rooms.length > 0 ? layout.rooms.length / fullLayout.rooms.length : 1;
+  const roomGone = (r: string) => ctx.excludedRooms.includes(r);
+  const allBathsGone = fullLayout.rooms.filter((r) => r.startsWith('bathroom')).every(roomGone) && fullLayout.rooms.some((r) => r.startsWith('bathroom'));
 
   // Base labor complexity from project qualifiers
   const conditionMultiplier = getConditionMultiplier(ctx);
@@ -29,9 +39,13 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
   if (ctx.projectType === 'interior' || ctx.projectType === 'both') {
     const heightRatio = ceilingHeight / 8;
     const effectiveWallSqFt = Math.round(layout.totalWallSqFt * heightRatio * roomFraction);
+    // Bigger scopes are cheaper per square foot (one mobilization, bulk paint, crew stays productive). Painting
+    // a few rooms gets none of that, and neither does a job a customer trims down after seeing the price.
+    const volEff = volumeEfficiency(effectiveWallSqFt);
+    volumeEfficiencyUsed = volEff;
 
     // Walls — rate varies by texture and condition
-    if (ctx.interiorWalls !== 'no') {
+    if (ctx.interiorWalls !== 'no' && !off('walls')) {
       const wallRate = getWallRate(ctx);
       const textureMultiplier = ctx.wallTexture === 'heavy_texture' ? 1.15
         : ctx.wallTexture === 'textured' ? 1.05
@@ -44,41 +58,48 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
       lineItems.push({
         category: 'Interior',
         description: 'Interior Walls',
-        amount: effectiveWallSqFt * wallRate * textureMultiplier * colorEfficiency * regionalMult * conditionMultiplier,
+        amount: effectiveWallSqFt * wallRate * textureMultiplier * colorEfficiency * regionalMult * conditionMultiplier * volEff,
+        key: 'walls',
       });
     }
 
     // Accent walls
-    if (ctx.accentWalls === 'yes') {
-      // ~15% of wall area is accent
-      const accentSqFt = Math.round(effectiveWallSqFt * 0.15);
+    if (ctx.accentWalls === 'yes' && !off('accent_walls')) {
+      // One accent wall is about 130 sq ft (a 13 ft wall at 10 ft with openings out). A bare "accent walls"
+      // with no count is one per bedroom-sized space, never more than 15% of all the wall area.
+      const count = ctx.accentWallCount || 1;
+      const accentSqFt = Math.min(Math.round(effectiveWallSqFt * 0.15), count * 130);
       lineItems.push({
         category: 'Interior',
-        description: 'Accent Walls',
-        amount: accentSqFt * BASE_RATES.specialty.accent_wall_per_sqft * regionalMult,
+        description: count > 1 ? `Accent Walls (${count})` : 'Accent Wall',
+        // a separate color means its own setup and extra cut-in along the neighbouring walls
+        amount: Math.max(accentSqFt * BASE_RATES.specialty.accent_wall_per_sqft, count * 90) * regionalMult,
+        key: 'accent_walls',
       });
     }
 
     // Ceilings
-    if (ctx.interiorCeilings === 'yes') {
+    if (ctx.interiorCeilings === 'yes' && !off('ceilings')) {
       const ceilingSqFt = Math.round(layout.totalCeilingSqFt * roomFraction);
       const ceilingRate = getCeilingRate(ctx);
       lineItems.push({
         category: 'Interior',
         description: 'Ceilings',
-        amount: ceilingSqFt * ceilingRate * regionalMult,
+        amount: ceilingSqFt * ceilingRate * regionalMult * volEff,
+        key: 'ceilings',
       });
     }
 
     // Trim & Baseboards
-    if (ctx.interiorTrim === 'yes') {
-      const trimLinFt = Math.round(layout.totalTrimLinFt * roomFraction);
+    if (ctx.interiorTrim === 'yes' && !off('trim')) {
+      const trimLinFt = ctx.trimLinearFeet ? Math.round(ctx.trimLinearFeet * trimShare) : Math.round(layout.totalTrimLinFt * roomFraction);
       const trimRate = getTrimRate(ctx);
       const trimCond = ctx.trimCondition || (ctx.projectCondition === 'new_construction' ? 'new' : 'existing_good');
       lineItems.push({
         category: 'Interior',
-        description: 'Trim & Baseboards',
-        amount: trimLinFt * trimRate * regionalMult * conditionMultiplier,
+        description: ctx.trimLinearFeet ? `Trim & Baseboards (${trimLinFt} lin ft)` : 'Trim & Baseboards',
+        amount: trimLinFt * trimRate * regionalMult * conditionMultiplier * volEff,
+        key: 'trim',
       });
 
       // New trim prep: caulking, nail holes, prime coat
@@ -103,29 +124,31 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
     }
 
     // Crown molding
-    if (ctx.crownMolding === 'yes') {
-      // Crown runs perimeter of rooms, ~80% of baseboard length
-      const crownLinFt = Math.round(layout.totalTrimLinFt * roomFraction * 0.8);
+    if (ctx.crownMolding === 'yes' && !off('crown')) {
+      // Crown runs perimeter of rooms, ~80% of baseboard length (unless the customer gave the footage)
+      const crownLinFt = ctx.crownLinearFeet ? Math.round(ctx.crownLinearFeet * trimShare) : Math.round(layout.totalTrimLinFt * roomFraction * 0.8);
       lineItems.push({
         category: 'Interior',
-        description: 'Crown Molding',
+        description: ctx.crownLinearFeet ? `Crown Molding (${crownLinFt} lin ft)` : 'Crown Molding',
         amount: crownLinFt * BASE_RATES.trim.crown_molding * regionalMult,
+        key: 'crown',
       });
     }
 
     // Wainscoting
-    if (ctx.wainscoting === 'yes') {
+    if (ctx.wainscoting === 'yes' && !off('wainscoting')) {
       // Wainscoting: ~30% of wall area, lower 3ft
       const wainscotSqFt = Math.round(effectiveWallSqFt * 0.15);
       lineItems.push({
         category: 'Interior',
         description: 'Wainscoting / Paneling',
         amount: wainscotSqFt * BASE_RATES.trim.wainscoting_per_sqft * regionalMult,
+        key: 'wainscoting',
       });
     }
 
     // Doors — material affects prep and rate
-    if (ctx.interiorDoors !== 'none') {
+    if (ctx.interiorDoors !== 'none' && !off('doors')) {
       const doorCount = ctx.doorCount || Math.round(layout.totalDoors * roomFraction);
       const doorTypes = ctx.doorTypes.length > 0 ? ctx.doorTypes : ['standard'];
       // Metal/fiberglass doors: smoother surface, less prep, ~15% less labor
@@ -144,7 +167,8 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
       lineItems.push({
         category: 'Interior',
         description: `Interior Doors (${doorCount})`,
-        amount: doorTotal * materialFactor * regionalMult * conditionMultiplier,
+        amount: doorTotal * materialFactor * regionalMult * conditionMultiplier * volEff,
+        key: 'doors',
       });
 
       // Door frames
@@ -153,12 +177,13 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
           category: 'Interior',
           description: 'Door Frames & Casings',
           amount: doorCount * BASE_RATES.doors.door_frame * regionalMult,
+          key: 'door_frames',
         });
       }
     }
 
     // Windows
-    if (ctx.interiorWindows !== 'none') {
+    if (ctx.interiorWindows !== 'none' && !off('windows')) {
       const winCount = ctx.windowCount || Math.round(layout.totalWindows * roomFraction);
       const winTypes = ctx.windowTypes.length > 0 ? ctx.windowTypes : ['single'];
       let winTotal = 0;
@@ -172,18 +197,27 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
       lineItems.push({
         category: 'Interior',
         description: `Window Frames/Sills (${winCount})`,
-        amount: winTotal * regionalMult,
+        amount: winTotal * regionalMult * volEff,
+        key: 'windows',
       });
     }
 
     // Cabinets — scope (fronts vs inside too) and stained wood affects pricing
     if (ctx.cabinets !== 'none') {
-      const locations = ctx.cabinetLocations.length > 0 ? ctx.cabinetLocations : ['kitchen'];
+      // "bathroom"/"laundry" cabinets with no location list are that room's cabinets, not a kitchen.
+      const inferred = ctx.cabinets === 'bathroom' || ctx.cabinets === 'laundry' ? [ctx.cabinets] : ['kitchen'];
+      const locations = (ctx.cabinetLocations.length > 0 ? ctx.cabinetLocations : inferred).filter(
+        (l) => !off(`cabinets:${l}`) && !(l === 'kitchen' && roomGone('kitchen')) && !(l === 'bathroom' && allBathsGone) && !(l === 'laundry' && roomGone('laundry')),
+      );
       const cabinetComplexity = ctx.hasStainedWood === 'yes' ? LABOR_COMPLEXITY.cabinet_refinish : 1.0;
       // Painting inside cabinets adds 40-60% (more surfaces, tighter access, more coats)
       const scopeMultiplier = ctx.cabinetScope === 'inside_too' ? 1.50 : 1.0;
       for (const loc of locations) {
-        const rate = getCabinetRate(loc, sqft);
+        // a customer-given door/drawer count prices the kitchen by the piece ($70-125 a door, drawer fronts about
+        // half) plus the fixed removal, degloss and masking time; otherwise by kitchen size
+        const rate = loc === 'kitchen' && ctx.cabinetDoorCount
+          ? ctx.cabinetDoorCount * BASE_RATES.cabinets.per_door + BASE_RATES.cabinets.kitchen_setup
+          : getCabinetRate(loc, sqft);
         const desc = ctx.cabinetScope === 'inside_too'
           ? `${capitalize(loc)} Cabinets (inside + out)`
           : `${capitalize(loc)} Cabinets`;
@@ -191,12 +225,13 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
           category: 'Interior',
           description: desc,
           amount: rate * scopeMultiplier * regionalMult * cabinetComplexity,
+          key: `cabinets:${loc}`,
         });
       }
     }
 
     // Closets — shelving level affects pricing
-    if (ctx.closets !== 'none') {
+    if (ctx.closets !== 'none' && !off('closets')) {
       const closetCount = ctx.closetCount || Math.round(layout.totalClosets * roomFraction) || 2;
       // Shelving add-on per closet
       const shelvingAdd = ctx.closetShelving === 'extensive' ? 250
@@ -209,12 +244,14 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
           category: 'Interior',
           description: `Closets (${closetCount})${shelvingAdd ? ' + shelving' : ''}`,
           amount: closetCount * (BASE_RATES.closets.standard + shelvingAdd) * regionalMult,
+          key: 'closets',
         });
       } else if (ctx.closets === 'walkin') {
         lineItems.push({
           category: 'Interior',
           description: `Walk-in Closets (${closetCount})${shelvingAdd ? ' + shelving' : ''}`,
           amount: closetCount * (BASE_RATES.closets.walkin_small + shelvingAdd * 1.5) * regionalMult,
+          key: 'closets',
         });
       } else if (ctx.closets === 'both') {
         const half = Math.ceil(closetCount / 2);
@@ -232,7 +269,7 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
     }
 
     // Stairways — railing material affects pricing (wrought iron is very labor-intensive)
-    if (ctx.stairways === 'yes') {
+    if (ctx.stairways === 'yes' && !off('stairs')) {
       const stairCount = ctx.stairwayCount || 1;
       let stairTotal = 0;
       // Wrought iron railings: intricate detail work, ~40% more labor
@@ -240,7 +277,12 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
         : ctx.interiorRailingMaterial === 'metal' ? 1.1
         : 1.0;
 
-      if (ctx.stairwayDetails === 'walls_only' || !ctx.stairwayDetails) {
+      if (ctx.stairwayDetails === 'railings_only') {
+        // railing and balusters alone: about 14 ft for a standard flight unless the customer gave the length
+        const railFt = ctx.stairRailFeet || 14 * stairCount;
+        const rate = ctx.railingType === 'spindles' || ctx.railingType === 'both' ? BASE_RATES.stairs.railing_spindles_per_ft : BASE_RATES.stairs.railing_simple_per_ft;
+        stairTotal = railFt * rate * railingMaterialFactor;
+      } else if (ctx.stairwayDetails === 'walls_only' || !ctx.stairwayDetails) {
         stairTotal = stairCount * BASE_RATES.stairs.walls_one_flight;
       } else if (ctx.stairwayDetails === 'walls_and_railings') {
         const railingCost = BASE_RATES.stairs.railing_simple_per_ft * 12 * railingMaterialFactor;
@@ -257,25 +299,27 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
 
       lineItems.push({
         category: 'Interior',
-        description: `Stairways (${stairCount})${ctx.interiorRailingMaterial === 'wrought_iron' ? ' — wrought iron detail' : ''}`,
+        description: `${ctx.stairwayDetails === 'railings_only' ? 'Stair Railing' : 'Stairways'} (${ctx.stairwayDetails === 'railings_only' ? `${ctx.stairRailFeet || 14 * stairCount} ft` : stairCount})${ctx.interiorRailingMaterial === 'wrought_iron' ? ' — wrought iron detail' : ''}`,
         amount: stairTotal * regionalMult,
+        key: 'stairs',
       });
     }
 
     // Interior shutters
-    if (ctx.interiorShutters === 'yes') {
+    if (ctx.interiorShutters === 'yes' && !off('interior_shutters')) {
       const shutterCount = Math.round(layout.totalWindows * roomFraction * 0.5) || 6;
       lineItems.push({
         category: 'Interior',
         description: `Interior Shutters (~${shutterCount})`,
         amount: shutterCount * BASE_RATES.specialty.shutter_interior * regionalMult,
+        key: 'interior_shutters',
       });
     }
 
     // ===== SPECIALTY SERVICES =====
 
     // Fireplace
-    if (ctx.specialtyServices.includes('fireplace')) {
+    if (ctx.specialtyServices.includes('fireplace') && !off('fireplace')) {
       const fpCount = ctx.fireplaceCount || 1;
       let fpRate = BASE_RATES.specialty.fireplace_full;
       switch (ctx.fireplaceType) {
@@ -289,11 +333,12 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
         category: 'Specialty',
         description: `Fireplace (${ctx.fireplaceType || 'full'})`,
         amount: fpCount * fpRate * regionalMult,
+        key: 'fireplace',
       });
     }
 
     // Exposed Beams
-    if (ctx.specialtyServices.includes('beams')) {
+    if (ctx.specialtyServices.includes('beams') && !off('beams')) {
       const beamFt = ctx.beamLinearFeet || 40;
       const beamRate = ctx.beamLocation === 'vaulted'
         ? BASE_RATES.specialty.beam_per_linft_vaulted
@@ -302,21 +347,23 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
         category: 'Specialty',
         description: `Exposed Beams (${beamFt} lin ft)`,
         amount: beamFt * beamRate * regionalMult,
+        key: 'beams',
       });
     }
 
     // Built-ins
-    if (ctx.specialtyServices.includes('built_ins')) {
+    if (ctx.specialtyServices.includes('built_ins') && !off('built_ins')) {
       const count = ctx.builtInCount || 2;
       lineItems.push({
         category: 'Specialty',
         description: `Built-in Shelving/Bookcases (${count})`,
         amount: count * BASE_RATES.specialty.bookcase_small * regionalMult,
+        key: 'built_ins',
       });
     }
 
     // Epoxy Floor
-    if (ctx.specialtyServices.includes('epoxy')) {
+    if (ctx.specialtyServices.includes('epoxy') && !off('epoxy')) {
       const garageSqft = ctx.epoxyGarageSqft || Math.round(sqft * 0.15);
       const epoxyRate = ctx.epoxyType === 'full_system'
         ? BASE_RATES.specialty.epoxy_garage_per_sqft
@@ -325,26 +372,12 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
         category: 'Specialty',
         description: `Epoxy Garage Floor (${garageSqft} sqft)`,
         amount: garageSqft * epoxyRate * regionalMult,
-      });
-    }
-
-    // Furniture
-    if (ctx.specialtyServices.includes('furniture') && ctx.furnitureItems.length > 0) {
-      let furnitureTotal = 0;
-      for (const item of ctx.furnitureItems) {
-        const key = `furniture_${item}` as keyof typeof BASE_RATES.specialty;
-        const rate = BASE_RATES.specialty[key] || BASE_RATES.specialty.furniture_cabinet;
-        furnitureTotal += typeof rate === 'number' ? rate : 175;
-      }
-      lineItems.push({
-        category: 'Specialty',
-        description: `Furniture Painting (${ctx.furnitureItems.length} pieces)`,
-        amount: furnitureTotal * regionalMult,
+        key: 'epoxy',
       });
     }
 
     // Brick/Stone (interior)
-    if (ctx.specialtyServices.includes('brick')) {
+    if (ctx.specialtyServices.includes('brick') && !off('brick')) {
       const brickSqft = ctx.brickSqft || 100;
       const brickRate = ctx.brickTreatment === 'whitewash'
         ? BASE_RATES.specialty.whitewash_brick_per_sqft
@@ -353,6 +386,7 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
         category: 'Specialty',
         description: `${ctx.brickTreatment === 'whitewash' ? 'Whitewash' : 'Paint'} Brick/Stone (${brickSqft} sqft)`,
         amount: brickSqft * brickRate * regionalMult,
+        key: 'brick',
       });
     }
 
@@ -363,7 +397,7 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
     // item above (double-billing the same "different color" callout
     // otherwise). Reduced proportionally when specific rooms are staying
     // the original color.
-    if (ctx.interiorColorChange === 'different' && ctx.accentWalls !== 'yes') {
+    if (ctx.interiorColorChange === 'different' && ctx.accentWalls !== 'yes' && ctx.interiorWalls !== 'no' && !off('walls')) {
       const totalRooms = layout.rooms.length || 1;
       const excluded = Math.min(ctx.colorChangeExcludedRoomCount ?? 0, totalRooms - 1);
       const scopeFraction =
@@ -376,7 +410,7 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
         description: excluded > 0
           ? `Color Change (extra coat, ${excluded} room${excluded === 1 ? '' : 's'} excluded)`
           : 'Color Change (extra coat)',
-        amount: extraCoatSqFt * BASE_RATES.interior.walls_repaint * regionalMult,
+        amount: extraCoatSqFt * BASE_RATES.interior.walls_repaint * regionalMult * volEff,
       });
     }
 
@@ -384,17 +418,39 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
     // colors than a single uniform color change — a per-extra-color
     // surcharge on top of the base color-change line above. Only kicks in
     // past 2 colors, and capped so an unusually high count can't run away.
-    if (ctx.colorChangeScope === 'multiple_colors' && ctx.colorCount && ctx.colorCount > 2) {
-      const extraColors = Math.min(ctx.colorCount - 2, 6);
+    const colorsLeft = ctx.colorCount ? Math.max(2, Math.round(ctx.colorCount * roomShare)) : 0;
+    if (ctx.colorChangeScope === 'multiple_colors' && colorsLeft > 2 && ctx.interiorWalls !== 'no' && !off('walls')) {
+      const extraColors = Math.min(colorsLeft - 2, 8);
+      // each extra color: its own gallon, roller and set-up plus taping between colors. Guides put an extra color
+      // at about $100-200; the area-based figure scales the same cost with the size of the home. Blend the two.
+      const flat = extraColors * 140;
+      const byArea = extraColors * 0.05 * effectiveWallSqFt * BASE_RATES.interior.walls_repaint;
       lineItems.push({
         category: 'Interior',
-        description: `Multi-Color Cut-In (${ctx.colorCount} colors)`,
-        amount: extraColors * 0.05 * effectiveWallSqFt * BASE_RATES.interior.walls_repaint * regionalMult,
+        description: `Multi-Color Cut-In (${colorsLeft} colors)`,
+        amount: ((flat + byArea) / 2) * regionalMult,
       });
     }
   }
 
+  // Furniture (indoor pieces, or patio sets on an exterior-only job)
+  if (ctx.specialtyServices.includes('furniture') && ctx.furnitureItems.length > 0 && !off('furniture')) {
+    let furnitureTotal = 0;
+    for (const item of ctx.furnitureItems) {
+      const key = `furniture_${item}` as keyof typeof BASE_RATES.specialty;
+      const rate = BASE_RATES.specialty[key] || BASE_RATES.specialty.furniture_cabinet;
+      furnitureTotal += typeof rate === 'number' ? rate : 175;
+    }
+    lineItems.push({
+      category: 'Specialty',
+      description: `Furniture Painting (${ctx.furnitureItems.length} pieces)`,
+      amount: furnitureTotal * regionalMult,
+      key: 'furniture',
+    });
+  }
+
   // ===== EXTERIOR =====
+  const bodyPainted = ctx.exteriorBody !== 'no' && !off('ext_body');
   if (ctx.projectType === 'exterior' || ctx.projectType === 'both') {
     const extSurface = calculateExteriorSurface(sqft, ctx.stories || 1, ctx.sidingType);
 
@@ -403,14 +459,17 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
     const extWallArea = ctx.exteriorScope === 'partial'
       ? Math.round(extSurface.wallSqFt * 0.5)
       : extSurface.wallSqFt;
-    lineItems.push({
+    if (bodyPainted) lineItems.push({
       category: 'Exterior',
       description: 'Exterior Body / Siding',
       amount: extWallArea * sidingRate * regionalMult * conditionMultiplier,
+      key: 'ext_body',
     });
 
     // Stucco condition add-ons
-    if (ctx.stuccoCondition === 'new_stucco') {
+    if (!bodyPainted) {
+      // only the house features the customer listed are painted: no stucco work
+    } else if (ctx.stuccoCondition === 'new_stucco') {
       // New stucco needs primer/sealer before paint
       lineItems.push({
         category: 'Prep Work',
@@ -427,48 +486,53 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
     }
 
     // Trim/fascia
-    if (ctx.exteriorTrim === 'yes') {
+    if (ctx.exteriorTrim === 'yes' && !off('ext_trim')) {
       lineItems.push({
         category: 'Exterior',
         description: 'Exterior Trim & Fascia',
         amount: extSurface.trimLinFt * BASE_RATES.exterior.fascia_per_linft * regionalMult,
+        key: 'ext_trim',
       });
     }
 
     // Soffits/eaves
-    if (ctx.soffitsEaves === 'yes') {
+    if (ctx.soffitsEaves === 'yes' && !off('soffits')) {
       lineItems.push({
         category: 'Exterior',
         description: 'Soffits & Eaves',
         amount: extSurface.soffitSqFt * BASE_RATES.exterior.soffit_per_sqft * regionalMult,
+        key: 'soffits',
       });
     }
 
     // Shutters
-    if (ctx.exteriorShutters === 'yes') {
+    if (ctx.exteriorShutters === 'yes' && !off('ext_shutters')) {
       const shutterCount = ctx.exteriorShutterCount || 8;
       lineItems.push({
         category: 'Exterior',
         description: `Exterior Shutters (${shutterCount})`,
         amount: shutterCount * BASE_RATES.specialty.shutter_exterior * regionalMult,
+        key: 'ext_shutters',
       });
     }
 
     // Garage door
-    if (ctx.garageDoor === 'single') {
-      lineItems.push({ category: 'Exterior', description: 'Garage Door (Single)', amount: BASE_RATES.doors.garage_single * regionalMult });
+    if (off('garage_door')) {
+      // taken off the price
+    } else if (ctx.garageDoor === 'single') {
+      lineItems.push({ category: 'Exterior', description: 'Garage Door (Single)', amount: BASE_RATES.doors.garage_single * regionalMult, key: 'garage_door' });
     } else if (ctx.garageDoor === 'double') {
-      lineItems.push({ category: 'Exterior', description: 'Garage Door (Double)', amount: BASE_RATES.doors.garage_double * regionalMult });
+      lineItems.push({ category: 'Exterior', description: 'Garage Door (Double)', amount: BASE_RATES.doors.garage_double * regionalMult, key: 'garage_door' });
     }
 
     // Entry door
-    if (ctx.entryDoor === 'yes') {
-      lineItems.push({ category: 'Exterior', description: 'Entry Door', amount: BASE_RATES.doors.entry_door * regionalMult });
+    if (ctx.entryDoor === 'yes' && !off('entry_door')) {
+      lineItems.push({ category: 'Exterior', description: 'Entry Door', amount: BASE_RATES.doors.entry_door * regionalMult, key: 'entry_door' });
     }
 
     // Railings — material drives prep (metal needs rust treatment + primer)
-    if (ctx.railings === 'yes') {
-      const railingFt = Math.round(Math.sqrt(sqft / (ctx.stories || 1)) * 0.3) || 20;
+    if (ctx.railings === 'yes' && !off('railings')) {
+      const railingFt = ctx.stairRailFeet || Math.round(Math.sqrt(sqft / (ctx.stories || 1)) * 0.3) || 20;
       // Metal railings need rust treatment, ~20% more expensive than wood
       // Composite/vinyl railings are cheaper (less prep)
       const materialMult = ctx.exteriorRailingMaterial === 'metal' ? 1.20
@@ -482,6 +546,7 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
             category: 'Exterior',
             description: `Railings (Simple${ctx.exteriorRailingMaterial === 'metal' ? ', metal' : ''})`,
             amount: railingFt * BASE_RATES.exterior.railing_simple_per_linft * materialMult * regionalMult,
+            key: 'railings',
           });
           break;
         case 'spindles':
@@ -489,6 +554,7 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
             category: 'Exterior',
             description: `Railings (Spindles${ctx.exteriorRailingMaterial === 'metal' ? ', metal' : ''})`,
             amount: railingFt * BASE_RATES.exterior.railing_spindle_per_linft * materialMult * regionalMult,
+            key: 'railings',
           });
           break;
         case 'both':
@@ -496,6 +562,7 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
             category: 'Exterior',
             description: 'Railings (Multiple Types)',
             amount: railingFt * (BASE_RATES.exterior.railing_simple_per_linft + BASE_RATES.exterior.railing_spindle_per_linft) / 2 * materialMult * regionalMult,
+            key: 'railings',
           });
           break;
         default:
@@ -503,31 +570,33 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
             category: 'Exterior',
             description: 'Railings',
             amount: railingFt * BASE_RATES.exterior.railing_simple_per_linft * materialMult * regionalMult,
+            key: 'railings',
           });
       }
     }
 
     // Balconies
-    if (ctx.balconies === 'yes') {
+    if (ctx.balconies === 'yes' && !off('balconies')) {
       const balcCount = ctx.balconyCount || 1;
       // Balcony: ~60 sqft deck + ~20 lin ft railing
       const balcAmount = balcCount * (60 * BASE_RATES.exterior.deck_paint_per_sqft + 20 * BASE_RATES.exterior.railing_simple_per_linft);
-      lineItems.push({ category: 'Exterior', description: `Balconies (${balcCount})`, amount: balcAmount * regionalMult });
+      lineItems.push({ category: 'Exterior', description: `Balconies (${balcCount})`, amount: balcAmount * regionalMult, key: 'balconies' });
     }
 
     // Deck
-    if (ctx.deck === 'yes') {
+    if (ctx.deck === 'yes' && !off('deck')) {
       const deckSizes = { small: 100, medium: 250, large: 450 };
-      const deckSqft = deckSizes[ctx.deckSize as keyof typeof deckSizes] || deckSizes.medium;
+      const deckSqft = ctx.deckSqft || deckSizes[ctx.deckSize as keyof typeof deckSizes] || deckSizes.medium;
       lineItems.push({
         category: 'Exterior',
-        description: 'Deck',
+        description: ctx.deckSqft ? `Deck (${deckSqft} sq ft)` : 'Deck',
         amount: deckSqft * BASE_RATES.exterior.deck_stain_per_sqft * regionalMult,
+        key: 'deck',
       });
     }
 
     // Fence
-    if (ctx.fence === 'yes') {
+    if (ctx.fence === 'yes' && !off('fence')) {
       const fenceFt = ctx.fenceLinearFeet || 100;
       const fenceRate = ctx.fenceType === 'picket_4ft' ? BASE_RATES.exterior.fence_per_linft_4ft
         : ctx.fenceType === 'chain_link' ? BASE_RATES.exterior.fence_per_linft_chain
@@ -539,50 +608,55 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
         category: 'Exterior',
         description: `${fenceLabel} (${fenceFt} ft)`,
         amount: fenceFt * fenceRate * regionalMult,
+        key: 'fence',
       });
     }
 
     // Gutters
-    if (ctx.gutters === 'yes') {
+    if (ctx.gutters === 'yes' && !off('gutters')) {
       lineItems.push({
         category: 'Exterior',
         description: 'Gutters & Downspouts',
         amount: extSurface.gutterLinFt * BASE_RATES.exterior.gutter_per_linft * regionalMult,
+        key: 'gutters',
       });
     }
 
     // Foundation
-    if (ctx.foundation === 'yes') {
+    if (ctx.foundation === 'yes' && !off('foundation')) {
       const perimeterFt = Math.round(Math.sqrt(sqft / (ctx.stories || 1)) * 4);
       lineItems.push({
         category: 'Exterior',
         description: 'Foundation Walls',
         amount: perimeterFt * BASE_RATES.exterior.foundation_per_linft * regionalMult,
+        key: 'foundation',
       });
     }
 
     // Exterior windows
-    if (ctx.exteriorWindows !== 'none') {
+    if (ctx.exteriorWindows !== 'none' && !off('ext_windows')) {
       const extWinCount = ctx.exteriorWindowCount || extSurface.windowTrimCount;
       lineItems.push({
         category: 'Exterior',
         description: `Exterior Window Trim (${extWinCount})`,
         amount: extWinCount * BASE_RATES.exterior.window_trim_each * regionalMult,
+        key: 'ext_windows',
       });
     }
 
     // Overhangs
-    if (ctx.overhangs === 'yes') {
-      const overhangSqFt = Math.round(Math.sqrt(sqft / (ctx.stories || 1)) * 4 * 3); // perimeter * 3ft depth
+    if (ctx.overhangs === 'yes' && !off('overhangs')) {
+      const overhangSqFt = ctx.overhangSqft || Math.round(Math.sqrt(sqft / (ctx.stories || 1)) * 4 * 3); // perimeter * 3ft depth
       lineItems.push({
         category: 'Exterior',
-        description: 'Overhangs / Patio Covers',
+        description: ctx.overhangSqft ? `Porch Ceiling / Patio Cover (${overhangSqFt} sq ft)` : 'Overhangs / Patio Covers',
         amount: overhangSqFt * BASE_RATES.exterior.overhang_per_sqft * regionalMult,
+        key: 'overhangs',
       });
     }
 
     // Multi-story access
-    if ((ctx.stories || 1) > 1) {
+    if (bodyPainted && (ctx.stories || 1) > 1) {
       const extraStories = (ctx.stories || 1) - 1;
       const storyPremium = extraStories === 1
         ? LABOR_COMPLEXITY.second_story_exterior
@@ -597,7 +671,7 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
     }
 
     // Access restrictions
-    if (ctx.accessRestrictions === 'some' || ctx.accessRestrictions === 'significant') {
+    if (bodyPainted && (ctx.accessRestrictions === 'some' || ctx.accessRestrictions === 'significant')) {
       const factor = ctx.accessRestrictions === 'significant' ? 0.15 : 0.07;
       lineItems.push({
         category: 'Exterior',
@@ -607,7 +681,7 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
     }
 
     // Exterior color change
-    if (ctx.exteriorColorChange === 'different') {
+    if (bodyPainted && ctx.exteriorColorChange === 'different') {
       const extraCoat = extWallArea * sidingRate * regionalMult * (LABOR_COMPLEXITY.different_color - 1);
       lineItems.push({
         category: 'Exterior',
@@ -618,32 +692,34 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
   }
 
   // ===== PREP WORK =====
-  if (ctx.prepWork.includes('power_washing')) {
-    const pwSqft = ctx.projectType === 'interior' ? 0 : sqft;
+  if (ctx.prepWork.includes('power_washing') && !off('power_washing')) {
+    const pwSqft = ctx.projectType === 'interior' ? 0 : ctx.pressureWashSqft || sqft;
     const pwAmount = Math.max(pwSqft * BASE_RATES.prep.power_washing, BASE_RATES.prep.power_washing_minimum);
-    lineItems.push({ category: 'Prep Work', description: 'Power Washing', amount: pwAmount * regionalMult });
+    lineItems.push({ category: 'Prep Work', description: ctx.pressureWashSqft ? `Pressure Washing (${pwSqft} sq ft)` : 'Power Washing', amount: pwAmount * regionalMult, key: 'power_washing' });
   }
   if (ctx.prepWork.includes('lead_test')) {
     lineItems.push({ category: 'Prep Work', description: 'Lead Paint Testing', amount: BASE_RATES.prep.lead_paint_test * regionalMult });
   }
-  if (ctx.prepWork.includes('wallpaper_removal')) {
-    const rooms = ctx.wallpaperRooms || 1;
+  if (ctx.prepWork.includes('wallpaper_removal') && !off('wallpaper_removal')) {
+    const rooms = Math.max(1, Math.round((ctx.wallpaperRooms || 1) * roomShare));
     // Average room ~300 sqft of wall
     const wpSqft = rooms * 300;
     lineItems.push({
       category: 'Prep Work',
       description: `Wallpaper Removal (${rooms} rooms)`,
       amount: wpSqft * BASE_RATES.prep.wallpaper_removal_per_sqft * regionalMult,
+      key: 'wallpaper_removal',
     });
   }
-  if (ctx.prepWork.includes('popcorn_removal')) {
-    const rooms = ctx.popcornCeilingRooms || 1;
-    // Average room ~150 sqft of ceiling
-    const pcSqft = rooms * 150;
+  if (ctx.prepWork.includes('popcorn_removal') && !off('popcorn_removal')) {
+    const rooms = Math.max(1, Math.round((ctx.popcornCeilingRooms || 1) * (ctx.popcornCeilingSqft ? 1 : roomShare)));
+    // Average room ~150 sqft of ceiling, unless the customer gave the area
+    const pcSqft = ctx.popcornCeilingSqft ? Math.round(ctx.popcornCeilingSqft * roomShare) : rooms * 150;
     lineItems.push({
       category: 'Prep Work',
-      description: `Popcorn Ceiling Removal (${rooms} rooms)`,
+      description: ctx.popcornCeilingSqft ? `Popcorn Ceiling Removal (${pcSqft} sq ft)` : `Popcorn Ceiling Removal (${rooms} rooms)`,
       amount: pcSqft * BASE_RATES.prep.popcorn_removal_per_sqft * regionalMult,
+      key: 'popcorn_removal',
     });
   }
   if (ctx.prepWork.includes('stain_cover') || ctx.hasStainedWood === 'yes') {
@@ -730,8 +806,33 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
     });
   }
 
+  // ===== Painting only some surfaces is fussier than painting them all together =====
+  // Trim or ceilings without the walls (or walls without the ceiling or trim) means masking and protecting the
+  // surfaces being left alone, plus a second pass of cut-in lines. Applies to a job that was scoped that way
+  // from the start and to a price the customer trimmed afterwards.
+  if (ctx.projectType === 'interior' || ctx.projectType === 'both') {
+    const has = (k: string) => lineItems.some((l) => l.key === k);
+    const surfaces = ['walls', 'ceilings', 'trim'];
+    const included = surfaces.filter(has);
+    // surfaces the customer wanted that were then taken off the price
+    const takenOff = surfaces.filter((s) => ctx.excludedItems.includes(s));
+    const wallsMissing = !has('walls') && ctx.interiorWalls === 'no';
+    if (included.length > 0 && (takenOff.length > 0 || wallsMissing)) {
+      const base = lineItems.filter((l) => l.key && surfaces.includes(l.key)).reduce((s, l) => s + l.amount, 0);
+      // trim or ceilings without the walls is the fussiest: the walls and floors have to be taped off and covered
+      const extra = base * Math.min(0.09, 0.03 * Math.max(takenOff.length, 1) + (wallsMissing ? 0.03 : 0));
+      if (extra > 1) lineItems.push({ category: 'Prep Work', description: 'Masking & protecting surfaces left unpainted', amount: extra });
+    }
+  }
+
   // ===== SUBTOTAL =====
-  const subtotal = lineItems.reduce((sum, item) => sum + item.amount, 0);
+  let subtotal = lineItems.reduce((sum, item) => sum + item.amount, 0);
+  // A painter won't mobilize for less than a minimum job fee, however small the item.
+  const minCharge = MIN_JOB_CHARGE * regionalMult;
+  if (subtotal < minCharge) {
+    lineItems.push({ category: 'Scheduling', description: 'Minimum service charge (small job)', amount: minCharge - subtotal });
+    subtotal = minCharge;
+  }
 
   // ===== MULTIPLIERS =====
   const multipliers: { label: string; factor: number }[] = [];
@@ -739,6 +840,10 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
   // Commercial
   if (ctx.propertyType === 'commercial') {
     multipliers.push({ label: 'Commercial Property', factor: 1.10 });
+    // Open commercial space has far fewer rooms, doors, corners and trim runs than the room-by-room home layout the
+    // interior rates were built on, and is usually sprayed: published commercial prices run $2-6 per sq ft overall.
+    const openLayout = sqft >= 1000 ? 0.68 : sqft >= 500 ? 0.84 : 1;
+    if (openLayout < 1 && (ctx.projectType === 'interior' || ctx.projectType === 'both')) multipliers.push({ label: 'Open Commercial Layout (fewer rooms, doors and trim)', factor: openLayout });
   }
 
   // Rental turnover or pre-sale listing — landlords and sellers-in-a-hurry
@@ -747,7 +852,9 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
   // maps both "it's a rental" and "we're putting it up for sale" language
   // to 'rental' since the same standard-finish pricing applies either way.
   if (ctx.propertyType === 'rental') {
-    multipliers.push({ label: 'Standard Turnover Finish (rental/pre-sale)', factor: 0.93 });
+    // An empty unit needs no furniture moving or protecting and is usually sprayed: published unit-turn prices
+    // ($1.50-3.00 per sq ft) run well under an owner-occupied repaint ($2-6).
+    multipliers.push({ label: 'Standard Turnover Finish (rental/pre-sale)', factor: ctx.occupancy === 'vacant' ? 0.62 : 0.93 });
   }
 
   // Multi-unit / apartment building — bulk work runs cheaper per unit than
@@ -826,7 +933,7 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
 
   // Terse user padding
   if (ctx.responseStyle === 'terse') {
-    multipliers.push({ label: 'Estimate Padding (fewer details)', factor: 1.10 });
+    multipliers.push({ label: 'Price Padding (fewer details)', factor: 1.10 });
   }
 
   // Apply multipliers
@@ -845,6 +952,7 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
     highRange: Math.round(total * (1 + highPct)),
     confidence,
     confidenceNote,
+    volumeEfficiency: volumeEfficiencyUsed < 0.995 ? Math.round(volumeEfficiencyUsed * 1000) / 1000 : undefined,
   };
 }
 
@@ -869,23 +977,40 @@ export function formatCurrency(amount: number): string {
 
 // ===== Helper Functions =====
 
+/**
+ * Per-square-foot cost falls as the amount of wall to paint grows (published guides: a single 12x12 bedroom runs
+ * about $1.50-2.70 per sq ft of wall, a whole 1,500 sq ft home about $1.00-1.50 all-in). Anchored at 600 sq ft of
+ * wall (about two rooms) with no discount, easing to 20% off at 4,500 sq ft (a large home).
+ */
+export function volumeEfficiency(wallSqFt: number): number {
+  if (wallSqFt <= 600) return 1;
+  const t = Math.min(1, Math.log(wallSqFt / 600) / Math.log(4500 / 600));
+  return 1 - 0.2 * t;
+}
+
 function getLayout(ctx: EstimatorContext, sqft: number) {
   if (ctx.interiorScope === 'specific_rooms' && ctx.selectedRooms.length > 0) {
     // Use actual room specs for selected rooms
     let totalWall = 0, totalCeiling = 0, totalTrim = 0, totalDoors = 0, totalWindows = 0, totalClosets = 0;
-    for (const room of ctx.selectedRooms) {
+    const keptRooms = ctx.selectedRooms.filter((r) => !ctx.excludedRooms.includes(r));
+    // one large open room described by its floor area ("1,200 sq ft basement") is sized from that area, not the template room
+    const lone = keptRooms.length === 1 ? STANDARD_ROOMS[keptRooms[0]] : undefined;
+    const loneScale = lone && ctx.squareFeet && ctx.squareFeet <= 4000 && (ctx.squareFeet <= 600 || ['bonus_room', 'garage', 'living_room'].includes(keptRooms[0]))
+      ? Math.min(4, Math.max(0.5, ctx.squareFeet / (lone.widthFt * lone.lengthFt)))
+      : 1;
+    for (const room of keptRooms) {
       const spec = STANDARD_ROOMS[room];
       if (spec) {
-        totalWall += spec.wallSqFt;
-        totalCeiling += spec.ceilingSqFt;
-        totalTrim += spec.trimLinearFt;
+        totalWall += spec.wallSqFt * loneScale;
+        totalCeiling += spec.ceilingSqFt * loneScale;
+        totalTrim += spec.trimLinearFt * loneScale;
         totalDoors += spec.doors;
         totalWindows += spec.windows;
         totalClosets += spec.closets;
       }
     }
     return {
-      rooms: ctx.selectedRooms,
+      rooms: keptRooms,
       totalWallSqFt: totalWall,
       totalCeilingSqFt: totalCeiling,
       totalTrimLinFt: totalTrim,
@@ -896,7 +1021,7 @@ function getLayout(ctx: EstimatorContext, sqft: number) {
   }
 
   // Whole house — estimate layout from sqft and bedroom count
-  return estimateHouseLayout(sqft, ctx.bedroomCount || undefined);
+  return estimateHouseLayout(sqft, ctx.bedroomCount || undefined, ctx.excludedRooms);
 }
 
 function getRoomFraction(ctx: EstimatorContext): number {
@@ -1008,7 +1133,7 @@ function calculateConfidence(ctx: EstimatorContext): {
   if (q >= 6) {
     return {
       confidence: 'medium',
-      confidenceNote: 'A site visit will refine the estimate.',
+      confidenceNote: 'A site visit will refine the price.',
       lowPct: 0.15,
       highPct: 0.15,
     };
@@ -1016,8 +1141,42 @@ function calculateConfidence(ctx: EstimatorContext): {
 
   return {
     confidence: 'low',
-    confidenceNote: 'Limited details provided — estimate padded for unknowns.',
+    confidenceNote: 'Limited details provided — price padded for unknowns.',
     lowPct: 0.25,
     highPct: 0.30,
   };
+}
+
+// ===== Rooms the customer can take off the price =====
+
+export interface EditableRoom {
+  key: string;
+  label: string;
+}
+
+/**
+ * The rooms in this price, so the customer can drop one. A whole-home job uses the typical room mix for the
+ * home's size (the same assumption the price is built on); a job for named rooms uses those rooms.
+ */
+export function getEditableRooms(ctx: EstimatorContext): EditableRoom[] {
+  if (ctx.projectType === 'exterior') return [];
+  const sqft = ctx.squareFeet || estimateSqftFromBedrooms(ctx.bedroomCount) || 1500;
+  const base = { ...ctx, excludedRooms: [] as string[] };
+  const keys =
+    ctx.interiorScope === 'specific_rooms' && ctx.selectedRooms.length > 0
+      ? ctx.selectedRooms
+      : ctx.interiorWalls === 'no' && ctx.interiorCeilings !== 'yes' && ctx.interiorTrim !== 'yes'
+      ? []
+      : getLayout(base, sqft).rooms;
+  if (keys.length < 2) return []; // a single room can't be taken off; remove its items instead
+  const counts: Record<string, number> = {};
+  return keys.map((key) => {
+    const spec = STANDARD_ROOMS[key];
+    const label = spec?.label ?? key.replace(/_/g, ' ');
+    counts[label] = (counts[label] || 0) + 1;
+    return { key, label };
+  }).map((r, _i, all) => {
+    const same = all.filter((x) => x.label === r.label);
+    return same.length > 1 ? { ...r, label: `${r.label} ${same.indexOf(r) + 1}` } : r;
+  });
 }

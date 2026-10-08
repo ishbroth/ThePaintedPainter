@@ -1,3 +1,5 @@
+import { getStateFromZip } from './zipCodeData';
+
 // ===== Market-Based Pricing Data =====
 // All rates are per sqft of PAINTABLE SURFACE AREA unless noted.
 // National average baseline — adjusted by regional multiplier.
@@ -60,6 +62,8 @@ export const BASE_RATES = {
     laundry: 600,
     // Per sqft rate for custom sizing
     per_sqft: 12.50,               // cabinet face per sqft
+    per_door: 90,                  // per door/drawer-front equivalent (guides: $70-125 a door, drawers about half)
+    kitchen_setup: 315,            // removing doors, degloss, masking the kitchen: fixed time whatever the door count
   },
 
   // ===== Closets (per closet) =====
@@ -114,6 +118,8 @@ export const BASE_RATES = {
     furniture_table_dining: 225,
     furniture_table_end: 95,
     furniture_chair: 125,
+    furniture_lounger: 140,
+    furniture_bench: 120,
     furniture_bookcase: 250,
     furniture_nightstand: 95,
     furniture_desk: 225,
@@ -334,8 +340,8 @@ export const REGIONAL_MULTIPLIERS: Record<string, { multiplier: number; market: 
   '017': { multiplier: 1.20, market: 'Framingham' },
   '018': { multiplier: 1.25, market: 'Woburn' },
   '019': { multiplier: 1.25, market: 'Lynn' },
-  '020': { multiplier: 1.35, market: 'Boston' },
-  '021': { multiplier: 1.35, market: 'Boston' },
+  '020': { multiplier: 1.40, market: 'Boston' },
+  '021': { multiplier: 1.40, market: 'Boston' },
   '022': { multiplier: 1.30, market: 'Boston' },
   '023': { multiplier: 1.25, market: 'Brockton' },
   '024': { multiplier: 1.25, market: 'Lexington' },
@@ -509,8 +515,8 @@ export const REGIONAL_MULTIPLIERS: Record<string, { multiplier: number; market: 
   '629': { multiplier: 0.80, market: 'Carbondale' },
 
   // ----- Washington State -----
-  '980': { multiplier: 1.30, market: 'Seattle' },
-  '981': { multiplier: 1.30, market: 'Seattle' },
+  '980': { multiplier: 1.40, market: 'Seattle' },
+  '981': { multiplier: 1.40, market: 'Seattle' },
   '982': { multiplier: 1.25, market: 'Everett' },
   '983': { multiplier: 1.20, market: 'Tacoma' },
   '984': { multiplier: 1.25, market: 'Tacoma' },
@@ -748,13 +754,53 @@ export const REGIONAL_MULTIPLIERS: Record<string, { multiplier: number; market: 
   '997': { multiplier: 1.45, market: 'Fairbanks' },
   '998': { multiplier: 1.45, market: 'Juneau' },
   '999': { multiplier: 1.50, market: 'Ketchikan' },
+
+  // ----- Metros that previously fell through to "National Average" -----
+  '352': { multiplier: 0.90, market: 'Birmingham' },
+  '392': { multiplier: 0.80, market: 'Jackson' },
+  '402': { multiplier: 0.90, market: 'Louisville' },
+  '462': { multiplier: 0.88, market: 'Indianapolis' },
+  '532': { multiplier: 0.95, market: 'Milwaukee' },
+  '571': { multiplier: 0.85, market: 'Sioux Falls' },
+  '581': { multiplier: 0.85, market: 'Fargo' },
+  '591': { multiplier: 0.92, market: 'Billings' },
+  '681': { multiplier: 0.88, market: 'Omaha' },
+  '701': { multiplier: 0.95, market: 'New Orleans' },
+  '722': { multiplier: 0.82, market: 'Little Rock' },
+  '731': { multiplier: 0.85, market: 'Oklahoma City' },
+  '820': { multiplier: 0.92, market: 'Cheyenne' },
+  '837': { multiplier: 0.95, market: 'Boise' },
+  '840': { multiplier: 1.00, market: 'Salt Lake City' },
+  '841': { multiplier: 1.00, market: 'Salt Lake City' },
+  '871': { multiplier: 0.92, market: 'Albuquerque' },
+  '041': { multiplier: 1.05, market: 'Portland ME' },
+  '054': { multiplier: 1.05, market: 'Burlington VT' },
+  '294': { multiplier: 1.00, market: 'Charleston SC' },
+  '291': { multiplier: 0.92, market: 'Columbia SC' },
+};
+
+// Any ZIP prefix not listed above uses its STATE's typical level instead of a flat national average.
+// Low-cost regions (rural South and Midwest) run roughly 15-25% under the national average and the
+// coastal/Northeast states run over it (published city-by-city cost guides, 2026).
+const STATE_FALLBACK_MULTIPLIERS: Record<string, number> = {
+  AL: 0.88, AR: 0.82, AZ: 1.02, CA: 1.20, CO: 1.10, CT: 1.25, DC: 1.35, DE: 1.10, FL: 1.05, GA: 0.98,
+  HI: 1.55, IA: 0.86, ID: 0.95, IL: 1.00, IN: 0.88, KS: 0.86, KY: 0.88, LA: 0.92, MA: 1.25, MD: 1.15,
+  ME: 1.02, MI: 0.90, MN: 0.98, MO: 0.88, MS: 0.80, MT: 0.92, NC: 0.95, ND: 0.85, NE: 0.88, NH: 1.10,
+  NJ: 1.20, NM: 0.92, NV: 1.05, NY: 1.10, OH: 0.90, OK: 0.85, OR: 1.10, PA: 1.00, RI: 1.15, SC: 0.94,
+  SD: 0.85, TN: 0.92, TX: 0.98, UT: 1.00, VA: 1.05, VT: 1.05, WA: 1.15, WI: 0.94, WV: 0.82, WY: 0.92,
+  AK: 1.42,
 };
 
 // ===== Lookup Functions =====
 
 export function getRegionalMultiplier(zipCode: string): { multiplier: number; market: string } {
   const prefix = zipCode.substring(0, 3);
-  return REGIONAL_MULTIPLIERS[prefix] || { multiplier: 1.0, market: 'National Average' };
+  const exact = REGIONAL_MULTIPLIERS[prefix];
+  if (exact) return exact;
+  const state = getStateFromZip(zipCode);
+  const stateLevel = state ? STATE_FALLBACK_MULTIPLIERS[state] : undefined;
+  if (stateLevel) return { multiplier: stateLevel, market: `${state} (statewide average)` };
+  return { multiplier: 1.0, market: 'National Average' };
 }
 
 // Apply guaranteed price discount (10% below market)

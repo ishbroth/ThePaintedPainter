@@ -40,6 +40,17 @@ const LABEL_OVERRIDES: Partial<Record<keyof EstimatorContext, string>> = {
   hoa: 'HOA',
   afterHoursRequired: 'After-hours/weekend scheduling needed',
   lowVocRequested: 'Low-VOC paint requested',
+  excludedRooms: 'Rooms the customer took off the price',
+  excludedItems: 'Items the customer took off the price',
+  trimLinearFeet: 'Trim (linear feet)',
+  crownLinearFeet: 'Crown molding (linear feet)',
+  accentWallCount: 'Accent walls',
+  stairRailFeet: 'Stair railing (feet)',
+  popcornCeilingSqft: 'Popcorn ceiling area (sq ft)',
+  cabinetDoorCount: 'Cabinet doors and drawer fronts',
+  deckSqft: 'Deck area (sq ft)',
+  pressureWashSqft: 'Pressure-wash area (sq ft)',
+  exteriorBody: 'House body painted (siding/stucco/brick)',
 };
 
 function titleCase(camel: string): string {

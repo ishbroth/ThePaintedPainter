@@ -64,6 +64,15 @@ function roomLabel(room: string | undefined): string {
   }
 }
 
+/** Any form of timing counts: ASAP/no-rush, a start date, a range, or "my dates are flexible". */
+const hasTiming = (c: EstimatorContext) => !!(c.timeline || c.startDate || c.endDate || c.datesFlexible);
+
+/** The customer narrowed the job to one thing (a railing, cabinets, trim footage, popcorn removal...) so whole-house questions don't apply. */
+const isNarrowInteriorJob = (c: EstimatorContext) =>
+  c.interiorWalls === 'no' &&
+  c.surfacesAddressed &&
+  (c.stairwayDetails === 'railings_only' || c.cabinets !== 'none' || c.trimLinearFeet != null || c.popcornCeilingSqft != null || c.prepWork.includes('popcorn_removal') || c.interiorTrim === 'yes' || c.interiorCeilings === 'yes');
+
 const isCommercialLike = (c: EstimatorContext) => c.propertyType === 'commercial' || c.propertyType === 'multi_unit';
 
 // ===== Topic list (priority order) =====
@@ -103,7 +112,7 @@ export const TOPICS: Topic[] = [
     priority: 15,
     relevant: (c) => c.projectType === 'interior' || c.projectType === 'both',
     alreadyAnswered: (c) =>
-      c.interiorScope === 'whole_house' || c.selectedRooms.length > 0,
+      c.interiorScope === 'whole_house' || c.selectedRooms.length > 0 || isNarrowInteriorJob(c),
     ask: (c) => {
       const t = c.additionalDetails.toLowerCase();
       const vague = /(a room|just a room|one room)/.test(t);
@@ -169,7 +178,8 @@ export const TOPICS: Topic[] = [
     relevant: (c) =>
       c.projectType !== 'exterior' &&
       c.interiorScope === 'whole_house' &&
-      !c.squareFeet,
+      !c.squareFeet &&
+      !isNarrowInteriorJob(c),
     alreadyAnswered: (c) => !!c.squareFeet,
     ask: (c) => {
       if (isCommercialLike(c)) {
@@ -274,7 +284,7 @@ export const TOPICS: Topic[] = [
     id: 'trim_scope',
     priority: 26,
     relevant: (c) => (c.projectType === 'interior' || c.projectType === 'both') && c.interiorTrim === 'yes',
-    alreadyAnswered: (c) => c.trimScopeAddressed || c.doorFrames === 'yes' || c.specialtyServices.includes('built_ins'),
+    alreadyAnswered: (c) => c.trimScopeAddressed || c.trimLinearFeet != null || c.doorFrames === 'yes' || c.specialtyServices.includes('built_ins'),
     ask: (c) =>
       pick(
         [
@@ -296,7 +306,7 @@ export const TOPICS: Topic[] = [
   {
     id: 'condition',
     priority: 30,
-    relevant: (c) => c.projectType !== 'exterior' && c.projectCondition !== 'new_construction',
+    relevant: (c) => c.projectType !== 'exterior' && c.projectCondition !== 'new_construction' && c.stairwayDetails !== 'railings_only' && c.cabinets === 'none',
     alreadyAnswered: (c) => {
       const t = c.additionalDetails.toLowerCase();
       return (
@@ -398,7 +408,9 @@ export const TOPICS: Topic[] = [
   {
     id: 'color_change',
     priority: 35,
-    relevant: (c) => c.projectType === 'interior' || c.projectType === 'both',
+    relevant: (c) =>
+      (c.projectType === 'interior' || c.projectType === 'both') &&
+      (c.interiorWalls !== 'no' || c.interiorCeilings === 'yes' || c.interiorTrim === 'yes' || c.cabinets !== 'none'),
     alreadyAnswered: (c) => !!c.interiorColorChange,
     ask: (c) =>
       pick(
@@ -474,7 +486,7 @@ export const TOPICS: Topic[] = [
   {
     id: 'siding',
     priority: 45,
-    relevant: (c) => c.projectType === 'exterior' || c.projectType === 'both',
+    relevant: (c) => (c.projectType === 'exterior' || c.projectType === 'both') && c.exteriorBody !== 'no',
     alreadyAnswered: (c) => !!c.sidingType,
     ask: (c) =>
       pick(
@@ -497,7 +509,9 @@ export const TOPICS: Topic[] = [
   {
     id: 'stories',
     priority: 48,
-    relevant: (c) => c.projectType === 'exterior' || c.projectType === 'both',
+    relevant: (c) =>
+      (c.projectType === 'exterior' || c.projectType === 'both') &&
+      (c.exteriorBody !== 'no' || c.exteriorTrim === 'yes' || c.gutters === 'yes' || c.soffitsEaves === 'yes' || c.exteriorWindows !== 'none'),
     alreadyAnswered: (c) => !!c.stories,
     ask: (c) => {
       if (isCommercialLike(c)) {
@@ -546,17 +560,17 @@ export const TOPICS: Topic[] = [
     // Occupancy/vacancy only matters for interior work (protecting furniture
     // and belongings while the crew is inside) — irrelevant for an
     // exterior-only job, so only timeline needs answering in that case.
-    alreadyAnswered: (c) => (c.projectType === 'exterior' ? !!c.timeline : !!c.occupancy && !!c.timeline),
+    alreadyAnswered: (c) => (c.projectType === 'exterior' ? hasTiming(c) : !!c.occupancy && hasTiming(c)),
     ask: (c) => {
       const exteriorOnly = c.projectType === 'exterior';
       const commercial = isCommercialLike(c);
       if (exteriorOnly) {
         return pick(["Last thing — when would you like this done? (a specific date or range, ASAP, or tell me your dates are flexible)", "And what's the timeline on this — specific dates, any rush, or are your dates flexible?"], seed(c));
       }
-      if (c.occupancy && !c.timeline) {
+      if (c.occupancy && !hasTiming(c)) {
         return pick(["Last thing — when would you like this done? (a specific date or range, ASAP, or tell me your dates are flexible)", "And what's the timeline — specific dates, any rush, or are your dates flexible?"], seed(c));
       }
-      if (!c.occupancy && c.timeline) {
+      if (!c.occupancy && hasTiming(c)) {
         if (commercial) {
           return pick(
             ["Last thing — will the space still be open/operating during the work, or empty?",
@@ -643,7 +657,7 @@ export function findTopic(id: string): Topic | null {
 
 export const metaBank = {
   cost: () =>
-    "Totally free to get the estimate. At the end I'll show you a guaranteed price plus painters in your area — you only pay the painter if you book. No card needed to keep chatting.",
+    "Totally free to get your price. At the end I'll show you a guaranteed price plus painters in your area — you only pay the painter if you book. No card needed to keep chatting.",
 
   how_it_works: () =>
     "You describe the job, I ask a few follow-ups, then I put together a price. You'll see 2-4 verified painters who'd take the job, plus a 'guaranteed price' option where we fan the job out to our whole pool.",
@@ -652,7 +666,7 @@ export const metaBank = {
     "Yep, I'm an AI helper — but my pricing is backed by real contractor data and actual painters bid on these jobs. I'm usually faster than a phone call.",
 
   real_person: () =>
-    "Sure — you can call or text Isaac at (619) 724-2702 any time. Or keep going with me and we'll have your estimate in under two minutes.",
+    "Sure — you can call or text Isaac at (619) 724-2702 any time. Or keep going with me and we'll have your price in under two minutes.",
 
   time: () =>
     "Usually 2-3 minutes. I only ask what I need to price it fairly.",

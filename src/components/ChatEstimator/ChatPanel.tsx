@@ -257,6 +257,7 @@ const ChatPanel = () => {
           assumptions: state.finalEstimate!.assumptions,
           matchedSituations: state.finalEstimate!.matchedSituations,
           transcript: state.transcript,
+          loyaltyDiscountPercent: state.finalEstimate!.loyaltyDiscountPercent ?? 0,
         };
         try {
           // Always a fresh hold window here — this whole block only runs for
@@ -384,7 +385,7 @@ const ChatPanel = () => {
       <div className="chat-estimator-card">
         <div className="chat-estimator-header">
           <div className="chat-estimator-header-row">
-            <h2>Get Your Free Painting Estimate</h2>
+            <h2>Get Your Free Painting Price</h2>
             {ttsSupported && (
               <button
                 type="button"
@@ -447,7 +448,7 @@ const ChatPanel = () => {
               </button>
             )}
             <button type="button" className="chat-action-button chat-action-secondary" onClick={startNewEstimate}>
-              Start a New Estimate
+              Get a New Price
             </button>
           </div>
         )}

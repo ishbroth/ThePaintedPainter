@@ -120,6 +120,19 @@ export const RATE_KEYS = {
   prep_drywall_patch_small: 'prep.drywall_patch.small',
   prep_drywall_patch_medium: 'prep.drywall_patch.medium',
   prep_drywall_patch_large: 'prep.drywall_patch.large',
+
+  // Exterior features and small-job items (added when the estimator learned to price a single item on its own)
+  exterior_shutter_each: 'exterior.shutter.each',
+  exterior_fence_6ft: 'exterior.fence.6ft',
+  exterior_fence_4ft: 'exterior.fence.4ft',
+  exterior_deck_stain: 'exterior.deck.stain',
+  exterior_deck_paint: 'exterior.deck.paint',
+  exterior_fascia: 'exterior.fascia.per_linft',
+  exterior_gutter: 'exterior.gutter.per_linft',
+  exterior_window_trim_each: 'exterior.window_trim.each',
+  stairs_railing_simple: 'stairs.railing.simple_per_ft',
+  stairs_railing_spindles: 'stairs.railing.spindles_per_ft',
+  min_job_charge: 'job.minimum_charge',
 } as const;
 
 export type RateKey = (typeof RATE_KEYS)[keyof typeof RATE_KEYS];
@@ -217,7 +230,39 @@ export function allKeys(): string[] {
 // ============================================================================
 
 export const USER_ADDITIONS: { key: string; entry: RateEntry }[] = [
-  // (empty — grows over time)
+  // Per-item figures from published 2026 contractor cost guides (Angi, HomeGuide, Homewyse, Fixr,
+  // estimators.us and local painter price pages), fed in October 2026. Each value is the typical (mid)
+  // figure of the range the guides gave; the averaging above blends it with what was already here,
+  // so nothing is overwritten.
+  { key: RATE_KEYS.interior_walls_repaint_good, entry: { value: 1.5, unit: 'perSqFt', source: 'web-2026-10 (walls $1-2 per sq ft of wall)', marketBasis: true } },
+  { key: RATE_KEYS.interior_ceiling_flat, entry: { value: 2, unit: 'perSqFt', source: 'web-2026-10 (ceilings $1-3; Homewyse $1.38-2.98)', marketBasis: true } },
+  { key: RATE_KEYS.trim_baseboard_3in, entry: { value: 3, unit: 'perLinFt', source: 'web-2026-10 (baseboard/trim $1-5 per linear ft; Homewyse $2.30-4.88)', marketBasis: true } },
+  { key: RATE_KEYS.door_interior_standard, entry: { value: 125, unit: 'perUnit', source: 'web-2026-10 (interior door avg $75-150, national avg about $125)', marketBasis: true } },
+  { key: RATE_KEYS.cabinet_kitchen_small, entry: { value: 2200, unit: 'perProject', source: 'web-2026-10 (small galley kitchen $800-3,000; $50-125 per door)', marketBasis: true } },
+  { key: RATE_KEYS.cabinet_kitchen_medium, entry: { value: 4500, unit: 'perProject', source: 'web-2026-10 (typical kitchen $2,000-7,000)', marketBasis: true } },
+  { key: RATE_KEYS.cabinet_kitchen_large, entry: { value: 7000, unit: 'perProject', source: 'web-2026-10 (large kitchen up to $12,000)', marketBasis: true } },
+  { key: RATE_KEYS.cabinet_bathroom_vanity, entry: { value: 210, unit: 'perProject', source: 'web-2026-10 (vanity $60-120 small, $180-360 for a 72 inch)', marketBasis: true } },
+  { key: RATE_KEYS.cabinet_bathroom_vanity, entry: { value: 260, unit: 'perProject', source: 'web-2026-10 (cabinet painters $25-75/hr, labor 80-85 percent)', marketBasis: true } },
+  { key: RATE_KEYS.cabinet_bathroom_vanity, entry: { value: 90, unit: 'perProject', source: 'web-2026-10 (small 24 inch vanity $60-120)', marketBasis: true } },
+  { key: RATE_KEYS.cabinet_bathroom_vanity, entry: { value: 270, unit: 'perProject', source: 'web-2026-10 (72 inch vanity $180-360)', marketBasis: true } },
+  { key: RATE_KEYS.exterior_siding_vinyl, entry: { value: 2.25, unit: 'perSqFt', source: 'web-2026-10 (vinyl $1.50-3.00)', marketBasis: true } },
+  { key: RATE_KEYS.exterior_siding_wood, entry: { value: 3.25, unit: 'perSqFt', source: 'web-2026-10 (wood $2.00-4.50)', marketBasis: true } },
+  { key: RATE_KEYS.exterior_siding_stucco, entry: { value: 3, unit: 'perSqFt', source: 'web-2026-10 (stucco $2.00-4.00)', marketBasis: true } },
+  { key: RATE_KEYS.exterior_siding_brick, entry: { value: 3.75, unit: 'perSqFt', source: 'web-2026-10 (brick $2.50-5.00)', marketBasis: true } },
+  { key: RATE_KEYS.prep_popcorn_removal_per_sqft, entry: { value: 2.7, unit: 'perSqFt', source: 'web-2026-10 (removal only $1.87-3.52; scrape $1-2)', marketBasis: true } },
+  { key: RATE_KEYS.prep_wallpaper_removal_per_sqft, entry: { value: 2.8, unit: 'perSqFt', source: 'web-2026-10 ($1-5 per sq ft; about $800 per room)', marketBasis: true } },
+  { key: RATE_KEYS.prep_power_wash_per_sqft, entry: { value: 0.3, unit: 'perSqFt', source: 'web-2026-10 (house wash $0.15-0.50 per sq ft)', marketBasis: true } },
+  { key: RATE_KEYS.exterior_shutter_each, entry: { value: 120, unit: 'perUnit', source: 'web-2026-10 (shutters $45-85 to $114-235 each)', marketBasis: true } },
+  { key: RATE_KEYS.exterior_fence_6ft, entry: { value: 7, unit: 'perLinFt', source: 'web-2026-10 (privacy fence $1.50-3.50 one coat up to $5-14)', marketBasis: true } },
+  { key: RATE_KEYS.exterior_deck_stain, entry: { value: 3.2, unit: 'perSqFt', source: 'web-2026-10 (deck stain $1.50-5.50 incl. cleaning)', marketBasis: true } },
+  { key: RATE_KEYS.exterior_deck_paint, entry: { value: 4.5, unit: 'perSqFt', source: 'web-2026-10 (deck paint $3-6)', marketBasis: true } },
+  { key: RATE_KEYS.exterior_fascia, entry: { value: 4.5, unit: 'perLinFt', source: 'web-2026-10 (fascia/soffit $3-6; Homewyse $4.39-8.42)', marketBasis: true } },
+  { key: RATE_KEYS.exterior_gutter, entry: { value: 3.5, unit: 'perLinFt', source: 'web-2026-10 (gutters $2-5 per linear ft)', marketBasis: true } },
+  { key: RATE_KEYS.exterior_window_trim_each, entry: { value: 90, unit: 'perUnit', source: 'web-2026-10 (window trim $25-150 each)', marketBasis: true } },
+  { key: RATE_KEYS.door_garage_single, entry: { value: 330, unit: 'perUnit', source: 'web-2026-10 (garage door $150-550)', marketBasis: true } },
+  { key: RATE_KEYS.door_garage_double, entry: { value: 450, unit: 'perUnit', source: 'web-2026-10 (garage door $150-550, double at the upper end)', marketBasis: true } },
+  { key: RATE_KEYS.door_entry_exterior, entry: { value: 200, unit: 'perUnit', source: 'web-2026-10 (front door $125-300)', marketBasis: true } },
+  { key: RATE_KEYS.min_job_charge, entry: { value: 350, unit: 'perProject', source: 'web-2026-10 (painter minimum job fee $250-500)', marketBasis: true } },
 ];
 
 // ============================================================================
@@ -405,6 +450,23 @@ function seedFromPricingData(): void {
   pushBand(RATE_KEYS.prep_drywall_patch_small, 'perPatch', PREP_WORK_PRICING.drywallRepairMinor, 'prep.drywallRepairMinor');
 }
 
+function seedExtras(): void {
+  const src = 'marketPricingData.ts';
+  const e = BASE_RATES.exterior;
+  const seed = (key: string, value: number, unit: RateUnit) => push(key, { value, unit, source: src, marketBasis: false });
+  seed(RATE_KEYS.exterior_shutter_each, BASE_RATES.specialty.shutter_exterior, 'perUnit');
+  seed(RATE_KEYS.exterior_fence_6ft, e.fence_per_linft_6ft, 'perLinFt');
+  seed(RATE_KEYS.exterior_fence_4ft, e.fence_per_linft_4ft, 'perLinFt');
+  seed(RATE_KEYS.exterior_deck_stain, e.deck_stain_per_sqft, 'perSqFt');
+  seed(RATE_KEYS.exterior_deck_paint, e.deck_paint_per_sqft, 'perSqFt');
+  seed(RATE_KEYS.exterior_fascia, e.fascia_per_linft, 'perLinFt');
+  seed(RATE_KEYS.exterior_gutter, e.gutter_per_linft, 'perLinFt');
+  seed(RATE_KEYS.exterior_window_trim_each, e.window_trim_each, 'perUnit');
+  seed(RATE_KEYS.stairs_railing_simple, BASE_RATES.stairs.railing_simple_per_ft, 'perLinFt');
+  seed(RATE_KEYS.stairs_railing_spindles, BASE_RATES.stairs.railing_spindles_per_ft, 'perLinFt');
+  seed(RATE_KEYS.min_job_charge, 300, 'perProject');
+}
+
 function applyUserAdditions(): void {
   for (const { key, entry } of USER_ADDITIONS) push(key, entry);
 }
@@ -413,4 +475,5 @@ function applyUserAdditions(): void {
 seedFromMarketPricingData();
 seedFromPricingConfig();
 seedFromPricingData();
+seedExtras();
 applyUserAdditions();
