@@ -1110,6 +1110,11 @@ export function extractAll(text: string, prev: EstimatorContext, lastBotTopicId:
   }
   if (lastBotTopicId === 'property_ownership' && !prev.propertyType && !patch.propertyType) {
     const low = text.toLowerCase();
+    // "renting" / "rental" with no more detail: a customer who lives there would say so, so this is a landlord's rental unit
+    if (/\b(rent|renting|rental|rented|landlord|tenants?)\b/.test(low) && !/\b(live|living)\b/.test(low)) {
+      patch.propertyType = 'rental';
+      acks.push('rental property');
+    }
     if (/\b(commercial|business|company|store|shop|restaurant|office|church|clinic|warehouse|salon|cafe|gym)\b/.test(low)) {
       patch.propertyType = 'commercial';
       acks.push('commercial');

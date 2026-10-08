@@ -22,7 +22,7 @@ import { calculateEstimate } from '../estimateEngine';
 import { supabase } from '../supabase';
 import { extractAll, extractPhotoTriggers, extractTimeline, extractPropertyType, extractAccessSignals, extractZip, extractSquareFeet } from './extractors';
 import { getStateFromZip } from '../zipCodeData';
-import { isDenial, denialIsAboutScope, isAmbiguousRenting, topicLabel, recentRecognized, recapSentence } from './clarify';
+import { isDenial, denialIsAboutScope, topicLabel, recentRecognized, recapSentence } from './clarify';
 import { extractTiming, timelineFromStart } from './dateParsing';
 import { defaultAssumptions, applyAssumptions, type Assumption } from './defaultAssumptions';
 import {
@@ -399,11 +399,6 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
     }
     const again = state.lastBotTopic ? state.lastBotTopic.ask(state.ctx) : 'What would you like me to change?';
     return asBot({}, `Sorry about that, I shouldn't have assumed. ${recap} Tell me what's wrong and I'll fix it, or answer this: ${again.charAt(0).toLowerCase()}${again.slice(1)}`);
-  }
-
-  // "renting" could mean a tenant or a landlord, and the price differs.
-  if (state.lastBotTopic?.id === 'property_ownership' && isAmbiguousRenting(trimmed)) {
-    return asBot({}, 'Just so I price it right: do you rent this place from someone (you are the tenant), or are you renting it out to tenants (you own it)?');
   }
 
   const ctxWithExplicit: EstimatorContext = { ...state.ctx, ...patch };

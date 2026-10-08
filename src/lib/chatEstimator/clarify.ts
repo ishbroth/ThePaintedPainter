@@ -21,11 +21,6 @@ export function denialIsAboutScope(text: string): boolean {
   return /\b(walls?|ceilings?|trim|baseboards?|doors?|surfaces?|what\s+(?:we'?re|i'?m|are\s+we|am\s+i|we\s+are)\s+painting|painting|scope)\b/i.test(text);
 }
 
-/** "renting" alone could be a tenant or a landlord. */
-export function isAmbiguousRenting(text: string): boolean {
-  return /^\s*(?:i'?m\s+|we'?re\s+|we\s+|i\s+)?rent(?:ing)?(?:\s+(?:it|here|this|this\s+place|the\s+place))?\s*[.!]?\s*$/i.test(text);
-}
-
 const TOPIC_LABEL: Record<string, string> = {
   project_type: 'whether this is inside, outside or both',
   which_rooms: 'which rooms are being painted',
