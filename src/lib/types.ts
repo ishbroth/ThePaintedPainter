@@ -144,6 +144,8 @@ export interface EstimatorContext {
   squareFeet: number | null;
   stories: number | null;
   ceilingHeight: string; // standard, nine_foot, ten_plus, vaulted_mixed
+  /** Share of the painted area that has the taller ceilings ("high ceilings in the living room" = a part, "throughout" = all). null = all of it. */
+  tallCeilingShare: number | null;
   occupancy: string; // vacant, furnished, occupied
   utilities: string; // yes, no
   hoa: string; // yes, no, skip

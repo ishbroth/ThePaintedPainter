@@ -31,7 +31,7 @@ export function makeInitialContext(): EstimatorContext {
     woodRotExtent: 'minor', wallpaperRooms: null, popcornCeilingRooms: null,
     multiTripRequired: '', specialEquipment: 'none', fixtureRemoval: 'none',
     hardwareReplacement: 'no', lowVocRequested: 'no',
-    squareFeet: null, stories: null, ceilingHeight: 'standard', occupancy: '',
+    squareFeet: null, stories: null, ceilingHeight: 'standard', tallCeilingShare: null, occupancy: '',
     utilities: 'yes', hoa: 'no', timeline: '', startDate: '', endDate: '', datesFlexible: false, afterHoursRequired: '',
     contactName: '', contactPhone: '', contactEmail: '', contactNotes: '',
     projectCondition: '', hasStainedWood: 'no', bedroomCount: null,

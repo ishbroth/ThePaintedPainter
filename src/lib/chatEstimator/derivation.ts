@@ -441,6 +441,13 @@ export function derive(ctx: EstimatorContext, transcript: string): Derivation[] 
     }
   }
 
+  // Taller ceilings that are only in one room ("high ceilings in the living room") affect only part of the job
+  if (ctx.ceilingHeight !== 'standard' && ctx.tallCeilingShare == null && ctx.interiorScope === 'whole_house') {
+    const wholeHome = /\b(throughout|whole (?:house|home|place)|all (?:the )?(?:rooms|ceilings)|every (?:room|ceiling)|entire|everywhere|all of (?:it|them))\b/.test(t);
+    const oneRoom = /\b(?:high|tall|vaulted|cathedral|soaring|\d{1,2}[\s-]?(?:foot|ft|')|twelve|ten|nine)[^.;\n]{0,25}?\b(?:in|for|on)\s+(?:the\s+|our\s+|my\s+)?(living|family|great|dining|kitchen|foyer|entry|entryway|master|stair|hall|den|office|bonus)\b|\b(?:living|family|great|dining|kitchen|foyer|entry|entryway|master|stair|stairwell|hall|den|office|bonus)\b[^.;\n]{0,30}?\b(?:high|tall|vaulted|cathedral|soaring)\s+ceiling|\b(?:vaulted|cathedral|soaring)\s+(?:living|family|great|dining|kitchen|foyer|entry|entryway|master)\b/.test(t);
+    if (oneRoom && !wholeHome) out.push({ patch: { tallCeilingShare: 0.35 }, reason: 'Tall ceilings in one room only' });
+  }
+
   // Porch work: the ceiling is an overhang, the floor is deck-type surface
   if (/\bporch\b/.test(t) && ctx.overhangSqft == null) {
     const ceilingM = t.match(/(\d[\d,]*)\s*(?:sq\.?\s*ft\.?|sqft|square\s*f(?:ee|oo)t)[^.]{0,30}ceiling|ceiling[^.]{0,40}?(\d[\d,]*)\s*(?:sq\.?\s*ft\.?|sqft|square\s*f(?:ee|oo)t)/);

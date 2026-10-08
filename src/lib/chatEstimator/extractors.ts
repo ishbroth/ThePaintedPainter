@@ -274,7 +274,8 @@ export function extractSidingType(
 export function extractCeilingType(text: string): 'flat' | 'popcorn' | 'vaulted' | null {
   const t = text.toLowerCase();
   if (/\bpopcorn\s+ceiling/.test(t)) return 'popcorn';
-  if (/\bvaulted\s+ceiling|\bcathedral\s+ceiling|\bhigh\s+ceilings?\b/.test(t)) return 'vaulted';
+  // (height — "high ceilings" — is a separate setting; only a vaulted/cathedral shape changes the ceiling type)
+  if (/\bvaulted\s+ceiling|\bcathedral\s+ceiling/.test(t)) return 'vaulted';
   if (/\bflat\s+ceiling|\bsmooth\s+ceiling/.test(t)) return 'flat';
   return null;
 }
@@ -491,9 +492,25 @@ export function extractInteriorSurfaceDetails(text: string): {
 /** Ceiling height — a real multiplier on wall/ceiling square footage, independent of ceiling TYPE (flat/popcorn/vaulted). */
 export function extractCeilingHeight(text: string): 'nine_foot' | 'ten_plus' | 'vaulted_mixed' | null {
   const t = text.toLowerCase();
-  if (/\b(vaulted|cathedral)\b/.test(t)) return 'vaulted_mixed';
-  if (/\b(10|ten)[\s-]?(?:\+|plus)?\s*f(?:oo|ee)?t ceilings?\b|\bhigh ceilings?\b/.test(t)) return 'ten_plus';
-  if (/\b(9|nine)[\s-]?f(?:oo|ee)?t ceilings?\b/.test(t)) return 'nine_foot';
+  const WORDS: Record<string, number> = { nine: 9, ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, eighteen: 18, twenty: 20 };
+  const num = (s: string) => (WORDS[s] ?? parseInt(s, 10));
+  const fromFeet = (n: number): 'nine_foot' | 'ten_plus' | 'vaulted_mixed' | null =>
+    n >= 12 && n <= 40 ? 'vaulted_mixed' : n >= 10 && n < 12 ? 'ten_plus' : n === 9 ? 'nine_foot' : null;
+  if (/\b(vaulted|cathedral|double[\s-]height|two[\s-]stor(?:y|ey)\s+(?:foyer|entry|entryway|living room|great room|ceiling)|soaring|loft(?:ed)? ceilings?|beamed vaulted)\b/.test(t)) return 'vaulted_mixed';
+  // "12 foot ceilings", "twelve-foot ceilings", "10' ceilings", "ceilings are 10 feet", "ceilings about 9 ft"
+  const NUM = '(\\d{1,2}|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|eighteen|twenty)';
+  const a = t.match(new RegExp(NUM + "\\s*(?:-|\\s)?(?:f(?:oo|ee)?t|')\\s*(?:tall\\s+|high\\s+)?ceilings?\\b"));
+  const b = t.match(new RegExp("\\bceilings?\\s*(?:are|is|run|go|measure|about|around|at|of|:)?\\s*(?:about\\s+|around\\s+|roughly\\s+)?" + NUM + "\\s*(?:-|\\s)?(?:f(?:oo|ee)?t|')"));
+  const feet = a ? num(a[1]) : b ? num(b[1]) : NaN;
+  if (isFinite(feet)) {
+    const h = fromFeet(feet);
+    if (h) return h;
+  }
+  // "high ceilings", "tall ceilings", "ceilings are really high", "extra tall walls", "10+ foot", "need a tall ladder for the ceilings"
+  if (/\b(?:high|tall|extra[\s-]tall|lofty|really high|very high|super high|nine[\s-]foot|9[\s-]foot)\s+ceilings?\b|\bceilings?\s+(?:are|is)\s+(?:really\s+|very\s+|pretty\s+|kind of\s+|fairly\s+|quite\s+)?(?:high|tall)\b|\b(?:tall|high)\s+walls\b|\bhigher than (?:normal|standard|usual)\b/.test(t)) {
+    return /\b(?:9[\s-]foot|nine[\s-]foot)\b/.test(t) ? 'nine_foot' : 'ten_plus';
+  }
+  if (/\b(10|ten)[\s-]?(?:\+|plus)\s*f(?:oo|ee)?t\b/.test(t)) return 'ten_plus';
   return null;
 }
 
@@ -1465,7 +1482,7 @@ export function extractAll(text: string, prev: EstimatorContext, lastBotTopicId:
   const ceilingHeight = extractCeilingHeight(text);
   if (ceilingHeight && (!prev.ceilingHeight || prev.ceilingHeight === 'standard')) {
     patch.ceilingHeight = ceilingHeight;
-    acks.push(ceilingHeight === 'vaulted_mixed' ? 'vaulted ceilings' : `${ceilingHeight === 'ten_plus' ? '10+' : '9'} ft ceilings`);
+    acks.push(ceilingHeight === 'vaulted_mixed' ? 'tall or vaulted ceilings' : `${ceilingHeight === 'ten_plus' ? '10+' : '9'} ft ceilings`);
   }
 
   const exteriorSurface = extractExteriorSurfaceDetails(text);

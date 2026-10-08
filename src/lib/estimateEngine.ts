@@ -37,11 +37,17 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
 
   // ===== INTERIOR =====
   if (ctx.projectType === 'interior' || ctx.projectType === 'both') {
-    const heightRatio = ceilingHeight / 8;
+    // taller ceilings may apply to only one room ("high ceilings in the living room")
+    const tallShare = ctx.tallCeilingShare ?? 1;
+    const heightRatio = 1 + (ceilingHeight / 8 - 1) * tallShare;
     const effectiveWallSqFt = Math.round(layout.totalWallSqFt * heightRatio * roomFraction);
     // Bigger scopes are cheaper per square foot (one mobilization, bulk paint, crew stays productive). Painting
     // a few rooms gets none of that, and neither does a job a customer trims down after seeing the price.
     const volEff = volumeEfficiency(effectiveWallSqFt);
+    // Reaching tall ceilings (ladders, planks or a lift, slower cutting-in) adds labor beyond the extra wall area itself.
+    const tallCeilingFactor = ctx.ceilingHeight === 'vaulted_mixed' ? LABOR_COMPLEXITY.vaulted : ctx.ceilingHeight === 'ten_plus' ? LABOR_COMPLEXITY.tall_ceiling : ctx.ceilingHeight === 'nine_foot' ? 1.05 : 1;
+    const tallWallFactorRaw = 1 + (tallCeilingFactor - 1) / 2;
+    const tallWallFactor = 1 + (tallWallFactorRaw - 1) * tallShare;
     volumeEfficiencyUsed = volEff;
 
     // Walls — rate varies by texture and condition
@@ -58,7 +64,7 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
       lineItems.push({
         category: 'Interior',
         description: 'Interior Walls',
-        amount: effectiveWallSqFt * wallRate * textureMultiplier * colorEfficiency * regionalMult * conditionMultiplier * volEff,
+        amount: effectiveWallSqFt * wallRate * textureMultiplier * colorEfficiency * regionalMult * conditionMultiplier * volEff * tallWallFactor,
         key: 'walls',
       });
     }
@@ -85,7 +91,7 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
       lineItems.push({
         category: 'Interior',
         description: 'Ceilings',
-        amount: ceilingSqFt * ceilingRate * regionalMult * volEff,
+        amount: ceilingSqFt * ceilingRate * regionalMult * volEff * (ctx.ceilingType === 'vaulted' ? 1 : 1 + (tallCeilingFactor - 1) * tallShare),
         key: 'ceilings',
       });
       // A ceiling going to a new color (or dark to light) needs an extra coat even when the walls stay the same color.
