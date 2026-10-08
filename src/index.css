@@ -211,7 +211,11 @@ img {
   z-index: 0;
   pointer-events: none;
   overflow: hidden;
-  opacity: 0.16; /* working pages: very light */
+  --hero-opacity: 0.16; /* working pages: very light */
+}
+
+.site-hero-bg--home {
+  --hero-opacity: 0.42;
 }
 
 .site-hero-bg::before {
@@ -219,9 +223,11 @@ img {
   position: absolute;
   inset: 0;
   background: url('/hero-collage-blur.jpg') center / cover no-repeat;
+  opacity: var(--hero-opacity);
 }
 
-.site-hero-bg__img {
+/* the picture and the lettering share one box so they always move together */
+.site-hero-bg__stage {
   position: absolute;
   top: 0;
   left: 50%;
@@ -229,13 +235,38 @@ img {
   width: var(--hero-size, 106vw);
   height: var(--hero-size, 106vw);
   margin-left: calc(var(--hero-size, 106vw) / -2);
-  background: url('/hero-collage.jpg') 0 0 / 100% 100% no-repeat;
   transform: translate3d(0, var(--hero-shift, 0px), 0);
   will-change: transform;
 }
 
-.site-hero-bg--home {
-  opacity: 0.42;
+.site-hero-bg__img {
+  position: absolute;
+  inset: 0;
+  background: url('/hero-collage.jpg') 0 0 / 100% 100% no-repeat;
+  opacity: var(--hero-opacity);
+}
+
+/* "The Painted Painter" lettering on its own, opaque, sitting exactly over the lettering in the translucent picture. Home page
+   only. SiteBackground sets --hero-title-opacity: 1 until the estimator card covers it, then 0 (so it is the translucent one). */
+.site-hero-bg__title {
+  display: none;
+}
+
+.site-hero-bg--home .site-hero-bg__title {
+  display: block;
+  position: absolute;
+  left: 26.667%;
+  top: 48.333%;
+  width: 46.667%;
+  height: 8.889%;
+  background: url('/hero-title.png') 0 0 / 100% 100% no-repeat;
+  opacity: var(--hero-title-opacity, 1);
+}
+
+@media (max-width: 640px) {
+  .site-hero-bg--home {
+    --hero-opacity: 0.5;
+  }
 }
 
 /* The carousel at the top of the home page: starts right under the header and its bottom edge is at Superman's eye level,

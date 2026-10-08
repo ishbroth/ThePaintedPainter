@@ -3,10 +3,13 @@ import { useLocation } from 'react-router-dom';
 
 /** The picture is scaled (equal proportions) to a little wider than the screen, so the roller on the left and the brush on the right both stay in view. */
 const WIDTH_OVER_SCREEN = 1.03;
-/** Where Superman's body ends, as a share of the picture's height (the estimator card starts around there). */
-const BODY_BOTTOM = 0.76;
-/** Where Superman's eyes begin (the brow line), as a share of the picture's height: the carousel's bottom edge sits there. */
-const EYE_LEVEL = 0.358;
+/** Where the "The Painted Painter" lettering sits in the picture, as shares of its height (top of the letters, bottom of the letters). */
+const TITLE_TOP = 0.4956;
+const TITLE_BOTTOM = 0.5594;
+/** The estimator card starts a little below the lettering. */
+const CARD_BELOW_TITLE = 0.565;
+/** Where the painting mask starts (just below the eyes), as a share of the picture's height: the carousel's bottom edge sits there, covering the eyes. */
+const EYE_LEVEL = 0.388;
 /** How far down the picture the bottom of the brush reaches (share of the picture's height); it has to stay on screen at the start. */
 const BRUSH_BOTTOM = 0.72;
 /** Extra nudge down, as a share of the screen height (about 54px on a 900px-tall screen). */
@@ -22,13 +25,15 @@ const EXTRA_DOWN = 0.06;
  *   of the picture and the bottom of the page come into view together.
  * - On a tall, narrow screen the picture can end up shorter than the screen; a blurred copy fills the rest and it stays put.
  *
- * On the home page it is stronger; on working pages (forms, dashboards) it is kept very light.
+ * On the home page it is stronger, and the "The Painted Painter" lettering is opaque until the estimator card covers it; on
+ * working pages (forms, dashboards) everything, lettering included, is kept very light.
  */
 const SiteBackground = () => {
   const { pathname } = useLocation();
 
   useEffect(() => {
     const root = document.documentElement;
+    const isHome = pathname === '/';
     let frame = 0;
     let size = 0;
     let screenHeight = 0;
@@ -46,7 +51,7 @@ const SiteBackground = () => {
       const headerHeight = main ? Math.max(0, Math.round(main.getBoundingClientRect().top + window.scrollY)) : 0;
       // The estimator card starts just under Superman's body, but never above the middle of the screen (so a small scroll
       // is what brings it into view and starts the spoken intro) and never so low that none of it shows.
-      const cardTop = Math.min(Math.max(size * BODY_BOTTOM + startShift + 8, screenHeight * 0.52), screenHeight * 0.86);
+      const cardTop = Math.min(Math.max(size * CARD_BELOW_TITLE + startShift + 8, screenHeight * 0.52), screenHeight * 0.86);
       // the carousel under the header ends at Superman's eye level
       const carouselHeight = Math.max(90, Math.round(size * EYE_LEVEL + startShift - headerHeight));
       root.style.setProperty('--hero-carousel-h', `${carouselHeight}px`);
@@ -61,7 +66,22 @@ const SiteBackground = () => {
       const progress = scrollable > 0 ? Math.min(1, Math.max(0, window.scrollY / scrollable)) : 0;
       // from where it starts to the point where its bottom meets the bottom of the screen, reached at the end of the page
       const endShift = -overhang;
-      root.style.setProperty('--hero-shift', `${Math.round(startShift + (endShift - startShift) * progress)}px`);
+      const shift = Math.round(startShift + (endShift - startShift) * progress);
+      root.style.setProperty('--hero-shift', `${shift}px`);
+
+      // Home page only: the lettering is fully opaque until the estimator card starts to cover it; once the card is over it,
+      // the lettering is back to the same translucency as the rest of the picture (the card hides it while that happens).
+      if (isHome) {
+        const card = document.querySelector('.chat-estimator-card');
+        let opacity = 1;
+        if (card) {
+          const titleTop = shift + size * TITLE_TOP;
+          const titleBottom = shift + size * TITLE_BOTTOM;
+          const cardTop = card.getBoundingClientRect().top;
+          opacity = Math.min(1, Math.max(0, (cardTop - titleTop) / Math.max(1, titleBottom - titleTop)));
+        }
+        root.style.setProperty('--hero-title-opacity', opacity.toFixed(3));
+      }
     };
     const onScroll = () => {
       if (!frame) frame = requestAnimationFrame(place);
@@ -84,7 +104,11 @@ const SiteBackground = () => {
 
   return (
     <div className={`site-hero-bg${pathname === '/' ? ' site-hero-bg--home' : ''}`} aria-hidden="true">
-      <div className="site-hero-bg__img" />
+      <div className="site-hero-bg__stage">
+        <div className="site-hero-bg__img" />
+        {/* just the lettering, opaque, on the home page only; it is part of the picture and moves with it */}
+        <div className="site-hero-bg__title" />
+      </div>
     </div>
   );
 };
