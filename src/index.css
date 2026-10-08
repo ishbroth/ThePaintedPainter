@@ -200,7 +200,58 @@ img {
   cursor: pointer;
 }
 
-/* Hero Collage */
+/* Home hero: Superman as a translucent, full-screen background that stays fixed while the page scrolls */
+.site-hero-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: url('/hero-superman.jpg');
+  background-repeat: no-repeat;
+  background-size: cover;
+  /* keeps his face and emblem in frame when a tall phone screen crops the sides */
+  background-position: 50% 30%;
+  opacity: 0.16; /* working pages: very light */
+}
+
+.site-hero-bg--home {
+  opacity: 0.4;
+}
+
+/* soften the lower part so the estimator and the text below read clearly over the image */
+.site-hero-bg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, transparent 0%, transparent 45%, var(--bg-page) 100%);
+}
+
+/* The estimator card starts at about 62% of the screen height: it peeks in under Superman's body, but the card has not
+   yet crossed the middle of the screen, so a small scroll is what brings it into view (and starts the spoken intro). */
+.hero-spacer {
+  height: max(18svh, calc(62svh - 150px));
+}
+
+@supports not (height: 1svh) {
+  .hero-spacer {
+    height: max(18vh, calc(62vh - 150px));
+  }
+}
+
+@media (max-width: 640px) {
+  .site-hero-bg {
+    background-position: 50% 22%;
+  }
+  .site-hero-bg--home {
+    /* on a phone the picture is cropped to his face and chest; a touch stronger so he still reads */
+    opacity: 0.5;
+  }
+  .hero-spacer {
+    height: max(14svh, calc(60svh - 160px));
+  }
+}
+
+/* Hero Collage (legacy) */
 .hero-collage {
   background: var(--bg-page);
   padding: 30px 20px;

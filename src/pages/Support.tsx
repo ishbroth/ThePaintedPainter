@@ -69,7 +69,7 @@ const Support = () => {
         <div className="container-custom max-w-3xl">
           <p className="text-[var(--text-secondary)] leading-relaxed text-center">
             The Painted Painter is Hotwire for painting: answer a few quick questions and get an instant AI-powered
-            estimate. Accept our guaranteed price for the best deal, or browse painters in your area and pick the
+            price. Accept our guaranteed price for the best deal, or browse painters in your area and pick the
             one that fits — either way, pricing is transparent and every painter is verified.
           </p>
         </div>
@@ -185,7 +185,7 @@ const Support = () => {
           <div>
             <h2 className="text-xl font-bold mb-4">For Homeowners</h2>
             <p className="text-[var(--text-secondary)] mb-4 text-sm leading-relaxed">
-              Get an instant estimate, compare options, and book a verified professional — all in one place. No phone
+              Get an instant price, compare options, and book a verified professional — all in one place. No phone
               tag, no waiting days for pricing.
             </p>
             <ul className="text-[var(--text-secondary)] mb-6 list-disc ml-5 space-y-1.5 text-sm">

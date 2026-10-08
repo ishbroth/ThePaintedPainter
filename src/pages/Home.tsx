@@ -134,13 +134,9 @@ const Home = () => {
   }, []);
 
   return (
-    <div>
-      {/* Hero Collage — now above the estimator */}
-      <section className="hero-collage">
-        <div className="collage-wrapper">
-          <img src="/IMG_7201.PNG" alt="The Painted Painter" />
-        </div>
-      </section>
+    <div className="home-page">
+      {/* Superman hero (the fixed translucent background lives in SiteBackground). Leaves the first screen to Superman; the estimator starts below his body and just peeks into view */}
+      <section className="hero-spacer" aria-hidden="true" />
 
       {/* AI Chat Estimator — replaces the old "Get a Free Painting Estimate" CTA card */}
       <ChatPanel />
