@@ -555,10 +555,23 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
   // or "ask_clarification" by the model, and since those are checked first
   // they'd otherwise win and produce a reply that has nothing to do with
   // the user clearly signaling they're ready to see a price.
-  if (hasIntent(intent, 'ready_to_finish')) {
-    if (readyToQuote(ctxNext)) {
+  // The price is only run when the customer clearly asks for it ("run it", "give me the price", "that's all") or after the
+  // wrap-up question. A reply that merely sounds finished to the language model ("ready to go" about the walls) isn't a request.
+  const explicitRunIt = /\b(run it|run the numbers?|price it(?: out)?|give me (?:the|a) (?:price|number)|show me (?:the )?(?:price|number)|get (?:me )?(?:the )?price|go ahead|that'?s (?:all|it|everything)|i'?m done|nothing else|finish it)\b/i.test(trimmed);
+  const wantsFinish = hasIntent(intent, 'ready_to_finish') && (s.wrapupAsked || explicitRunIt);
+  if (wantsFinish) {
+    // Even on an explicit "run it", the standard questions come first (ZIP, timing, occupancy, rental or home) unless the wrap-up was reached.
+    const essentialsKnown =
+      !!ctxNext.zipCode &&
+      !!(ctxNext.timeline || ctxNext.startDate || ctxNext.endDate || ctxNext.datesFlexible) &&
+      (ctxNext.projectType === 'exterior' || !!ctxNext.occupancy) &&
+      !!ctxNext.propertyType;
+    if (readyToQuote(ctxNext) && (s.wrapupAsked || essentialsKnown)) {
       return await finalizeTurn(s, customerId);
     }
+    if (readyToQuote(ctxNext)) {
+      s = { ...s, history: [...s.history, botMessage("Happy to run it. I just need a few quick details first so the price is accurate.")] };
+    } else {
     // Not ready — acknowledge, then fall through to actually ASK the missing
     // topic below instead of just describing it. Without this, a user who
     // keeps saying "run it"/"that's all" would see this same static line
@@ -571,6 +584,7 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
         botMessage(`Before I run the numbers I need one more thing: ${missing}`),
       ],
     };
+    }
   } else {
     // 3. Handle meta questions / clarifications before advancing topics
     const metaReply = metaAnswer(intent.intents, s.lastBotTopic, s, Object.keys(patch).length > 0);

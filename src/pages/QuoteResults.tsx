@@ -12,7 +12,8 @@ import { buildResponseSummary, timelineLabel } from '../lib/chatEstimator/respon
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
 import { hapticMedium } from '../lib/haptics';
-import { QUOTE_RESULT_KEY, QUOTE_EXPIRES_KEY, PRICE_HOLD_MINUTES } from '../lib/chatEstimator/persistence';
+import { QUOTE_RESULT_KEY, QUOTE_EXPIRES_KEY, PRICE_HOLD_MINUTES, clearEstimatorSession } from '../lib/chatEstimator/persistence';
+import { deleteAccountChatState } from '../lib/chatEstimator/accountPersistence';
 
 interface LocationState {
   estimate: EstimateBreakdown;
@@ -61,6 +62,7 @@ function timingSummary(ctx: EstimatorContext): string {
 const QuoteResults = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { user: authUser } = useAuth();
   const state = loadState(location.state as LocationState | null);
   const [breakdownOpen, setBreakdownOpen] = useState(false);
 
@@ -217,6 +219,9 @@ const QuoteResults = () => {
               className="price-hold-refresh"
               onClick={() => {
                 hapticMedium();
+                // an expired price means a brand-new estimate: forget the old chat, here and on the account
+                clearEstimatorSession();
+                if (authUser) void deleteAccountChatState(authUser.id);
                 navigate('/');
               }}
             >

@@ -18,6 +18,15 @@ export async function loadAccountChatState(userId: string): Promise<ChatState | 
   }
 }
 
+/** Best-effort — removes the signed-in customer's saved estimate so the next visit starts fresh. */
+export async function deleteAccountChatState(userId: string): Promise<void> {
+  try {
+    await supabase.from(TABLE).delete().eq('user_id', userId);
+  } catch {
+    // ignore — non-critical
+  }
+}
+
 /** Best-effort — a failed save just means this device falls back to sessionStorage for the rest of the tab's life; never throws. */
 export async function saveAccountChatState(userId: string, state: ChatState): Promise<void> {
   try {

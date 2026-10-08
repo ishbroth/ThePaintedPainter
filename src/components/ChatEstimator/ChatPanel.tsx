@@ -10,10 +10,10 @@ import {
   type ChatState,
 } from '../../lib/chatEstimator/chatEngine';
 import { hapticLight } from '../../lib/haptics';
-import { CHAT_STATE_KEY, QUOTE_EXPIRES_KEY, QUOTE_RESULT_KEY, PRICE_HOLD_MINUTES } from '../../lib/chatEstimator/persistence';
+import { CHAT_STATE_KEY, QUOTE_EXPIRES_KEY, QUOTE_RESULT_KEY, PRICE_HOLD_MINUTES, clearEstimatorSession, isExpiredFinishedChat } from '../../lib/chatEstimator/persistence';
 import { isTTSSupported, speak, stopSpeaking, setupSpeechUnlock } from '../../lib/textToSpeech';
 import { uploadQuotePhoto, analyzeQuotePhoto } from '../../lib/chatEstimator/photoUpload';
-import { loadAccountChatState, saveAccountChatState } from '../../lib/chatEstimator/accountPersistence';
+import { loadAccountChatState, saveAccountChatState, deleteAccountChatState } from '../../lib/chatEstimator/accountPersistence';
 import { useAuth } from '../../lib/auth';
 
 const READ_ALOUD_KEY = 'tpp-read-aloud';
@@ -23,6 +23,11 @@ function loadInitialState(): ChatState {
     const saved = sessionStorage.getItem(CHAT_STATE_KEY);
     if (saved) {
       const restored = deserializeChatState(saved);
+      // a finished price whose countdown ran out is not shown again: start a new estimate
+      if (restored && isExpiredFinishedChat(restored)) {
+        clearEstimatorSession();
+        return makeInitialState();
+      }
       if (restored) return restored;
     }
   } catch {
@@ -227,6 +232,11 @@ const ChatPanel = () => {
         // this callback runs.
         setState((current) => {
           if (current.history.length > 1 || current.finalEstimate) return current;
+          // a saved price that has expired is dropped, not restored
+          if (isExpiredFinishedChat(saved)) {
+            void deleteAccountChatState(user.id);
+            return current;
+          }
           // If the saved conversation is already a completed quote, treat
           // it like the "restored already finished" case (same as a
           // sessionStorage restore) — show it with the View/Start-new
