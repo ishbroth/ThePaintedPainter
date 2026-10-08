@@ -200,54 +200,66 @@ img {
   cursor: pointer;
 }
 
-/* Home hero: Superman as a translucent, full-screen background that stays fixed while the page scrolls */
+/* Hero background: the whole collage (the houses around Superman) as a translucent, full-screen image that stays fixed while
+   the page scrolls. The sharp collage is shown whole and centred ("contain") starting just below the header; a pre-blurred
+   copy of it fills the rest of the screen, so it suits any screen shape, wide or tall. SiteBackground sets --header-h (the
+   header's height) and --hero-top (where the sharp picture starts, sliding up as the header scrolls off). */
 .site-hero-bg {
   position: fixed;
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  background-image: url('/hero-superman.jpg');
-  background-repeat: no-repeat;
-  background-size: cover;
-  /* keeps his face and emblem in frame when a tall phone screen crops the sides */
-  background-position: 50% 30%;
+  overflow: hidden;
   opacity: 0.16; /* working pages: very light */
 }
 
-.site-hero-bg--home {
-  opacity: 0.4;
-}
-
-/* soften the lower part so the estimator and the text below read clearly over the image */
-.site-hero-bg::after {
+.site-hero-bg::before {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(to bottom, transparent 0%, transparent 45%, var(--bg-page) 100%);
+  background: url('/hero-collage-blur.jpg') center / cover no-repeat;
 }
 
-/* The estimator card starts at about 62% of the screen height: it peeks in under Superman's body, but the card has not
-   yet crossed the middle of the screen, so a small scroll is what brings it into view (and starts the spoken intro). */
+.site-hero-bg__img {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: var(--hero-top, 82px);
+  height: calc(100vh - var(--header-h, 82px));
+  background: url('/hero-collage.jpg') center top / contain no-repeat;
+}
+
+@supports (height: 1svh) {
+  .site-hero-bg__img {
+    height: calc(100svh - var(--header-h, 82px));
+  }
+}
+
+.site-hero-bg--home {
+  opacity: 0.42;
+}
+
+/* The collage is a square of side S (the smaller of the screen width and the space below the header), centred across and starting right under the header.
+   Superman's body ends about 74% of the way down it, so the estimator card starts just under that point. That is always
+   lower than the middle of the screen, so the card peeks in at the bottom and a small scroll is what brings it past the
+   middle (which starts the spoken intro). 40px is the card section's own top padding. */
 .hero-spacer {
-  height: max(18svh, calc(62svh - 150px));
+  --box-h: calc(100vh - var(--header-h, 82px));
+  --hero-s: min(100vw, var(--box-h));
+  height: max(calc(52vh - var(--header-h, 82px) - 40px), calc(var(--hero-s) * 0.76 - 40px));
 }
 
-@supports not (height: 1svh) {
+@supports (height: 1svh) {
   .hero-spacer {
-    height: max(18vh, calc(62vh - 150px));
+    --box-h: calc(100svh - var(--header-h, 82px));
+    --hero-s: min(100vw, var(--box-h));
+    height: max(calc(52svh - var(--header-h, 82px) - 40px), calc(var(--hero-s) * 0.76 - 40px));
   }
 }
 
 @media (max-width: 640px) {
-  .site-hero-bg {
-    background-position: 50% 22%;
-  }
   .site-hero-bg--home {
-    /* on a phone the picture is cropped to his face and chest; a touch stronger so he still reads */
     opacity: 0.5;
-  }
-  .hero-spacer {
-    height: max(14svh, calc(60svh - 160px));
   }
 }
 
