@@ -283,7 +283,7 @@ export const TOPICS: Topic[] = [
   {
     id: 'trim_scope',
     priority: 26,
-    relevant: (c) => (c.projectType === 'interior' || c.projectType === 'both') && c.interiorTrim === 'yes',
+    relevant: (c) => (c.projectType === 'interior' || c.projectType === 'both') && c.interiorTrim === 'yes' && (c.surfacesAddressed || c.trimLinearFeet != null || c.crownMolding === 'yes'),
     alreadyAnswered: (c) => c.trimScopeAddressed || c.trimLinearFeet != null || c.doorFrames === 'yes' || c.specialtyServices.includes('built_ins'),
     ask: (c) =>
       pick(

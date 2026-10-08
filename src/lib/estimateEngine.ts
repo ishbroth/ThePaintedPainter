@@ -692,7 +692,9 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
   }
 
   // ===== PREP WORK =====
-  if (ctx.prepWork.includes('power_washing') && !off('power_washing')) {
+  // (the power wash that is assumed before painting goes away with the siding; a wash-only job keeps it)
+  const washGoesWithBody = off('ext_body') && ctx.exteriorBody !== 'no' && !ctx.pressureWashSqft;
+  if (ctx.prepWork.includes('power_washing') && !off('power_washing') && !washGoesWithBody) {
     const pwSqft = ctx.projectType === 'interior' ? 0 : ctx.pressureWashSqft || sqft;
     const pwAmount = Math.max(pwSqft * BASE_RATES.prep.power_washing, BASE_RATES.prep.power_washing_minimum);
     lineItems.push({ category: 'Prep Work', description: ctx.pressureWashSqft ? `Pressure Washing (${pwSqft} sq ft)` : 'Power Washing', amount: pwAmount * regionalMult, key: 'power_washing' });

@@ -1,6 +1,7 @@
-import type { CSSProperties } from 'react';
+import { useState, type CSSProperties } from 'react';
 import type { Assumption } from '../../lib/chatEstimator/defaultAssumptions';
-import type { PriceEditorView, EditorRow } from '../../lib/priceEditing';
+import type { EstimatorContext } from '../../lib/types';
+import type { PriceEditorView, EditorRow, FieldDef } from '../../lib/priceEditing';
 
 const currency = (n: number) =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n);
@@ -16,27 +17,36 @@ interface Props {
   disabled?: boolean;
   onToggleItem: (key: string) => void;
   onToggleRoom: (key: string) => void;
+  onSetField: (field: keyof EstimatorContext, value: string | number | null) => void;
   onReset: () => void;
 }
 
-const toggleStyle = (removed: boolean, disabled: boolean): CSSProperties => ({
-  marginLeft: 10,
-  padding: '3px 10px',
-  borderRadius: 999,
-  fontSize: '0.74rem',
-  fontWeight: 700,
-  border: `1px solid ${removed ? 'var(--accent-blue)' : 'var(--border-strong)'}`,
-  background: removed ? 'rgba(116, 185, 255, 0.12)' : 'transparent',
-  color: removed ? 'var(--accent-blue)' : 'var(--text-secondary)',
+const linkStyle = (disabled: boolean): CSSProperties => ({
+  background: 'none',
+  border: 'none',
+  padding: 0,
+  marginLeft: 12,
+  fontSize: '0.78rem',
+  color: disabled ? 'var(--text-faint)' : 'var(--accent-blue)',
   cursor: disabled ? 'not-allowed' : 'pointer',
-  opacity: disabled ? 0.5 : 1,
+  textDecoration: 'underline',
   whiteSpace: 'nowrap',
 });
 
-/** The "Price Breakdown" panel: main items and rooms can be taken off and added back; surcharges recalculate on their own. */
-export default function PriceBreakdown({ view, assumptions, canEdit, edited, disabled, onToggleItem, onToggleRoom, onReset }: Props) {
+const inputStyle: CSSProperties = {
+  padding: '6px 8px',
+  borderRadius: 6,
+  border: '1px solid var(--border-strong)',
+  background: 'var(--bg-page)',
+  color: 'var(--text-primary)',
+  fontSize: '0.85rem',
+};
+
+/** The "Price Breakdown" panel: main items and rooms have small "edit" and "remove" links; surcharges recalculate on their own. */
+export default function PriceBreakdown({ view, assumptions, canEdit, edited, disabled, onToggleItem, onToggleRoom, onSetField, onReset }: Props) {
   const { current, rows, rooms, originalTotal, canRemoveMore } = view;
   const estimate = current.estimate;
+  const [openEdit, setOpenEdit] = useState<string | null>(null);
 
   const rowByKey = new Map<string, EditorRow>(rows.map((r) => [r.key, r]));
   const grouped: Record<string, { key?: string; description: string; amount: number; removedRow?: EditorRow }[]> = {};
@@ -47,19 +57,68 @@ export default function PriceBreakdown({ view, assumptions, canEdit, edited, dis
     if (r.removed) (grouped[r.category] ??= []).push({ key: r.key, description: r.label, amount: r.amount, removedRow: r });
   }
 
-  const renderToggle = (row: EditorRow | undefined) => {
+  const fieldValue = (f: FieldDef): string => {
+    const v = current.ctx[f.field] as unknown;
+    return v === null || v === undefined ? '' : String(v);
+  };
+
+  const renderField = (f: FieldDef) => (
+    <label key={String(f.field)} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+      <span style={{ minWidth: 130 }}>{f.label}</span>
+      {f.kind === 'select' ? (
+        <select
+          value={fieldValue(f)}
+          disabled={disabled}
+          style={inputStyle}
+          onChange={(e) => onSetField(f.field, f.numeric ? Number(e.target.value) : e.target.value)}
+        >
+          {fieldValue(f) === '' && <option value="">—</option>}
+          {f.options?.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
+      ) : (
+        <input
+          type="number"
+          min={f.min}
+          max={f.max}
+          disabled={disabled}
+          value={fieldValue(f)}
+          style={{ ...inputStyle, width: 90 }}
+          onChange={(e) => {
+            const raw = e.target.value;
+            if (raw === '') return onSetField(f.field, null);
+            const n = Number(raw);
+            if (Number.isFinite(n)) onSetField(f.field, Math.min(f.max ?? n, Math.max(f.min ?? n, Math.round(n))));
+          }}
+        />
+      )}
+    </label>
+  );
+
+  const renderLinks = (row: EditorRow | undefined) => {
     if (!canEdit || !row) return null;
     const blocked = !row.removed && !canRemoveMore;
     return (
-      <button
-        type="button"
-        disabled={disabled || blocked}
-        title={blocked ? 'At least one item has to stay on the price.' : undefined}
-        style={toggleStyle(row.removed, !!disabled || blocked)}
-        onClick={() => onToggleItem(row.key)}
-      >
-        {row.removed ? `Add back ${signed(row.change)}` : `Take off ${signed(row.change)}`}
-      </button>
+      <>
+        {!row.removed && row.fields.length > 0 && (
+          <button type="button" disabled={disabled} style={linkStyle(!!disabled)} onClick={() => setOpenEdit(openEdit === row.key ? null : row.key)}>
+            {openEdit === row.key ? 'done' : 'edit'}
+          </button>
+        )}
+        <button
+          type="button"
+          disabled={disabled || blocked}
+          title={blocked ? 'At least one item has to stay on the price.' : `${row.removed ? 'Adds' : 'Saves'} ${currency(Math.abs(row.change))} on the total`}
+          style={linkStyle(!!disabled || blocked)}
+          onClick={() => {
+            setOpenEdit(null);
+            onToggleItem(row.key);
+          }}
+        >
+          {row.removed ? `add back (${signed(row.change)})` : `remove (${signed(row.change)})`}
+        </button>
+      </>
     );
   };
 
@@ -67,14 +126,15 @@ export default function PriceBreakdown({ view, assumptions, canEdit, edited, dis
     <div className="breakdown-panel">
       {canEdit && (
         <div style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', marginBottom: 14, lineHeight: 1.5 }}>
-          Changed your mind? Take a room or item off to see the new price right away, and add it back any time.
-          Surcharges and adjustments are recalculated for you. The amount shown on each button includes the surcharges that applied to that
-          item, and it can differ from the item's own line: a smaller job can lose the multi-room rate, need extra masking, or reach the
-          minimum service charge.
+          Changed your mind? Use <strong>edit</strong> or <strong>remove</strong> next to any main item and the price updates right away.
+          Anything that only exists because of that item goes with it (taking off the siding also takes off its power washing, and so on),
+          and surcharges and adjustments are recalculated. The amount in each link includes the surcharges that applied to that item, so
+          it can differ from the item's own line: a smaller job can lose the multi-room rate, need extra masking, or reach the minimum
+          service charge.
           {edited && (
             <>
               {' '}
-              <button type="button" onClick={onReset} style={{ background: 'none', border: 'none', color: 'var(--accent-blue)', cursor: 'pointer', padding: 0, fontSize: 'inherit' }}>
+              <button type="button" onClick={onReset} style={{ background: 'none', border: 'none', color: 'var(--accent-blue)', cursor: 'pointer', padding: 0, fontSize: 'inherit', textDecoration: 'underline' }}>
                 Reset to the original price ({currency(originalTotal)})
               </button>
             </>
@@ -91,13 +151,8 @@ export default function PriceBreakdown({ view, assumptions, canEdit, edited, dis
               <div key={r.key} className="breakdown-line" style={{ opacity: r.removed ? 0.55 : 1 }}>
                 <span className="breakdown-line-desc" style={{ textDecoration: r.removed ? 'line-through' : 'none' }}>{r.label}</span>
                 <span className="breakdown-line-amt">
-                  <button
-                    type="button"
-                    disabled={disabled || blocked}
-                    style={toggleStyle(r.removed, !!disabled || blocked)}
-                    onClick={() => onToggleRoom(r.key)}
-                  >
-                    {r.removed ? `Add back ${signed(r.change)}` : `Take off ${signed(r.change)}`}
+                  <button type="button" disabled={disabled || blocked} style={linkStyle(!!disabled || blocked)} onClick={() => onToggleRoom(r.key)}>
+                    {r.removed ? `add back (${signed(r.change)})` : `remove (${signed(r.change)})`}
                   </button>
                 </span>
               </div>
@@ -116,12 +171,24 @@ export default function PriceBreakdown({ view, assumptions, canEdit, edited, dis
             const row = li.key ? rowByKey.get(li.key) : undefined;
             const removed = !!li.removedRow;
             return (
-              <div key={`${li.key ?? 'x'}-${i}`} className="breakdown-line" style={{ opacity: removed ? 0.55 : 1 }}>
-                <span className="breakdown-line-desc" style={{ textDecoration: removed ? 'line-through' : 'none' }}>{li.description}</span>
-                <span className="breakdown-line-amt">
-                  <span style={{ textDecoration: removed ? 'line-through' : 'none' }}>{currency(li.amount)}</span>
-                  {renderToggle(row)}
-                </span>
+              <div key={`${li.key ?? 'x'}-${i}`}>
+                <div className="breakdown-line" style={{ opacity: removed ? 0.55 : 1 }}>
+                  <span className="breakdown-line-desc" style={{ textDecoration: removed ? 'line-through' : 'none' }}>{li.description}</span>
+                  <span className="breakdown-line-amt">
+                    <span style={{ textDecoration: removed ? 'line-through' : 'none' }}>{currency(li.amount)}</span>
+                    {renderLinks(row)}
+                  </span>
+                </div>
+                {canEdit && row && row.alsoAffects.length > 0 && (
+                  <div style={{ fontSize: '0.74rem', color: 'var(--text-faint)', margin: '-2px 0 6px 2px' }}>
+                    {row.removed ? 'Adds back with it' : 'Also removes'}: {row.alsoAffects.join(', ')}
+                  </div>
+                )}
+                {canEdit && row && openEdit === row.key && !row.removed && (
+                  <div style={{ display: 'grid', gap: 8, padding: '8px 10px', margin: '2px 0 8px', background: 'var(--bg-page)', borderRadius: 8 }}>
+                    {row.fields.map(renderField)}
+                  </div>
+                )}
               </div>
             );
           })}

@@ -65,9 +65,10 @@ const QuoteResults = () => {
   const [breakdownOpen, setBreakdownOpen] = useState(false);
 
   // Price editing: rooms and main items the customer takes off (and adds back) after seeing the price.
-  const [edits, setEdits] = useState<{ rooms: string[]; items: string[] }>({
+  const [edits, setEdits] = useState<{ rooms: string[]; items: string[]; fields: Partial<EstimatorContext> }>({
     rooms: state?.ctx.excludedRooms ?? [],
     items: state?.ctx.excludedItems ?? [],
+    fields: {},
   });
   const editBase = useMemo(
     () => (state && state.transcript ? baseFromResult({ ctx: state.ctx, transcript: state.transcript, loyaltyDiscountPercent: state.loyaltyDiscountPercent }) : null),
@@ -75,7 +76,7 @@ const QuoteResults = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [state?.transcript],
   );
-  const view = useMemo(() => (editBase ? buildPriceEditor(editBase, edits.rooms, edits.items) : null), [editBase, edits]);
+  const view = useMemo(() => (editBase ? buildPriceEditor(editBase, edits.rooms, edits.items, edits.fields) : null), [editBase, edits]);
   // Older saved prices don't carry the wording they were built from, so they show as before and can't be edited.
   const shownView = useMemo(
     () =>
@@ -93,7 +94,7 @@ const QuoteResults = () => {
   );
   const liveEstimate: EstimateBreakdown | undefined = view?.current.estimate ?? state?.estimate;
   const liveCtx: EstimatorContext | undefined = view?.current.ctx ?? state?.ctx;
-  const edited = edits.rooms.length > 0 || edits.items.length > 0;
+  const edited = edits.rooms.length > 0 || edits.items.length > 0 || Object.keys(edits.fields).length > 0;
 
   // Reuse the persisted expiry rather than resetting the clock on every
   // mount — otherwise a back/forward navigation back to this page would
@@ -270,7 +271,8 @@ const QuoteResults = () => {
           disabled={expired}
           onToggleItem={(key) => { hapticMedium(); setEdits((e) => ({ ...e, items: e.items.includes(key) ? e.items.filter((k) => k !== key) : [...e.items, key] })); }}
           onToggleRoom={(key) => { hapticMedium(); setEdits((e) => ({ ...e, rooms: e.rooms.includes(key) ? e.rooms.filter((k) => k !== key) : [...e.rooms, key] })); }}
-          onReset={() => setEdits({ rooms: [], items: [] })}
+          onSetField={(field, value) => { setEdits((e) => ({ ...e, fields: { ...e.fields, [field]: value } as Partial<EstimatorContext> })); }}
+          onReset={() => setEdits({ rooms: [], items: [], fields: {} })}
         />
       )}
 

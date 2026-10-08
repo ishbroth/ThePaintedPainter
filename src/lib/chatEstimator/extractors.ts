@@ -377,6 +377,9 @@ export function extractTimeline(text: string): 'asap' | 'this_month' | 'no_rush'
   if (/\b(asap|urgent|as soon as possible|this week|next week|(?:this|next) weekend|by (?:next )?weekend|rush|need(?:s|ed)? (?:it |this )?done (?:now|immediately|next week)|right away)\b/.test(t)) {
     return 'asap';
   }
+  if (/\b(?:a\s+)?(?:few|couple(?: of)?|several)\s+months?\b|\bnext\s+(?:two|three|2|3|few)\s+months\b/.test(t)) {
+    return 'no_rush';
+  }
   if (/\b(this month|within a month|next few weeks|couple weeks|next month|mid[\s-]?(?:month|\w+)|end of the month|before (?:the )?holidays?|before (?:thanksgiving|christmas))\b/.test(t)) {
     return 'this_month';
   }
@@ -1070,7 +1073,7 @@ export function extractAll(text: string, prev: EstimatorContext, lastBotTopicId:
     if (n && n > 0 && n < 30) {
       patch.popcornCeilingRooms = n;
       acks.push(`${n} room${n === 1 ? '' : 's'} of popcorn removal`);
-    } else if (/\b(throughout|most of|all (?:over|of)|entire|whole house|every room)\b/i.test(text)) {
+    } else if (/\b(throughout|most(?: of)?(?: the| them| rooms)?|all (?:over|of)|all (?:the )?rooms|everywhere|entire|whole house|every room)\b/i.test(text)) {
       const bedroomEstimate = patch.bedroomCount ?? prev.bedroomCount;
       patch.popcornCeilingRooms = (bedroomEstimate ?? 3) + 3;
       acks.push('most of the house');
@@ -1615,7 +1618,8 @@ export function extractAll(text: string, prev: EstimatorContext, lastBotTopicId:
   const scopeBlockedBy = ['trim_scope', 'condition', 'property_ownership', 'color_change', 'location', 'timeline_and_access', 'commercial_access', 'siding', 'stories', 'house_size', 'room_size', 'reno_context', 'popcorn_extent'];
   const surf = lastBotTopicId && scopeBlockedBy.includes(lastBotTopicId) ? ({} as ReturnType<typeof extractSurfaceScope>) : extractSurfaceScope(text);
   // A plain list as the answer to "which surfaces?" ("walls", "walls and ceilings", "walls ceilings trim") means exactly those.
-  if (lastBotTopicId === 'surfaces' && surf.walls === undefined && surf.ceilings === undefined && surf.trim === undefined && surf.doors === undefined) {
+  const onlySurfaceWords = /^\s*(?:(?:just|only|and|the|with|plus|also|,|&|\+)\s*)*(?:(?:walls?|ceilings?|trim|baseboards?|doors?)\s*(?:,|and|&|\+|\/)?\s*)+[.!]?\s*$/i.test(text);
+  if ((lastBotTopicId === 'surfaces' || onlySurfaceWords) && !surf.everything) {
     const low = text.toLowerCase();
     const w = /\bwalls?\b/.test(low), c = /\bceilings?\b/.test(low), tr = /\b(trim|baseboards?|casings?|molding|moulding)\b/.test(low), d = /\bdoors?\b/.test(low);
     if (/\b(everything|all of it|the works|full (?:package|scope)|the whole (?:thing|room)|the usual|standard)\b/.test(low)) {
@@ -1634,7 +1638,10 @@ export function extractAll(text: string, prev: EstimatorContext, lastBotTopicId:
   if (surf.doors !== undefined) patch.interiorDoors = surf.doors === 'yes' ? 'some' : 'none';
   if (surf.closets !== undefined) patch.closets = surf.closets === 'yes' ? 'standard' : 'none';
   if (surf.everything) acks.push('whole room');
-  if (surf.walls === 'yes' && surf.trim === 'no') acks.push('walls only');
+  if (surf.walls === 'yes' && surf.trim === 'no') {
+    const named = [surf.walls === 'yes' ? 'walls' : '', surf.ceilings === 'yes' ? 'ceilings' : '', surf.doors === 'yes' ? 'doors' : ''].filter(Boolean);
+    acks.push(named.length === 1 ? 'walls only' : named.join(' and ') + ', no trim');
+  }
   if (
     surf.walls !== undefined || surf.ceilings !== undefined || surf.trim !== undefined ||
     surf.doors !== undefined || surf.everything
