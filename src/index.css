@@ -200,10 +200,11 @@ img {
   cursor: pointer;
 }
 
-/* Hero background: the whole collage (the houses around Superman) as a translucent image stretched to fill the screen (a little
-   past the edges is fine). It starts at the very top of the page, where the header is, and moves in proportion to how far the
-   page is scrolled: SiteBackground sets --hero-w / --hero-h (its size), --hero-shift (how far it has moved up) and
-   --hero-spacer (where the estimator card starts, just under Superman's body). A pre-blurred copy fills any gap. */
+/* Hero background: the whole collage (the houses around Superman) as a translucent image at its true proportions, scaled so its
+   width fills the screen and spills a little past both sides (and usually past the bottom). It starts at the very top of the
+   page, where the header is, and moves up in proportion to how far the page is scrolled. SiteBackground sets --hero-size (its
+   side), --hero-shift (how far it has moved up) and --hero-spacer (where the estimator card starts, under Superman's body).
+   A pre-blurred copy fills any gap on tall, narrow screens. */
 .site-hero-bg {
   position: fixed;
   inset: 0;
@@ -224,10 +225,10 @@ img {
   position: absolute;
   top: 0;
   left: 50%;
-  width: var(--hero-w, 120vw);
-  height: var(--hero-h, 112vh);
-  margin-left: calc(var(--hero-w, 120vw) / -2);
-  /* stretched on purpose: it fills the box even when the proportions aren't exact */
+  /* a square, so the collage keeps its true proportions; a little wider than the screen, centred on Superman */
+  width: var(--hero-size, 106vw);
+  height: var(--hero-size, 106vw);
+  margin-left: calc(var(--hero-size, 106vw) / -2);
   background: url('/hero-collage.jpg') 0 0 / 100% 100% no-repeat;
   transform: translate3d(0, var(--hero-shift, 0px), 0);
   will-change: transform;
