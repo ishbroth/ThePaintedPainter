@@ -22,6 +22,7 @@ import { calculateEstimate } from '../estimateEngine';
 import { supabase } from '../supabase';
 import { extractAll, extractPhotoTriggers, extractTimeline, extractPropertyType, extractAccessSignals, extractZip, extractSquareFeet } from './extractors';
 import { getStateFromZip } from '../zipCodeData';
+import { hasScopeLimiter } from './scopeWords';
 import { isDenial, denialIsAboutScope, topicLabel, recentRecognized, recapSentence } from './clarify';
 import { extractTiming, timelineFromStart } from './dateParsing';
 import { defaultAssumptions, applyAssumptions, type Assumption } from './defaultAssumptions';
@@ -404,13 +405,34 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
   const ctxWithExplicit: EstimatorContext = { ...state.ctx, ...patch };
 
   // A reading of the message that isn't supported by anything the customer actually said gets undone, not priced.
-  const surfaceWords = /(wall|ceiling|trim|baseboard|door|everything|whole|entire|full|all of it|the works|window|cabinet|stair|rail|molding|moulding)/i;
-  if (!state.ctx.surfacesAddressed && ctxWithExplicit.surfacesAddressed && !surfaceWords.test(trimmed) && state.lastBotTopic?.id !== 'surfaces') {
-    ctxWithExplicit.surfacesAddressed = false;
-    ctxWithExplicit.interiorWalls = state.ctx.interiorWalls;
-    ctxWithExplicit.interiorCeilings = state.ctx.interiorCeilings;
-    ctxWithExplicit.interiorTrim = state.ctx.interiorTrim;
-    ctxWithExplicit.interiorDoors = state.ctx.interiorDoors;
+  // Surfaces: a surface can only be switched OFF by a message that names it (or limits the scope: "only", "just", "walls only"),
+  // and the whole scope only counts as answered when the customer actually covered it. "No trim" says nothing about the ceilings.
+  {
+    const low = trimmed.toLowerCase();
+    const named = {
+      walls: /\bwalls?\b/.test(low),
+      ceilings: /\bceilings?\b/.test(low),
+      trim: /\b(trim|baseboards?|casings?|molding|moulding)\b/.test(low),
+      doors: /\bdoors?\b/.test(low),
+    };
+    const limiter = hasScopeLimiter(trimmed) || /\b(everything|all of it|the works|full package|whole (?:thing|room|house|place))\b/.test(low);
+    const answeringSurfaces = state.lastBotTopic?.id === 'surfaces';
+    const flips: Array<[keyof EstimatorContext, string, keyof typeof named]> = [
+      ['interiorWalls', 'no', 'walls'], ['interiorCeilings', 'no', 'ceilings'], ['interiorTrim', 'no', 'trim'], ['interiorDoors', 'none', 'doors'],
+    ];
+    for (const [field, off, word] of flips) {
+      if (ctxWithExplicit[field] === off && state.ctx[field] !== off && !named[word] && !limiter && !answeringSurfaces) {
+        (ctxWithExplicit as unknown as Record<string, unknown>)[field] = state.ctx[field];
+      }
+    }
+    if (!state.ctx.surfacesAddressed && ctxWithExplicit.surfacesAddressed && !answeringSurfaces && !limiter && !(named.walls && named.ceilings)) {
+      ctxWithExplicit.surfacesAddressed = false;
+    }
+    // Mentioning the ceilings as something to paint puts them in scope, whatever else was assumed.
+    const negatesCeiling = /\b(?:no|not|without|skip|except|excluding|leave|don'?t (?:paint|do|need))\s+(?:the\s+|any\s+|our\s+)?(?:\w+\s+)?ceilings?\b/.test(low);
+    if (named.ceilings && !negatesCeiling && ctxWithExplicit.interiorCeilings === 'no' && !/\bremov|scrape|popcorn\b/.test(low)) {
+      ctxWithExplicit.interiorCeilings = 'yes';
+    }
   }
   if (state.ctx.exteriorColorChange !== 'different' && ctxWithExplicit.exteriorColorChange === 'different' && !/(exterior|outside|siding|stucco|brick|house color|front|fence|deck|shutter|fascia)/i.test(trimmed)) {
     ctxWithExplicit.exteriorColorChange = state.ctx.exteriorColorChange;
@@ -669,6 +691,21 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
       s = { ...s, retriedIds: [...s.retriedIds, s.lastBotTopic.id] };
     }
     return await advanceAfterUncertainty(s, customerId);
+  }
+
+  // A partial scope answer ("no trim") leaves the ceilings and doors open: ask about those now, once, instead of assuming.
+  if (
+    s.lastBotTopic?.id === 'surfaces' &&
+    !s.lastBotTopic.alreadyAnswered(ctxNext) &&
+    !(s.clarifiedIds ?? []).includes('surfaces') &&
+    (ctxNext.interiorTrim === 'no' || ctxNext.interiorCeilings === 'no' || ctxNext.interiorDoors === 'none')
+  ) {
+    s = {
+      ...s,
+      clarifiedIds: [...(s.clarifiedIds ?? []), 'surfaces'],
+      history: [...s.history, botMessage(s.lastBotTopic.ask(ctxNext))],
+    };
+    return { state: s, done: null };
   }
 
   // A reply that matched nothing and doesn't answer the question: ask what they meant (once per topic) with what we

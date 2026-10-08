@@ -55,6 +55,8 @@ export interface EstimatorContext {
   stairwayDetails: string; // walls_only, walls_and_railings, full
   interiorShutters: string; // yes, no, skip
   interiorColorChange: string; // same, different, dramatic
+  /** The ceiling's own color change when it differs from the walls ("walls same color, ceiling dark to light"). */
+  ceilingColorChange: string; // '' (follows the walls), same, different, dramatic
   // Refines the default "different color = whole space, one new color"
   // assumption once a customer volunteers more detail. Deliberately not a
   // standing question — see topics.ts `color_scope_clarify` for why.

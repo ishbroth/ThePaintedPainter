@@ -88,6 +88,14 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
         amount: ceilingSqFt * ceilingRate * regionalMult * volEff,
         key: 'ceilings',
       });
+      // A ceiling going to a new color (or dark to light) needs an extra coat even when the walls stay the same color.
+      if (ctx.ceilingColorChange === 'different' || ctx.ceilingColorChange === 'dramatic') {
+        lineItems.push({
+          category: 'Interior',
+          description: ctx.ceilingColorChange === 'dramatic' ? 'Ceiling Color Change (dark to light, extra coats)' : 'Ceiling Color Change (extra coat)',
+          amount: ceilingSqFt * ceilingRate * (ctx.ceilingColorChange === 'dramatic' ? 0.5 : 0.3) * regionalMult * volEff,
+        });
+      }
     }
 
     // Trim & Baseboards

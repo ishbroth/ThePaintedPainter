@@ -239,12 +239,16 @@ export const TOPICS: Topic[] = [
       // see the field comments in types.ts.
       c.surfacesAddressed ||
       c.interiorWalls === 'no' ||
-      c.interiorCeilings === 'no' ||
-      c.interiorTrim === 'no' ||
-      c.interiorDoors === 'none' ||
       c.additionalDetails.toLowerCase().includes('walls only') ||
       c.additionalDetails.toLowerCase().includes('whole room'),
     ask: (c) => {
+      // Part of the answer is known ("no trim"): ask about the rest instead of assuming walls only.
+      if (c.interiorTrim === 'no' && c.interiorCeilings !== 'no' && c.interiorDoors !== 'none') {
+        return "No trim, got it. What about the ceilings and the doors — are those getting painted, or staying as they are?";
+      }
+      if (c.interiorCeilings === 'no' && c.interiorTrim !== 'no') {
+        return "No ceilings, got it. And the trim and doors — painted too, or staying as they are?";
+      }
       const singular = c.selectedRooms.length === 1;
       const hasKitchen = c.selectedRooms.includes('kitchen');
       if (hasKitchen) {

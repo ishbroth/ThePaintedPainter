@@ -14,7 +14,7 @@ export function makeInitialContext(): EstimatorContext {
     doorFrames: 'no', interiorWindows: 'none', windowCount: null, windowTypes: [],
     cabinets: 'none', cabinetLocations: [], closets: 'none', closetCount: null,
     stairways: 'none', stairwayCount: null, stairwayDetails: '', interiorShutters: 'no',
-    interiorColorChange: '',
+    interiorColorChange: '', ceilingColorChange: '',
     colorChangeScope: '', colorChangeExcludedRoomCount: null, colorCount: null, colorClarificationNeeded: '',
     multiPhaseRequested: '',
     trimLinearFeet: null, crownLinearFeet: null, accentWallCount: null, stairRailFeet: null, popcornCeilingSqft: null,

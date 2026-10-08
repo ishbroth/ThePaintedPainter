@@ -340,7 +340,9 @@ export function derive(ctx: EstimatorContext, transcript: string): Derivation[] 
     if ((negated.has('trim') || negated.has('baseboard')) && ctx.interiorTrim !== 'no') neg.interiorTrim = 'no';
     if (negated.has('door') && ctx.interiorDoors !== 'none') neg.interiorDoors = 'none';
     if (negated.has('window') && ctx.interiorWindows !== 'none') neg.interiorWindows = 'none';
-    if (Object.keys(neg).length > 0) out.push({ patch: { ...neg, surfacesAddressed: true }, reason: 'Customer ruled out surfaces' });
+    // ruling out the walls, or several surfaces, settles the scope; ruling out only the trim (say) leaves the ceilings and doors open
+    const settles = neg.interiorWalls === 'no' || Object.keys(neg).length >= 2;
+    if (Object.keys(neg).length > 0) out.push({ patch: { ...neg, ...(settles ? { surfacesAddressed: true } : {}) }, reason: 'Customer ruled out surfaces' });
   }
   const tNeg = t.replace(negRe, ' ');
   const hasOnly = hasScopeLimiter(t);
@@ -418,6 +420,24 @@ export function derive(ctx: EstimatorContext, transcript: string): Derivation[] 
       out.push({ patch: { exteriorBody: 'no', projectType: ctx.projectType || 'exterior' }, reason: 'Only specific exterior features → no house-body painting' });
     } else if (features && bodyWords) {
       out.push({ patch: { exteriorBody: 'yes' }, reason: 'Whole exterior including features' });
+    }
+  }
+
+  // The ceiling can change color differently from the walls ("walls same color, ceiling dark to light")
+  if (ctx.ceilingColorChange === '' && /\bceilings?\b/.test(t)) {
+    const cm = t.match(/\bceilings?\b[^.;\n]{0,45}?(dark(?:er)?\s+to\s+(?:light|white)|light(?:er)?\s+to\s+dark|dramatic|black\s+to\s+white|navy\s+to\s+white)/);
+    const cd = !cm && t.match(/\bceilings?\b[^.;\n]{0,40}?(different\s+colou?r|new\s+colou?r|a\s+new\s+shade|going\s+(?:to\s+)?(?:a\s+)?(?:white|black|blue|grey|gray))/);
+    const cs = !cm && !cd && t.match(/\bceilings?\b[^.;\n]{0,30}?(same\s+colou?r|staying|keep)/);
+    if (cm || cd || cs) {
+      const wallsSame = /\bwalls?\b[^.;\n]{0,30}?(same\s+colou?r|staying|keep|no\s+change)/.test(t);
+      out.push({
+        patch: {
+          ceilingColorChange: cm ? 'dramatic' : cd ? 'different' : 'same',
+          interiorCeilings: 'yes',
+          ...(wallsSame && ctx.interiorColorChange !== 'same' ? { interiorColorChange: 'same' } : {}),
+        },
+        reason: 'Ceiling color change read separately from the walls',
+      });
     }
   }
 

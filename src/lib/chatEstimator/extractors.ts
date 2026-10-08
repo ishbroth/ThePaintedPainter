@@ -157,6 +157,8 @@ export function extractCabinets(text: string): { yes: boolean; locations: string
 
 export function extractColorChange(text: string): 'same' | 'different' | 'dramatic' | null {
   const t = text.toLowerCase();
+  // "walls same color, ceiling dark to light": the dramatic change belongs to the ceiling, not the walls
+  if (/\bceilings?\b[^.;\n]{0,45}?(dark(?:er)?\s+to\s+(?:light|white)|light(?:er)?\s+to\s+dark|dramatic)/.test(t) && /\bwalls?\b[^.;\n]{0,30}?(same\s+(?:\w+\s+)?colou?r|staying|keep|no\s+change)/.test(t)) return 'same';
   if (/\b(dark\s+to\s+light|light\s+to\s+dark|black\s+to\s+white|white\s+to\s+black|dramatic(?:ally)?\s+(?:change|different))\b/.test(t)) return 'dramatic';
   if (/\b(different\s+color|new\s+color|change\s+the\s+color|changing\s+color|different\s+one|something\s+(?:new|different)|a\s+(?:new|different)\s+(?:shade|one|paint)|going\s+(?:from\s+[\w\s-]{2,30}\s+)?to\s+(?:a\s+|an\s+)?(?:\w+\s+)?(?:white|grey|gray|beige|tan|blue|green|navy|black|red|yellow|cream|color|shade|dark|light|darker|lighter|bold|brighter)|changing\s+(?:it\s+)?(?:from\s+[\w\s-]{2,30}\s+)?to|switching\s+to|painting\s+it\s+(?:a\s+)?(?:new|different)|repainting\s+(?:it\s+)?(?:a\s+)?(?:new|different))\b/.test(t)) return 'different';
   if (/\b(same\s+(?:\w+\s+)?colou?r|same\s+(?:white|beige|grey|gray|tan|cream)|match(?:ing)?\s+(?:the\s+)?(?:existing|current)|keep(?:ing)?\s+(?:the\s+)?(?:same|current|existing)|no\s+colou?r\s+change|not\s+changing\s+(?:the\s+)?colou?r|staying\s+(?:the\s+)?same|just\s+(?:a\s+)?(?:fresh coat|refresh|touch[\s-]?up))\b/.test(t)) return 'same';
@@ -1624,9 +1626,46 @@ export function extractAll(text: string, prev: EstimatorContext, lastBotTopicId:
   const surf = lastBotTopicId && scopeBlockedBy.includes(lastBotTopicId) ? ({} as ReturnType<typeof extractSurfaceScope>) : extractSurfaceScope(text);
   // A plain list as the answer to "which surfaces?" ("walls", "walls and ceilings", "walls ceilings trim") means exactly those.
   const onlySurfaceWords = /^\s*(?:(?:just|only|and|the|with|plus|also|,|&|\+)\s*)*(?:(?:walls?|ceilings?|trim|baseboards?|doors?)\s*(?:,|and|&|\+|\/)?\s*)+[.!]?\s*$/i.test(text);
+  let listParsed = false;
   if ((lastBotTopicId === 'surfaces' || onlySurfaceWords) && !surf.everything) {
     const low = text.toLowerCase();
-    const w = /\bwalls?\b/.test(low), c = /\bceilings?\b/.test(low), tr = /\b(trim|baseboards?|casings?|molding|moulding)\b/.test(low), d = /\bdoors?\b/.test(low);
+    // earlier the customer already ruled something out ("no trim"): this reply only adds to that, it doesn't restate the whole scope
+    const partialMode = lastBotTopicId === 'surfaces' && !prev.surfacesAddressed && (prev.interiorTrim === 'no' || prev.interiorCeilings === 'no' || prev.interiorDoors === 'none');
+    const negatedPartial = (word: string) =>
+      new RegExp('\\b(?:no|not|without|skip|except|leave|keep)\\s+(?:the\\s+|any\\s+|our\\s+)?' + word + '\\b').test(low) ||
+      new RegExp('\\b' + word + '\\s+(?:can\\s+)?(?:stay|stays|remain|as[\\s-]is|untouched|skipped|are\\s+fine|is\\s+fine|not\\s+included)\\b').test(low);
+    if (partialMode) {
+      const pw = /\bceilings?\b/.test(low), pd = /\bdoors?\b/.test(low), ptr = /\b(trim|baseboards?|casings?)\b/.test(low);
+      const refusal = /^\s*(?:no|nope|nah|neither|none|skip (?:them|those|it)|leave (?:them|it|those)|as[\s-]is|not needed|just the walls|walls only)\b/.test(low);
+      if (refusal) {
+        surf.ceilings = 'no'; surf.doors = 'no'; surf.trim = 'no';
+      } else {
+        if (pw && !negatedPartial('ceilings?')) surf.ceilings = 'yes';
+        if (pd && !negatedPartial('doors?')) surf.doors = 'yes';
+        if (ptr && !negatedPartial('(?:trim|baseboards?|casings?)')) surf.trim = 'yes';
+        if (pw && negatedPartial('ceilings?')) surf.ceilings = 'no';
+        if (pd && negatedPartial('doors?')) surf.doors = 'no';
+        if (/\b(both|all|everything|yes|yeah|yep|sure)\b/.test(low) && !pw && !pd) { surf.ceilings = 'yes'; surf.doors = 'yes'; }
+        if (/\bno\s+(?:the\s+)?ceilings?\b|\bwithout\s+(?:the\s+)?ceilings?\b/.test(low)) surf.ceilings = 'no';
+        if (/\bno\s+(?:the\s+)?doors?\b|\bwithout\s+(?:the\s+)?doors?\b/.test(low)) surf.doors = 'no';
+      }
+      listParsed = true;
+    } else {
+    const NEG = "(?:no|not|without|skip|except|excluding|don'?t (?:paint|do|need)(?: the)?)\\s+(?:the\\s+|any\\s+|our\\s+)?(?:\\w+\\s+)?";
+    const named = (word: string) => new RegExp('\\b' + word + '\\b').test(low);
+    const negated = (word: string) =>
+      new RegExp('\\b' + NEG + word + '\\b').test(low) ||
+      new RegExp('\\b(?:leave|skip|keep|ignore)\\s+(?:the\\s+|our\\s+)?' + word + '\\b').test(low) ||
+      new RegExp('\\b' + word + '\\s+(?:can\\s+)?(?:stay|stays|remain|as[\\s-]is|untouched|skipped|are\\s+fine|is\\s+fine|not\\s+included)\\b').test(low);
+    const mentionW = named('walls?'), mentionC = named('ceilings?'), mentionTr = named('(?:trim|baseboards?|casings?|molding|moulding)'), mentionD = named('doors?');
+    const w = mentionW && !negated('walls?'), c = mentionC && !negated('ceilings?'), tr = mentionTr && !negated('(?:trim|baseboards?|casings?|molding|moulding)'), d = mentionD && !negated('doors?');
+    if (!w && !c && !tr && !d && (mentionW || mentionC || mentionTr || mentionD)) {
+      // only negations ("no trim"): rule those out and leave the rest of the scope open
+      if (mentionW) surf.walls = 'no';
+      if (mentionC) surf.ceilings = 'no';
+      if (mentionTr) surf.trim = 'no';
+      if (mentionD) surf.doors = 'no';
+    }
     if (/\b(everything|all of it|the works|full (?:package|scope)|the whole (?:thing|room)|the usual|standard)\b/.test(low)) {
       surf.everything = true;
       surf.walls = 'yes'; surf.ceilings = 'yes'; surf.trim = 'yes'; surf.doors = 'yes';
@@ -1635,6 +1674,8 @@ export function extractAll(text: string, prev: EstimatorContext, lastBotTopicId:
       surf.ceilings = c ? 'yes' : 'no';
       surf.trim = tr ? 'yes' : 'no';
       surf.doors = d ? 'yes' : 'no';
+      listParsed = true;
+    }
     }
   }
   if (surf.walls !== undefined) patch.interiorWalls = surf.walls;
@@ -1647,11 +1688,12 @@ export function extractAll(text: string, prev: EstimatorContext, lastBotTopicId:
     const named = [surf.walls === 'yes' ? 'walls' : '', surf.ceilings === 'yes' ? 'ceilings' : '', surf.doors === 'yes' ? 'doors' : ''].filter(Boolean);
     acks.push(named.length === 1 ? 'walls only' : named.join(' and ') + ', no trim');
   }
-  if (
-    surf.walls !== undefined || surf.ceilings !== undefined || surf.trim !== undefined ||
-    surf.doors !== undefined || surf.everything
-  ) {
+  const decidedWalls = surf.walls !== undefined || surf.everything;
+  const partialOnly = !listParsed && !decidedWalls && (surf.ceilings !== undefined || surf.trim !== undefined || surf.doors !== undefined);
+  if (listParsed || decidedWalls || (surf.ceilings !== undefined && surf.trim !== undefined)) {
     patch.surfacesAddressed = true;
+  } else if (partialOnly) {
+    // "no trim" alone doesn't say what happens to the ceilings and doors, so the surfaces question stays open
   } else if (!prev.surfacesAddressed) {
     // A plain narrative listing — e.g. "ceilings painted, walls painted,
     // trim and doors painted" — describes the full package just as clearly
