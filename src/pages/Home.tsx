@@ -60,9 +60,11 @@ const reviews = [
 const SmoothCarousel = ({
   triplets,
   speed = 30,
+  className = '',
 }: {
   triplets: typeof carousel1Triplets;
   speed?: number;
+  className?: string;
 }) => {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -88,7 +90,7 @@ const SmoothCarousel = ({
   const duplicatedTriplets = [...triplets, ...triplets];
 
   return (
-    <section className="carousel-section fade-in" ref={ref}>
+    <section className={`carousel-section fade-in ${className}`.trim()} ref={ref}>
       <div className="smooth-carousel-container">
         <div
           className="smooth-carousel-track"
@@ -135,7 +137,10 @@ const Home = () => {
 
   return (
     <div className="home-page">
-      {/* Superman hero (the fixed translucent background lives in SiteBackground). Leaves the first screen to Superman; the estimator starts below his body and just peeks into view */}
+      {/* The second carousel, moved to the top: its bottom edge sits at Superman's eye level (SiteBackground sets its height) */}
+      <SmoothCarousel triplets={carousel2Triplets} speed={35} className="hero-carousel" />
+
+      {/* Leaves the first screen to the picture; the first screen to Superman; the estimator starts below his body and just peeks into view */}
       <section className="hero-spacer" aria-hidden="true" />
 
       {/* AI Chat Estimator — replaces the old "Get a Free Painting Estimate" CTA card */}
@@ -178,11 +183,6 @@ const Home = () => {
           ))}
         </div>
       </section>
-
-      <div className="divider"></div>
-
-      {/* Carousel 2 */}
-      <SmoothCarousel triplets={carousel2Triplets} speed={35} />
 
       <div className="divider"></div>
 

@@ -5,6 +5,8 @@ import { useLocation } from 'react-router-dom';
 const WIDTH_OVER_SCREEN = 1.03;
 /** Where Superman's body ends, as a share of the picture's height (the estimator card starts around there). */
 const BODY_BOTTOM = 0.76;
+/** Where Superman's eyes begin (the brow line), as a share of the picture's height: the carousel's bottom edge sits there. */
+const EYE_LEVEL = 0.358;
 /** How far down the picture the bottom of the brush reaches (share of the picture's height); it has to stay on screen at the start. */
 const BRUSH_BOTTOM = 0.72;
 /** Extra nudge down, as a share of the screen height (about 54px on a 900px-tall screen). */
@@ -45,7 +47,10 @@ const SiteBackground = () => {
       // The estimator card starts just under Superman's body, but never above the middle of the screen (so a small scroll
       // is what brings it into view and starts the spoken intro) and never so low that none of it shows.
       const cardTop = Math.min(Math.max(size * BODY_BOTTOM + startShift + 8, screenHeight * 0.52), screenHeight * 0.86);
-      root.style.setProperty('--hero-spacer', `${Math.max(0, Math.round(cardTop - headerHeight - 40))}px`);
+      // the carousel under the header ends at Superman's eye level
+      const carouselHeight = Math.max(90, Math.round(size * EYE_LEVEL + startShift - headerHeight));
+      root.style.setProperty('--hero-carousel-h', `${carouselHeight}px`);
+      root.style.setProperty('--hero-spacer', `${Math.max(0, Math.round(cardTop - headerHeight - carouselHeight - 40))}px`);
       place();
     };
 

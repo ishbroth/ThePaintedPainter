@@ -238,6 +238,29 @@ img {
   opacity: 0.42;
 }
 
+/* The carousel at the top of the home page: starts right under the header and its bottom edge is at Superman's eye level,
+   so its height comes from SiteBackground (--hero-carousel-h). */
+.carousel-section.hero-carousel {
+  padding: 8px 0 0;
+  height: var(--hero-carousel-h, 200px);
+  box-sizing: border-box;
+}
+
+.hero-carousel .smooth-carousel-container,
+.hero-carousel .smooth-carousel-track,
+.hero-carousel .carousel-triplet,
+.hero-carousel .carousel-slide {
+  height: 100%;
+}
+
+.hero-carousel .carousel-slide {
+  width: calc(var(--hero-carousel-h, 200px) * 1.4);
+}
+
+.hero-carousel .carousel-slide img {
+  height: 100%;
+}
+
 /* Leaves the first screen to the picture; the estimator card starts under Superman's body, lower than the middle of the
    screen, so it peeks in at the bottom and a small scroll is what brings it past the middle (starting the spoken intro). */
 .hero-spacer {
