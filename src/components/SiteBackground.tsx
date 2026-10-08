@@ -2,11 +2,11 @@ import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 
 /** The picture is scaled (equal proportions) to a little wider than the screen, so the roller on the left and the brush on the right both stay in view. */
-const WIDTH_OVER_SCREEN = 1.06;
+const WIDTH_OVER_SCREEN = 1.03;
 /** Where Superman's body ends, as a share of the picture's height (the estimator card starts around there). */
 const BODY_BOTTOM = 0.76;
-/** Where the middle of the Superman panel sits on the screen at the start, as a share of the screen height. */
-const PANEL_CENTER_AT_START = 0.47;
+/** How far down the picture the bottom of the brush reaches (share of the picture's height); it has to stay on screen at the start. */
+const BRUSH_BOTTOM = 0.72;
 
 /**
  * The hero collage (Superman with the houses around him) as a translucent background.
@@ -35,8 +35,8 @@ const SiteBackground = () => {
       size = Math.round(window.innerWidth * WIDTH_OVER_SCREEN);
       root.style.setProperty('--hero-size', `${size}px`);
       const overhang = Math.max(0, size - screenHeight);
-      // taller than the screen: start with the Superman panel (roller and brush too) on screen instead of the top row of houses
-      startShift = overhang > 0 ? -Math.min(overhang, Math.max(0, size * 0.5 - screenHeight * PANEL_CENTER_AT_START)) : 0;
+      // taller than the screen: start as far down as possible (the most of the top row of houses) while the brush is still on screen
+      startShift = overhang > 0 ? -Math.min(overhang, Math.max(0, size * BRUSH_BOTTOM - screenHeight + 10)) : 0;
       const main = document.querySelector('main');
       const headerHeight = main ? Math.max(0, Math.round(main.getBoundingClientRect().top + window.scrollY)) : 0;
       // The estimator card starts just under Superman's body, but never above the middle of the screen (so a small scroll
