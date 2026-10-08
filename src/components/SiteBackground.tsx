@@ -7,6 +7,8 @@ const WIDTH_OVER_SCREEN = 1.03;
 const BODY_BOTTOM = 0.76;
 /** How far down the picture the bottom of the brush reaches (share of the picture's height); it has to stay on screen at the start. */
 const BRUSH_BOTTOM = 0.72;
+/** Extra nudge down, as a share of the screen height (about 54px on a 900px-tall screen). */
+const EXTRA_DOWN = 0.06;
 
 /**
  * The hero collage (Superman with the houses around him) as a translucent background.
@@ -36,7 +38,8 @@ const SiteBackground = () => {
       root.style.setProperty('--hero-size', `${size}px`);
       const overhang = Math.max(0, size - screenHeight);
       // taller than the screen: start as far down as possible (the most of the top row of houses) while the brush is still on screen
-      startShift = overhang > 0 ? -Math.min(overhang, Math.max(0, size * BRUSH_BOTTOM - screenHeight + 10)) : 0;
+      // (nudged a little further down than that: the brush handle's tip may sit just past the bottom edge)
+      startShift = overhang > 0 ? -Math.min(overhang, Math.max(0, size * BRUSH_BOTTOM - screenHeight + 10 - screenHeight * EXTRA_DOWN)) : 0;
       const main = document.querySelector('main');
       const headerHeight = main ? Math.max(0, Math.round(main.getBoundingClientRect().top + window.scrollY)) : 0;
       // The estimator card starts just under Superman's body, but never above the middle of the screen (so a small scroll
