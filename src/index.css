@@ -200,10 +200,10 @@ img {
   cursor: pointer;
 }
 
-/* Hero background: the whole collage (the houses around Superman) as a translucent, full-screen image that stays fixed while
-   the page scrolls. The sharp collage is shown whole and centred ("contain") starting just below the header; a pre-blurred
-   copy of it fills the rest of the screen, so it suits any screen shape, wide or tall. SiteBackground sets --header-h (the
-   header's height) and --hero-top (where the sharp picture starts, sliding up as the header scrolls off). */
+/* Hero background: the whole collage (the houses around Superman) as a translucent image stretched to fill the screen (a little
+   past the edges is fine). It starts at the very top of the page, where the header is, and moves in proportion to how far the
+   page is scrolled: SiteBackground sets --hero-w / --hero-h (its size), --hero-shift (how far it has moved up) and
+   --hero-spacer (where the estimator card starts, just under Superman's body). A pre-blurred copy fills any gap. */
 .site-hero-bg {
   position: fixed;
   inset: 0;
@@ -222,39 +222,25 @@ img {
 
 .site-hero-bg__img {
   position: absolute;
-  left: 0;
-  right: 0;
-  top: var(--hero-top, 82px);
-  height: calc(100vh - var(--header-h, 82px));
-  background: url('/hero-collage.jpg') center top / contain no-repeat;
-}
-
-@supports (height: 1svh) {
-  .site-hero-bg__img {
-    height: calc(100svh - var(--header-h, 82px));
-  }
+  top: 0;
+  left: 50%;
+  width: var(--hero-w, 120vw);
+  height: var(--hero-h, 112vh);
+  margin-left: calc(var(--hero-w, 120vw) / -2);
+  /* stretched on purpose: it fills the box even when the proportions aren't exact */
+  background: url('/hero-collage.jpg') 0 0 / 100% 100% no-repeat;
+  transform: translate3d(0, var(--hero-shift, 0px), 0);
+  will-change: transform;
 }
 
 .site-hero-bg--home {
   opacity: 0.42;
 }
 
-/* The collage is a square of side S (the smaller of the screen width and the space below the header), centred across and starting right under the header.
-   Superman's body ends about 74% of the way down it, so the estimator card starts just under that point. That is always
-   lower than the middle of the screen, so the card peeks in at the bottom and a small scroll is what brings it past the
-   middle (which starts the spoken intro). 40px is the card section's own top padding. */
+/* Leaves the first screen to the picture; the estimator card starts under Superman's body, lower than the middle of the
+   screen, so it peeks in at the bottom and a small scroll is what brings it past the middle (starting the spoken intro). */
 .hero-spacer {
-  --box-h: calc(100vh - var(--header-h, 82px));
-  --hero-s: min(100vw, var(--box-h));
-  height: max(calc(52vh - var(--header-h, 82px) - 40px), calc(var(--hero-s) * 0.76 - 40px));
-}
-
-@supports (height: 1svh) {
-  .hero-spacer {
-    --box-h: calc(100svh - var(--header-h, 82px));
-    --hero-s: min(100vw, var(--box-h));
-    height: max(calc(52svh - var(--header-h, 82px) - 40px), calc(var(--hero-s) * 0.76 - 40px));
-  }
+  height: var(--hero-spacer, calc(60vh - 120px));
 }
 
 @media (max-width: 640px) {
