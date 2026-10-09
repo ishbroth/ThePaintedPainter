@@ -527,7 +527,7 @@ const ChatPanel = () => {
                 aria-label="Type your answer"
                 spellCheck
                 autoCapitalize="sentences"
-                data-placeholder="Type your answer here, or use your phone's mic to talk…"
+                data-placeholder="Start typing or talking here"
                 onInput={onComposerInput}
                 onKeyDown={onKeyDown}
                 onPaste={onComposerPaste}
