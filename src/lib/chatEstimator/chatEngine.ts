@@ -1046,15 +1046,21 @@ async function finalizeTurn(state: ChatState, customerId?: string): Promise<Turn
   // sense, or nothing that adds up to a job all stop here with a "can we try that again?".
   const userTurns = state.history.filter((m) => m.role === 'user');
   let verdict = reviewLocally(userTurns.map((m) => ({ text: m.text, recognized: !!(m.ackChips && m.ackChips.length > 0) })));
+  let aiApproved = false;
   if (verdict.ok) {
     const ai = await reviewWithAI(userTurns.map((m) => m.text));
     if (ai && !ai.ok) verdict = ai;
+    aiApproved = !!ai?.ok;
   }
   if (!verdict.ok) return restartAfterReview(verdict.reason);
 
   const loyaltyDiscountPercent = customerId ? await fetchLoyaltyDiscountPercent(customerId) : 0;
   const result = finalize(state.ctx, state.transcript, loyaltyDiscountPercent);
-  if (!hasPaintingScope(result.estimate.lineItems)) return restartAfterReview('no_project');
+  // A price that is just the minimum service charge is fine when what was described is painting (one french-pane window, one
+  // door): it is only blocked when nothing paintable was described at all. The AI review decides that; if it couldn't be
+  // reached, a job type or some rooms/size on record counts as described.
+  const describedSomething = !!(state.ctx.projectType || state.ctx.selectedRooms.length > 0 || state.ctx.squareFeet || state.ctx.bedroomCount || state.ctx.furnitureItems.length > 0 || state.ctx.cabinets !== 'none');
+  if (!hasPaintingScope(result.estimate.lineItems) && !aiApproved && !describedSomething) return restartAfterReview('no_project');
   const s = {
     ...state,
     history: [...state.history, botMessage(result.summary)],

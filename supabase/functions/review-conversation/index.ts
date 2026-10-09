@@ -34,7 +34,7 @@ Mark it NOT ok if any of these is true:
 - "abusive": cursing, insults, sexual or hateful remarks, or harassing the assistant.
 - "dismissive": the customer says they don't need anything painted, need nothing, the place doesn't exist, or they are just testing or messing around.
 - "nonsense": most replies are unrelated to painting, random, contradictory in a way that makes no sense, or keyboard mashing.
-- "no_project": the replies never describe anything that could be painted (no rooms, surfaces, building or items).
+- "no_project": the replies never describe anything that could be painted (no rooms, surfaces, building or items). A very small job is a real job: one window, one door, a railing, a mailbox, a single wall or one piece of furniture is fine, even though it will be priced at a small minimum charge.
 
 A normal customer can be terse, vague, unsure, mildly frustrated ("ugh, fine") or make typos, and that is OK. Only reject when it is clear this is not a real request. When in doubt, mark it ok.
 
