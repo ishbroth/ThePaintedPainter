@@ -816,3 +816,24 @@
     font-size: 2rem;
   }
 }
+
+/* A blinking cursor at the end of the placeholder, so it is clear this is where to type (the real caret is hidden while empty). */
+.chat-composer-text:empty {
+  caret-color: transparent;
+}
+
+.chat-composer-text:empty::after {
+  content: '';
+  display: inline-block;
+  width: 2px;
+  height: 1.1em;
+  margin-left: 3px;
+  vertical-align: text-bottom;
+  background: var(--accent-blue-ink);
+  animation: chat-caret-blink 1.05s steps(1) infinite;
+}
+
+@keyframes chat-caret-blink {
+  0%, 50% { opacity: 1; }
+  50.01%, 100% { opacity: 0; }
+}
