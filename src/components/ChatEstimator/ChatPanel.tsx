@@ -45,6 +45,8 @@ const ChatPanel = () => {
   const [state, setState] = useState<ChatState>(loadInitialState);
   const [input, setInput] = useState('');
   const [thinking, setThinking] = useState(false);
+  // what was just sent, shown in the conversation right away while the reply is on its way
+  const [pendingText, setPendingText] = useState('');
   const [readAloud, setReadAloud] = useState(() => {
     try {
       const saved = localStorage.getItem(READ_ALOUD_KEY);
@@ -62,7 +64,9 @@ const ChatPanel = () => {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [photoError, setPhotoError] = useState('');
   const messagesRef = useRef<HTMLDivElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // the one place you type: a right-aligned bubble at the end of the conversation, with Send right after the text
+  const composerRef = useRef<HTMLSpanElement>(null);
+  const focusComposerNextRef = useRef(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const sectionRef = useRef<HTMLElement>(null);
   const navigate = useNavigate();
@@ -319,14 +323,17 @@ const ChatPanel = () => {
     hapticLight();
     const text = input;
     setInput('');
+    if (composerRef.current) composerRef.current.textContent = '';
+    focusComposerNextRef.current = true;
+    setPendingText(text);
     setThinking(true);
     try {
       const result = await handleUserMessage(state, text, user?.id);
       setState(result.state);
     } finally {
       setThinking(false);
-      // Re-focus textarea for continuous flow
-      setTimeout(() => textareaRef.current?.focus(), 0);
+      setPendingText('');
+      // the cursor goes back to the next line, ready for the next answer (focused once the new composer is on screen)
     }
   }
 
@@ -393,7 +400,7 @@ const ChatPanel = () => {
     }
   }
 
-  function onKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
+  function onKeyDown(e: KeyboardEvent<HTMLSpanElement>) {
     // Enter to send; Shift+Enter for newline
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -402,6 +409,34 @@ const ChatPanel = () => {
   }
 
   const waiting = !!state.finalEstimate;
+
+  // After sending (not on first page load, which would pull the page down to the chat), put the cursor back in the new composer.
+  useEffect(() => {
+    if (!thinking && !waiting && focusComposerNextRef.current) {
+      focusComposerNextRef.current = false;
+      const el = composerRef.current;
+      if (el) {
+        el.focus({ preventScroll: true });
+        el.scrollIntoView({ block: 'nearest' });
+      }
+    }
+  }, [thinking, waiting, state.history.length]);
+
+  function onComposerInput(e: React.FormEvent<HTMLSpanElement>) {
+    const el = e.currentTarget;
+    const text = el.textContent ?? '';
+    // a browser can leave a stray <br> behind once everything is deleted, which would hide the placeholder
+    if (text === '') el.innerHTML = '';
+    setInput(text);
+    el.scrollIntoView({ block: 'nearest' });
+  }
+
+  function onComposerPaste(e: React.ClipboardEvent<HTMLSpanElement>) {
+    // plain text only, whatever was copied
+    e.preventDefault();
+    const text = e.clipboardData.getData('text/plain');
+    document.execCommand('insertText', false, text);
+  }
 
   return (
     <section className="chat-estimator-section" ref={sectionRef}>
@@ -469,9 +504,46 @@ const ChatPanel = () => {
               <div className="chat-bubble-text chat-loading">Preparing your results…</div>
             </div>
           )}
+          {pendingText && !waiting && (
+            <div className="chat-bubble chat-bubble-user">
+              <div className="chat-bubble-text">{pendingText}</div>
+            </div>
+          )}
           {thinking && !waiting && (
             <div className="chat-bubble chat-bubble-bot">
               <div className="chat-bubble-text chat-loading">…</div>
+            </div>
+          )}
+          {/* One open window: your answer is typed right here, under the question, with Send at the end of what you type. */}
+          {!waiting && !thinking && (
+            <div className="chat-bubble chat-bubble-user chat-composer" onClick={() => composerRef.current?.focus()}>
+              <span
+                ref={composerRef}
+                className="chat-composer-text"
+                contentEditable="plaintext-only"
+                suppressContentEditableWarning
+                role="textbox"
+                aria-multiline="true"
+                aria-label="Type your answer"
+                spellCheck
+                autoCapitalize="sentences"
+                data-placeholder="Type your answer here, or use your phone's mic to talk…"
+                onInput={onComposerInput}
+                onKeyDown={onKeyDown}
+                onPaste={onComposerPaste}
+              />
+              <button
+                type="button"
+                className="chat-send-inline"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  send();
+                }}
+                disabled={!input.trim()}
+                aria-label="Send"
+              >
+                Send
+              </button>
             </div>
           )}
         </div>
@@ -488,27 +560,6 @@ const ChatPanel = () => {
             </button>
           </div>
         )}
-
-        <div className="chat-input-row">
-          <textarea
-            ref={textareaRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={onKeyDown}
-            placeholder="Start typing, or tap your phone's mic to talk…"
-            rows={2}
-            disabled={waiting || thinking}
-            className="chat-input"
-          />
-          <button
-            className="chat-send"
-            onClick={send}
-            disabled={waiting || thinking || !input.trim()}
-            aria-label="Send"
-          >
-            Send
-          </button>
-        </div>
 
         <p className="chat-input-hint">
           Getting off track? Try "Back Up" or "Start Over"

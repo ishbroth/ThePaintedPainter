@@ -95,8 +95,9 @@
 .chat-messages {
   flex: 1 1 auto;
   padding: 18px 20px;
-  max-height: 420px;
-  min-height: 240px;
+  /* one large open window: the conversation and the place you type are the same field */
+  max-height: min(640px, 74vh);
+  min-height: 380px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -181,6 +182,51 @@
 .chat-loading {
   color: var(--text-secondary);
   font-style: italic;
+}
+
+/* The inline composer: a right-aligned bubble under the last question. The text is typed in the span; Send sits right after it
+   and moves along as the text grows or wraps. */
+.chat-composer {
+  cursor: text;
+  min-width: 120px;
+  line-height: 1.6;
+  caret-color: var(--accent-blue-ink);
+}
+
+.chat-composer-text {
+  outline: none;
+  white-space: pre-wrap;
+  word-break: break-word;
+  min-width: 2px;
+}
+
+.chat-composer-text:empty::before {
+  content: attr(data-placeholder);
+  color: color-mix(in srgb, var(--accent-blue-ink) 62%, transparent);
+  font-weight: 400;
+}
+
+.chat-send-inline {
+  display: inline-block;
+  margin-left: 10px;
+  padding: 3px 12px;
+  font-family: 'Cabin', sans-serif;
+  font-weight: 700;
+  font-size: 0.75rem;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--accent-blue);
+  background: var(--accent-blue-ink);
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  vertical-align: baseline;
+  user-select: none;
+}
+
+.chat-send-inline:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 .chat-input-row {
