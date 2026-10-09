@@ -15,6 +15,8 @@
 //      at all — naturalizeForSpeech() drops them entirely rather than
 //      speaking the link text, so only the surrounding sentence is heard.
 
+import { splitPrompt } from './promptHints';
+
 export function isTTSSupported(): boolean {
   return typeof window !== 'undefined' && 'speechSynthesis' in window;
 }
@@ -152,7 +154,7 @@ async function getPreferredVoice(): Promise<SpeechSynthesisVoice | null> {
 export async function speak(text: string): Promise<void> {
   if (!isTTSSupported()) return;
   window.speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(naturalizeForSpeech(text));
+  const utterance = new SpeechSynthesisUtterance(naturalizeForSpeech(splitPrompt(text).spoken));
   // A hair slower than the 1.0 default reads as noticeably less rushed/
   // robotic without dragging.
   utterance.rate = 0.95;
