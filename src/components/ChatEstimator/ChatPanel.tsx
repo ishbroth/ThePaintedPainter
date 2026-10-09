@@ -433,7 +433,7 @@ const ChatPanel = () => {
   // Typing while focus is elsewhere on the page (after clicking the background, say) goes to the box too.
   useEffect(() => {
     if (!keyboardDevice) return;
-    const onKey = (e: KeyboardEvent) => {
+    const onKey = (e: globalThis.KeyboardEvent) => {
       const el = composerRef.current;
       if (!el || e.ctrlKey || e.metaKey || e.altKey || e.key.length !== 1) return;
       const active = document.activeElement as HTMLElement | null;
