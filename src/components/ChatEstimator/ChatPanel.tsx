@@ -417,17 +417,32 @@ const ChatPanel = () => {
 
   const waiting = !!state.finalEstimate;
 
-  // After sending (not on first page load, which would pull the page down to the chat), put the cursor back in the new composer.
+  // Desktop (mouse + keyboard): the cursor is already in the box, so typing just works, on load without scrolling the page and again
+  // after each send. Phones and tablets: nothing is focused until the customer taps their bubble, so the keypad only opens on request.
+  const keyboardDevice = typeof window !== 'undefined' && window.matchMedia?.('(hover: hover) and (pointer: fine)').matches;
   useEffect(() => {
-    if (!thinking && !waiting && focusComposerNextRef.current) {
-      focusComposerNextRef.current = false;
+    if (!keyboardDevice || thinking || waiting) return;
+    const el = composerRef.current;
+    if (!el) return;
+    const afterSend = focusComposerNextRef.current;
+    focusComposerNextRef.current = false;
+    el.focus({ preventScroll: true });
+    if (afterSend) el.scrollIntoView({ block: 'nearest' });
+  }, [keyboardDevice, thinking, waiting, state.history.length]);
+
+  // Typing while focus is elsewhere on the page (after clicking the background, say) goes to the box too.
+  useEffect(() => {
+    if (!keyboardDevice) return;
+    const onKey = (e: KeyboardEvent) => {
       const el = composerRef.current;
-      if (el) {
-        el.focus({ preventScroll: true });
-        el.scrollIntoView({ block: 'nearest' });
-      }
-    }
-  }, [thinking, waiting, state.history.length]);
+      if (!el || e.ctrlKey || e.metaKey || e.altKey || e.key.length !== 1) return;
+      const active = document.activeElement as HTMLElement | null;
+      if (active && (active === el || active.isContentEditable || /^(INPUT|TEXTAREA|SELECT|BUTTON)$/.test(active.tagName))) return;
+      el.focus({ preventScroll: true });
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [keyboardDevice]);
 
   function onComposerInput(e: React.FormEvent<HTMLSpanElement>) {
     const el = e.currentTarget;
