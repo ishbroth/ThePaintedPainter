@@ -24,6 +24,30 @@
   background: linear-gradient(180deg, var(--bg-surface-hover) 0%, var(--bg-surface) 100%);
 }
 
+/* "Working with XXX Painting Company": stays above the conversation (outside the scrolling messages) */
+.chat-work-with-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 24px;
+  background: rgba(116, 185, 255, 0.14);
+  border-bottom: 1px solid var(--accent-blue);
+  color: var(--text-primary);
+  font-size: 0.92rem;
+}
+
+.chat-work-with-banner button {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent-blue);
+  font-size: 0.8rem;
+  text-decoration: underline;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
 .chat-estimator-header-row {
   display: flex;
   align-items: flex-start;

@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../lib/auth';
 import { supabase, supabaseUrl } from '../../lib/supabase';
 import AddToCalendar from '../../components/AddToCalendar';
 import { fmtRange } from '../../lib/dates';
+import { WORK_WITH_KEY, clearEstimatorSession } from '../../lib/chatEstimator/persistence';
+import { deleteAccountChatState } from '../../lib/chatEstimator/accountPersistence';
 
 interface Project {
   id: string;
@@ -24,6 +26,9 @@ interface Project {
   confirmUrl: string | null;
   reviewToken: string | null;
   reviewSubmitted: boolean;
+  /** Finished jobs only: the painter's id and the ZIP of the job, for "Work with again". */
+  painterId?: string | null;
+  zip?: string | null;
   // email/phone/owner_name arrive only once the deposit is paid
   painter: { company_name: string; owner_name?: string; email?: string; phone?: string } | null;
 }
@@ -119,6 +124,23 @@ function RescheduleRequest({ projectId }: { projectId: string }) {
 }
 
 function ProjectCard({ project }: { project: Project }) {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+
+  /** Start a new price for the painter who did this job: their ZIP is known and they come first in the results. */
+  function workWithAgain() {
+    if (!project.painterId || !project.painter) return;
+    // a new estimate replaces anything half-finished, here and on the account
+    clearEstimatorSession();
+    if (user) void deleteAccountChatState(user.id);
+    try {
+      sessionStorage.setItem(WORK_WITH_KEY, JSON.stringify({ id: project.painterId, companyName: project.painter.company_name, zip: project.zip ?? '' }));
+    } catch {
+      // storage unavailable: the estimator just starts as usual
+    }
+    navigate('/#estimator');
+  }
+
   return (
     <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-xl p-6">
       <div className="flex items-start justify-between mb-3">
@@ -232,6 +254,15 @@ function ProjectCard({ project }: { project: Project }) {
               Rate this painter
             </Link>
           ) : null}
+          {project.painterId && project.painter?.company_name && (
+            <button
+              type="button"
+              onClick={workWithAgain}
+              className="inline-block px-4 py-2 border border-[var(--accent-blue)] text-[var(--accent-blue)] text-sm font-semibold rounded-lg hover:bg-[var(--accent-blue)] hover:text-white transition-colors"
+            >
+              Work with again
+            </button>
+          )}
           {project.price != null && Math.floor(project.price / 100) > 0 && (
             <span className="text-sm text-[var(--accent-blue)]">
               +{Math.floor(project.price / 100)} loyalty point{Math.floor(project.price / 100) === 1 ? '' : 's'} earned

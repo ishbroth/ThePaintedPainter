@@ -39,6 +39,17 @@ export interface RankedPainter {
   reasons: string[]
   /** Set when the painter is booked until later than today (only shown for flexible customers / dates that fit). */
   availableFrom: string | null
+  /** The customer chose "Work with again" for this painter: shown first, priced like any other painter. */
+  workedWithBefore?: boolean
+}
+
+/** What happened to the painter the customer asked to work with again. */
+export interface PreferredOutcome {
+  id: string
+  companyName: string
+  status: 'listed' | 'unavailable'
+  /** When unavailable: a short reason shown to the customer, e.g. "is booked through your dates". */
+  reason?: string
 }
 
 export interface RankResult {
@@ -46,6 +57,7 @@ export interface RankResult {
   mystery: { price: number; priceToken: string }
   holdUntil: number
   duration: { days: number; low: number; high: number }
+  preferred?: PreferredOutcome
 }
 
 function jobSpecialties(ctx: Record<string, unknown>): string[] {
@@ -99,7 +111,7 @@ export async function rankPainters(
   supabaseUrl: string,
   ctx: Record<string, unknown>,
   baseTotal: number,
-  opts: { exclude?: string[]; holdUntilMs?: number; limit?: number } = {},
+  opts: { exclude?: string[]; holdUntilMs?: number; limit?: number; preferredId?: string } = {},
 ): Promise<RankResult> {
   const zip = String(ctx.zipCode ?? '')
   const holdUntil = opts.holdUntilMs ?? Date.now() + DEFAULT_HOLD_MS
@@ -117,6 +129,23 @@ export async function rankPainters(
   const timing = timingFromCtx(ctx)
   const today = todayIso()
 
+  // The painter the customer wants to work with again: find out up front whether they can be listed, and why not if not.
+  let preferred: PreferredOutcome | undefined
+  if (opts.preferredId) {
+    const row = (rows ?? []).find((p: { id: string }) => p.id === opts.preferredId) as Record<string, unknown> | undefined
+    if (!row) {
+      const { data: gone } = await supabase.from('painters').select('company_name').eq('id', opts.preferredId).maybeSingle()
+      preferred = { id: opts.preferredId, companyName: gone?.company_name ?? 'Your painter', status: 'unavailable', reason: "isn't taking new jobs right now" }
+    } else {
+      const d = zipDistanceMiles(zip, row.zip_code as string)
+      const name = row.company_name as string
+      if (excluded.has(opts.preferredId)) preferred = { id: opts.preferredId, companyName: name, status: 'unavailable', reason: "can't take this job" }
+      else if (d === null || d > SERVICE_RADIUS_MILES) preferred = { id: opts.preferredId, companyName: name, status: 'unavailable', reason: "doesn't cover the area for this job" }
+      else if (!evaluateAvailability(row as never, timing, duration.days, today).show) preferred = { id: opts.preferredId, companyName: name, status: 'unavailable', reason: 'is booked through your dates' }
+      else preferred = { id: opts.preferredId, companyName: name, status: 'listed' }
+    }
+  }
+
   // Nearby, not excluded, and available for what the customer asked — nearest first.
   const nearby = (rows ?? [])
     .filter((p: { id: string }) => !excluded.has(p.id))
@@ -126,7 +155,7 @@ export async function rankPainters(
     .filter((x: { avail: { show: boolean } }) => x.avail.show)
     .sort((a: { distance: number }, b: { distance: number }) => a.distance - b.distance)
 
-  if (nearby.length === 0) return { painters: [], mystery, holdUntil, duration }
+  if (nearby.length === 0) return { painters: [], mystery, holdUntil, duration, preferred }
 
   // Private price estimate per painter -> rank-based deviation from the baseline.
   const projected = nearby.map(({ p }: { p: Record<string, unknown> }) => {
@@ -202,5 +231,15 @@ export async function rankPainters(
     })
   }
 
-  return { painters: opts.limit ? ranked.slice(0, opts.limit) : ranked, mystery, holdUntil, duration }
+  // "Work with again": that painter goes first, with their own price; everyone else follows in the usual order.
+  if (preferred?.status === 'listed') {
+    const at = ranked.findIndex((r) => r.id === preferred!.id)
+    if (at > 0) ranked.unshift(...ranked.splice(at, 1))
+    if (ranked[0]?.id === preferred.id) {
+      ranked[0].workedWithBefore = true
+      ranked[0].reasons = ["you've worked together before", ...ranked[0].reasons]
+    }
+  }
+
+  return { painters: opts.limit ? ranked.slice(0, opts.limit) : ranked, mystery, holdUntil, duration, preferred }
 }

@@ -40,6 +40,17 @@ export interface PainterResult {
   /** Portfolio photo URLs, newest first. */
   photos: string[];
   reasons: string[];
+  /** The customer picked "Work with again" for this painter: listed first. */
+  workedWithBefore?: boolean;
+}
+
+/** What became of the painter the customer asked to work with again. */
+export interface PreferredPainterOutcome {
+  id: string;
+  companyName: string;
+  status: 'listed' | 'unavailable';
+  /** When unavailable, e.g. "is booked through your dates". */
+  reason?: string;
 }
 
 export interface PainterReview {
@@ -83,6 +94,7 @@ export interface PainterResults {
   holdUntil: number;
   /** Estimated working days for the job. */
   duration: { days: number; low: number; high: number };
+  preferred?: PreferredPainterOutcome;
 }
 
 /**

@@ -105,6 +105,9 @@ serve(async (req: Request) => {
       id: r.id,
       status: r.status,
       price: r.guaranteed_price ?? r.selected_painter_price,
+      // for "Work with again" on a finished job: which painter, and the ZIP of that job
+      painterId: r.status === 'completed' ? r.accepted_by : null,
+      zip: r.quote_zip,
       address: [r.customer_street_address, r.customer_city, r.customer_state].filter(Boolean).join(', ') || r.quote_zip,
       scheduledDate: r.scheduled_date,
       preferredDate: r.customer_preferred_date,

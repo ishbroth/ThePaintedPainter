@@ -157,6 +157,12 @@ export interface EstimatorContext {
   datesFlexible: boolean;
   afterHoursRequired: string; // '' (unasked), yes, no — commercial jobs needing night/weekend scheduling to avoid disrupting business
 
+  // "Work with again": a painter the customer used before, shown first in the results with their own price.
+  preferredPainterId: string;
+  preferredPainterName: string;
+  /** The ZIP came from the customer's previous job, not from this chat: a different ZIP typed later replaces it. */
+  zipFromHistory: boolean;
+
   // Contact
   contactName: string;
   contactPhone: string;

@@ -239,7 +239,7 @@ export default function PainterResultCard({
 
   return (
     <div
-      style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 12, marginBottom: 14, overflow: 'hidden' }}
+      style={{ background: 'var(--bg-surface)', border: result.workedWithBefore ? '2px solid var(--accent-blue)' : '1px solid var(--border)', borderRadius: 12, marginBottom: 14, overflow: 'hidden' }}
     >
       <div className="flex flex-col md:flex-row">
         <div className="md:w-72 md:flex-shrink-0 h-48 md:h-auto relative">
@@ -248,6 +248,11 @@ export default function PainterResultCard({
 
         <div className="flex-1 p-4 flex flex-col md:flex-row gap-4 justify-between cursor-pointer" onClick={toggle}>
           <div className="min-w-0">
+            {result.workedWithBefore && (
+              <span style={{ display: 'inline-block', marginBottom: 6, padding: '2px 10px', borderRadius: 999, fontSize: '0.74rem', fontWeight: 700, color: 'var(--accent-blue)', background: 'rgba(116, 185, 255, 0.14)', border: '1px solid var(--accent-blue)' }}>
+                ★ You've worked with them before
+              </span>
+            )}
             <h3 style={{ fontFamily: "'Cabin', sans-serif", fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 2px' }}>
               {result.companyName}
             </h3>

@@ -102,6 +102,35 @@ export interface ChatResult {
 
 export { makeInitialContext };
 
+/**
+ * "Work with again": a fresh conversation for a painter the customer has used before. Their ZIP from that job is known from
+ * the start (so the location question is skipped and the right group of painters is searched), and the chosen painter is
+ * remembered so they come first in the results, priced for that painter.
+ */
+export function makeWorkWithAgainState(painter: { id: string; companyName: string; zip: string }): ChatState {
+  const state = makeInitialState();
+  const ctx: EstimatorContext = {
+    ...state.ctx,
+    zipCode: /^\d{5}$/.test(painter.zip) ? painter.zip : '',
+    state: /^\d{5}$/.test(painter.zip) ? getStateFromZip(painter.zip) : '',
+    zipFromHistory: /^\d{5}$/.test(painter.zip),
+    preferredPainterId: painter.id,
+    preferredPainterName: painter.companyName,
+  };
+  const where = ctx.zipCode ? ` I'll use ZIP ${ctx.zipCode} from your last job with them (tell me if this one is somewhere else).` : '';
+  return {
+    ...state,
+    ctx,
+    history: [
+      {
+        role: 'bot',
+        text: `Welcome back! You're working with ${painter.companyName} again.${where} What do you need painted?`,
+        timestamp: Date.now(),
+      },
+    ],
+  };
+}
+
 export function makeInitialState(): ChatState {
   return {
     ctx: makeInitialContext(),
@@ -448,6 +477,21 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
     ctxWithExplicit.selectedRooms = state.ctx.selectedRooms;
   }
   const newTranscript = `${state.transcript}\n${trimmed}`.trim();
+  // A ZIP carried over from the customer's last job gives way to a different one typed now (a different property).
+  if (state.ctx.zipFromHistory) {
+    // only when it reads as a ZIP ("zip 90210", "it's in 90210", or just the number), not a square-footage figure
+    const typedZip = /\b(zip|postal|located|it'?s in|property is in|moving|different)\b|^\s*\d{5}\s*$/i.test(trimmed) ? extractZip(trimmed) : null;
+    if (typedZip) {
+      if (typedZip !== state.ctx.zipCode) {
+        ctxWithExplicit.zipCode = typedZip;
+        const st = getStateFromZip(typedZip);
+        if (st) ctxWithExplicit.state = st;
+        acknowledgements.push(`ZIP ${typedZip}`);
+      }
+      ctxWithExplicit.zipFromHistory = false;
+    }
+  }
+
   // Corrections ("actually the zip is 98101", "it's closer to 2,400 sq ft", "change my dates to ..."): the extractors only
   // fill empty fields, so without this a later correction would be silently ignored.
   if (/\b(actually|correction|correct that|oh wait|wait,|sorry,|i meant|make that|change (?:it|that|the|my)|should (?:be|say)|instead|not [\w ]{0,20} but)\b/i.test(trimmed)) {

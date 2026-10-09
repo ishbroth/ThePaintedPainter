@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   makeInitialState,
+  makeWorkWithAgainState,
   handleUserMessage,
   applyUploadedPhoto,
   applyPhotoAssessment,
@@ -10,7 +11,7 @@ import {
   type ChatState,
 } from '../../lib/chatEstimator/chatEngine';
 import { hapticLight } from '../../lib/haptics';
-import { CHAT_STATE_KEY, QUOTE_EXPIRES_KEY, QUOTE_RESULT_KEY, PRICE_HOLD_MINUTES, clearEstimatorSession, isExpiredFinishedChat } from '../../lib/chatEstimator/persistence';
+import { CHAT_STATE_KEY, QUOTE_EXPIRES_KEY, QUOTE_RESULT_KEY, PRICE_HOLD_MINUTES, clearEstimatorSession, isExpiredFinishedChat, readWorkWithAgain, clearWorkWithAgain } from '../../lib/chatEstimator/persistence';
 import { isTTSSupported, speak, stopSpeaking, setupSpeechUnlock } from '../../lib/textToSpeech';
 import { uploadQuotePhoto, analyzeQuotePhoto } from '../../lib/chatEstimator/photoUpload';
 import { loadAccountChatState, saveAccountChatState, deleteAccountChatState } from '../../lib/chatEstimator/accountPersistence';
@@ -19,6 +20,9 @@ import { useAuth } from '../../lib/auth';
 const READ_ALOUD_KEY = 'tpp-read-aloud';
 
 function loadInitialState(): ChatState {
+  // "Work with again" from a finished project starts a fresh conversation for that painter (the marker is cleared once mounted)
+  const workWith = readWorkWithAgain();
+  if (workWith) return makeWorkWithAgainState(workWith);
   try {
     const saved = sessionStorage.getItem(CHAT_STATE_KEY);
     if (saved) {
@@ -188,6 +192,15 @@ const ChatPanel = () => {
 
   useEffect(() => setupSpeechUnlock(), []);
 
+  // the "Work with again" marker has done its job once the conversation exists
+  useEffect(() => {
+    clearWorkWithAgain();
+  }, []);
+
+  function stopWorkingWithPainter() {
+    setState((s) => ({ ...s, ctx: { ...s.ctx, preferredPainterId: '', preferredPainterName: '' } }));
+  }
+
   useEffect(() => {
     // Persist on every change so a back-button nav (or reload) back to this
     // page picks the conversation up where it left off instead of resetting.
@@ -231,7 +244,7 @@ const ChatPanel = () => {
         // effect closed over at mount, which is already stale by the time
         // this callback runs.
         setState((current) => {
-          if (current.history.length > 1 || current.finalEstimate) return current;
+          if (current.history.length > 1 || current.finalEstimate || current.ctx.preferredPainterId) return current;
           // a saved price that has expired is dropped, not restored
           if (isExpiredFinishedChat(saved)) {
             void deleteAccountChatState(user.id);
@@ -411,6 +424,19 @@ const ChatPanel = () => {
           </div>
           <p>Tell me about your project. Type naturally — I'll guide you from there.</p>
         </div>
+
+        {state.ctx.preferredPainterName && (
+          <div className="chat-work-with-banner" role="status">
+            <span>
+              Working with <strong>{state.ctx.preferredPainterName}</strong>
+            </span>
+            {!state.finalEstimate && (
+              <button type="button" onClick={stopWorkingWithPainter}>
+                Choose differently
+              </button>
+            )}
+          </div>
+        )}
 
         <div className="chat-messages" ref={messagesRef}>
           {state.history.map((m, i) => (

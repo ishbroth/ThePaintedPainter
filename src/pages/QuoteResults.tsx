@@ -192,6 +192,12 @@ const QuoteResults = () => {
   const estimate = liveEstimate ?? state.estimate;
   const ctx = liveCtx ?? state.ctx;
   const { assumptions } = state;
+
+  // "Work with again": that painter is listed first, and the price shown up top is theirs
+  const firstPainter = painterMatches && painterMatches.length > 0 ? painterMatches[0] : null;
+  const headlinePrice = firstPainter?.workedWithBefore ? firstPainter.price : estimate.total;
+  const priceScale = estimate.total > 0 ? headlinePrice / estimate.total : 1;
+  const preferredOutcome = results?.preferred;
   const duration = results?.duration ?? estimateDayRange(estimate.total);
 
 
@@ -239,9 +245,12 @@ const QuoteResults = () => {
         <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
           {describeJob(ctx)}
         </p>
-        <div className="quote-results-price">{currency(estimate.total)}</div>
+        {firstPainter?.workedWithBefore && (
+          <div style={{ color: 'var(--accent-blue)', fontWeight: 700, fontSize: '0.95rem', marginBottom: 4 }}>Your price with {firstPainter.companyName}</div>
+        )}
+        <div className="quote-results-price">{currency(headlinePrice)}</div>
         <div className="quote-results-range">
-          Likely range: {currency(estimate.lowRange)} – {currency(estimate.highRange)}
+          Likely range: {currency(Math.round(estimate.lowRange * priceScale))} – {currency(Math.round(estimate.highRange * priceScale))}
         </div>
         <div style={{ marginTop: 10, color: 'var(--text-secondary)', fontSize: '0.88rem' }}>
           Expected time on site: <strong>about {duration.low === duration.high ? duration.low : `${duration.low}–${duration.high}`} working day{duration.high === 1 ? '' : 's'}</strong>
@@ -282,6 +291,11 @@ const QuoteResults = () => {
       )}
 
       {/* Real painter list */}
+      {preferredOutcome?.status === 'unavailable' && (
+        <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--accent)', borderRadius: 10, padding: '12px 16px', margin: '0 0 16px', fontSize: '0.92rem', color: 'var(--text-secondary)' }}>
+          <strong style={{ color: 'var(--text-primary)' }}>{preferredOutcome.companyName}</strong> {preferredOutcome.reason ?? "can't take this job"}, so here are other painters near you.
+        </div>
+      )}
       <div className="painter-list-header">
         <h2>Painters who can do this job</h2>
         <p>
@@ -289,7 +303,7 @@ const QuoteResults = () => {
             <>Finding painters near you…</>
           ) : painterMatches.length > 0 ? (
             <>
-              {painterMatches.length} painter{painterMatches.length === 1 ? '' : 's'} in your area, nearest first. Pick
+              {painterMatches.length} painter{painterMatches.length === 1 ? '' : 's'} in your area{firstPainter?.workedWithBefore ? `, with ${firstPainter.companyName} first and the rest nearest first` : ', nearest first'}. Pick
               one to claim their guaranteed price.
             </>
           ) : (

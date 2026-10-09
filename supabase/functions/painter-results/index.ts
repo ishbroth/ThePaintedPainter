@@ -14,7 +14,7 @@
 // and a claim is only accepted for a price we signed (see submit-quote-claim).
 // Fuller detail (credentials, crew, reviews…) comes from painter-detail on demand.
 //
-// POST { ctx: <estimator context incl. timing>, baseTotal: number, resumeToken?: string }
+// POST { ctx: <estimator context incl. timing, and preferredPainterId for "Work with again">, baseTotal: number, resumeToken?: string }
 //   resumeToken: from a "your painter declined" email — reloads the same search with
 //   the declined painter removed, and the hold lasts until that email's 72 hours end.
 //
@@ -66,12 +66,35 @@ serve(async (req: Request) => {
       holdUntilMs = new Date(job.fallback_expires_at).getTime()
     }
 
-    const result = await rankPainters(supabase, supabaseUrl, ctx, baseTotal, { exclude, holdUntilMs })
+    // "Work with again": only honored when the signed-in caller really finished a job with that painter.
+    let preferredId: string | undefined
+    const wantedId = typeof ctx.preferredPainterId === 'string' ? ctx.preferredPainterId : ''
+    const authHeader = req.headers.get('Authorization')
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY')
+    if (wantedId && authHeader && anonKey) {
+      const authClient = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authHeader } } })
+      const { data: userData } = await authClient.auth.getUser(authHeader.replace('Bearer ', ''))
+      const user = userData?.user
+      if (user) {
+        const orFilter = user.email ? `customer_id.eq.${user.id},customer_email.eq.${user.email}` : `customer_id.eq.${user.id}`
+        const { data: past } = await supabase
+          .from('quote_selections')
+          .select('id')
+          .eq('accepted_by', wantedId)
+          .eq('status', 'completed')
+          .or(orFilter)
+          .limit(1)
+        if (past && past.length > 0) preferredId = wantedId
+      }
+    }
+
+    const result = await rankPainters(supabase, supabaseUrl, ctx, baseTotal, { exclude, holdUntilMs, preferredId })
     return json({
       painters: result.painters,
       mystery: result.mystery,
       holdUntil: result.holdUntil,
       duration: result.duration,
+      preferred: result.preferred,
     })
   } catch (error) {
     console.error('Error in painter-results:', error)

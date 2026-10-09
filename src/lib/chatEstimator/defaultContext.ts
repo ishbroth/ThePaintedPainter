@@ -33,6 +33,7 @@ export function makeInitialContext(): EstimatorContext {
     hardwareReplacement: 'no', lowVocRequested: 'no',
     squareFeet: null, stories: null, ceilingHeight: 'standard', tallCeilingShare: null, occupancy: '',
     utilities: 'yes', hoa: 'no', timeline: '', startDate: '', endDate: '', datesFlexible: false, afterHoursRequired: '',
+    preferredPainterId: '', preferredPainterName: '', zipFromHistory: false,
     contactName: '', contactPhone: '', contactEmail: '', contactNotes: '',
     projectCondition: '', hasStainedWood: 'no', bedroomCount: null,
     trimCondition: 'existing_good', wallTexture: 'smooth', doorMaterial: 'wood',

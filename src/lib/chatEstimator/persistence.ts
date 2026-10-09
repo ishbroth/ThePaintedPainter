@@ -7,6 +7,33 @@
 export const CHAT_STATE_KEY = 'ttp_chat_estimator_state';
 export const QUOTE_RESULT_KEY = 'ttp_quote_result';
 export const QUOTE_EXPIRES_KEY = 'ttp_quote_expires_at';
+/** Set by "Work with again" on a finished project; the estimator reads it once and starts a conversation for that painter. */
+export const WORK_WITH_KEY = 'ttp_work_with_again';
+
+export interface WorkWithAgain {
+  id: string;
+  companyName: string;
+  zip: string;
+}
+
+export function readWorkWithAgain(): WorkWithAgain | null {
+  try {
+    const raw = sessionStorage.getItem(WORK_WITH_KEY);
+    if (!raw) return null;
+    const v = JSON.parse(raw) as Partial<WorkWithAgain>;
+    return v && typeof v.id === 'string' && v.id && typeof v.companyName === 'string' ? { id: v.id, companyName: v.companyName, zip: String(v.zip ?? '') } : null;
+  } catch {
+    return null;
+  }
+}
+
+export function clearWorkWithAgain(): void {
+  try {
+    sessionStorage.removeItem(WORK_WITH_KEY);
+  } catch {
+    // ignore
+  }
+}
 
 /** How long a guaranteed price stays locked in before the customer needs a fresh quote. */
 export const PRICE_HOLD_MINUTES = 45;
