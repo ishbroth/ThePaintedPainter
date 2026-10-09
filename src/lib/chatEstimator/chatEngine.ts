@@ -1059,7 +1059,8 @@ async function finalizeTurn(state: ChatState, customerId?: string): Promise<Turn
   // A price that is just the minimum service charge is fine when what was described is painting (one french-pane window, one
   // door): it is only blocked when nothing paintable was described at all. The AI review decides that; if it couldn't be
   // reached, a job type or some rooms/size on record counts as described.
-  const describedSomething = !!(state.ctx.projectType || state.ctx.selectedRooms.length > 0 || state.ctx.squareFeet || state.ctx.bedroomCount || state.ctx.furnitureItems.length > 0 || state.ctx.cabinets !== 'none');
+  const PAINTABLE_WORDS = /\b(windows?|doors?|railings?|rails?|fences?|gates?|shutters?|mailbox|walls?|ceilings?|cabinets?|trim|baseboards?|molding|deck|porch|garage|shed|siding|stairs?|stairway|closets?|room|bedroom|bathroom|kitchen|living room|dining|hallway|basement|furniture|chair|table|dresser|desk|bookcase|fireplace|mantel|pantry|house|apartment|condo)\b/i;
+  const describedSomething = userTurns.some((m) => PAINTABLE_WORDS.test(m.text)) || !!(state.ctx.projectType || state.ctx.selectedRooms.length > 0 || state.ctx.squareFeet || state.ctx.bedroomCount || state.ctx.furnitureItems.length > 0 || state.ctx.cabinets !== 'none');
   if (!hasPaintingScope(result.estimate.lineItems) && !aiApproved && !describedSomething) return restartAfterReview('no_project');
   const s = {
     ...state,
