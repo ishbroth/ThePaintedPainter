@@ -272,8 +272,10 @@ img {
 /* The carousel at the top of the home page: starts right under the header and its bottom edge is at Superman's eye level,
    so its height comes from SiteBackground (--hero-carousel-h). */
 .carousel-section.hero-carousel {
-  padding: 8px 0 0;
-  height: var(--hero-carousel-h, 200px);
+  padding: 0;
+  /* pictures at 1.25x the other carousels' size; the space above them (under the header) is whatever is left */
+  margin-top: var(--hero-carousel-gap, 0px);
+  height: var(--hero-carousel-h, 250px);
   box-sizing: border-box;
 }
 

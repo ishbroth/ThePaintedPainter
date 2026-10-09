@@ -10,6 +10,8 @@ const TITLE_BOTTOM = 0.5594;
 const CARD_BELOW_TITLE = 0.565;
 /** Where the painting mask starts (just below the eyes), as a share of the picture's height: the carousel's bottom edge sits there, covering the eyes. */
 const EYE_LEVEL = 0.388;
+/** The top carousel's pictures: the other carousels' size (200px tall) times 1.25. Smaller only when the screen is too short to fit that above the mask. */
+const HERO_CAROUSEL_HEIGHT = 250;
 /** How far down the picture the bottom of the brush reaches (share of the picture's height); it has to stay on screen at the start. */
 const BRUSH_BOTTOM = 0.72;
 /** Extra nudge down, as a share of the screen height (about 54px on a 900px-tall screen). */
@@ -53,9 +55,14 @@ const SiteBackground = () => {
       // is what brings it into view and starts the spoken intro) and never so low that none of it shows.
       const cardTop = Math.min(Math.max(size * CARD_BELOW_TITLE + startShift + 8, screenHeight * 0.52), screenHeight * 0.86);
       // the carousel under the header ends at Superman's eye level
-      const carouselHeight = Math.max(90, Math.round(size * EYE_LEVEL + startShift - headerHeight));
+      // Room between the header and the mask. The pictures are a fixed size; any extra room sits between the header and them,
+      // so their bottom edge always rests at the mask (covering the eyes).
+      const room = Math.max(0, Math.round(size * EYE_LEVEL + startShift - headerHeight));
+      const carouselHeight = Math.min(HERO_CAROUSEL_HEIGHT, Math.max(60, room));
+      const carouselGap = Math.max(0, room - carouselHeight);
       root.style.setProperty('--hero-carousel-h', `${carouselHeight}px`);
-      root.style.setProperty('--hero-spacer', `${Math.max(0, Math.round(cardTop - headerHeight - carouselHeight - 40))}px`);
+      root.style.setProperty('--hero-carousel-gap', `${carouselGap}px`);
+      root.style.setProperty('--hero-spacer', `${Math.max(0, Math.round(cardTop - headerHeight - carouselGap - carouselHeight - 40))}px`);
       place();
     };
 
