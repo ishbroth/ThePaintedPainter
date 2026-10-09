@@ -23,6 +23,7 @@
 //   supabase functions deploy claim-job --no-verify-jwt
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { conversationNote } from '../_shared/conversationLog.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
 import { notify } from '../_shared/notify.ts'
 import { describeTiming } from '../_shared/offers.ts'
@@ -132,7 +133,7 @@ serve(async (req: Request) => {
 
     // Preview: what the accept page shows before the painter presses the button (nothing changes).
     if (previewOnly) {
-      const summary = (job.project_summary ?? {}) as { timelineLabel?: string; qa?: { question: string; answer: string }[] }
+      const summary = (job.project_summary ?? {}) as { timelineLabel?: string; qa?: { question: string; answer: string }[]; conversation?: string[] }
       return json({
         open: job.status === 'offer_sent',
         zip: job.quote_zip,
@@ -142,6 +143,8 @@ serve(async (req: Request) => {
         timing: describeTiming(job),
         estimatedDays: estimateWorkingDays(Number(job.guaranteed_price) || 0, claimer.crew_size),
         qa: summary.qa ?? [],
+        conversation: summary.conversation ?? [],
+        conversationNote: conversationNote(summary.conversation ?? []),
         photos: job.photos ?? [],
       })
     }

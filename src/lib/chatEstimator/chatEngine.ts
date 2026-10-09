@@ -23,6 +23,7 @@ import { supabase } from '../supabase';
 import { extractAll, extractPhotoTriggers, extractTimeline, extractPropertyType, extractAccessSignals, extractZip, extractSquareFeet } from './extractors';
 import { getStateFromZip } from '../zipCodeData';
 import { hasScopeLimiter } from './scopeWords';
+import { reviewLocally, reviewWithAI, hasPaintingScope, retryMessage, profanityScan, type ReviewResult } from './conversationReview';
 import { isDenial, denialIsAboutScope, topicLabel, recentRecognized, recapSentence } from './clarify';
 import { extractTiming, timelineFromStart } from './dateParsing';
 import { defaultAssumptions, applyAssumptions, type Assumption } from './defaultAssumptions';
@@ -403,6 +404,16 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
     done: null,
   });
   const recap = recapSentence(recentRecognized(state.history));
+
+  // Cursing or insults: say so once, kindly, and ask the question again; nothing in that message is used. (The conversation is
+  // also reviewed as a whole before any price goes out, and the customer's words go to painters with the job.)
+  {
+    const heat = profanityScan(trimmed);
+    if (heat.strong > 0 || heat.insult) {
+      const again = state.lastBotTopic ? state.lastBotTopic.ask(state.ctx) : 'What do you need painted?';
+      return asBot({}, `Let's keep this friendly. I'm here to get you a price for a painting job. ${again}`);
+    }
+  }
 
   // The customer is disputing something the bot did ("I never said trim", "I didn't say walls only"): apologise, say what
   // was actually understood, and ask — never fill in a default. Nothing in the message is applied.
@@ -1024,9 +1035,26 @@ async function fetchLoyaltyDiscountPercent(customerId: string): Promise<number> 
   }
 }
 
+/** A clean start with an explanation: nothing from the blocked conversation is priced or sent to anyone. */
+function restartAfterReview(reason: ReviewResult['reason']): TurnResult {
+  const fresh = makeInitialState();
+  return { state: { ...fresh, history: [{ role: 'bot', text: retryMessage(reason), timestamp: Date.now() }] }, done: null };
+}
+
 async function finalizeTurn(state: ChatState, customerId?: string): Promise<TurnResult> {
+  // Review the whole conversation before any price goes out: profanity, "I don't need anything painted", answers that make no
+  // sense, or nothing that adds up to a job all stop here with a "can we try that again?".
+  const userTurns = state.history.filter((m) => m.role === 'user');
+  let verdict = reviewLocally(userTurns.map((m) => ({ text: m.text, recognized: !!(m.ackChips && m.ackChips.length > 0) })));
+  if (verdict.ok) {
+    const ai = await reviewWithAI(userTurns.map((m) => m.text));
+    if (ai && !ai.ok) verdict = ai;
+  }
+  if (!verdict.ok) return restartAfterReview(verdict.reason);
+
   const loyaltyDiscountPercent = customerId ? await fetchLoyaltyDiscountPercent(customerId) : 0;
   const result = finalize(state.ctx, state.transcript, loyaltyDiscountPercent);
+  if (!hasPaintingScope(result.estimate.lineItems)) return restartAfterReview('no_project');
   const s = {
     ...state,
     history: [...state.history, botMessage(result.summary)],

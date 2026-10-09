@@ -391,6 +391,19 @@ ${body}
         .map((item) => `<p style="margin: 4px 0;"><strong>${escapeHtml(item.question)}:</strong> ${escapeHtml(item.answer)}</p>`)
         .join('')
 
+      // every reply the customer typed, in order, so the painter can judge for themselves
+      const conversation = Array.isArray(data.conversation) ? (data.conversation as string[]) : []
+      const conversationHtml = conversation.length > 0
+        ? `
+          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
+          <p style="font-weight: 600; margin-bottom: 4px;">What the customer typed (every reply, in order)</p>
+          ${data.conversationNote ? `<p style="margin: 4px 0 8px; font-size: 13px; color: #b45309;">&#9888; ${escapeHtml(data.conversationNote)}</p>` : ''}
+          <ol style="margin: 8px 0; padding-left: 20px; font-size: 13px; color: #374151;">
+            ${conversation.map((line) => `<li style="margin: 3px 0;">${escapeHtml(line)}</li>`).join('')}
+          </ol>
+        `
+        : ''
+
       const photos = Array.isArray(data.photos) ? (data.photos as { url: string; description: string; label: string }[]) : []
       const photosHtml = photos.length > 0
         ? `
@@ -423,6 +436,7 @@ ${body}
         <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
         <p style="font-weight: 600; margin-bottom: 12px;">Job details</p>
         ${qaHtml}
+        ${conversationHtml}
         ${photosHtml}
       `)
     }

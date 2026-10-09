@@ -413,7 +413,9 @@ export function derive(ctx: EstimatorContext, transcript: string): Derivation[] 
   if (ctx.exteriorBody === '' && (ctx.projectType === 'exterior' || ctx.projectType === 'both' || (!ctx.projectType && !mentionsIndoorRoom))) {
     const features = /\b(fence|fences|deck|shutters?|garage door|front door|entry door|porch|railings?|gutters?|fascia|soffits?|eaves|exterior trim|window trim|patio furniture|outdoor furniture|patio set|pressure wash|power wash|soft wash|driveway|patio)\b/.test(t);
     const bodyWords = /\b(siding|stucco|brick|clapboard|hardie|shingles?|whole (?:house|exterior)|entire (?:house|exterior|outside)|(?:exterior|outside) of (?:my|the|our|a) (?:house|home)|house exterior|(?:exterior|outside) (?:paint|repaint|painting)|repaint (?:the )?(?:house|exterior|outside)|victorian|colonial|ranch|bungalow|barn|shed|two[- ]story|three[- ]story|\d\s*stor(?:y|ies))\b/.test(t);
-    const washOnly = /\b(pressure|power|soft)\s*wash/.test(t) && !/\b(paint|repaint|stain|coat|seal)/.test(t);
+    // "no painting", "not painting", "without painting" are the opposite of asking for paint
+    const withoutNoPaint = t.replace(/\b(?:no|not|without|don'?t want|don'?t need)\s+(?:any\s+)?(?:re-?)?(?:paint|painting|stain|staining)\b/g, ' ');
+    const washOnly = /\b(pressure|power|soft)\s*wash/.test(t) && !/\b(paint|repaint|stain|coat|seal)/.test(withoutNoPaint);
     if (washOnly) {
       out.push({ patch: { exteriorBody: 'no', projectType: 'exterior', prepWork: ctx.prepWork.includes('power_washing') ? ctx.prepWork : [...ctx.prepWork, 'power_washing'], exteriorTrim: 'no' }, reason: 'Pressure washing only → no painting of the house body' });
     } else if (features && (hasOnly || !bodyWords)) {

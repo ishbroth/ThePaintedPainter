@@ -285,6 +285,8 @@ const ChatPanel = () => {
           matchedSituations: state.finalEstimate!.matchedSituations,
           transcript: state.transcript,
           loyaltyDiscountPercent: state.finalEstimate!.loyaltyDiscountPercent ?? 0,
+          // every reply the customer typed, in order; it goes to painters with the job
+          userMessages: state.history.filter((m) => m.role === 'user').map((m) => m.text),
         };
         try {
           // Always a fresh hold window here — this whole block only runs for

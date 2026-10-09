@@ -1,6 +1,7 @@
 // Shared bits for sending a painter a job offer and describing a job's timing.
 
 import { notify } from './notify.ts'
+import { conversationNote } from './conversationLog.ts'
 
 // deno-lint-ignore no-explicit-any
 type Supabase = any
@@ -17,7 +18,7 @@ export interface OfferJob {
   timeline: string | null
   estimated_days: number | null
   painter_payout_amount: number | null
-  project_summary: { qa?: unknown[]; timelineLabel?: string } | null
+  project_summary: { qa?: unknown[]; timelineLabel?: string; conversation?: string[] } | null
   photos: unknown[] | null
 }
 
@@ -73,6 +74,8 @@ export async function sendPainterOffer(
         payoutAmount: job.painter_payout_amount,
         acceptUrl: `${frontendUrl}/painter/accept-job?token=${job.claim_token}&painter_id=${painter.id}`,
         qa: job.project_summary?.qa ?? [],
+        conversation: job.project_summary?.conversation ?? [],
+        conversationNote: conversationNote(job.project_summary?.conversation ?? []),
         photos: job.photos ?? [],
       },
     }),

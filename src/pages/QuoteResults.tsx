@@ -21,6 +21,8 @@ interface LocationState {
   assumptions: Assumption[];
   matchedSituations: MatchedSituation[];
   transcript: string;
+  /** Everything the customer typed, in order (sent to painters with the job). */
+  userMessages?: string[];
   loyaltyDiscountPercent?: number;
   expiresAt?: number;
   /** Set when reloaded from a "your painter declined" email: ties claims to that 72-hour window. */
@@ -395,7 +397,8 @@ const QuoteResults = () => {
           guaranteedPrice={claimTarget.selectionType === 'specific_painter' ? claimTarget.price : (results?.mystery.price ?? Math.round(estimate.total))}
           priceToken={claimTarget.selectionType === 'specific_painter' ? claimTarget.priceToken : (results?.mystery.priceToken ?? '')}
           resumeToken={state.resumeToken}
-          resumeState={{ ctx, estimate, assumptions, transcript: state.transcript, loyaltyDiscountPercent: state.loyaltyDiscountPercent }}
+          conversation={state.userMessages ?? state.transcript.split('\n').filter(Boolean)}
+          resumeState={{ ctx, estimate, assumptions, transcript: state.transcript, userMessages: state.userMessages, loyaltyDiscountPercent: state.loyaltyDiscountPercent }}
           onPriceExpired={() => { setClaimTarget(null); setResults(null); loadResults(); }}
           onClose={() => setClaimTarget(null)}
         />
@@ -418,6 +421,7 @@ const ClaimPriceModal = ({
   guaranteedPrice,
   priceToken,
   resumeToken,
+  conversation,
   resumeState,
   onPriceExpired,
   onClose,
@@ -427,6 +431,7 @@ const ClaimPriceModal = ({
   guaranteedPrice: number;
   priceToken: string;
   resumeToken?: string;
+  conversation: string[];
   resumeState: unknown;
   onPriceExpired: () => void;
   onClose: () => void;
@@ -461,6 +466,7 @@ const ClaimPriceModal = ({
           timeline: ctx.timeline,
           timelineLabel: timelineLabel(ctx.timeline),
           qa: buildResponseSummary(ctx),
+          conversation,
           preferredDate: preferredDate || undefined,
           customerId: user?.id,
           photos: ctx.photos.length > 0 ? ctx.photos : undefined,

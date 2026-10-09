@@ -11,6 +11,9 @@ interface Preview {
   timing: string;
   estimatedDays: number;
   qa: { question: string; answer: string }[];
+  /** Everything the customer typed in the chat, in order. */
+  conversation?: string[];
+  conversationNote?: string | null;
   photos: { url: string; description: string; label: string }[];
 }
 
@@ -112,6 +115,18 @@ export default function AcceptJob() {
                   <strong>{item.question}:</strong> {item.answer}
                 </p>
               ))}
+            </div>
+          )}
+
+          {preview.conversation && preview.conversation.length > 0 && (
+            <div style={card}>
+              <p style={{ color: 'var(--text-primary)', fontWeight: 600, margin: '0 0 4px' }}>What the customer typed (every reply, in order)</p>
+              {preview.conversationNote && <p style={{ color: '#b45309', fontSize: '0.85rem', margin: '4px 0 8px' }}>⚠ {preview.conversationNote}</p>}
+              <ol style={{ margin: '8px 0 0', paddingLeft: 20, color: 'var(--text-secondary)', fontSize: '0.88rem' }}>
+                {preview.conversation.map((line, i) => (
+                  <li key={i} style={{ margin: '3px 0' }}>{line}</li>
+                ))}
+              </ol>
             </div>
           )}
 

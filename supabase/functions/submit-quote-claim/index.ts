@@ -23,6 +23,7 @@ import { verifyPrice } from '../_shared/priceToken.ts'
 import { evaluateAvailability, isIsoDate } from '../_shared/availability.ts'
 import { estimateWorkingDays } from '../_shared/duration.ts'
 import { describeTiming } from '../_shared/offers.ts'
+import { cleanConversation, conversationRejected, conversationNote } from '../_shared/conversationLog.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -62,6 +63,8 @@ interface ClaimRequest {
   timeline: string
   timelineLabel: string
   qa: ResponseQA[]
+  /** Everything the customer typed in the chat, in order, so painters can read it. */
+  conversation?: string[]
   /** Optional — a request, not a commitment. The painter sets the actual scheduled_date when accepting. */
   preferredDate?: string
   /** Set when the customer was logged in at claim time, so My Projects can find this row without relying on email matching. */
@@ -101,6 +104,14 @@ serve(async (req: Request) => {
       selectionType, selectedPainterId, guaranteedPrice, quoteZip, customer, timeline, timelineLabel, qa,
       preferredDate, parentQuoteId, phaseLabel, photos, priceToken, timing, resumeState, resumeToken,
     } = body
+
+    const conversation = cleanConversation(body.conversation)
+    if (conversationRejected(conversation)) {
+      return new Response(
+        JSON.stringify({ error: "Hmm… we can't send this one to painters. Please start over and tell us about your painting project.", code: 'conversation_rejected' }),
+        { status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      )
+    }
 
     if (!selectionType || !guaranteedPrice || !customer?.name || !customer?.email || !customer?.phone || !customer?.streetAddress) {
       return new Response(
@@ -245,7 +256,7 @@ serve(async (req: Request) => {
         guaranteed_price: guaranteedPrice,
         selected_painter_id: selectionType === 'specific_painter' ? selectedPainterId : null,
         selected_painter_price: guaranteedPrice,
-        project_summary: { qa, timeline, timelineLabel },
+        project_summary: { qa, timeline, timelineLabel, conversation },
         photos: photos ?? [],
         notified_painters: notifiedPainters.map((p) => p.id),
         status: 'offer_sent',
@@ -309,6 +320,8 @@ serve(async (req: Request) => {
               payoutAmount: painterPayoutAmount,
               acceptUrl,
               qa,
+              conversation,
+              conversationNote: conversationNote(conversation),
               photos: photos ?? [],
             },
           }),
