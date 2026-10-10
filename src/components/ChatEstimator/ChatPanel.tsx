@@ -5,6 +5,7 @@ import {
   makeWorkWithAgainState,
   handleUserMessage,
   applyUploadedPhoto,
+  applyUploadedPhotos,
   applyPhotoAssessment,
   serializeChatState,
   deserializeChatState,
@@ -15,6 +16,7 @@ import { CHAT_STATE_KEY, QUOTE_EXPIRES_KEY, QUOTE_RESULT_KEY, PRICE_HOLD_MINUTES
 import { composerPrompt, GENERIC_PROMPT } from '../../lib/promptHints';
 import { isTTSSupported, speak, stopSpeaking, setupSpeechUnlock } from '../../lib/textToSpeech';
 import { uploadQuotePhoto, analyzeQuotePhoto } from '../../lib/chatEstimator/photoUpload';
+import PhotoPopup from './PhotoPopup';
 import { loadAccountChatState, saveAccountChatState, deleteAccountChatState } from '../../lib/chatEstimator/accountPersistence';
 import { useAuth } from '../../lib/auth';
 
@@ -360,7 +362,29 @@ const ChatPanel = () => {
     }
   }
 
+  // the "attach photo" link: up to five photos at once
+  const [photoPopupOpen, setPhotoPopupOpen] = useState(false);
+
+  async function submitPhotoPopup(photos: { file: File; caption: string }[]) {
+    const uploaded: { url: string; description: string }[] = [];
+    for (const p of photos) {
+      const url = await uploadQuotePhoto(p.file);
+      uploaded.push({ url, description: p.caption || 'Photo of the property' });
+    }
+    setState((prev) => applyUploadedPhotos(prev, uploaded));
+    setPhotoPopupOpen(false);
+    // best-effort read of the first photo only (each read costs a vision call)
+    const first = uploaded[0];
+    analyzeQuotePhoto(first.url, first.description, 'the property').then((assessment) => {
+      if (assessment) setState((prev) => applyPhotoAssessment(prev, 'property', assessment));
+    });
+  }
+
   function handlePhotoLinkClick(id: string, label: string) {
+    if (id === 'photos') {
+      setPhotoPopupOpen(true);
+      return;
+    }
     setPhotoError('');
     setPendingPhotoRequest({ id, label });
     photoInputRef.current?.click();
@@ -609,6 +633,8 @@ const ChatPanel = () => {
         style={{ display: 'none' }}
       />
 
+      {photoPopupOpen && <PhotoPopup onClose={() => setPhotoPopupOpen(false)} onSubmit={submitPhotoPopup} />}
+
       {pendingPhotoFile && pendingPhotoRequest && (
         <div className="chat-photo-modal-overlay" onClick={cancelPhotoUpload}>
           <div className="chat-photo-modal" onClick={(e) => e.stopPropagation()}>
@@ -651,10 +677,18 @@ const ChatPanel = () => {
 
 /** Renders **bold** markers as <strong>, and [[photo:id|label]] markers as a clickable "provide a picture" link. */
 function renderText(text: string, onPhotoRequest: (id: string, label: string) => void): ReactNode[] {
-  const parts = text.split(/(\*\*[^*]+\*\*|\[\[photo:[^|]+\|[^\]]+\]\])/g);
+  const parts = text.split(/(\*\*[^*]+\*\*|\[\[photo:[^|]+\|[^\]]+\]\]|\[\[photos\|[^\]]+\]\])/g);
   return parts.map((p, i) => {
     const bold = p.match(/^\*\*([^*]+)\*\*$/);
     if (bold) return <strong key={i}>{bold[1]}</strong>;
+    const attach = p.match(/^\[\[photos\|([^\]]+)\]\]$/);
+    if (attach) {
+      return (
+        <button key={i} type="button" className="chat-photo-link" onClick={() => onPhotoRequest('photos', attach[1])}>
+          {'\u{1F4CE}'} {attach[1].charAt(0).toUpperCase() + attach[1].slice(1)}
+        </button>
+      );
+    }
     const photo = p.match(/^\[\[photo:([^|]+)\|([^\]]+)\]\]$/);
     if (photo) {
       const [, id, label] = photo;

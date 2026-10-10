@@ -857,3 +857,97 @@
 @media (prefers-reduced-motion: reduce) {
   .chat-brush-orbit { animation-duration: 3s; }
 }
+
+/* "Attach photo" popup: up to five photos in one go */
+.chat-photo-modal-wide {
+  max-width: 560px;
+}
+
+.chat-photo-tip {
+  margin: 0 0 12px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent-blue) 12%, transparent);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.chat-photo-slots {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.chat-photo-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.chat-photo-slot-empty {
+  aspect-ratio: 4 / 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border: 1px dashed var(--accent-blue);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent-blue) 8%, transparent);
+  color: var(--accent-blue);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.chat-photo-slot-empty span:first-child {
+  font-size: 1.4rem;
+  line-height: 1;
+}
+
+.chat-photo-slot-frame {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--bg-page);
+}
+
+.chat-photo-slot-frame img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.chat-photo-slot-remove {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.chat-photo-slot-caption {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--input-border);
+  background: var(--bg-page);
+  color: var(--text-primary);
+  font-size: 0.75rem;
+}
+
+.chat-photo-fine {
+  margin: 10px 0 0;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+}

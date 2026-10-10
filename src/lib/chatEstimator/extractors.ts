@@ -1683,7 +1683,7 @@ export function extractAll(text: string, prev: EstimatorContext, lastBotTopicId:
       if (mentionTr) surf.trim = 'no';
       if (mentionD) surf.doors = 'no';
     }
-    if (/\b(everything|all of it|the works|full (?:package|scope)|the whole (?:thing|room)|the usual|standard)\b/.test(low)) {
+    if (/\b(everything|all of it|the works|full (?:package|scope)|(?:the )?whole (?:thing|room|place|apartment|house|home|unit|space)|the usual|standard)\b/.test(low)) {
       surf.everything = true;
       surf.walls = 'yes'; surf.ceilings = 'yes'; surf.trim = 'yes'; surf.doors = 'yes';
     } else if (w || c || tr || d) {
@@ -1700,7 +1700,11 @@ export function extractAll(text: string, prev: EstimatorContext, lastBotTopicId:
   if (surf.trim !== undefined) patch.interiorTrim = surf.trim;
   if (surf.doors !== undefined) patch.interiorDoors = surf.doors === 'yes' ? 'some' : 'none';
   if (surf.closets !== undefined) patch.closets = surf.closets === 'yes' ? 'standard' : 'none';
-  if (surf.everything) acks.push('whole room');
+  if (surf.everything) {
+    acks.push('whole room');
+    // "the whole room" is the full package, trim and doors included, which the estimator reads back to the customer; no separate trim question
+    patch.trimScopeAddressed = true;
+  }
   if (surf.walls === 'yes' && surf.trim === 'no') {
     const named = [surf.walls === 'yes' ? 'walls' : '', surf.ceilings === 'yes' ? 'ceilings' : '', surf.doors === 'yes' ? 'doors' : ''].filter(Boolean);
     acks.push(named.length === 1 ? 'walls only' : named.join(' and ') + ', no trim');

@@ -179,6 +179,24 @@ export function applyUploadedPhoto(
   };
 }
 
+/** Several photos attached at once from the popup (they count as the pictures of the property). */
+export function applyUploadedPhotos(
+  state: ChatState,
+  photos: { url: string; description: string }[],
+): ChatState {
+  const photoRequests = state.ctx.photoRequests.map((r) => (r.id === 'property' ? { ...r, fulfilled: true } : r));
+  const stamp = Date.now();
+  const added = photos.map((p, i) => ({ id: `property-${stamp}-${i}`, url: p.url, description: p.description, label: 'the property' }));
+  return {
+    ...state,
+    ctx: { ...state.ctx, photoRequests, photos: [...state.ctx.photos, ...added] },
+    history: [
+      ...state.history,
+      botMessage(photos.length === 1 ? 'Got the photo, thanks, that helps a lot.' : `Got ${photos.length} photos, thanks, that helps a lot.`),
+    ],
+  };
+}
+
 export interface PhotoAssessment {
   severity: 'minor' | 'moderate' | 'extensive' | null;
   matchesDescription: boolean;
@@ -571,6 +589,16 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
     responseLengths,
   };
 
+  // "The whole room" / "the whole place" / "everything" as the answer to what gets painted: read back what that covers, so the
+  // customer can correct it, instead of moving on as if only a word had been said.
+  const fullScopeAnswer =
+    state.lastBotTopic?.id === 'surfaces' &&
+    /\b(everything|all of it|the works|full (?:package|scope)|(?:the )?whole (?:thing|room|place|apartment|house|home|unit|space))\b/i.test(trimmed) &&
+    ctxNext.surfacesAddressed &&
+    ctxNext.interiorWalls !== 'no' && ctxNext.interiorCeilings !== 'no' && ctxNext.interiorTrim !== 'no' && ctxNext.interiorDoors !== 'none';
+  // the full package includes the trim and doors, which the read-back covers: no separate trim question afterwards
+  if (fullScopeAnswer) ctxNext.trimScopeAddressed = true;
+
   // Photo-request triggers — a bare keyword match, run independently of
   // whichever extraction path (LLM or regex) handled the rest of this
   // message, and deduplicated against requests already raised so the same
@@ -855,7 +883,7 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
       // detail shots above) help painters respond faster and with more
       // confidence, so it's worth inviting even for a straightforward job.
       const alreadyAskedForProperty = ctxNext.photoRequests.some((r) => r.id === 'property');
-      const propertyMarker = alreadyAskedForProperty ? '' : '[[photo:property|the property]] ';
+      const propertyMarker = alreadyAskedForProperty ? '' : '[[photos|attach photo]] ';
 
       // Anything raised earlier in the conversation that never got a photo
       // attached — remind here rather than letting it quietly drop, since
@@ -876,7 +904,7 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
         history: [
           ...s.history,
           botMessage(
-            `I think I've got enough to put a number together. ${reminderLeadIn}${reminderMarkers}${reminderMarkers ? ' ' : ''}${propertyMarker}A couple of photos of the property help painters respond faster and with more confidence, so feel free to attach some. ` +
+            `I think I've got enough to put a number together. ${reminderLeadIn}${reminderMarkers}${reminderMarkers ? ' ' : ''}A couple of photos of the property help painters respond faster and with more confidence, please attach some here. ${propertyMarker}` +
               "Anything else I should know, like the ceiling height? " +
               "Otherwise just say 'run it' and I'll price it out.",
           ),
@@ -891,7 +919,9 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
   // 8. Ask the next topic — lead with a brief acknowledgment of what was
   //    just said so the reply doesn't read as a non-sequitur when the user
   //    volunteers detail beyond what the last question asked for.
-  const ackLeadIn = acknowledgements.length > 0
+  const ackLeadIn = fullScopeAnswer
+    ? 'Got it, so the walls, ceilings, trim and doors, correct? '
+    : acknowledgements.length > 0
     ? `${ACK_LEAD_INS[s.askedIds.length % ACK_LEAD_INS.length]} ${acknowledgements.join(', ')}. `
     : '';
   const prompt = ackLeadIn + (photoLinkMarker ? `${photoLinkMarker} ` : '') + next.ask(ctxNext);

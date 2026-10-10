@@ -3,6 +3,39 @@ import type { PhotoAssessment } from './chatEngine';
 
 const BUCKET = 'quote-photos';
 
+/** The popup takes up to this many photos. */
+export const MAX_POPUP_PHOTOS = 5;
+/** Longest side after shrinking, and the quality it is saved at: a room photo comes out around 200 to 500 KB. */
+const MAX_SIDE = 1600;
+const JPEG_QUALITY = 0.8;
+/** Photos bigger than this (before shrinking) are refused. */
+const MAX_INPUT_BYTES = 25 * 1024 * 1024;
+
+/** Shrinks a photo (longest side 1600px, JPEG) so it is cheap to upload, store and send to painters. */
+export async function compressImage(file: File): Promise<File> {
+  if (file.size > MAX_INPUT_BYTES) throw new Error('too large');
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height));
+  const width = Math.max(1, Math.round(bitmap.width * scale));
+  const height = Math.max(1, Math.round(bitmap.height * scale));
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('no canvas');
+  ctx.drawImage(bitmap, 0, 0, width, height);
+  bitmap.close?.();
+  let quality = JPEG_QUALITY;
+  let blob: Blob | null = null;
+  for (let i = 0; i < 3; i++) {
+    blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality));
+    if (blob && blob.size <= 900 * 1024) break;
+    quality -= 0.15;
+  }
+  if (!blob) throw new Error('could not shrink');
+  return new File([blob], 'photo.jpg', { type: 'image/jpeg' });
+}
+
 /** Uploads a photo the customer picked/took and returns its public URL. */
 export async function uploadQuotePhoto(file: File): Promise<string> {
   const ext = file.name.split('.').pop()?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';

@@ -34,7 +34,7 @@ const TOPIC_PROMPTS: Record<string, string> = {
 
 /** The final question in a message (an explanation that follows it is not the question). */
 function coreQuestion(text: string): string {
-  const flat = text.replace(/\[\[photo:[^\]]*\]\]/g, ' ').replace(/\s+/g, ' ');
+  const flat = text.replace(/\[\[photos?[:|][^\]]*\]\]/g, ' ').replace(/\s+/g, ' ');
   const questions = flat.match(/[^.!?]*\?/g);
   return (questions && questions[questions.length - 1].trim()) || flat;
 }

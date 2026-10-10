@@ -32,7 +32,7 @@ export function naturalizeForSpeech(text: string): string {
   // ChatPanel, but not meant to be read aloud at all; drop entirely rather
   // than speaking the label, then collapse the double space this leaves
   // behind between the surrounding sentences.
-  s = s.replace(/\[\[photo:[^|]+\|[^\]]+\]\]/g, '').replace(/ {2,}/g, ' ').trim();
+  s = s.replace(/\[\[photos?[:|][^\]]*\]\]/g, '').replace(/ {2,}/g, ' ').trim();
 
   // Any stray middle dots (shouldn't normally happen, but a literal "·"
   // glyph read aloud is worse than a dropped one) — treat as a soft "or"
