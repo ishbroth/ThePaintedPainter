@@ -504,6 +504,8 @@ const ChatPanel = () => {
   function onComposerInput(e: React.FormEvent<HTMLSpanElement>) {
     const el = e.currentTarget;
     const text = el.textContent ?? '';
+    // starting to type also starts the greeting, if it hasn't played yet
+    playIntroIfFreshRef.current();
     // a browser can leave a stray <br> behind once everything is deleted, which would hide the placeholder
     if (text === '') el.innerHTML = '';
     setInput(text);
@@ -612,8 +614,9 @@ const ChatPanel = () => {
               className="chat-bubble chat-bubble-user chat-composer"
               onClick={() => {
                 composerRef.current?.focus();
-                // phones and tablets: this tap is what starts the voice (it's a real touch, which also lets the browser play audio)
-                if (!keyboardDevice) playIntroIfFreshRef.current();
+                // clicking or tapping the typing bubble starts the greeting if it hasn't played yet (phones need this tap; on a laptop
+                // it covers someone who hasn't scrolled). It plays once: after the scroll trigger has played it, this does nothing.
+                playIntroIfFreshRef.current();
               }}
             >
               <span
