@@ -12,7 +12,7 @@ import {
 } from '../../lib/chatEstimator/chatEngine';
 import { hapticLight } from '../../lib/haptics';
 import { CHAT_STATE_KEY, QUOTE_EXPIRES_KEY, QUOTE_RESULT_KEY, PRICE_HOLD_MINUTES, clearEstimatorSession, isExpiredFinishedChat, readWorkWithAgain, clearWorkWithAgain } from '../../lib/chatEstimator/persistence';
-import { splitPrompt, topicHint } from '../../lib/promptHints';
+import { composerPrompt, GENERIC_PROMPT } from '../../lib/promptHints';
 import { isTTSSupported, speak, stopSpeaking, setupSpeechUnlock } from '../../lib/textToSpeech';
 import { uploadQuotePhoto, analyzeQuotePhoto } from '../../lib/chatEstimator/photoUpload';
 import { loadAccountChatState, saveAccountChatState, deleteAccountChatState } from '../../lib/chatEstimator/accountPersistence';
@@ -73,10 +73,10 @@ const ChatPanel = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const ttsSupported = isTTSSupported();
-  // First reply: a plain invitation. After that, the options the question offered (kept out of the spoken question) sit here, subdued.
+  // First reply: a plain invitation. After that, the core of the question being asked, rephrased short ("Please estimate square feet").
   const lastBotText = [...state.history].reverse().find((m) => m.role === 'bot')?.text ?? '';
   const hasAnswered = state.history.some((m) => m.role === 'user');
-  const composerPlaceholder = (hasAnswered && (splitPrompt(lastBotText).hint || topicHint(state.lastBotTopic?.id))) || 'Type or talk here.';
+  const composerPlaceholder = hasAnswered ? composerPrompt(lastBotText, state.lastBotTopic?.id) : GENERIC_PROMPT;
   // Skip anything already in history at mount (restored conversations, or
   // the initial greeting) — only speak messages that arrive from here on,
   // so turning read-aloud on doesn't unexpectedly narrate the whole past
