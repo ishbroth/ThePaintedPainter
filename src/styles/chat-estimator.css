@@ -951,3 +951,29 @@
   color: var(--text-secondary);
   font-size: 0.75rem;
 }
+
+/* Touch screens: text at 16px or more, or the phone zooms in on the page when the keypad opens */
+@media (pointer: coarse) {
+  .chat-composer,
+  .chat-composer-text,
+  .chat-photo-desc-input,
+  .chat-photo-slot-caption {
+    font-size: 16px;
+  }
+}
+
+/* Keypad open (phones, tablets): the estimator fills the visible top half, with the conversation scrolling inside it */
+.chat-estimator-section.keyboard-open {
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+.chat-estimator-section.keyboard-open .chat-messages {
+  max-height: calc(var(--vvh, 50vh) - 150px);
+  min-height: 0;
+}
+
+.chat-estimator-section.keyboard-open .chat-estimator-header p,
+.chat-estimator-section.keyboard-open .chat-input-hint {
+  display: none;
+}

@@ -454,6 +454,33 @@ const ChatPanel = () => {
     if (afterSend) el.scrollIntoView({ block: 'nearest' });
   }, [keyboardDevice, thinking, waiting, state.history.length]);
 
+  // Phones and tablets: when the keypad comes up, the estimator takes the top half of what is left on screen and the keypad the
+  // bottom half (the page scrolls so the estimator's top is at the top, and the conversation area is sized to what is visible).
+  useEffect(() => {
+    if (keyboardDevice) return;
+    const vv = window.visualViewport;
+    if (!vv) return;
+    let wasOpen = false;
+    const onResize = () => {
+      const open = vv.height < window.innerHeight - 140;
+      document.documentElement.style.setProperty('--vvh', `${Math.round(vv.height)}px`);
+      sectionRef.current?.classList.toggle('keyboard-open', open);
+      if (open && !wasOpen) {
+        window.setTimeout(() => {
+          sectionRef.current?.querySelector('.chat-estimator-card')?.scrollIntoView({ block: 'start' });
+          messagesRef.current?.scrollTo({ top: messagesRef.current.scrollHeight });
+          composerRef.current?.scrollIntoView({ block: 'nearest' });
+        }, 60);
+      }
+      wasOpen = open;
+    };
+    vv.addEventListener('resize', onResize);
+    return () => {
+      vv.removeEventListener('resize', onResize);
+      sectionRef.current?.classList.remove('keyboard-open');
+    };
+  }, [keyboardDevice]);
+
   // Typing while focus is elsewhere on the page (after clicking the background, say) goes to the box too.
   useEffect(() => {
     if (!keyboardDevice) return;
