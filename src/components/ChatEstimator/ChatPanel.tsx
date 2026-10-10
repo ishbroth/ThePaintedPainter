@@ -465,7 +465,7 @@ const ChatPanel = () => {
       <div className="chat-estimator-card">
         <div className="chat-estimator-header">
           <div className="chat-estimator-header-row">
-            <h2>Get Your Free Painting Price</h2>
+            <h2>Pick Your Price, Pick Your Painter.</h2>
             {ttsSupported && (
               <button
                 type="button"
