@@ -37,10 +37,7 @@ const SiteBackground = () => {
       screenHeight = window.innerHeight;
       size = Math.round(window.innerWidth * WIDTH_OVER_SCREEN);
       root.style.setProperty('--hero-size', `${size}px`);
-      const overhang = Math.max(0, size - screenHeight);
-      // taller than the screen: start as far down as possible (the most of the top row of houses) while the brush is still on screen
-      // (nudged a little further down than that: the brush handle's tip may sit just past the bottom edge)
-      // (no longer: the picture starts with its top, the row of houses included, exactly at the top of the screen)
+      // the picture starts with its top, the row of houses included, exactly at the top of the screen
       startShift = 0;
       const main = document.querySelector('main');
       const headerHeight = main ? Math.max(0, Math.round(main.getBoundingClientRect().top + window.scrollY)) : 0;
