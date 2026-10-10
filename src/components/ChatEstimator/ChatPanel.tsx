@@ -575,7 +575,14 @@ const ChatPanel = () => {
           )}
           {/* One open window: your answer is typed right here, under the question, with Send at the end of what you type. */}
           {!waiting && !thinking && (
-            <div className="chat-bubble chat-bubble-user chat-composer" onClick={() => composerRef.current?.focus()}>
+            <div
+              className="chat-bubble chat-bubble-user chat-composer"
+              onClick={() => {
+                composerRef.current?.focus();
+                // phones and tablets: this tap is what starts the voice (it's a real touch, which also lets the browser play audio)
+                if (!keyboardDevice) playIntroIfFreshRef.current();
+              }}
+            >
               <span
                 ref={composerRef}
                 className="chat-composer-text"

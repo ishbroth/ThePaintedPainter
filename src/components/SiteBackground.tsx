@@ -42,11 +42,21 @@ const SiteBackground = () => {
       // above it. The picture is scaled (equal proportions) so the lettering lands there with the picture's top at the top of
       // the screen; it is never much narrower than the screen (a bit of the top row can be cut off instead) nor much wider
       // than it (on a tall phone screen the picture then starts a little lower, over the blurred fill).
-      const cardTop = Math.round(screenHeight * 0.75);
+      let cardTop = Math.round(screenHeight * 0.75);
       const letteringBottom = cardTop - LETTERING_GAP;
       const fit = letteringBottom / TITLE_BOTTOM;
-      size = Math.round(Math.min(window.innerWidth * MAX_WIDTH_OVER_SCREEN, Math.max(window.innerWidth * MIN_WIDTH_OVER_SCREEN, fit)));
-      startShift = Math.round(letteringBottom - size * TITLE_BOTTOM);
+      const maxSize = window.innerWidth * MAX_WIDTH_OVER_SCREEN;
+      if (fit > maxSize) {
+        // A tall, narrow screen (a phone held upright): the picture can't be big enough to put the lettering that low, so the
+        // picture stays at its widest with its top at the top of the screen, and the estimator moves up to stay just below the
+        // lettering. Superman, the lettering and the estimator are all pulled up together.
+        size = Math.round(maxSize);
+        startShift = 0;
+        cardTop = Math.round(size * TITLE_BOTTOM + LETTERING_GAP);
+      } else {
+        size = Math.round(Math.max(window.innerWidth * MIN_WIDTH_OVER_SCREEN, fit));
+        startShift = Math.round(letteringBottom - size * TITLE_BOTTOM);
+      }
       root.style.setProperty('--hero-size', `${size}px`);
       // (the card sits 40px below the top of the page content that follows the spacer)
       root.style.setProperty('--hero-spacer', `${Math.max(0, cardTop - headerHeight - 40)}px`);
