@@ -8,10 +8,6 @@ const TITLE_TOP = 0.4956;
 const TITLE_BOTTOM = 0.5594;
 /** The estimator card starts a little below the lettering. */
 const CARD_BELOW_TITLE = 0.565;
-/** How far down the picture the bottom of the brush reaches (share of the picture's height); it has to stay on screen at the start. */
-const BRUSH_BOTTOM = 0.72;
-/** Extra nudge down, as a share of the screen height (about 54px on a 900px-tall screen). */
-const EXTRA_DOWN = 0.06;
 
 /**
  * The hero collage (Superman with the houses around him) as a translucent background.
@@ -44,12 +40,13 @@ const SiteBackground = () => {
       const overhang = Math.max(0, size - screenHeight);
       // taller than the screen: start as far down as possible (the most of the top row of houses) while the brush is still on screen
       // (nudged a little further down than that: the brush handle's tip may sit just past the bottom edge)
-      startShift = overhang > 0 ? -Math.min(overhang, Math.max(0, size * BRUSH_BOTTOM - screenHeight + 10 - screenHeight * EXTRA_DOWN)) : 0;
+      // (no longer: the picture starts with its top, the row of houses included, exactly at the top of the screen)
+      startShift = 0;
       const main = document.querySelector('main');
       const headerHeight = main ? Math.max(0, Math.round(main.getBoundingClientRect().top + window.scrollY)) : 0;
       // The estimator card starts just under Superman's body, but never above the middle of the screen (so a small scroll
       // is what brings it into view and starts the spoken intro) and never so low that none of it shows.
-      const cardTop = Math.min(Math.max(size * CARD_BELOW_TITLE + startShift + 8, screenHeight * 0.52), screenHeight * 0.86);
+      const cardTop = Math.min(Math.max(size * CARD_BELOW_TITLE + startShift + 8, screenHeight * 0.52), screenHeight * 0.95);
       root.style.setProperty('--hero-spacer', `${Math.max(0, Math.round(cardTop - headerHeight - 40))}px`);
       place();
     };

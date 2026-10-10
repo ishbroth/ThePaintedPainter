@@ -845,16 +845,15 @@
   gap: 10px;
 }
 
-.chat-brush-swing {
-  transform-origin: 24px 4px;
-  animation: chat-brush-swing 0.75s ease-in-out infinite alternate;
+.chat-brush-orbit {
+  transform-origin: 24px 24px;
+  animation: chat-brush-orbit 0.9s linear infinite;
 }
 
-@keyframes chat-brush-swing {
-  from { transform: rotate(-28deg); }
-  to { transform: rotate(28deg); }
+@keyframes chat-brush-orbit {
+  to { transform: rotate(360deg); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .chat-brush-swing { animation: none; }
+  .chat-brush-orbit { animation-duration: 3s; }
 }

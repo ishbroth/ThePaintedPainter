@@ -521,17 +521,21 @@ const ChatPanel = () => {
               )}
             </div>
           ))}
-          {waiting && (
+          {/* Only while a price is actually being prepared (not when coming back to a finished chat) */}
+          {waiting && !restoredAlreadyFinishedRef.current && (
             <div className="chat-bubble chat-bubble-bot">
               <div className="chat-bubble-text chat-loading chat-preparing">
-                <svg className="chat-brush-spinner" viewBox="0 0 48 48" width="34" height="34" aria-hidden="true">
-                  <g className="chat-brush-swing">
-                    <rect x="22" y="2" width="5" height="22" rx="2.5" fill="#8a5a2b" />
-                    <rect x="20" y="22" width="9" height="7" rx="1" fill="#b9bec6" />
-                    <path d="M19.5 29 h10 l-1 14 q-4 3 -8 0 z" fill="#ff8a3d" />
+                <span>Preparing your results…</span>
+                <svg className="chat-brush-spinner" viewBox="0 0 48 48" width="30" height="30" aria-hidden="true">
+                  <circle cx="24" cy="24" r="18" fill="none" stroke="#f3d9c4" strokeWidth="3" />
+                  <g className="chat-brush-orbit">
+                    <g transform="translate(24 3) rotate(90)">
+                      <rect x="-1" y="-2.2" width="11" height="4.4" rx="2.2" fill="#8a5a2b" />
+                      <rect x="9" y="-3" width="4" height="6" fill="#b9bec6" />
+                      <path d="M13 -3 h7 q3 3 0 6 h-7 z" fill="#ff8a3d" />
+                    </g>
                   </g>
                 </svg>
-                <span>Preparing your results…</span>
               </div>
             </div>
           )}
