@@ -139,7 +139,7 @@ export function makeInitialState(): ChatState {
     history: [
       {
         role: 'bot',
-        text: "Hello citizen. What do you need painted?",
+        text: "Hello, citizen. What do you need painted?",
         timestamp: Date.now(),
       },
     ],
