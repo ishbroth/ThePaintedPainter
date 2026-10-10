@@ -427,8 +427,8 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
       const surfacesTopic = findTopic('surfaces');
       const scopeQuestion =
         state.ctx.projectType === 'both'
-          ? 'Inside, which of these are being painted: walls, ceilings, trim, doors? And outside, is it just the siding, or the trim, doors, deck and fence too?'
-          : 'Which of these are being painted: walls, ceilings, trim, doors? (Say "everything" or list the ones you want.)';
+          ? 'Inside, what all is being painted? And outside, is it just the siding, or more than that?'
+          : 'What all is being painted?';
       return asBot(
         {
           ctx: reset,
@@ -877,7 +877,7 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
           ...s.history,
           botMessage(
             `I think I've got enough to put a number together. ${reminderLeadIn}${reminderMarkers}${reminderMarkers ? ' ' : ''}${propertyMarker}A couple of photos of the property help painters respond faster and with more confidence, so feel free to attach some. ` +
-              "Anything else I should know — unusual heights, tough access, special colors, timing? " +
+              "Anything else I should know, like the ceiling height? " +
               "Otherwise just say 'run it' and I'll price it out.",
           ),
         ],
@@ -1104,7 +1104,7 @@ function lineItemNotes(ctx: EstimatorContext, lineItems: EstimateLineItem[]): st
     notes.push("I've included a boom lift rental in the price — that's a real equipment cost, not just extra labor.");
   }
   if (ctx.fixtureRemoval === 'extensive') {
-    notes.push("I've added time for removing and reinstalling fixtures/hardware around the work area.");
+    notes.push("I've added time for removing and reinstalling fixtures and hardware around the work area.");
   }
   if (ctx.hardwareReplacement === 'yes') {
     notes.push("I've included labor for the hardware install — just note the hardware itself is a separate cost.");

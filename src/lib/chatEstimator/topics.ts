@@ -89,12 +89,12 @@ export const TOPICS: Topic[] = [
     ask: (c) =>
       pick(
         [
-          "Quick one — interior, exterior, or both?",
+          "Quick one, is this interior, exterior, or both?",
           "Are we working on the inside, the outside, or both?",
           "Is this interior or exterior painting?",
-          "Interior, exterior, or the whole house inside and out?",
-          "What are we tackling — inside, outside, or both?",
-          "Just so I scope this right — inside, outside, or both?",
+          "Are we painting the inside, the outside, or both?",
+          "What are we tackling, the inside, the outside, or both?",
+          "Just so I scope this right, is it inside, outside, or both?",
         ],
         seed(c),
       ),
@@ -117,16 +117,16 @@ export const TOPICS: Topic[] = [
       const t = c.additionalDetails.toLowerCase();
       const vague = /(a room|just a room|one room)/.test(t);
       if (vague) {
-        return "Got it — which room? Bedroom, living room, kitchen, bathroom, something else?";
+        return "Got it, which room?";
       }
       return pick(
         [
-          "Which rooms are we painting? List as many as you like.",
+          "Which rooms are we painting?",
           "Which room or rooms should we price out?",
           "What rooms are on the list?",
-          "Which spaces are we covering — go ahead and rattle them off.",
-          "Give me the room list — bedrooms, living areas, whatever's getting painted.",
-          "What all needs paint? Just name the rooms.",
+          "Which spaces are we covering?",
+          "What rooms are getting painted?",
+          "What all needs paint?",
         ],
         seed(c),
       );
@@ -158,7 +158,7 @@ export const TOPICS: Topic[] = [
         [
           `About how big is that ${label}? Small, medium, large, or do you happen to know the dimensions?`,
           `How big is the ${label} — rough size or actual dimensions, either works.`,
-          `What size ${label} are we talking? Small/medium/large is fine if you don't know exact numbers.`,
+          `What size ${label} are we talking? Small, medium, or large is fine if you don't know exact numbers.`,
         ],
         seed(c),
       );
@@ -185,7 +185,7 @@ export const TOPICS: Topic[] = [
       if (isCommercialLike(c)) {
         return pick(
           [
-            "About how big is the space — total square footage?",
+            "About how big is the space, in total square feet?",
             "What's the total square footage we're working with?",
             "Roughly how many square feet is the space?",
           ],
@@ -195,17 +195,17 @@ export const TOPICS: Topic[] = [
       if (c.bedroomCount) {
         return pick(
           [
-            "And about how many square feet is the place? Bedroom count alone can vary a lot in size, so a rough number helps me price it right.",
-            "Got the bedroom count — do you also know roughly the square footage? It varies enough that a real number helps.",
+            "And about how many square feet is the place?",
+            "Got the bedroom count. Do you also know roughly how many square feet it is?",
           ],
           seed(c),
         );
       }
       return pick(
         [
-          "About how big is the place? Square footage or bedroom count works — whatever you know.",
-          "Roughly how big is it — square footage, or even just bedroom count if that's easier?",
-          "What's the size of the place? A square footage number is ideal, but bedroom count works too.",
+          "About how big is the place?",
+          "Roughly how big is it?",
+          "What's the size of the place?",
         ],
         seed(c),
       );
@@ -244,31 +244,31 @@ export const TOPICS: Topic[] = [
     ask: (c) => {
       // Part of the answer is known ("no trim"): ask about the rest instead of assuming walls only.
       if (c.interiorTrim === 'no' && c.interiorCeilings !== 'no' && c.interiorDoors !== 'none') {
-        return "No trim, got it. What about the ceilings and the doors — are those getting painted, or staying as they are?";
+        return "No trim, got it. What about the ceilings and the doors, are those getting painted?";
       }
       if (c.interiorCeilings === 'no' && c.interiorTrim !== 'no') {
-        return "No ceilings, got it. And the trim and doors — painted too, or staying as they are?";
+        return "No ceilings, got it. And the trim and doors, are those getting painted too?";
       }
       const singular = c.selectedRooms.length === 1;
       const hasKitchen = c.selectedRooms.includes('kitchen');
       if (hasKitchen) {
-        return "For the kitchen — walls, ceiling, trim, doors, and are the cabinets getting painted too?";
+        return "For the kitchen, what all is getting painted, and are the cabinets included?";
       }
       if (singular) {
         const label = roomLabel(c.selectedRooms[0]);
         return pick(
           [
-            `In that ${label}, are we doing just the walls, or walls + ceiling + trim + doors — or somewhere in between?`,
-            `For the ${label} — just walls, or the full package (ceiling, trim, doors too)?`,
+            `In that ${label}, what all are we painting?`,
+            `For the ${label}, are we painting just the walls, or more than that?`,
           ],
           seed(c),
         );
       }
       return pick(
         [
-          "Are we painting just the walls in those rooms, or the full package — walls, ceilings, trim, doors?",
-          "For those rooms — just walls, or everything (ceilings, trim, doors included)?",
-          "How much of each room — walls only, or the full walls/ceiling/trim/door package?",
+          "What all are we painting in those rooms?",
+          "For those rooms, are we painting just the walls, or more than that?",
+          "How much of each room are we painting?",
         ],
         seed(c),
       );
@@ -292,16 +292,16 @@ export const TOPICS: Topic[] = [
     ask: (c) =>
       pick(
         [
-          "Quick one on the trim — is that just the baseboards, or does it also cover door frames/casings, closet shelving, or other woodwork like built-ins?",
-          "When you say trim, do you mean baseboards only, or should I also price door frames, casings, or built-in shelving?",
-          "Just to price the trim right — baseboards alone, or also door frames/casings and any built-in woodwork?",
+          "Quick one on the trim, what does that include?",
+          "When you say trim, what all does that cover?",
+          "Just to price the trim right, what does it include?",
         ],
         seed(c),
       ),
     clarify: () =>
-      "Baseboards alone is one price. Door frames/casings, closet shelving, and built-ins each add their own labor, so it helps to know which ones apply.",
+      "Baseboards alone is one price. Door frames, casings, closet shelving, and built-ins each add their own labor, so it helps to know which ones apply.",
     example: () =>
-      "'Just baseboards' or 'baseboards and door frames' or 'everything — trim, doors, closets, all of it'.",
+      "'Just baseboards', 'baseboards and door frames', or 'everything — trim, doors, closets, all of it'.",
   },
 
   // ——————————————————————————————————————————
@@ -326,10 +326,10 @@ export const TOPICS: Topic[] = [
     ask: (c) =>
       pick(
         [
-          "How are the walls looking right now — smooth and ready, or any holes, cracks, wallpaper, popcorn ceilings, anything like that?",
-          "What kind of shape is it in — clean and ready for paint, or are there repairs to deal with first?",
-          "Any prep concerns I should know about — holes, wallpaper, popcorn ceilings, water stains, that sort of thing?",
-          "Is it in good shape overall, or is there some damage/repair work mixed in?",
+          "How are the walls looking right now?",
+          "What kind of shape is it in?",
+          "Any prep concerns I should know about?",
+          "Is it in good shape overall?",
         ],
         seed(c),
       ),
@@ -355,7 +355,7 @@ export const TOPICS: Topic[] = [
     ask: (c) =>
       pick(
         [
-          "For the popcorn ceiling removal — about how many rooms are we talking?",
+          "For the popcorn ceiling removal, about how many rooms are we talking?",
           "How many rooms need that popcorn texture scraped off?",
         ],
         seed(c),
@@ -378,9 +378,9 @@ export const TOPICS: Topic[] = [
     ask: (c) =>
       pick(
         [
-          "Are you living here, or renting/selling it?",
-          "Is this your home, or a rental/listing?",
-          "Quick one — do you live here, or is it a rental or something you're selling?",
+          "Are you living here, or is it a rental or something you're selling?",
+          "Is this your home, or a rental?",
+          "Quick one, do you live here, or is it a rental?",
         ],
         seed(c),
       ),
@@ -399,11 +399,11 @@ export const TOPICS: Topic[] = [
     relevant: (c) => c.propertyType === 'commercial',
     alreadyAnswered: (c) => !!c.afterHoursRequired,
     ask: () =>
-      "Since it's a business — does this need to happen after hours or on weekends so it doesn't disrupt operations, or can the crew work during the day?",
+      "Since it's a business, when can the crew work so it doesn't disrupt operations?",
     clarify: () =>
       "After-hours or weekend work usually means a bit of a premium since it's outside a normal crew schedule — but it keeps the business running without interruption.",
     example: () =>
-      "E.g., 'needs to be nights/weekends, we're open during the day' or 'daytime is fine, we're flexible'.",
+      "E.g., 'needs to be nights or weekends, we're open during the day' or 'daytime is fine, we're flexible'.",
   },
 
   // ——————————————————————————————————————————
@@ -419,16 +419,16 @@ export const TOPICS: Topic[] = [
     ask: (c) =>
       pick(
         [
-          "Same color going back, or a different one? And if different — anything dramatic like dark-to-light?",
-          "Sticking with the same color, or changing it up? Let me know if it's a big shift like dark to light.",
-          "Are we matching the existing color or going with something new?",
+          "Is it the same color going back, or a different one?",
+          "Are you sticking with the same color, or changing it up?",
+          "Are we matching the existing color, or going with something new?",
         ],
         seed(c),
       ),
     clarify: () =>
       "Going over the same color is usually one coat. A different color is typically two coats. Dark to light (or vice versa) can be three coats, which bumps the price a bit.",
     example: () =>
-      "Like 'same beige going back up' / 'changing to a light gray' / 'going from dark navy to white'.",
+      "Like 'same beige going back up', 'changing to a light gray', or 'going from dark navy to white'.",
   },
 
   // ——————————————————————————————————————————
@@ -447,7 +447,7 @@ export const TOPICS: Topic[] = [
     alreadyAnswered: (c) => !c.colorClarificationNeeded,
     ask: (c) =>
       c.colorClarificationNeeded === 'color_count'
-        ? "How many colors total, roughly?"
+        ? "Roughly how many colors?"
         : "Can you describe where you want the different color(s) — which rooms or walls?",
     clarify: (c) =>
       c.colorClarificationNeeded === 'color_count'
@@ -472,9 +472,9 @@ export const TOPICS: Topic[] = [
     ask: (c) =>
       pick(
         [
-          "Since it's a renovation: where are the other trades at? Drywall taped and textured, trim installed, primer done — or still in progress?",
-          "How far along are the other trades — is drywall/trim finished, or is stuff still being installed?",
-          "What stage is the space in — ready for paint, or are other contractors still working?",
+          "Since it's a renovation, where are the other trades at?",
+          "How far along are the other trades?",
+          "What stage is the space in?",
         ],
         seed(c),
       ),
@@ -495,9 +495,9 @@ export const TOPICS: Topic[] = [
     ask: (c) =>
       pick(
         [
-          "What's the exterior made of — stucco, wood, Hardie board, vinyl, brick, or a mix?",
+          "What's the exterior made of?",
           "What kind of siding does it have?",
-          "What material is the outside — stucco, wood, fiber cement, vinyl, brick, something else?",
+          "What material is the outside?",
         ],
         seed(c),
       ),
@@ -519,16 +519,16 @@ export const TOPICS: Topic[] = [
     alreadyAnswered: (c) => !!c.stories,
     ask: (c) => {
       if (isCommercialLike(c)) {
-        return pick(["How many stories is the building?", "Is the building single-story, two-story, or taller?"], seed(c));
+        return pick(["How many stories is the building?", "How tall is the building?"], seed(c));
       }
       return pick(
-        ["How many stories is the house?", "Is it single-story, two-story, or taller?", "How tall is the place — how many stories?"],
+        ["How many stories is the house?", "How tall is the house?", "How many stories is the place?"],
         seed(c),
       );
     },
     clarify: () =>
-      "Just how tall it is — 1, 2, or 3 stories. Each extra story means more ladder/scaffold time.",
-    example: (c) => (isCommercialLike(c) ? "E.g., 'single story' / 'two story' / 'three-story building'." : "E.g., 'single story' / 'two story' / 'it's a three-story townhouse'."),
+      "Just how tall it is — 1, 2, or 3 stories. Each extra story means more ladder and scaffold time.",
+    example: (c) => (isCommercialLike(c) ? "E.g., 'single story', 'two story', or 'three-story building'." : "E.g., 'single story', 'two story', or 'it's a three-story townhouse'."),
   },
 
   // ——————————————————————————————————————————
@@ -542,9 +542,9 @@ export const TOPICS: Topic[] = [
     ask: (c) =>
       pick(
         [
-          "What ZIP code is the property in? Helps me calibrate local pricing.",
-          "What's the ZIP code there? Rates vary quite a bit by area.",
-          "Where's this located — what ZIP code?",
+          "What ZIP code is the property in?",
+          "What's the ZIP code there?",
+          "Where's this located, what ZIP code?",
         ],
         seed(c),
       ),
@@ -569,29 +569,29 @@ export const TOPICS: Topic[] = [
       const exteriorOnly = c.projectType === 'exterior';
       const commercial = isCommercialLike(c);
       if (exteriorOnly) {
-        return pick(["Last thing — when would you like this done? (a specific date or range, ASAP, or tell me your dates are flexible)", "And what's the timeline on this — specific dates, any rush, or are your dates flexible?"], seed(c));
+        return pick(["Last thing, when would you like this done?", "And what's the timeline on this?"], seed(c));
       }
       if (c.occupancy && !hasTiming(c)) {
-        return pick(["Last thing — when would you like this done? (a specific date or range, ASAP, or tell me your dates are flexible)", "And what's the timeline — specific dates, any rush, or are your dates flexible?"], seed(c));
+        return pick(["Last thing, when would you like this done?", "And what's the timeline?"], seed(c));
       }
       if (!c.occupancy && hasTiming(c)) {
         if (commercial) {
           return pick(
-            ["Last thing — will the space still be open/operating during the work, or empty?",
-              "Will the business still be running while we work, or will it be closed/vacant?"],
+            ["Last thing, will the space still be open during the work?",
+              "Will the business still be running while we work?"],
             seed(c),
           );
         }
         return pick(
-          ["Last thing — will the property be occupied, furnished, or completely empty when we work?",
-            "Will it be lived-in during the work, furnished but empty, or totally vacant?"],
+          ["Last thing, will the property be occupied, furnished, or empty when we work?",
+            "Will anyone be living there while we work?"],
           seed(c),
         );
       }
       if (commercial) {
         return pick(
           [
-            "Last thing — when would you like this done, and will the business still be operating during the work, or closed/vacant?",
+            "Last thing, when would you like this done, and will the business still be operating during the work?",
             "Two quick ones — timeline, and will you still be open for business during the work?",
           ],
           seed(c),
@@ -599,8 +599,8 @@ export const TOPICS: Topic[] = [
       }
       return pick(
         [
-          "Last thing — when would you like this done (specific dates, ASAP, or flexible?), and will it be occupied / furnished / or empty when we work?",
-          "Two quick ones to wrap up — timeline, and will the place be occupied, furnished, or empty while we work?",
+          "Last thing, when would you like this done, and will anyone be there while we work?",
+          "Two quick ones to wrap up, what's your timeline, and will anyone be there while we work?",
         ],
         seed(c),
       );
@@ -608,14 +608,14 @@ export const TOPICS: Topic[] = [
     clarify: (c) => {
       if (c.projectType === 'exterior') return "Timeline helps me flag rush jobs, which run a bit higher since it usually means pulling a crew off another job.";
       return isCommercialLike(c)
-        ? "Timeline helps me flag rush or after-hours work. Knowing if you're open during the job matters too — working around customers/staff takes more care."
+        ? "Timeline helps me flag rush or after-hours work. Knowing if you're open during the job matters too — working around customers and staff takes more care."
         : "Timeline helps me flag rush jobs, which run a bit higher since it usually means pulling a crew off another job. Knowing if it's lived-in matters too because we have to be more careful protecting stuff.";
     },
     example: (c) => {
-      if (c.projectType === 'exterior') return "E.g., 'ASAP' / 'sometime next month' / 'whenever, no rush'.";
+      if (c.projectType === 'exterior') return "E.g., 'ASAP', 'sometime next month', or 'whenever, no rush'.";
       return isCommercialLike(c)
-        ? "E.g., 'ASAP, we'll be closed for it' / 'next month, still open for business' / 'whenever, no rush'."
-        : "E.g., 'ASAP, place is vacant' / 'next month, we'll still be living there' / 'whenever, nothing urgent'.";
+        ? "E.g., 'ASAP, we'll be closed for it', 'next month, still open for business', or 'whenever, no rush'."
+        : "E.g., 'ASAP, place is vacant', 'next month, we'll still be living there', or 'whenever, nothing urgent'.";
     },
   },
 ];
