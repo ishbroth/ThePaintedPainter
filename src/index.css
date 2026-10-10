@@ -269,28 +269,25 @@ img {
   }
 }
 
-/* The carousel at the top of the home page: starts right under the header and its bottom edge is at Superman's eye level,
-   so its height comes from SiteBackground (--hero-carousel-h). */
-.carousel-section.hero-carousel {
+/* The larger carousel under the estimator: pictures at 1.25x the other carousels' size. */
+.carousel-section.carousel-large {
   padding: 0;
-  /* pictures at 1.25x the other carousels' size; the space above them (under the header) is whatever is left */
-  margin-top: var(--hero-carousel-gap, 0px);
-  height: var(--hero-carousel-h, 250px);
+  height: 250px;
   box-sizing: border-box;
 }
 
-.hero-carousel .smooth-carousel-container,
-.hero-carousel .smooth-carousel-track,
-.hero-carousel .carousel-triplet,
-.hero-carousel .carousel-slide {
+.carousel-large .smooth-carousel-container,
+.carousel-large .smooth-carousel-track,
+.carousel-large .carousel-triplet,
+.carousel-large .carousel-slide {
   height: 100%;
 }
 
-.hero-carousel .carousel-slide {
-  width: calc(var(--hero-carousel-h, 200px) * 1.4);
+.carousel-large .carousel-slide {
+  width: 350px;
 }
 
-.hero-carousel .carousel-slide img {
+.carousel-large .carousel-slide img {
   height: 100%;
 }
 

@@ -137,17 +137,14 @@ const Home = () => {
 
   return (
     <div className="home-page">
-      {/* The second carousel, moved to the top: its bottom edge sits at Superman's eye level (SiteBackground sets its height) */}
-      <SmoothCarousel triplets={carousel2Triplets} speed={35} className="hero-carousel" />
-
       {/* Leaves the first screen to the picture; the first screen to Superman; the estimator starts below his body and just peeks into view */}
       <section className="hero-spacer" aria-hidden="true" />
 
       {/* AI Chat Estimator — replaces the old "Get a Free Painting Estimate" CTA card */}
       <ChatPanel />
 
-      {/* Carousel 1, between the estimator and the description */}
-      <SmoothCarousel triplets={carousel1Triplets} speed={40} />
+      {/* The carousel that was at the top of the page (under the header, resting on Superman's eyes), now right under the estimator */}
+      <SmoothCarousel triplets={carousel2Triplets} speed={35} className="carousel-large" />
 
       <div className="divider"></div>
 
@@ -163,6 +160,11 @@ const Home = () => {
         </p>
         <p className="slogan">Transparent pricing. Verified painters. Nationwide coverage.</p>
       </section>
+
+      <div className="divider"></div>
+
+      {/* Carousel 1 */}
+      <SmoothCarousel triplets={carousel1Triplets} speed={40} />
 
       <div className="divider"></div>
 
