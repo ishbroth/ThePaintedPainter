@@ -193,11 +193,6 @@ const Home = () => {
 
       <div className="divider"></div>
 
-      {/* Carousel 4 */}
-      <SmoothCarousel triplets={carousel4Triplets} speed={40} />
-
-      <div className="divider"></div>
-
       {/* Painters Map Section */}
       <section className="map-section fade-in">
         <h2>Find Painters Near You</h2>
@@ -212,6 +207,11 @@ const Home = () => {
           </div>
         </div>
       </section>
+
+      <div className="divider"></div>
+
+      {/* Carousel 4 (firefighter, Kool-Aid Man), at the very bottom under the map */}
+      <SmoothCarousel triplets={carousel4Triplets} speed={40} />
     </div>
   );
 };

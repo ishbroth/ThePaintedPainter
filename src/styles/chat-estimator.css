@@ -837,3 +837,24 @@
   0%, 50% { opacity: 1; }
   50.01%, 100% { opacity: 0; }
 }
+
+/* Paintbrush spinner shown while the price is being prepared (1.5 seconds before the painter page) */
+.chat-preparing {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.chat-brush-swing {
+  transform-origin: 24px 4px;
+  animation: chat-brush-swing 0.75s ease-in-out infinite alternate;
+}
+
+@keyframes chat-brush-swing {
+  from { transform: rotate(-28deg); }
+  to { transform: rotate(28deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-brush-swing { animation: none; }
+}

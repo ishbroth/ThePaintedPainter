@@ -309,7 +309,7 @@ const ChatPanel = () => {
         } catch {
           navigate('/quote-results', { state: payload });
         }
-      }, 1400); // brief pause so the user sees the wrap-up message
+      }, 1500); // the paintbrush spinner shows for 1.5 seconds, then the customer moves on to pick their painter
       return () => clearTimeout(t);
     }
   }, [state.finalEstimate, state.transcript, navigate]);
@@ -523,7 +523,16 @@ const ChatPanel = () => {
           ))}
           {waiting && (
             <div className="chat-bubble chat-bubble-bot">
-              <div className="chat-bubble-text chat-loading">Preparing your results…</div>
+              <div className="chat-bubble-text chat-loading chat-preparing">
+                <svg className="chat-brush-spinner" viewBox="0 0 48 48" width="34" height="34" aria-hidden="true">
+                  <g className="chat-brush-swing">
+                    <rect x="22" y="2" width="5" height="22" rx="2.5" fill="#8a5a2b" />
+                    <rect x="20" y="22" width="9" height="7" rx="1" fill="#b9bec6" />
+                    <path d="M19.5 29 h10 l-1 14 q-4 3 -8 0 z" fill="#ff8a3d" />
+                  </g>
+                </svg>
+                <span>Preparing your results…</span>
+              </div>
             </div>
           )}
           {pendingText && !waiting && (
