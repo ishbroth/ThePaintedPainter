@@ -143,8 +143,8 @@ const Home = () => {
       {/* AI Chat Estimator — replaces the old "Get a Free Painting Estimate" CTA card */}
       <ChatPanel />
 
-      {/* The carousel that was at the top of the page (under the header, resting on Superman's eyes), now right under the estimator */}
-      <SmoothCarousel triplets={carousel2Triplets} speed={35} className="carousel-large" />
+      {/* The carousel that was at the top of the page (under the header, resting on Superman's eyes), now right under the estimator, same size as the others */}
+      <SmoothCarousel triplets={carousel2Triplets} speed={43.75} />
 
       <div className="divider"></div>
 
@@ -164,7 +164,7 @@ const Home = () => {
       <div className="divider"></div>
 
       {/* Carousel 1 */}
-      <SmoothCarousel triplets={carousel1Triplets} speed={40} />
+      <SmoothCarousel triplets={carousel1Triplets} speed={50} />
 
       <div className="divider"></div>
 
@@ -189,7 +189,7 @@ const Home = () => {
       <div className="divider"></div>
 
       {/* Carousel 3 */}
-      <SmoothCarousel triplets={carousel3Triplets} speed={35} />
+      <SmoothCarousel triplets={carousel3Triplets} speed={43.75} />
 
       <div className="divider"></div>
 
@@ -211,7 +211,7 @@ const Home = () => {
       <div className="divider"></div>
 
       {/* Carousel 4 (firefighter, Kool-Aid Man), at the very bottom under the map */}
-      <SmoothCarousel triplets={carousel4Triplets} speed={40} />
+      <SmoothCarousel triplets={carousel4Triplets} speed={50} />
     </div>
   );
 };

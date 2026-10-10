@@ -268,27 +268,6 @@ img {
   }
 }
 
-/* The larger carousel under the estimator: pictures at 1.25x the other carousels' size. */
-.carousel-section.carousel-large {
-  padding: 0;
-  height: 250px;
-  box-sizing: border-box;
-}
-
-.carousel-large .smooth-carousel-container,
-.carousel-large .smooth-carousel-track,
-.carousel-large .carousel-triplet,
-.carousel-large .carousel-slide {
-  height: 100%;
-}
-
-.carousel-large .carousel-slide {
-  width: 350px;
-}
-
-.carousel-large .carousel-slide img {
-  height: 100%;
-}
 
 /* Leaves the first screen to the picture; the estimator card starts under Superman's body, lower than the middle of the
    screen, so it peeks in at the bottom and a small scroll is what brings it past the middle (starting the spoken intro). */
