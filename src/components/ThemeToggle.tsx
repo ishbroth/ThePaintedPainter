@@ -16,7 +16,6 @@ const ThemeToggle = () => {
     <div
       style={{
         background: 'var(--bg-chrome)',
-        borderBottom: '1px solid var(--border)',
         padding: '3px 20px',
         display: 'flex',
         alignItems: 'center',
