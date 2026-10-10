@@ -23,6 +23,7 @@ import { supabase } from '../supabase';
 import { extractAll, extractPhotoTriggers, extractTimeline, extractPropertyType, extractAccessSignals, extractZip, extractSquareFeet } from './extractors';
 import { getStateFromZip } from '../zipCodeData';
 import { hasScopeLimiter } from './scopeWords';
+import { lookupZipCity } from '../zipLookup';
 import { reviewLocally, reviewWithAI, hasPaintingScope, retryMessage, profanityScan, type ReviewResult } from './conversationReview';
 import { isDenial, denialIsAboutScope, topicLabel, recentRecognized, recapSentence } from './clarify';
 import { extractTiming, timelineFromStart } from './dateParsing';
@@ -138,7 +139,7 @@ export function makeInitialState(): ChatState {
     history: [
       {
         role: 'bot',
-        text: "Hello, what do you need painted?",
+        text: "Hello citizen...what do you need painted?",
         timestamp: Date.now(),
       },
     ],
@@ -598,6 +599,20 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
     ctxNext.interiorWalls !== 'no' && ctxNext.interiorCeilings !== 'no' && ctxNext.interiorTrim !== 'no' && ctxNext.interiorDoors !== 'none';
   // the full package includes the trim and doors, which the read-back covers: no separate trim question afterwards
   if (fullScopeAnswer) ctxNext.trimScopeAddressed = true;
+
+  // A ZIP code that was just given (or changed): look up its city and say it back ("ZIP 91941, La Mesa").
+  if (ctxNext.zipCode && (ctxNext.zipCode !== state.ctx.zipCode || !ctxNext.zipCity)) {
+    const city = await lookupZipCity(ctxNext.zipCode);
+    ctxNext.zipCity = city;
+    if (city && ctxNext.zipCode !== state.ctx.zipCode) {
+      const zip = ctxNext.zipCode;
+      const at = acknowledgements.findIndex((a) => a.includes(zip));
+      if (at >= 0) acknowledgements[at] = `${acknowledgements[at]}, ${city}`;
+      else acknowledgements.push(`ZIP ${zip}, ${city}`);
+    }
+  } else if (!ctxNext.zipCode) {
+    ctxNext.zipCity = '';
+  }
 
   // Photo-request triggers — a bare keyword match, run independently of
   // whichever extraction path (LLM or regex) handled the rest of this

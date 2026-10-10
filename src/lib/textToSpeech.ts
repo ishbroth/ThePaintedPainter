@@ -39,6 +39,9 @@ export function naturalizeForSpeech(text: string): string {
   // list separator.
   s = s.replace(/\s*·\s*/g, ', or ');
 
+  // ZIP codes are said digit by digit ("9 1 9 4 1"), never as a number ("ninety-one thousand...").
+  s = s.replace(/\b(zip(?:\s*code)?(?:\s+is)?\s*)(\d{5})(?:-(\d{4}))?\b/gi, (_m, lead: string, five: string, four?: string) => `${lead}${five.split('').join(' ')}${four ? `, ${four.split('').join(' ')}` : ''}`);
+
   // Dollar ranges before single amounts, so "$1,500 – $2,000" becomes
   // "1,500 to 2,000 dollars" rather than "1,500 dollars to 2,000 dollars".
   s = s.replace(/\$\s?([\d,]+)\s*[–—-]\s*\$\s?([\d,]+)/g, '$1 to $2 dollars');
@@ -112,8 +115,15 @@ function pickBestVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | n
   const english = american.length > 0 ? american : allEnglish;
   if (english.length === 0) return null;
 
+  // Browsers don't say which voices are male, so known male voice names (Edge, Google, Apple, Windows) get a big lead and known
+  // female ones a penalty.
+  const MALE = /\b(guy|davis|christopher|eric|roger|steffan|brian|andrew|ryan|tony|jason|david|mark|james|aaron|fred|alex|tom|evan|nathan|ralph|albert|bruce|junior|rishi|daniel|arthur|oliver|male)\b/;
+  const FEMALE = /\b(aria|jenny|sara|jane|ana|michelle|emma|ava|allison|susan|karen|moira|tessa|zoe|nicky|samantha|victoria|kathy|fiona|zira|hazel|catherine|female|siri)\b/;
   const score = (v: SpeechSynthesisVoice): number => {
     const name = v.name.toLowerCase();
+    return baseScore(v, name) + (MALE.test(name) ? 200 : 0) - (FEMALE.test(name) ? 50 : 0);
+  };
+  const baseScore = (v: SpeechSynthesisVoice, name: string): number => {
     // Modern neural/cloud voices (Edge's "Online (Natural)" voices, Google's
     // WaveNet-backed voices, iOS/Android's higher-quality downloaded voices)
     // sound dramatically more human than the classic compact/default
@@ -157,18 +167,34 @@ async function getPreferredVoice(): Promise<SpeechSynthesisVoice | null> {
 export async function speak(text: string): Promise<void> {
   if (!isTTSSupported()) return;
   window.speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(naturalizeForSpeech(splitPrompt(text).spoken));
-  // A hair slower than the 1.0 default reads as noticeably less rushed/
-  // robotic without dragging.
-  utterance.rate = 0.9975; // 5% faster than the previous 0.95
-  utterance.pitch = 1;
+  const myRun = ++speakRun;
+  // "Hello citizen...what do you need painted?": the "..." is a real pause, so each side is spoken separately with a beat between.
+  const parts = splitPrompt(text).spoken.split(/\.{3,}|\u2026/).map((p) => p.trim()).filter(Boolean);
   const voice = await getPreferredVoice();
-  if (voice) utterance.voice = voice;
-  window.speechSynthesis.speak(utterance);
+  if (myRun !== speakRun) return; // something newer started speaking while the voice loaded
+  const speakPart = (index: number) => {
+    if (myRun !== speakRun || index >= parts.length) return;
+    const utterance = new SpeechSynthesisUtterance(naturalizeForSpeech(parts[index]));
+    // A hair slower than the 1.0 default reads as noticeably less rushed/
+    // robotic without dragging.
+    utterance.rate = 0.9975; // 5% faster than the previous 0.95
+    utterance.pitch = 1;
+    if (voice) utterance.voice = voice;
+    utterance.onend = () => {
+      if (index + 1 < parts.length) window.setTimeout(() => speakPart(index + 1), ELLIPSIS_PAUSE_MS);
+    };
+    window.speechSynthesis.speak(utterance);
+  };
+  speakPart(0);
 }
+
+/** Bumped every time speech starts or stops, so a pending second half of a sentence is dropped. */
+let speakRun = 0;
+const ELLIPSIS_PAUSE_MS = 650;
 
 export function stopSpeaking(): void {
   if (!isTTSSupported()) return;
+  speakRun++;
   window.speechSynthesis.cancel();
 }
 

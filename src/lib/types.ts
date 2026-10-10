@@ -7,6 +7,8 @@ export type UserResponseStyle = 'terse' | 'normal' | 'detailed';
 export interface EstimatorContext {
   // Start
   zipCode: string;
+  /** The city that ZIP belongs to (looked up when the ZIP is given), repeated back to the customer. */
+  zipCity?: string;
   state: string;
   yearBuilt: number | null;
   propertyType: string; // '' (unasked), residential, condo, multi_unit, commercial, rental
