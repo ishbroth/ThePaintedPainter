@@ -1,8 +1,8 @@
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 
-/** The picture is never narrower than 0.85x, nor wider than 1.3x, the screen's width (equal proportions). */
-const MIN_WIDTH_OVER_SCREEN = 0.85;
+/** The picture is never narrower than 0.9x, nor wider than 1.3x, the screen's width (equal proportions). */
+const MIN_WIDTH_OVER_SCREEN = 0.9;
 const MAX_WIDTH_OVER_SCREEN = 1.3;
 /** Where the "The Painted Painter" lettering sits in the picture, as shares of its height (top of the letters, bottom of the letters). */
 const TITLE_TOP = 0.4956;
@@ -38,11 +38,11 @@ const SiteBackground = () => {
       screenHeight = window.innerHeight;
       const main = document.querySelector('main');
       const headerHeight = main ? Math.max(0, Math.round(main.getBoundingClientRect().top + window.scrollY)) : 0;
-      // The estimator card starts at the top of the bottom third of the screen, and "The Painted Painter" lettering rests just
+      // The estimator card starts at the top of the bottom quarter of the screen, and "The Painted Painter" lettering rests just
       // above it. The picture is scaled (equal proportions) so the lettering lands there with the picture's top at the top of
       // the screen; it is never much narrower than the screen (a bit of the top row can be cut off instead) nor much wider
       // than it (on a tall phone screen the picture then starts a little lower, over the blurred fill).
-      const cardTop = Math.round(screenHeight * (2 / 3));
+      const cardTop = Math.round(screenHeight * 0.75);
       const letteringBottom = cardTop - LETTERING_GAP;
       const fit = letteringBottom / TITLE_BOTTOM;
       size = Math.round(Math.min(window.innerWidth * MAX_WIDTH_OVER_SCREEN, Math.max(window.innerWidth * MIN_WIDTH_OVER_SCREEN, fit)));
