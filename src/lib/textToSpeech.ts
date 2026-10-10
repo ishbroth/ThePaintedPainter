@@ -190,7 +190,7 @@ export async function speak(text: string): Promise<void> {
 
 /** Bumped every time speech starts or stops, so a pending second half of a sentence is dropped. */
 let speakRun = 0;
-const ELLIPSIS_PAUSE_MS = 650;
+const ELLIPSIS_PAUSE_MS = 250;
 
 export function stopSpeaking(): void {
   if (!isTTSSupported()) return;
