@@ -262,6 +262,11 @@ img {
   opacity: var(--hero-title-opacity, 1);
 }
 
+/* Light mode: the picture is washed out, so white lettering needs a soft dark edge to stand out solidly (it fades with the lettering). */
+[data-theme="light"] .site-hero-bg--home .site-hero-bg__title {
+  filter: drop-shadow(0 0 1.5px rgba(20, 20, 30, 0.85)) drop-shadow(0 2px 5px rgba(20, 20, 30, 0.6));
+}
+
 @media (max-width: 640px) {
   .site-hero-bg--home {
     --hero-opacity: 0.5;
