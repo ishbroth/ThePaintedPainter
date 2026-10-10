@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import ChatPanel from '../components/ChatEstimator/ChatPanel';
 import PaintersMapSection from '../components/PaintersMapSection';
 
@@ -117,6 +117,17 @@ const SmoothCarousel = ({
 };
 
 const Home = () => {
+  // The home page always opens at the top (not wherever a refresh or the back button left it), unless the link points at a section
+  // (the "Get your price" link goes to /#estimator and scrolls itself).
+  useLayoutEffect(() => {
+    const previous = window.history.scrollRestoration;
+    window.history.scrollRestoration = 'manual';
+    if (!window.location.hash) window.scrollTo(0, 0);
+    return () => {
+      window.history.scrollRestoration = previous;
+    };
+  }, []);
+
   useEffect(() => {
     const fadeElements = document.querySelectorAll('.fade-in');
     const observer = new IntersectionObserver(
