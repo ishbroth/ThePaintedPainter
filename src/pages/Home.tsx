@@ -146,6 +146,11 @@ const Home = () => {
       {/* AI Chat Estimator — replaces the old "Get a Free Painting Estimate" CTA card */}
       <ChatPanel />
 
+      {/* Carousel 1, between the estimator and the description */}
+      <SmoothCarousel triplets={carousel1Triplets} speed={40} />
+
+      <div className="divider"></div>
+
       {/* Platform Description */}
       <section className="about-text fade-in">
         <h2>The Ultimate Painter Booking Site</h2>
@@ -158,11 +163,6 @@ const Home = () => {
         </p>
         <p className="slogan">Transparent pricing. Verified painters. Nationwide coverage.</p>
       </section>
-
-      <div className="divider"></div>
-
-      {/* Carousel 1 */}
-      <SmoothCarousel triplets={carousel1Triplets} speed={40} />
 
       <div className="divider"></div>
 
