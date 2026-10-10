@@ -26,6 +26,10 @@ export interface EstimatorContext {
   // phrasing) left the surfaces topic looking unanswered even though the
   // customer had already said exactly what they wanted.
   surfacesAddressed: boolean;
+  /** Surfaces the customer ruled out in so many words ("no ceilings"), which the estimator never suggests adding back. */
+  excludedSurfaces?: string[];
+  /** Surfaces the customer said yes to when the estimator suggested them (they stay in even though the transcript also says "just walls"). */
+  addedSurfaces?: string[];
   interiorWalls: string; // yes, no
   accentWalls: string; // yes, no, skip
   interiorCeilings: string; // yes, no

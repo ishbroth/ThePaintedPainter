@@ -249,34 +249,69 @@ export const TOPICS: Topic[] = [
       if (c.interiorCeilings === 'no' && c.interiorTrim !== 'no') {
         return "No ceilings, got it. And the trim and doors, are those getting painted too?";
       }
-      const singular = c.selectedRooms.length === 1;
       const hasKitchen = c.selectedRooms.includes('kitchen');
       if (hasKitchen) {
         return "For the kitchen, what all is getting painted, and are the cabinets included?";
       }
-      if (singular) {
-        const label = roomLabel(c.selectedRooms[0]);
-        return pick(
-          [
-            `In that ${label}, what all are we painting?`,
-            `For the ${label}, are we painting just the walls, or more than that?`,
-          ],
-          seed(c),
-        );
-      }
-      return pick(
-        [
-          "What all are we painting in those rooms?",
-          "For those rooms, are we painting just the walls, or more than that?",
-          "How much of each room are we painting?",
-        ],
-        seed(c),
-      );
+      return 'What in the room are we painting?';
     },
     clarify: () =>
       "Some folks just want walls refreshed. Others want the whole package — walls, ceiling, trim, doors, closets. Either works. You can also mix and match.",
     example: () =>
       "'Just walls' is common. Or 'walls and ceiling, no trim'. Or 'everything except the doors'.",
+  },
+
+  // ——————————————————————————————————————————
+  // Building up the job: if only some surfaces were named ("just walls"), suggest the rest one at a time (ceilings, then
+  // baseboards, then doors) the way a good salesperson would, each only once, and never one the customer ruled out.
+  // ——————————————————————————————————————————
+  {
+    id: 'upsell_ceilings',
+    priority: 27,
+    relevant: (c) => (c.projectType === 'interior' || c.projectType === 'both') && c.surfacesAddressed && c.interiorCeilings === 'no' && !(c.excludedSurfaces ?? []).includes('ceilings'),
+    alreadyAnswered: (c) => c.interiorCeilings !== 'no',
+    ask: (c) =>
+      pick(
+        [
+          "Want me to add the ceilings too? Fresh ceilings make fresh walls look even better.",
+          "Should we include the ceilings? They're easy to do while we're already painting the walls.",
+        ],
+        seed(c),
+      ),
+    clarify: () => "I mean painting the ceilings in those rooms along with the walls. It's quick to add while the crew is already there.",
+    example: () => "Just say 'yes, add the ceilings' or 'no, leave the ceilings'.",
+  },
+  {
+    id: 'upsell_trim',
+    priority: 28,
+    relevant: (c) => (c.projectType === 'interior' || c.projectType === 'both') && c.surfacesAddressed && c.interiorTrim === 'no' && !(c.excludedSurfaces ?? []).includes('trim'),
+    alreadyAnswered: (c) => c.interiorTrim !== 'no',
+    ask: (c) =>
+      pick(
+        [
+          "How about the baseboards? Crisp, clean baseboards give the whole room a finished look.",
+          "What about the baseboards? Fresh ones frame the new wall color nicely.",
+        ],
+        seed(c),
+      ),
+    clarify: () => "Baseboards are the trim along the bottom of the walls. Painting them along with the walls gives a cleaner, finished result.",
+    example: () => "Just say 'yes, the baseboards too' or 'no, leave them'.",
+  },
+  {
+    id: 'upsell_doors',
+    priority: 29,
+    relevant: (c) => (c.projectType === 'interior' || c.projectType === 'both') && c.surfacesAddressed && c.interiorDoors === 'none' && !(c.excludedSurfaces ?? []).includes('doors'),
+    alreadyAnswered: (c) => c.interiorDoors !== 'none',
+    ask: (c) =>
+      pick(
+        [
+          "And the doors? Freshly painted doors tie the whole room together.",
+          "Would you like the doors done too? It's the finishing touch that makes a room look new.",
+        ],
+        seed(c),
+      ),
+    clarify: () => "I mean the interior doors in those rooms. Painting them at the same time as everything else keeps the whole space looking consistent.",
+    example: () => "Just say 'yes, do the doors' or 'no, skip the doors'.",
   },
 
   // ——————————————————————————————————————————

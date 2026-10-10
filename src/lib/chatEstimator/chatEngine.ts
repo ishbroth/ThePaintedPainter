@@ -493,6 +493,48 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
       ctxWithExplicit.interiorCeilings = 'yes';
     }
   }
+  // Surfaces the customer rules out in so many words ("no ceilings", "without the doors") are never suggested back to them.
+  {
+    const low = trimmed.toLowerCase();
+    const ruledOut = new Set(state.ctx.excludedSurfaces ?? []);
+    const added = new Set(state.ctx.addedSurfaces ?? []);
+    const re = /\b(?:no|not|without|skip|except|excluding|leave out|don'?t (?:paint|do|need|want))\s+(?:the\s+|any\s+|our\s+)?(ceilings?|trim|baseboards?|doors?)\b/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(low))) ruledOut.add(m[1].startsWith('ceiling') ? 'ceilings' : m[1].startsWith('door') ? 'doors' : 'trim');
+    // the answer to a suggestion ("Want me to add the ceilings too?"): yes adds it, no leaves it out, whatever else was read into the reply
+    const offer: Record<string, { field: 'interiorCeilings' | 'interiorTrim' | 'interiorDoors'; on: string; word: RegExp; key: string }> = {
+      upsell_ceilings: { field: 'interiorCeilings', on: 'yes', word: /\bceilings?\b/, key: 'ceilings' },
+      upsell_trim: { field: 'interiorTrim', on: 'yes', word: /\b(?:baseboards?|trim|molding)\b/, key: 'trim' },
+      upsell_doors: { field: 'interiorDoors', on: 'some', word: /\bdoors?\b/, key: 'doors' },
+    };
+    const asked = state.lastBotTopic ? offer[state.lastBotTopic.id] : undefined;
+    if (asked) {
+      const yes = /^\s*(?:yes|yeah|yep|yup|sure|ok|okay|please|definitely|absolutely|why not|sounds good|do it|add (?:it|them)|go ahead|let'?s do it|that'?d be (?:great|good|nice)|i guess|fine|of course|love to)\b/.test(low);
+      const no = /^\s*(?:no|nope|nah|not (?:now|needed|really|this time)|skip|pass|leave (?:it|them)|that'?s (?:ok|okay|fine|alright)|no thanks|no thank you|i'?m good)\b/.test(low);
+      const target = ctxWithExplicit as unknown as Record<string, unknown>;
+      if (yes && !no) {
+        target[asked.field] = asked.on;
+        added.add(asked.key);
+        if (asked.field === 'interiorTrim') ctxWithExplicit.trimScopeAddressed = true;
+      } else if (no) {
+        target[asked.field] = state.ctx[asked.field];
+        ruledOut.add(asked.key);
+      }
+    }
+    // "yes, and the doors too": any other surface named as something to add comes along
+    if (asked && !/^\s*(?:no|nope|nah)\b/.test(low)) {
+      for (const o of Object.values(offer)) {
+        if (o.word.test(low) && !ruledOut.has(o.key)) {
+          (ctxWithExplicit as unknown as Record<string, unknown>)[o.field] = o.on;
+          added.add(o.key);
+          if (o.field === 'interiorTrim') ctxWithExplicit.trimScopeAddressed = true;
+        }
+      }
+    }
+    if (ruledOut.size > 0) ctxWithExplicit.excludedSurfaces = [...ruledOut];
+    for (const key of ruledOut) added.delete(key);
+    if (added.size > 0) ctxWithExplicit.addedSurfaces = [...added];
+  }
   if (state.ctx.exteriorColorChange !== 'different' && ctxWithExplicit.exteriorColorChange === 'different' && !/(exterior|outside|siding|stucco|brick|house color|front|fence|deck|shutter|fascia)/i.test(trimmed)) {
     ctxWithExplicit.exteriorColorChange = state.ctx.exteriorColorChange;
   }
@@ -612,6 +654,15 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
     }
   } else if (!ctxNext.zipCode) {
     ctxNext.zipCity = '';
+  }
+
+  // Surfaces added at the estimator's suggestion stay in, even though the transcript also says "just walls".
+  for (const key of ctxNext.addedSurfaces ?? []) {
+    if (key === 'ceilings') ctxNext.interiorCeilings = 'yes';
+    else if (key === 'trim') {
+      ctxNext.interiorTrim = 'yes';
+      ctxNext.trimScopeAddressed = true;
+    } else if (key === 'doors') ctxNext.interiorDoors = 'some';
   }
 
   // Photo-request triggers — a bare keyword match, run independently of
