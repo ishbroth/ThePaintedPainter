@@ -12,7 +12,7 @@ import {
   type ChatState,
 } from '../../lib/chatEstimator/chatEngine';
 import { hapticLight } from '../../lib/haptics';
-import { CHAT_STATE_KEY, QUOTE_EXPIRES_KEY, QUOTE_RESULT_KEY, PRICE_HOLD_MINUTES, clearEstimatorSession, isExpiredFinishedChat, readWorkWithAgain, clearWorkWithAgain } from '../../lib/chatEstimator/persistence';
+import { CHAT_STATE_KEY, QUOTE_EXPIRES_KEY, QUOTE_RESULT_KEY, PRICE_HOLD_MINUTES, startedFromHomeReload, clearEstimatorSession, isExpiredFinishedChat, readWorkWithAgain, clearWorkWithAgain } from '../../lib/chatEstimator/persistence';
 import { composerPrompt, GENERIC_PROMPT } from '../../lib/promptHints';
 import { isTTSSupported, speak, stopSpeaking, setupSpeechUnlock } from '../../lib/textToSpeech';
 import { uploadQuotePhoto, analyzeQuotePhoto } from '../../lib/chatEstimator/photoUpload';
@@ -246,6 +246,12 @@ const ChatPanel = () => {
     }
     if (appliedAccountStateRef.current === user.id) return;
     appliedAccountStateRef.current = user.id;
+    // a refresh of the home page starts over: the saved copy of this customer's conversation goes too
+    if (startedFromHomeReload) {
+      void deleteAccountChatState(user.id);
+      accountLoadCompleteRef.current = true;
+      return;
+    }
     loadAccountChatState(user.id).then((saved) => {
       if (saved) {
         // This fetch is async and kicked off at mount — if the user typed

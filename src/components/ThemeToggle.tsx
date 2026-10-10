@@ -7,6 +7,11 @@ const ThemeToggle = () => {
   const { theme, toggleTheme } = useTheme();
   const isLight = theme === 'light';
 
+  // the bar floats over the picture, so the words get a soft halo in the page's own background colour to stay readable
+  const halo = isLight
+    ? '0 0 3px rgba(255,255,255,0.95), 0 0 7px rgba(255,255,255,0.9), 0 0 12px rgba(255,255,255,0.8)'
+    : '0 0 3px rgba(0,0,0,0.95), 0 0 7px rgba(0,0,0,0.9), 0 0 12px rgba(0,0,0,0.8)';
+
   const handleToggle = () => {
     hapticLight();
     toggleTheme();
@@ -15,7 +20,7 @@ const ThemeToggle = () => {
   return (
     <div
       style={{
-        background: 'var(--bg-chrome)',
+        background: 'transparent',
         padding: '3px 20px',
         display: 'flex',
         alignItems: 'center',
@@ -28,8 +33,9 @@ const ThemeToggle = () => {
           fontSize: '0.7rem',
           letterSpacing: '1px',
           textTransform: 'uppercase',
-          fontWeight: isLight ? 700 : 400,
-          color: isLight ? 'var(--accent)' : 'var(--text-secondary)',
+          fontWeight: 700,
+          color: isLight ? 'var(--accent)' : 'var(--text-primary)',
+          textShadow: halo,
         }}
       >
         Light Mode
@@ -74,8 +80,9 @@ const ThemeToggle = () => {
           fontSize: '0.7rem',
           letterSpacing: '1px',
           textTransform: 'uppercase',
-          fontWeight: isLight ? 400 : 700,
-          color: isLight ? 'var(--text-secondary)' : 'var(--accent)',
+          fontWeight: 700,
+          color: isLight ? 'var(--text-primary)' : 'var(--accent)',
+          textShadow: halo,
         }}
       >
         Dark Mode
