@@ -464,6 +464,10 @@ img {
   text-align: center;
   padding: 45px 20px;
   color: var(--text-primary);
+  /* the background picture shows through the page: a soft frosted backing keeps this text readable */
+  background: rgba(255, 255, 255, 0.78);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
 }
 
 .about-text h2 {
