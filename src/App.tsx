@@ -91,8 +91,8 @@ function App() {
           <ThemeAccountSync />
           <SiteBackground />
           <div className="min-h-screen flex flex-col" style={{ position: 'relative', zIndex: 1 }}>
-            <Header />
             <ThemeToggle />
+            <Header />
             <AuthRedirectBanner />
             <main className="flex-grow">
               <Routes>
