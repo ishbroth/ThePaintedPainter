@@ -1,7 +1,6 @@
 import { useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
-import { hapticMedium } from '../lib/haptics';
 import ChatPanel from '../components/ChatEstimator/ChatPanel';
+import PaintersMapSection from '../components/PaintersMapSection';
 
 // Carousel 1 (4 triplets)
 const carousel1Triplets = [
@@ -193,20 +192,8 @@ const Home = () => {
 
       <div className="divider"></div>
 
-      {/* Painters Map Section */}
-      <section className="map-section fade-in">
-        <h2>Find Painters Near You</h2>
-        <p className="map-subtitle">Browse verified painters across the country</p>
-        <div className="home-map-container">
-          <div className="home-map-placeholder">
-            <p>Interactive Map</p>
-            <p className="map-note">Google Maps integration coming soon</p>
-            <Link to="/painters-map" className="map-link-btn" onClick={() => hapticMedium()}>
-              View Full Painters Map →
-            </Link>
-          </div>
-        </div>
-      </section>
+      {/* Painters map: opens right here on the page */}
+      <PaintersMapSection />
 
       <div className="divider"></div>
 
