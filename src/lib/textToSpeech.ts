@@ -106,7 +106,10 @@ function loadVoices(): Promise<SpeechSynthesisVoice[]> {
 
 /** Ranks available voices for how natural/human they sound, best first. */
 function pickBestVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
-  const english = voices.filter((v) => v.lang?.toLowerCase().startsWith('en'));
+  // American English first (en-US); other English accents only if no US voice is installed.
+  const allEnglish = voices.filter((v) => v.lang?.toLowerCase().replace('_', '-').startsWith('en'));
+  const american = allEnglish.filter((v) => v.lang.toLowerCase().replace('_', '-') === 'en-us');
+  const english = american.length > 0 ? american : allEnglish;
   if (english.length === 0) return null;
 
   const score = (v: SpeechSynthesisVoice): number => {
@@ -157,7 +160,7 @@ export async function speak(text: string): Promise<void> {
   const utterance = new SpeechSynthesisUtterance(naturalizeForSpeech(splitPrompt(text).spoken));
   // A hair slower than the 1.0 default reads as noticeably less rushed/
   // robotic without dragging.
-  utterance.rate = 0.95;
+  utterance.rate = 0.9975; // 5% faster than the previous 0.95
   utterance.pitch = 1;
   const voice = await getPreferredVoice();
   if (voice) utterance.voice = voice;
