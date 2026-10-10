@@ -1,13 +1,14 @@
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 
-/** The picture is scaled (equal proportions) to a little wider than the screen, so the roller on the left and the brush on the right both stay in view. */
-const WIDTH_OVER_SCREEN = 1.03;
+/** The picture is never narrower than 0.85x, nor wider than 1.3x, the screen's width (equal proportions). */
+const MIN_WIDTH_OVER_SCREEN = 0.85;
+const MAX_WIDTH_OVER_SCREEN = 1.3;
 /** Where the "The Painted Painter" lettering sits in the picture, as shares of its height (top of the letters, bottom of the letters). */
 const TITLE_TOP = 0.4956;
 const TITLE_BOTTOM = 0.5594;
-/** The estimator card starts a little below the lettering. */
-const CARD_BELOW_TITLE = 0.565;
+/** The lettering ends this many pixels above the top of the estimator card. */
+const LETTERING_GAP = 14;
 
 /**
  * The hero collage (Superman with the houses around him) as a translucent background.
@@ -35,16 +36,20 @@ const SiteBackground = () => {
 
     const layout = () => {
       screenHeight = window.innerHeight;
-      size = Math.round(window.innerWidth * WIDTH_OVER_SCREEN);
-      root.style.setProperty('--hero-size', `${size}px`);
-      // the picture starts with its top, the row of houses included, exactly at the top of the screen
-      startShift = 0;
       const main = document.querySelector('main');
       const headerHeight = main ? Math.max(0, Math.round(main.getBoundingClientRect().top + window.scrollY)) : 0;
-      // The estimator card starts just under Superman's body, but never above the middle of the screen (so a small scroll
-      // is what brings it into view and starts the spoken intro) and never so low that none of it shows.
-      const cardTop = Math.min(Math.max(size * CARD_BELOW_TITLE + startShift + 8, screenHeight * 0.52), screenHeight * 0.95);
-      root.style.setProperty('--hero-spacer', `${Math.max(0, Math.round(cardTop - headerHeight - 40))}px`);
+      // The estimator card starts at the top of the bottom third of the screen, and "The Painted Painter" lettering rests just
+      // above it. The picture is scaled (equal proportions) so the lettering lands there with the picture's top at the top of
+      // the screen; it is never much narrower than the screen (a bit of the top row can be cut off instead) nor much wider
+      // than it (on a tall phone screen the picture then starts a little lower, over the blurred fill).
+      const cardTop = Math.round(screenHeight * (2 / 3));
+      const letteringBottom = cardTop - LETTERING_GAP;
+      const fit = letteringBottom / TITLE_BOTTOM;
+      size = Math.round(Math.min(window.innerWidth * MAX_WIDTH_OVER_SCREEN, Math.max(window.innerWidth * MIN_WIDTH_OVER_SCREEN, fit)));
+      startShift = Math.round(letteringBottom - size * TITLE_BOTTOM);
+      root.style.setProperty('--hero-size', `${size}px`);
+      // (the card sits 40px below the top of the page content that follows the spacer)
+      root.style.setProperty('--hero-spacer', `${Math.max(0, cardTop - headerHeight - 40)}px`);
       place();
     };
 
