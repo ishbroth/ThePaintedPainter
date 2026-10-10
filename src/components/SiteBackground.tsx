@@ -1,24 +1,25 @@
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 
-/** The picture is never narrower than 0.9x, nor wider than 1.3x, the screen's width (equal proportions). */
-const MIN_WIDTH_OVER_SCREEN = 0.9;
-const MAX_WIDTH_OVER_SCREEN = 1.3;
+/** The picture is just the Superman panel: its width over its height. */
+const ASPECT = 1566 / 774;
+/** The picture is a little taller than the screen (so it has room to move as the page scrolls) but never wider than 1.35x the screen. */
+const HEIGHT_OVER_SCREEN = 1.1;
+const MAX_WIDTH_OVER_SCREEN = 1.35;
 /** Where the "The Painted Painter" lettering sits in the picture, as shares of its height (top of the letters, bottom of the letters). */
-const TITLE_TOP = 0.4956;
-const TITLE_BOTTOM = 0.5594;
-/** The lettering ends this many pixels above the top of the estimator card. */
-const LETTERING_GAP = 14;
+const TITLE_TOP = 0.4655;
+const TITLE_BOTTOM = 0.6492;
+/** The estimator card starts this many pixels below the lettering. */
+const CARD_GAP = 34;
 
 /**
- * The hero collage (Superman with the houses around him) as a translucent background.
+ * Superman (the painter with the roller and the brush) as a translucent background.
  *
- * - It keeps its true proportions and is scaled so its width fills the screen (and spills a little past both sides), so
- *   Superman is centred across, with the roller and the brush in view. On most screens that makes it taller than the screen,
- *   so it also spills past the bottom; it starts positioned so the Superman panel (roller and brush included) is on screen.
+ * - Just the Superman panel, no houses. It is scaled (equal proportions) to fill the screen from top to bottom, never much
+ *   wider than the screen, so on a laptop the roller and the brush stay near the edges and Superman fills the view.
  * - It is not pinned. As you scroll, it moves up slowly, in proportion to how much page there is to scroll, so the bottom
  *   of the picture and the bottom of the page come into view together.
- * - On a tall, narrow screen the picture can end up shorter than the screen; a blurred copy fills the rest and it stays put.
+ * - On a tall, narrow screen (a phone) the picture can be shorter than the screen; a blurred copy fills the rest.
  *
  * On the home page it is stronger, and the "The Painted Painter" lettering is opaque until the estimator card covers it; on
  * working pages (forms, dashboards) everything, lettering included, is kept very light.
@@ -38,26 +39,14 @@ const SiteBackground = () => {
       screenHeight = window.innerHeight;
       const main = document.querySelector('main');
       const headerHeight = main ? Math.max(0, Math.round(main.getBoundingClientRect().top + window.scrollY)) : 0;
-      // The estimator card starts at the top of the bottom quarter of the screen, and "The Painted Painter" lettering rests just
-      // above it. The picture is scaled (equal proportions) so the lettering lands there with the picture's top at the top of
-      // the screen; it is never much narrower than the screen (a bit of the top row can be cut off instead) nor much wider
-      // than it (on a tall phone screen the picture then starts a little lower, over the blurred fill).
-      let cardTop = Math.round(screenHeight * 0.75);
-      const letteringBottom = cardTop - LETTERING_GAP;
-      const fit = letteringBottom / TITLE_BOTTOM;
-      const maxSize = window.innerWidth * MAX_WIDTH_OVER_SCREEN;
-      if (fit > maxSize) {
-        // A tall, narrow screen (a phone held upright): the picture can't be big enough to put the lettering that low, so the
-        // picture stays at its widest with its top at the top of the screen, and the estimator moves up to stay just below the
-        // lettering. Superman, the lettering and the estimator are all pulled up together.
-        size = Math.round(maxSize);
-        startShift = 0;
-        cardTop = Math.round(size * TITLE_BOTTOM + LETTERING_GAP);
-      } else {
-        size = Math.round(Math.max(window.innerWidth * MIN_WIDTH_OVER_SCREEN, fit));
-        startShift = Math.round(letteringBottom - size * TITLE_BOTTOM);
-      }
+      // taller than the screen by a little, unless that would make it wider than the screen allows (then it is as wide as allowed)
+      const width = Math.round(Math.min(screenHeight * HEIGHT_OVER_SCREEN * ASPECT, window.innerWidth * MAX_WIDTH_OVER_SCREEN));
+      size = Math.round(width / ASPECT); // the picture's height
+      startShift = 0; // its top is at the top of the screen
+      root.style.setProperty('--hero-w', `${width}px`);
       root.style.setProperty('--hero-size', `${size}px`);
+      // the estimator card starts a little below the lettering (and never so low that none of it shows)
+      const cardTop = Math.min(Math.round(size * TITLE_BOTTOM + CARD_GAP), Math.round(screenHeight * 0.85));
       // (the card sits 40px below the top of the page content that follows the spacer)
       root.style.setProperty('--hero-spacer', `${Math.max(0, cardTop - headerHeight - 40)}px`);
       place();

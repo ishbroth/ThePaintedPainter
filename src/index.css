@@ -221,7 +221,7 @@ img {
   content: '';
   position: absolute;
   inset: 0;
-  background: url('/hero-collage-blur.jpg') center / cover no-repeat;
+  background: url('/hero-superman-blur.jpg') center / cover no-repeat;
   opacity: var(--hero-opacity);
 }
 
@@ -230,10 +230,10 @@ img {
   position: absolute;
   top: 0;
   left: 50%;
-  /* a square, so the collage keeps its true proportions; a little wider than the screen, centred on Superman */
-  width: var(--hero-size, 106vw);
-  height: var(--hero-size, 106vw);
-  margin-left: calc(var(--hero-size, 106vw) / -2);
+  /* the Superman picture at its true proportions, centred across the screen */
+  width: var(--hero-w, 106vw);
+  height: var(--hero-size, 52vw);
+  margin-left: calc(var(--hero-w, 106vw) / -2);
   transform: translate3d(0, var(--hero-shift, 0px), 0);
   will-change: transform;
 }
@@ -241,7 +241,7 @@ img {
 .site-hero-bg__img {
   position: absolute;
   inset: 0;
-  background: url('/hero-collage.jpg') 0 0 / 100% 100% no-repeat;
+  background: url('/hero-superman.jpg') 0 0 / 100% 100% no-repeat;
   opacity: var(--hero-opacity);
 }
 
@@ -254,10 +254,10 @@ img {
 .site-hero-bg--home .site-hero-bg__title {
   display: block;
   position: absolute;
-  left: 26.667%;
-  top: 48.333%;
-  width: 46.667%;
-  height: 8.889%;
+  left: 26.23%;
+  top: 46.55%;
+  width: 47.68%;
+  height: 18.37%;
   background: url('/hero-title.png') 0 0 / 100% 100% no-repeat;
   opacity: var(--hero-title-opacity, 1);
 }
