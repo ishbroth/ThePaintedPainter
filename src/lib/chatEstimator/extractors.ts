@@ -1072,7 +1072,7 @@ export function extractAll(text: string, prev: EstimatorContext, lastBotTopicId:
     acks.push(`${sqft.toLocaleString()} sqft`);
   } else if (
     !prev.squareFeet &&
-    (lastBotTopicId === 'room_size' || lastBotTopicId === 'house_size')
+    (lastBotTopicId === 'room_size' || lastBotTopicId === 'house_size' || lastBotTopicId === 'ext_size')
   ) {
     // extractSquareFeet requires a unit ("600 sqft") — but the question that
     // was JUST asked ("about how big is the place?") makes a bare number
@@ -1640,7 +1640,7 @@ export function extractAll(text: string, prev: EstimatorContext, lastBotTopicId:
   // Surface scope limiters. Skipped when the reply is answering a different question: "just regular trim" to the trim
   // question means baseboards, not "paint only the trim".
   const scopeBlockedBy = ['trim_scope', 'condition', 'property_ownership', 'color_change', 'location', 'timeline_and_access', 'commercial_access', 'siding', 'stories', 'house_size', 'room_size', 'reno_context', 'popcorn_extent'];
-  const surf = lastBotTopicId && scopeBlockedBy.includes(lastBotTopicId) ? ({} as ReturnType<typeof extractSurfaceScope>) : extractSurfaceScope(text);
+  const surf = lastBotTopicId && (scopeBlockedBy.includes(lastBotTopicId) || lastBotTopicId.startsWith('ext_')) ? ({} as ReturnType<typeof extractSurfaceScope>) : extractSurfaceScope(text);
   // A plain list as the answer to "which surfaces?" ("walls", "walls and ceilings", "walls ceilings trim") means exactly those.
   const onlySurfaceWords = /^\s*(?:(?:just|only|and|the|with|plus|also|,|&|\+)\s*)*(?:(?:walls?|ceilings?|trim|baseboards?|doors?)\s*(?:,|and|&|\+|\/)?\s*)+[.!]?\s*$/i.test(text);
   let listParsed = false;

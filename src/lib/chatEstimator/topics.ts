@@ -77,6 +77,16 @@ const isCommercialLike = (c: EstimatorContext) => c.propertyType === 'commercial
 
 // ===== Topic list (priority order) =====
 
+/** An outside job (the house itself, not just a fence or a deck): the exterior interview applies. */
+function isExteriorJob(c: EstimatorContext): boolean {
+  return (c.projectType === 'exterior' || c.projectType === 'both') && c.exteriorBody !== 'no';
+}
+
+/** An exterior question (ext_*) the customer has already answered. */
+function extDone(c: EstimatorContext, id: string): boolean {
+  return (c.extAnswered ?? []).includes(id);
+}
+
 export const TOPICS: Topic[] = [
   // ——————————————————————————————————————————
   // Project type — only ask if truly ambiguous
@@ -259,6 +269,126 @@ export const TOPICS: Topic[] = [
       "Some folks just want walls refreshed. Others want the whole package — walls, ceiling, trim, doors, closets. Either works. You can also mix and match.",
     example: () =>
       "'Just walls' is common. Or 'walls and ceiling, no trim'. Or 'everything except the doors'.",
+  },
+
+  // ——————————————————————————————————————————
+  // Exterior interview: size, then what else beyond the siding gets painted (one question each), the windows, the shape the
+  // outside is in and the repairs it needs, and the color. Each is asked once; location and timing come after.
+  // ——————————————————————————————————————————
+  {
+    id: 'ext_size',
+    priority: 46,
+    relevant: (c) => isExteriorJob(c) && !c.squareFeet && !c.bedroomCount,
+    alreadyAnswered: (c) => !!c.squareFeet || !!c.bedroomCount,
+    ask: (c) =>
+      pick(
+        [
+          'About how big is the house, in square feet?',
+          "Roughly how many square feet is the house? A rough number is fine.",
+        ],
+        seed(c),
+      ),
+    clarify: () => "The size of the house (the living space, not the lot) is what I use to estimate how much surface there is to paint.",
+    example: () => "Something like '2,000 square feet', or '4 bedrooms' if you don't know the number.",
+  },
+  {
+    id: 'ext_trim',
+    priority: 48.1,
+    relevant: (c) => isExteriorJob(c) && c.exteriorTrim !== 'yes',
+    alreadyAnswered: (c) => c.exteriorTrim === 'yes' || extDone(c, 'ext_trim'),
+    ask: (c) => pick(["Are we painting the trim too? That's the fascia boards and the trim around the windows and doors.", "What about the trim, the fascia and the trim around the windows and doors?"], seed(c)),
+    clarify: () => "The trim is the boards that frame the roofline, windows and doors. It's usually painted along with the siding.",
+    example: () => "Just say 'yes, the trim too' or 'no, just the siding'.",
+  },
+  {
+    id: 'ext_doors',
+    priority: 48.2,
+    relevant: (c) => isExteriorJob(c) && c.entryDoor !== 'yes',
+    alreadyAnswered: (c) => c.entryDoor === 'yes' || extDone(c, 'ext_doors'),
+    ask: (c) => pick(["What about the front door, is that getting painted?", "Is the front door part of the job?"], seed(c)),
+    clarify: () => "I mean the front entry door, and any other exterior doors you want painted.",
+    example: () => "Just say 'yes, the front door' or 'no'.",
+  },
+  {
+    id: 'ext_garage',
+    priority: 48.3,
+    relevant: (c) => isExteriorJob(c) && c.garageDoor === 'none',
+    alreadyAnswered: (c) => c.garageDoor !== 'none' || extDone(c, 'ext_garage'),
+    ask: (c) => pick(["And the garage door?", "Does the garage door get painted too?"], seed(c)),
+    clarify: () => "Garage doors are painted separately from the walls, so I want to know whether to include them.",
+    example: () => "Just say 'yes, one garage door', 'yes, two' or 'no'.",
+  },
+  {
+    id: 'ext_garage_count',
+    priority: 48.35,
+    relevant: (c) => isExteriorJob(c) && c.garageDoor === 'single',
+    alreadyAnswered: (c) => c.garageDoor === 'double' || extDone(c, 'ext_garage_count'),
+    ask: () => 'Is that one garage door, or two?',
+    clarify: () => "A two-car garage often has two single doors or one wide double door; either way I just need to know how many there are.",
+    example: () => "Just say 'one' or 'two'.",
+  },
+  {
+    id: 'ext_gutters',
+    priority: 48.4,
+    relevant: (c) => isExteriorJob(c) && c.gutters !== 'yes',
+    alreadyAnswered: (c) => c.gutters === 'yes' || extDone(c, 'ext_gutters'),
+    ask: (c) => pick(["Do the gutters and downspouts need painting too?", "What about the gutters and downspouts, are those getting painted?"], seed(c)),
+    clarify: () => "Gutters and downspouts can be painted to match the house.",
+    example: () => "Just say 'yes, the gutters too' or 'no'.",
+  },
+  {
+    id: 'ext_eaves',
+    priority: 48.5,
+    relevant: (c) => isExteriorJob(c) && c.soffitsEaves !== 'yes',
+    alreadyAnswered: (c) => c.soffitsEaves === 'yes' || extDone(c, 'ext_eaves'),
+    ask: (c) => pick(["And the eaves and soffits, the underside of the roof overhang?", "Should we include the eaves and soffits?"], seed(c)),
+    clarify: () => "The eaves and soffits are the underside of the part of the roof that hangs out past the walls.",
+    example: () => "Just say 'yes, the eaves too' or 'no'.",
+  },
+  {
+    id: 'ext_windows',
+    priority: 48.6,
+    relevant: (c) => isExteriorJob(c) && c.exteriorWindows === 'none',
+    alreadyAnswered: (c) => c.exteriorWindows !== 'none' || extDone(c, 'ext_windows'),
+    ask: (c) => pick(["What kind of windows does the house have? Vinyl windows don't need painting.", "What are the windows made of?"], seed(c)),
+    clarify: () => "Vinyl windows are usually left alone. Wood windows (and French-pane windows with lots of little panes) take real painting time, and aluminum frames sometimes just need the trim around them done.",
+    example: () => "Just say 'vinyl', 'wood', 'aluminum', 'French pane', or 'a mix'.",
+  },
+  {
+    id: 'ext_window_count',
+    priority: 48.7,
+    relevant: (c) => isExteriorJob(c) && c.exteriorWindows !== 'none' && !c.exteriorWindowCount,
+    alreadyAnswered: (c) => !!c.exteriorWindowCount || extDone(c, 'ext_window_count'),
+    ask: (c) => pick(["About how many windows are getting painted?", "How many windows would that be?"], seed(c)),
+    clarify: () => "A rough count of the windows that need painting is fine.",
+    example: () => "Something like '12 windows' or 'about 20'.",
+  },
+  {
+    id: 'ext_condition',
+    priority: 48.8,
+    relevant: (c) => isExteriorJob(c),
+    alreadyAnswered: (c) => extDone(c, 'ext_condition'),
+    ask: (c) => pick(["How is the paint holding up on the outside right now?", "What shape is the outside in right now?"], seed(c)),
+    clarify: () => "I mean whether the paint is in decent shape, or fading, peeling or flaking. Peeling paint needs extra prep.",
+    example: () => "Something like 'it's faded but fine' or 'peeling in a few spots'.",
+  },
+  {
+    id: 'ext_repairs',
+    priority: 48.9,
+    relevant: (c) => isExteriorJob(c),
+    alreadyAnswered: (c) => extDone(c, 'ext_repairs'),
+    ask: (c) => pick(["Is there any repair work needed before painting?", "Any repairs needed first, like rotted wood, cracks or gaps?"], seed(c)),
+    clarify: () => "Repairs are things like rotted wood to replace, cracks in the stucco, or gaps that need caulking before the paint goes on.",
+    example: () => "Something like 'a few rotted boards' or 'no repairs needed'.",
+  },
+  {
+    id: 'ext_color',
+    priority: 49,
+    relevant: (c) => isExteriorJob(c),
+    alreadyAnswered: (c) => !!c.exteriorColorChange || extDone(c, 'ext_color'),
+    ask: (c) => pick(["Is the house staying the same color, or going a different color?", "Are you keeping the current color, or changing it?"], seed(c)),
+    clarify: () => "A new color usually takes an extra coat, and a big change like dark to light takes more.",
+    example: () => "Just say 'same color' or 'a different color'.",
   },
 
   // ——————————————————————————————————————————

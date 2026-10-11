@@ -30,6 +30,8 @@ export interface EstimatorContext {
   excludedSurfaces?: string[];
   /** Surfaces the customer said yes to when the estimator suggested them (they stay in even though the transcript also says "just walls"). */
   addedSurfaces?: string[];
+  /** Exterior questions (ext_*) the customer has answered, so each is asked once and never counted as answered when it wasn't. */
+  extAnswered?: string[];
   interiorWalls: string; // yes, no
   accentWalls: string; // yes, no, skip
   interiorCeilings: string; // yes, no

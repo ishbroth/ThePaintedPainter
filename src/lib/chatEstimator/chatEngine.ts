@@ -535,7 +535,90 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
     for (const key of ruledOut) added.delete(key);
     if (added.size > 0) ctxWithExplicit.addedSurfaces = [...added];
   }
-  if (state.ctx.exteriorColorChange !== 'different' && ctxWithExplicit.exteriorColorChange === 'different' && !/(exterior|outside|siding|stucco|brick|house color|front|fence|deck|shutter|fascia)/i.test(trimmed)) {
+  // The "anything else?" at the end of an outside job (fences, overhangs, chimneys, decks, shutters): on an outside job these words
+  // mean the outside ones, even without saying "exterior".
+  if (state.wrapupAsked && (state.ctx.projectType === 'exterior' || state.ctx.projectType === 'both')) {
+    const low = trimmed.toLowerCase();
+    const negated = (word: string) => new RegExp('\\b(?:no|without|skip|not)\\s+(?:the\\s+)?' + word + '\\b').test(low);
+    if (/\bshutters?\b/.test(low) && !negated('shutters?')) {
+      ctxWithExplicit.exteriorShutters = 'yes';
+      if (state.ctx.projectType === 'exterior') ctxWithExplicit.interiorShutters = state.ctx.interiorShutters;
+    }
+    if (/\b(?:overhangs?|patio covers?|porch ceilings?|pergolas?)\b/.test(low) && !negated('overhangs?')) ctxWithExplicit.overhangs = 'yes';
+    if (/\bchimneys?\b/.test(low) && !negated('chimneys?') && !ctxWithExplicit.additionalDetails.toLowerCase().includes('chimney')) {
+      ctxWithExplicit.additionalDetails = `${ctxWithExplicit.additionalDetails ? ctxWithExplicit.additionalDetails + '; ' : ''}chimney to paint`;
+    }
+  }
+
+  // Answers to the exterior questions (ext_*): yes adds the thing, no leaves it out, and each answer is recorded so the question isn't
+  // asked again (or counted as answered when it wasn't).
+  {
+    const asked = state.lastBotTopic?.id;
+    if (asked && asked.startsWith('ext_')) {
+      const low = trimmed.toLowerCase();
+      const target = ctxWithExplicit as unknown as Record<string, unknown>;
+      const yes = /^\s*(?:yes|yeah|yep|yup|sure|ok|okay|please|definitely|absolutely|why not|sounds good|do it|go ahead|of course|that too|them too|it too)\b/.test(low);
+      const no = /^\s*(?:no|nope|nah|not (?:needed|really|this time)|skip|pass|leave (?:it|them)|none|that'?s (?:ok|okay|fine)|no thanks|just the siding)\b/.test(low);
+      const yesNo: Record<string, { field: string; on: string }> = {
+        ext_trim: { field: 'exteriorTrim', on: 'yes' },
+        ext_doors: { field: 'entryDoor', on: 'yes' },
+        ext_garage: { field: 'garageDoor', on: 'single' },
+        ext_gutters: { field: 'gutters', on: 'yes' },
+        ext_eaves: { field: 'soffitsEaves', on: 'yes' },
+      };
+      const offer = yesNo[asked];
+      if (offer) {
+        if (yes && !no) target[offer.field] = offer.on;
+        else if (no) target[offer.field] = (state.ctx as unknown as Record<string, unknown>)[offer.field];
+        if (asked === 'ext_garage' && /\b(?:two|2|double|both|pair)\b/.test(low) && !no) target.garageDoor = 'double';
+      }
+      if (asked === 'ext_garage_count') {
+        if (/\b(?:two|2|double|both|pair|2-car|two-car)\b/.test(low)) ctxWithExplicit.garageDoor = 'double';
+      }
+      if (asked === 'ext_windows') {
+        if (/\bvinyl\b/.test(low) && !/\b(?:wood|aluminum|aluminium|french|mix|some)\b/.test(low)) ctxWithExplicit.exteriorWindows = 'none';
+        else if (/\b(?:wood|wooden|french|divided|pane|panes|grid|grids|mix|mixed|some)\b/.test(low)) ctxWithExplicit.exteriorWindows = 'full';
+        else if (/\b(?:aluminum|aluminium|metal)\b/.test(low)) ctxWithExplicit.exteriorWindows = 'trim_only';
+        else if (/\b(?:not sure|don'?t know|no idea|unsure)\b/.test(low)) ctxWithExplicit.exteriorWindows = 'trim_only';
+        if (/\b(?:french|divided|panes?|grids?)\b/.test(low) && !ctxWithExplicit.windowTypes.includes('french_pane')) {
+          ctxWithExplicit.windowTypes = [...ctxWithExplicit.windowTypes, 'french_pane'];
+        }
+      }
+      if (asked === 'ext_window_count') {
+        const words: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, twelve: 12, fifteen: 15, twenty: 20 };
+        const digits = low.match(/\b(\d{1,3})\b/);
+        const word = Object.keys(words).find((w) => new RegExp('\\b' + w + '\\b').test(low));
+        const n = digits ? parseInt(digits[1], 10) : word ? words[word] : null;
+        if (n && n > 0 && n < 200) ctxWithExplicit.exteriorWindowCount = n;
+      }
+      if (asked === 'ext_condition') {
+        if (/\b(?:peeling|peel|flaking|flake|chipping|chipped|bad|rough|terrible|awful|failing|cracking|blistering|bare|worn out|rundown|run down)\b/.test(low)) ctxWithExplicit.exteriorCondition = 'poor';
+        else if (/\b(?:fading|faded|fade|worn|dull|chalky|some|okay|ok|fair|so-so|older|dated|dirty|mildew)\b/.test(low)) ctxWithExplicit.exteriorCondition = 'fair';
+        else if (/\b(?:good|great|fine|excellent|decent|new|pristine|solid|nice)\b/.test(low)) ctxWithExplicit.exteriorCondition = 'good';
+        if (/\b(?:peeling|flaking|chipping|blistering)\b/.test(low) && !ctxWithExplicit.prepWork.includes('power_washing')) ctxWithExplicit.prepWork = [...ctxWithExplicit.prepWork, 'power_washing'];
+      }
+      if (asked === 'ext_repairs' && !no) {
+        const prep = new Set(ctxWithExplicit.prepWork);
+        if (/\b(?:rot|rotted|rotten|rotting|dry rot|soft wood|damaged wood|wood damage)\b/.test(low)) prep.add('wood_rot');
+        if (/\b(?:caulk|caulking|gaps?|seams?|cracks?|cracked|stucco|holes?)\b/.test(low)) {
+          prep.add('caulking');
+          if (ctxWithExplicit.caulkingExtent !== 'extensive') ctxWithExplicit.caulkingExtent = /\b(?:lots|many|extensive|everywhere|all over)\b/.test(low) ? 'extensive' : 'moderate';
+        }
+        if (/\b(?:mold|mildew|moss|algae)\b/.test(low)) prep.add('mold_treatment');
+        if (yes && prep.size === ctxWithExplicit.prepWork.length) prep.add('caulking'); // "yes, some repairs" without detail: priced as typical caulking and patching
+        ctxWithExplicit.prepWork = [...prep];
+      }
+      if (asked === 'ext_color') {
+        if (/\b(?:same|keep|keeping|current|existing|match|matching|stay|staying)\b/.test(low) && !/\bdifferent|new color|change\b/.test(low)) ctxWithExplicit.exteriorColorChange = 'same';
+        else if (/\b(?:different|new|change|changing|switch|switching|another|dark|light|paint it)\b/.test(low)) ctxWithExplicit.exteriorColorChange = 'different';
+      }
+      // a question back ("what do you mean?") is not an answer
+      if (!trimmed.endsWith('?')) {
+        ctxWithExplicit.extAnswered = [...new Set([...(state.ctx.extAnswered ?? []), asked])];
+      }
+    }
+  }
+  if (state.lastBotTopic?.id !== 'ext_color' && state.ctx.exteriorColorChange !== 'different' && ctxWithExplicit.exteriorColorChange === 'different' && !/(exterior|outside|siding|stucco|brick|house color|front|fence|deck|shutter|fascia)/i.test(trimmed)) {
     ctxWithExplicit.exteriorColorChange = state.ctx.exteriorColorChange;
   }
 
@@ -971,7 +1054,13 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
           ...s.history,
           botMessage(
             `I think I've got enough to put a number together. ${reminderLeadIn}${reminderMarkers}${reminderMarkers ? ' ' : ''}A couple of photos of the property help painters respond faster and with more confidence, please attach some here. ${propertyMarker}` +
-              "Anything else I should know, like the ceiling height? " +
+              `Anything else I should know, like ${
+                ctxNext.projectType === 'exterior'
+                  ? 'fences, overhangs, chimneys, decks or shutters'
+                  : ctxNext.projectType === 'both'
+                    ? 'the ceiling height, fences, decks or shutters'
+                    : 'the ceiling height'
+              }? ` +
               "Otherwise just say 'run it' and I'll price it out.",
           ),
         ],

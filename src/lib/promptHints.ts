@@ -19,6 +19,18 @@ const TOPIC_PROMPTS: Record<string, string> = {
   room_size: 'About how big is the room?',
   house_size: 'Please estimate square feet',
   surfaces: 'Which surfaces?',
+  ext_size: 'Please estimate square feet',
+  ext_trim: 'Paint the trim?',
+  ext_doors: 'Paint the front door?',
+  ext_garage: 'Paint the garage door?',
+  ext_garage_count: 'One or two garage doors?',
+  ext_gutters: 'Paint the gutters?',
+  ext_eaves: 'Paint the eaves and soffits?',
+  ext_windows: 'What are the windows made of?',
+  ext_window_count: 'How many windows?',
+  ext_condition: 'How is the paint holding up?',
+  ext_repairs: 'Any repairs needed?',
+  ext_color: 'Same color or a new one?',
   upsell_ceilings: 'Add the ceilings?',
   upsell_trim: 'Add the baseboards?',
   upsell_doors: 'Add the doors?',
@@ -32,7 +44,7 @@ const TOPIC_PROMPTS: Record<string, string> = {
   siding: 'What is the outside made of?',
   stories: 'How many stories?',
   location: 'ZIP code?',
-  timeline_and_access: 'When, and is it occupied or empty?',
+  timeline_and_access: 'When would you like it done?',
 };
 
 /** The final question in a message (an explanation that follows it is not the question). */
@@ -47,6 +59,8 @@ function coreQuestion(text: string): string {
  * "Please estimate square feet", "How many doors?". Falls back to the generic invitation.
  */
 export function composerPrompt(botText: string, topicId?: string | null): string {
+  // the last question before pricing ("Anything else I should know?... say 'run it'")
+  if (/\brun it\b/i.test(botText)) return 'Anything else to add?';
   const q = coreQuestion(botText);
   if (/\b(square (?:feet|foot|footage)|sq\.? ?ft)\b/i.test(q)) return 'Please estimate square feet';
   if (/\blinear (?:feet|foot)\b/i.test(q)) return 'About how many linear feet?';
