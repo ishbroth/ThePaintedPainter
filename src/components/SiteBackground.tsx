@@ -36,6 +36,7 @@ const SiteBackground = () => {
     let size = 0;
     let screenHeight = 0;
     let startShift = 0; // how far up the picture starts (0 = its top is at the top of the page)
+    let isPhone = false;
 
     const layout = () => {
       screenHeight = window.innerHeight;
@@ -44,6 +45,7 @@ const SiteBackground = () => {
       // A phone held upright: Superman is scaled so the roller and the brush reach the margins of the screen. Anything wider:
       // taller than the screen by a little, unless that would make it wider than the screen allows.
       const phone = window.innerWidth <= 700 && screenHeight > window.innerWidth * 1.2;
+      isPhone = phone;
       const width = phone
         ? Math.round(window.innerWidth * PHONE_WIDTH_OVER_SCREEN)
         : Math.round(Math.min(screenHeight * HEIGHT_OVER_SCREEN * ASPECT, window.innerWidth * MAX_WIDTH_OVER_SCREEN));
@@ -64,7 +66,9 @@ const SiteBackground = () => {
       const scrollable = document.documentElement.scrollHeight - screenHeight;
       const progress = scrollable > 0 ? Math.min(1, Math.max(0, window.scrollY / scrollable)) : 0;
       // from where it starts to the point where its bottom meets the bottom of the screen, reached at the end of the page
-      const endShift = -overhang;
+      // (on a phone the picture is shorter than the screen, so it travels down instead, ending with its bottom edge at the bottom of
+      // the screen as the page ends; on larger screens it travels up until its bottom edge meets the bottom of the screen)
+      const endShift = isPhone ? Math.max(0, screenHeight - size) : -overhang;
       const shift = Math.round(startShift + (endShift - startShift) * progress);
       root.style.setProperty('--hero-shift', `${shift}px`);
 
