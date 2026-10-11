@@ -460,30 +460,59 @@ const ChatPanel = () => {
     if (afterSend) el.scrollIntoView({ block: 'nearest' });
   }, [keyboardDevice, thinking, waiting, state.history.length]);
 
-  // Phones and tablets: when the keypad comes up, the estimator takes the top half of what is left on screen and the keypad the
-  // bottom half (the page scrolls so the estimator's top is at the top, and the conversation area is sized to what is visible).
+  // Phones and tablets: while the keypad is up, the estimator becomes a window that fills exactly the space above the keypad (its title
+  // on top, the conversation scrolling inside, your line at the bottom). The page behind it does not move or follow the cursor.
   useEffect(() => {
     if (keyboardDevice) return;
+    const section = sectionRef.current;
+    if (!section) return;
+    const root = document.documentElement;
     const vv = window.visualViewport;
-    if (!vv) return;
-    let wasOpen = false;
-    const onResize = () => {
-      const open = vv.height < window.innerHeight - 140;
-      document.documentElement.style.setProperty('--vvh', `${Math.round(vv.height)}px`);
-      sectionRef.current?.classList.toggle('keyboard-open', open);
-      if (open && !wasOpen) {
-        window.setTimeout(() => {
-          sectionRef.current?.querySelector('.chat-estimator-card')?.scrollIntoView({ block: 'start' });
-          messagesRef.current?.scrollTo({ top: messagesRef.current.scrollHeight });
-          composerRef.current?.scrollIntoView({ block: 'nearest' });
-        }, 60);
+    let focused = false;
+    let open = false;
+    const update = () => {
+      const height = vv ? vv.height : window.innerHeight;
+      root.style.setProperty('--vvh', `${Math.round(height)}px`);
+      root.style.setProperty('--vvtop', `${Math.round(vv ? vv.offsetTop : 0)}px`);
+      const full = window.innerHeight > window.innerWidth ? Math.max(screen.width, screen.height) : Math.min(screen.width, screen.height);
+      const nowOpen = focused && height < full * 0.78;
+      if (nowOpen === open) return;
+      open = nowOpen;
+      if (open) {
+        // keep the page the same length while the card is lifted out of it
+        section.style.minHeight = `${section.offsetHeight}px`;
+        section.classList.add('keyboard-open');
+        window.setTimeout(() => messagesRef.current?.scrollTo({ top: messagesRef.current.scrollHeight }), 30);
+      } else {
+        section.classList.remove('keyboard-open');
+        section.style.minHeight = '';
       }
-      wasOpen = open;
     };
-    vv.addEventListener('resize', onResize);
+    const onFocusIn = (ev: FocusEvent) => {
+      if (!(ev.target as HTMLElement | null)?.closest?.('.chat-composer')) return;
+      focused = true;
+      update();
+      window.setTimeout(update, 120);
+      window.setTimeout(update, 400);
+    };
+    const onFocusOut = () => {
+      // moving between the typing line and the page elements around it does not count as leaving
+      window.setTimeout(() => {
+        focused = !!document.activeElement?.closest?.('.chat-composer');
+        update();
+      }, 120);
+    };
+    section.addEventListener('focusin', onFocusIn);
+    section.addEventListener('focusout', onFocusOut);
+    vv?.addEventListener('resize', update);
+    vv?.addEventListener('scroll', update);
     return () => {
-      vv.removeEventListener('resize', onResize);
-      sectionRef.current?.classList.remove('keyboard-open');
+      section.removeEventListener('focusin', onFocusIn);
+      section.removeEventListener('focusout', onFocusOut);
+      vv?.removeEventListener('resize', update);
+      vv?.removeEventListener('scroll', update);
+      section.classList.remove('keyboard-open');
+      section.style.minHeight = '';
     };
   }, [keyboardDevice]);
 
@@ -509,7 +538,8 @@ const ChatPanel = () => {
     // a browser can leave a stray <br> behind once everything is deleted, which would hide the placeholder
     if (text === '') el.innerHTML = '';
     setInput(text);
-    el.scrollIntoView({ block: 'nearest' });
+    if (keyboardDevice) el.scrollIntoView({ block: 'nearest' });
+    else messagesRef.current?.scrollTo({ top: messagesRef.current.scrollHeight });
   }
 
   function onComposerPaste(e: React.ClipboardEvent<HTMLSpanElement>) {
@@ -525,6 +555,9 @@ const ChatPanel = () => {
         <div className="chat-estimator-header">
           <div className="chat-estimator-header-row">
             <h2>Pick Your Price, Pick Your Painter.</h2>
+            <button type="button" className="chat-kbd-done" onClick={() => (document.activeElement as HTMLElement | null)?.blur()}>
+              Done
+            </button>
           </div>
           <p>Tell me about your project. Type naturally — I'll guide you from there.</p>
         </div>
@@ -597,7 +630,7 @@ const ChatPanel = () => {
             </div>
           )}
           {/* One open window: your answer is typed right here, under the question, with Send at the end of what you type. */}
-          {!waiting && !thinking && (
+          {!waiting && (!thinking || !keyboardDevice) && (
             <div
               className="chat-bubble chat-bubble-user chat-composer"
               onClick={() => {

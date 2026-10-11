@@ -9,6 +9,9 @@ const MAX_WIDTH_OVER_SCREEN = 1.35;
 /** Where the "The Painted Painter" lettering sits in the picture, as shares of its height (top of the letters, bottom of the letters). */
 const TITLE_TOP = 0.4655;
 const TITLE_BOTTOM = 0.6492;
+/** The same, in the full square collage that phones use (houses along the top and bottom, Superman in the middle). */
+const SQUARE_TITLE_TOP = 0.4956;
+const SQUARE_TITLE_BOTTOM = 0.5594;
 /** The estimator card starts this many pixels below the lettering. */
 const CARD_GAP = 34;
 
@@ -34,19 +37,29 @@ const SiteBackground = () => {
     let size = 0;
     let screenHeight = 0;
     let startShift = 0; // how far up the picture starts (0 = its top is at the top of the page)
+    let titleTop = TITLE_TOP;
+    let titleBottom = TITLE_BOTTOM;
 
     const layout = () => {
       screenHeight = window.innerHeight;
       const main = document.querySelector('main');
       const headerHeight = main ? Math.max(0, Math.round(main.getBoundingClientRect().top + window.scrollY)) : 0;
-      // taller than the screen by a little, unless that would make it wider than the screen allows (then it is as wide as allowed)
-      const width = Math.round(Math.min(screenHeight * HEIGHT_OVER_SCREEN * ASPECT, window.innerWidth * MAX_WIDTH_OVER_SCREEN));
-      size = Math.round(width / ASPECT); // the picture's height
+      // A phone held upright is too narrow for the wide Superman panel without cutting off the roller and the brush, so it gets the
+      // whole square collage at the screen's width instead (the roller and brush in view, the houses above and below).
+      const square = window.innerWidth <= 700 && screenHeight > window.innerWidth * 1.2;
+      document.querySelector('.site-hero-bg')?.classList.toggle('site-hero-bg--square', square);
+      titleTop = square ? SQUARE_TITLE_TOP : TITLE_TOP;
+      titleBottom = square ? SQUARE_TITLE_BOTTOM : TITLE_BOTTOM;
+      // otherwise: taller than the screen by a little, unless that would make it wider than the screen allows
+      const width = square
+        ? window.innerWidth
+        : Math.round(Math.min(screenHeight * HEIGHT_OVER_SCREEN * ASPECT, window.innerWidth * MAX_WIDTH_OVER_SCREEN));
+      size = square ? width : Math.round(width / ASPECT); // the picture's height
       startShift = 0; // its top is at the top of the screen
       root.style.setProperty('--hero-w', `${width}px`);
       root.style.setProperty('--hero-size', `${size}px`);
       // the estimator card starts a little below the lettering (and never so low that none of it shows)
-      const cardTop = Math.min(Math.round(size * TITLE_BOTTOM + CARD_GAP), Math.round(screenHeight * 0.85));
+      const cardTop = Math.min(Math.round(size * titleBottom + CARD_GAP), Math.round(screenHeight * 0.85));
       // (the card sits 40px below the top of the page content that follows the spacer)
       root.style.setProperty('--hero-spacer', `${Math.max(0, cardTop - headerHeight - 40)}px`);
       place();
@@ -68,10 +81,10 @@ const SiteBackground = () => {
         const card = document.querySelector('.chat-estimator-card');
         let opacity = 1;
         if (card) {
-          const titleTop = shift + size * TITLE_TOP;
-          const titleBottom = shift + size * TITLE_BOTTOM;
+          const top = shift + size * titleTop;
+          const bottom = shift + size * titleBottom;
           const cardTop = card.getBoundingClientRect().top;
-          opacity = Math.min(1, Math.max(0, (cardTop - titleTop) / Math.max(1, titleBottom - titleTop)));
+          opacity = Math.min(1, Math.max(0, (cardTop - top) / Math.max(1, bottom - top)));
         }
         root.style.setProperty('--hero-title-opacity', opacity.toFixed(3));
       }

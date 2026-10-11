@@ -965,19 +965,51 @@
   }
 }
 
-/* Keypad open (phones, tablets): the estimator fills the visible top half, with the conversation scrolling inside it */
+/* Keypad open (phones, tablets): the estimator is a window filling exactly the space above the keypad; the conversation scrolls inside */
 .chat-estimator-section.keyboard-open {
-  padding-top: 8px;
-  padding-bottom: 8px;
+  position: fixed;
+  top: var(--vvtop, 0px);
+  left: 0;
+  right: 0;
+  height: var(--vvh, 50vh);
+  z-index: 2000;
+  padding: 0;
+  background: var(--bg-page);
+  overscroll-behavior: contain;
 }
 
 .chat-estimator-section.keyboard-open .chat-estimator-card {
+  max-width: none;
+  height: 100%;
+  margin: 0;
+  border-radius: 0;
+  border: none;
+  box-shadow: none;
   min-height: 0;
 }
 
 .chat-estimator-section.keyboard-open .chat-messages {
-  max-height: calc(var(--vvh, 50vh) - 150px);
+  flex: 1 1 auto;
+  max-height: none;
   min-height: 0;
+  overscroll-behavior: contain;
+}
+
+.chat-kbd-done {
+  display: none;
+  flex-shrink: 0;
+  padding: 2px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.chat-estimator-section.keyboard-open .chat-kbd-done {
+  display: inline-flex;
 }
 
 .chat-estimator-section.keyboard-open .chat-estimator-header p,
