@@ -654,6 +654,9 @@ const ChatPanel = () => {
                 spellCheck
                 autoCapitalize="sentences"
                 data-placeholder={composerPlaceholder}
+                onFocus={() => {
+                  if (!keyboardDevice) playIntroIfFreshRef.current(); // phones: focusing the line (the tap that opens the keypad) starts the greeting
+                }}
                 onInput={onComposerInput}
                 onKeyDown={onKeyDown}
                 onPaste={onComposerPaste}

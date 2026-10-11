@@ -122,13 +122,15 @@ function pickBestVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | n
   // Albert) and the novelty ones are deliberately NOT here, and are pushed down below.
   const MALE = /\b(guy|davis|christopher|eric|roger|steffan|brian|andrew|ryan|tony|jason|david|mark|james|aaron|alex|tom|evan|nathan|daniel|arthur|oliver|rishi|male)\b/;
   // iPhone and Mac ship joke and robot voices; they must never be picked.
-  const NOVELTY = /\b(fred|ralph|junior|albert|rocko|eddy|reed|sandy|shelley|flo|grandma|grandpa|bad news|good news|whisper|zarvox|trinoids|bubbles|bells|boing|cellos|organ|wobble|jester|superstar|bahh|kathy|princess|agnes|bruce|victoria|compact)\b/;
+  const NOVELTY = /\b(fred|ralph|junior|albert|sandy|shelley|flo|grandma|grandpa|bad news|good news|whisper|zarvox|trinoids|bubbles|bells|boing|cellos|organ|wobble|jester|superstar|bahh|kathy|princess|agnes|bruce|victoria|compact)\b/;
+  // Apple's other American male voices (a step below Aaron, Evan, Nathan and Tom) and Android's male voice codes: still male, so they beat any female default
+  const MALE_FALLBACK = /\b(eddy|reed|rocko)\b|en-us-x-(?:iol|iom|tpd)\b/;
   const FEMALE = /\b(aria|jenny|sara|jane|ana|michelle|emma|ava|allison|susan|karen|moira|tessa|zoe|nicky|samantha|victoria|kathy|fiona|zira|hazel|catherine|female|siri)\b/;
   const score = (v: SpeechSynthesisVoice): number => {
     const name = v.name.toLowerCase();
     // the best-sounding iPhone male voices first (Enhanced and Premium downloads, then Evan, Nathan, Tom, Aaron)
     const iosPreferred = /\b(evan|nathan|tom|aaron)\b/.test(name) ? 40 : 0;
-    return baseScore(v, name) + (MALE.test(name) ? 200 : 0) + iosPreferred - (FEMALE.test(name) ? 50 : 0) - (NOVELTY.test(name) ? 1000 : 0);
+    return baseScore(v, name) + (MALE.test(name) ? 200 : MALE_FALLBACK.test(name) ? 120 : 0) + iosPreferred - (FEMALE.test(name) ? 50 : 0) - (NOVELTY.test(name) ? 1000 : 0);
   };
   const baseScore = (v: SpeechSynthesisVoice, name: string): number => {
     // Modern neural/cloud voices (Edge's "Online (Natural)" voices, Google's
@@ -188,10 +190,17 @@ export function prepareVoice(): void {
 export function speak(text: string): Promise<void> {
   if (!isTTSSupported()) return Promise.resolve();
   const synth = window.speechSynthesis;
-  if (synth.speaking || synth.pending) synth.cancel();
+  // choose the voice now, from what the phone already knows (the list is often there even before the async lookup finishes)
+  if (!selectedVoice) {
+    const known = synth.getVoices();
+    if (known.length > 0) selectedVoice = pickBestVoice(known) ?? selectedVoice;
+    if (!selectedVoice) prepareVoice();
+  }
+  // cancelling something that is playing makes some phones drop whatever is spoken right after, so that start waits a moment
+  const mustCancel = (synth.speaking || synth.pending) && !unlockInFlight;
+  if (mustCancel) synth.cancel();
   synth.resume?.(); // a phone can leave the engine paused
   const myRun = ++speakRun;
-  if (selectedVoice === undefined) prepareVoice();
   // "Hello, citizen...": a "..." is a real pause, so each side is spoken separately with a beat between.
   const parts = splitPrompt(text).spoken.split(/\.{3,}|\u2026/).map((p) => p.trim()).filter(Boolean);
   const speakPart = (index: number) => {
@@ -209,7 +218,8 @@ export function speak(text: string): Promise<void> {
     };
     synth.speak(utterance);
   };
-  speakPart(0);
+  if (mustCancel) window.setTimeout(() => speakPart(0), 80);
+  else speakPart(0);
   return Promise.resolve();
 }
 
@@ -242,8 +252,15 @@ function unlockSpeechSynthesis(): void {
   unlocked = true;
   const utterance = new SpeechSynthesisUtterance(' ');
   utterance.volume = 0;
+  unlockInFlight = true;
+  utterance.onend = utterance.onerror = () => {
+    unlockInFlight = false;
+  };
   window.speechSynthesis.speak(utterance);
 }
+
+/** True while the silent unlock sound is still playing (a greeting that starts in the same tap queues behind it instead of cancelling it). */
+let unlockInFlight = false;
 
 /**
  * Call once, e.g. at the app root. Listens for the very first touch/click
