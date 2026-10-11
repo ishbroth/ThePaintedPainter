@@ -32,6 +32,8 @@ export interface EstimatorContext {
   addedSurfaces?: string[];
   /** Exterior questions (ext_*) the customer has answered, so each is asked once and never counted as answered when it wasn't. */
   extAnswered?: string[];
+  /** The job is a separate building like a shed (named here), not a house: no live-here/rental or house questions, just its size and what it's made of. */
+  standaloneStructure?: string;
   interiorWalls: string; // yes, no
   accentWalls: string; // yes, no, skip
   interiorCeilings: string; // yes, no

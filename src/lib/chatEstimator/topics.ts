@@ -77,9 +77,20 @@ const isCommercialLike = (c: EstimatorContext) => c.propertyType === 'commercial
 
 // ===== Topic list (priority order) =====
 
+/**
+ * The whole job is things that stand apart from a house (a shed, a deck, a fence, patio furniture, an overhang, a piece of furniture):
+ * whether the customer lives there, rents or owns it, and whether the home is occupied or empty, don't matter for those.
+ */
+export function isStandaloneOnlyJob(c: EstimatorContext): boolean {
+  if (c.standaloneStructure) return true;
+  if (c.projectType === 'exterior' && c.exteriorBody === 'no') return true;
+  const furnitureOnly = c.furnitureItems.length > 0 && c.selectedRooms.length === 0 && c.interiorScope === '' && !c.squareFeet && !c.bedroomCount;
+  return furnitureOnly && (c.projectType === 'interior' || c.projectType === '');
+}
+
 /** An outside job (the house itself, not just a fence or a deck): the exterior interview applies. */
 function isExteriorJob(c: EstimatorContext): boolean {
-  return (c.projectType === 'exterior' || c.projectType === 'both') && c.exteriorBody !== 'no';
+  return (c.projectType === 'exterior' || c.projectType === 'both') && c.exteriorBody !== 'no' && !c.standaloneStructure;
 }
 
 /** An exterior question (ext_*) the customer has already answered. */
@@ -278,10 +289,12 @@ export const TOPICS: Topic[] = [
   {
     id: 'ext_size',
     priority: 46,
-    relevant: (c) => isExteriorJob(c) && !c.squareFeet && !c.bedroomCount,
+    relevant: (c) => (isExteriorJob(c) || !!c.standaloneStructure) && !c.squareFeet && !c.bedroomCount,
     alreadyAnswered: (c) => !!c.squareFeet || !!c.bedroomCount,
     ask: (c) =>
-      pick(
+      c.standaloneStructure
+        ? `About how big is the ${c.standaloneStructure}, in square feet? Or its length and width.`
+        : pick(
         [
           'About how big is the house, in square feet?',
           "Roughly how many square feet is the house? A rough number is fine.",
@@ -538,7 +551,7 @@ export const TOPICS: Topic[] = [
   {
     id: 'property_ownership',
     priority: 32,
-    relevant: () => true,
+    relevant: (c) => !isStandaloneOnlyJob(c),
     alreadyAnswered: (c) => !!c.propertyType,
     ask: (c) =>
       pick(
@@ -729,9 +742,9 @@ export const TOPICS: Topic[] = [
     // Occupancy/vacancy only matters for interior work (protecting furniture
     // and belongings while the crew is inside) — irrelevant for an
     // exterior-only job, so only timeline needs answering in that case.
-    alreadyAnswered: (c) => (c.projectType === 'exterior' ? hasTiming(c) : !!c.occupancy && hasTiming(c)),
+    alreadyAnswered: (c) => (c.projectType === 'exterior' || isStandaloneOnlyJob(c) ? hasTiming(c) : !!c.occupancy && hasTiming(c)),
     ask: (c) => {
-      const exteriorOnly = c.projectType === 'exterior';
+      const exteriorOnly = c.projectType === 'exterior' || isStandaloneOnlyJob(c);
       const commercial = isCommercialLike(c);
       if (exteriorOnly) {
         return pick(["Last thing, when would you like this done?", "And what's the timeline on this?"], seed(c));

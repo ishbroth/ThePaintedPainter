@@ -409,9 +409,18 @@ export function derive(ctx: EstimatorContext, transcript: string): Derivation[] 
     out.push({ patch: { ...interiorOff, closets: /walk[\s-]?in/.test(t) ? 'both' : 'standard', closetCount: nn, interiorScope: 'specific_rooms' }, reason: 'Closets only' });
   }
 
+  // A separate building (shed, barn, gazebo...): its own small job, nothing to do with a house
+  if (!ctx.standaloneStructure) {
+    const s = t.match(/\b(shed|barn|gazebo|playhouse|dog ?house|workshop|outbuilding|greenhouse|pergola)\b/);
+    const aboutAHouse = /\b(?:my|the|our|a)\s+(?:house|home)\b|\bsiding\b|\bstucco\b|\bwhole (?:house|exterior)\b/.test(t.replace(/dog ?house|play ?house|green ?house/g, ' '));
+    if (s && !aboutAHouse && !/\b(?:bed|bath)rooms?\b|\bkitchen\b|\bliving room\b/.test(t)) {
+      out.push({ patch: { standaloneStructure: s[1].replace('doghouse', 'dog house'), projectType: ctx.projectType || 'exterior', stories: ctx.stories ?? 1 }, reason: 'A separate building, not a house' });
+    }
+  }
+
   // Exterior jobs that are about features, not the house body
   if (ctx.exteriorBody === '' && (ctx.projectType === 'exterior' || ctx.projectType === 'both' || (!ctx.projectType && !mentionsIndoorRoom))) {
-    const features = /\b(fence|fences|deck|shutters?|garage door|front door|entry door|porch|railings?|gutters?|fascia|soffits?|eaves|exterior trim|window trim|patio furniture|outdoor furniture|patio set|pressure wash|power wash|soft wash|driveway|patio)\b/.test(t);
+    const features = /\b(fence|fences|sheds?|gazebos?|pergolas?|playhouses?|dog ?houses?|barns?|outbuildings?|workshops?|greenhouses?|arbors?|mailbox(?:es)?|swing sets?|overhangs?|patio covers?|deck|shutters?|garage door|front door|entry door|porch|railings?|gutters?|fascia|soffits?|eaves|exterior trim|window trim|patio furniture|outdoor furniture|patio set|pressure wash|power wash|soft wash|driveway|patio)\b/.test(t);
     const bodyWords = /\b(siding|stucco|brick|clapboard|hardie|shingles?|whole (?:house|exterior)|entire (?:house|exterior|outside)|(?:exterior|outside) of (?:my|the|our|a) (?:house|home)|house exterior|(?:exterior|outside) (?:paint|repaint|painting)|repaint (?:the )?(?:house|exterior|outside)|victorian|colonial|ranch|bungalow|barn|shed|two[- ]story|three[- ]story|\d\s*stor(?:y|ies))\b/.test(t);
     // "no painting", "not painting", "without painting" are the opposite of asking for paint
     const withoutNoPaint = t.replace(/\b(?:no|not|without|don'?t want|don'?t need)\s+(?:any\s+)?(?:re-?)?(?:paint|painting|stain|staining)\b/g, ' ');

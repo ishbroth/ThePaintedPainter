@@ -258,6 +258,7 @@ export function extractColorScope(text: string): {
 
 export function extractSidingType(
   text: string,
+  answeringSiding = false,
 ): 'stucco' | 'wood' | 'vinyl' | 'hardie' | 'brick' | 'stone' | 'aluminum' | null {
   const t = text.toLowerCase();
   if (/\bstucco\b/.test(t)) return 'stucco';
@@ -268,6 +269,12 @@ export function extractSidingType(
   if (/\bvinyl\s+siding\b/.test(t)) return 'vinyl';
   if (/\bbrick\b/.test(t)) return 'brick';
   if (/\bstone\b/.test(t)) return 'stone';
+  // right after "what's it made of?" a bare material is the answer
+  if (answeringSiding) {
+    if (/\bwood(?:en)?\b/.test(t)) return 'wood';
+    if (/\bvinyl\b/.test(t)) return 'vinyl';
+    if (/\b(?:aluminum|aluminium|metal)\b/.test(t)) return 'aluminum';
+  }
   return null;
 }
 
@@ -1282,7 +1289,7 @@ export function extractAll(text: string, prev: EstimatorContext, lastBotTopicId:
     acks.push('noted where the color change goes');
   }
 
-  const siding = extractSidingType(text);
+  const siding = extractSidingType(text, lastBotTopicId === 'siding');
   if (siding && !prev.sidingType) {
     patch.sidingType = siding;
     acks.push(siding);

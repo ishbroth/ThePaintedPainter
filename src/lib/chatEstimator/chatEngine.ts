@@ -36,7 +36,7 @@ import {
 } from '../pricing/situations';
 import { classifyIntent, hasIntent, type Intent, type IntentResult } from './intents';
 import { derive, applyDerivations } from './derivation';
-import { pickNextTopic, pickRetryTopic, findTopic, metaBank, type Topic } from './topics';
+import { pickNextTopic, pickRetryTopic, findTopic, metaBank, isStandaloneOnlyJob, type Topic } from './topics';
 import { extractWithLLM } from './llmClient';
 import { makeInitialContext } from './defaultContext';
 
@@ -572,6 +572,11 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
         else if (no) target[offer.field] = (state.ctx as unknown as Record<string, unknown>)[offer.field];
         if (asked === 'ext_garage' && /\b(?:two|2|double|both|pair)\b/.test(low) && !no) target.garageDoor = 'double';
       }
+      if (asked === 'ext_size' && !ctxWithExplicit.squareFeet) {
+        // "10x12" or "10 by 12" for a shed or a small building: length times width
+        const dims = low.match(/(\d{1,3})\s*(?:x|by|×)\s*(\d{1,3})/);
+        if (dims) ctxWithExplicit.squareFeet = parseInt(dims[1], 10) * parseInt(dims[2], 10);
+      }
       if (asked === 'ext_garage_count') {
         if (/\b(?:two|2|double|both|pair|2-car|two-car)\b/.test(low)) ctxWithExplicit.garageDoor = 'double';
       }
@@ -797,8 +802,8 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
     const essentialsKnown =
       !!ctxNext.zipCode &&
       !!(ctxNext.timeline || ctxNext.startDate || ctxNext.endDate || ctxNext.datesFlexible) &&
-      (ctxNext.projectType === 'exterior' || !!ctxNext.occupancy) &&
-      !!ctxNext.propertyType;
+      (ctxNext.projectType === 'exterior' || !!ctxNext.occupancy || isStandaloneOnlyJob(ctxNext)) &&
+      (!!ctxNext.propertyType || isStandaloneOnlyJob(ctxNext));
     if (readyToQuote(ctxNext) && (s.wrapupAsked || essentialsKnown)) {
       return await finalizeTurn(s, customerId);
     }
@@ -1188,7 +1193,7 @@ function readyToQuote(ctx: EstimatorContext): boolean {
     if (!haveScope) return false;
   }
   if (ctx.projectType === 'exterior' || ctx.projectType === 'both') {
-    if (!ctx.sidingType) return false;
+    if (!ctx.sidingType && ctx.exteriorBody !== 'no') return false;
   }
   return true;
 }
@@ -1200,7 +1205,7 @@ function whatsMissing(ctx: EstimatorContext): string {
     ctx.interiorScope !== 'whole_house') {
     return "which rooms or roughly how big?";
   }
-  if ((ctx.projectType === 'exterior' || ctx.projectType === 'both') && !ctx.sidingType) {
+  if ((ctx.projectType === 'exterior' || ctx.projectType === 'both') && !ctx.sidingType && ctx.exteriorBody !== 'no') {
     return "what's the exterior siding made of?";
   }
   return "just the ZIP code.";
