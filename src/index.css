@@ -225,22 +225,6 @@ img {
   opacity: var(--hero-opacity);
 }
 
-/* Phones held upright: the whole square collage (roller and brush both in view) instead of the wide Superman panel */
-.site-hero-bg--square::before {
-  background-image: url('/hero-collage-blur.jpg');
-}
-
-.site-hero-bg--square .site-hero-bg__img {
-  background-image: url('/hero-collage.jpg');
-}
-
-.site-hero-bg--square.site-hero-bg--home .site-hero-bg__title {
-  left: 26.667%;
-  top: 48.333%;
-  width: 46.667%;
-  height: 8.889%;
-}
-
 /* the picture and the lettering share one box so they always move together */
 .site-hero-bg__stage {
   position: absolute;
