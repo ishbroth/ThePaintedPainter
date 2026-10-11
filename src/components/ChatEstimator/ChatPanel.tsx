@@ -525,18 +525,6 @@ const ChatPanel = () => {
         <div className="chat-estimator-header">
           <div className="chat-estimator-header-row">
             <h2>Pick Your Price, Pick Your Painter.</h2>
-            {ttsSupported && (
-              <button
-                type="button"
-                className={`chat-read-aloud-toggle ${readAloud ? 'active' : ''}`}
-                onClick={toggleReadAloud}
-                aria-pressed={!readAloud}
-                aria-label={readAloud ? 'Mute' : 'Unmute'}
-                title={readAloud ? 'Mute' : 'Unmute'}
-              >
-                {readAloud ? '\u{1F50A} Mute' : '\u{1F507} Unmute'}
-              </button>
-            )}
           </div>
           <p>Tell me about your project. Type naturally — I'll guide you from there.</p>
         </div>
@@ -663,9 +651,23 @@ const ChatPanel = () => {
           </div>
         )}
 
-        <p className="chat-input-hint">
-          Getting off track? Try "Back Up" or "Start Over"
-        </p>
+        <div className="chat-footer-row">
+          {ttsSupported && (
+            <button
+              type="button"
+              className={`chat-read-aloud-toggle ${readAloud ? 'active' : ''}`}
+              onClick={toggleReadAloud}
+              aria-pressed={!readAloud}
+              aria-label={readAloud ? 'Mute' : 'Unmute'}
+              title={readAloud ? 'Mute' : 'Unmute'}
+            >
+              {readAloud ? '\u{1F50A} Mute' : '\u{1F507} Unmute'}
+            </button>
+          )}
+          <p className="chat-input-hint">
+            Getting off track? Try "Back Up" or "Start Over"
+          </p>
+        </div>
       </div>
 
       <input

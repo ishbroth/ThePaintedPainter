@@ -117,11 +117,18 @@ function pickBestVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | n
 
   // Browsers don't say which voices are male, so known male voice names (Edge, Google, Apple, Windows) get a big lead and known
   // female ones a penalty.
-  const MALE = /\b(guy|davis|christopher|eric|roger|steffan|brian|andrew|ryan|tony|jason|david|mark|james|aaron|fred|alex|tom|evan|nathan|ralph|albert|bruce|junior|rishi|daniel|arthur|oliver|male)\b/;
+  // Real male voices: Edge/Windows (Guy, Davis, Christopher, Eric, Roger, Steffan, Brian, Andrew, Ryan, David, Mark), iPhone/Mac
+  // (Aaron, Evan, Nathan, Tom, Alex), plus the British ones as a last resort. The old robotic Apple voices (Fred, Ralph, Junior,
+  // Albert) and the novelty ones are deliberately NOT here, and are pushed down below.
+  const MALE = /\b(guy|davis|christopher|eric|roger|steffan|brian|andrew|ryan|tony|jason|david|mark|james|aaron|alex|tom|evan|nathan|daniel|arthur|oliver|rishi|male)\b/;
+  // iPhone and Mac ship joke and robot voices; they must never be picked.
+  const NOVELTY = /\b(fred|ralph|junior|albert|rocko|eddy|reed|sandy|shelley|flo|grandma|grandpa|bad news|good news|whisper|zarvox|trinoids|bubbles|bells|boing|cellos|organ|wobble|jester|superstar|bahh|kathy|princess|agnes|bruce|victoria|compact)\b/;
   const FEMALE = /\b(aria|jenny|sara|jane|ana|michelle|emma|ava|allison|susan|karen|moira|tessa|zoe|nicky|samantha|victoria|kathy|fiona|zira|hazel|catherine|female|siri)\b/;
   const score = (v: SpeechSynthesisVoice): number => {
     const name = v.name.toLowerCase();
-    return baseScore(v, name) + (MALE.test(name) ? 200 : 0) - (FEMALE.test(name) ? 50 : 0);
+    // the best-sounding iPhone male voices first (Enhanced and Premium downloads, then Evan, Nathan, Tom, Aaron)
+    const iosPreferred = /\b(evan|nathan|tom|aaron)\b/.test(name) ? 40 : 0;
+    return baseScore(v, name) + (MALE.test(name) ? 200 : 0) + iosPreferred - (FEMALE.test(name) ? 50 : 0) - (NOVELTY.test(name) ? 1000 : 0);
   };
   const baseScore = (v: SpeechSynthesisVoice, name: string): number => {
     // Modern neural/cloud voices (Edge's "Online (Natural)" voices, Google's
@@ -159,8 +166,10 @@ let selectedVoice: SpeechSynthesisVoice | null | undefined;
 async function getPreferredVoice(): Promise<SpeechSynthesisVoice | null> {
   if (selectedVoice !== undefined) return selectedVoice;
   const voices = await loadVoices();
-  selectedVoice = pickBestVoice(voices);
-  return selectedVoice;
+  const best = pickBestVoice(voices);
+  if (best) selectedVoice = best;
+  else voicesPromise = null; // none yet (iPhone loads them late): ask again next time instead of settling for the default
+  return best;
 }
 
 /** Cancels whatever is currently speaking (if anything) and speaks new text. */
@@ -179,6 +188,7 @@ export async function speak(text: string): Promise<void> {
     // robotic without dragging.
     utterance.rate = 0.9975; // 5% faster than the previous 0.95
     utterance.pitch = 1;
+    utterance.lang = voice?.lang || 'en-US'; // never the phone's other-language default
     if (voice) utterance.voice = voice;
     utterance.onend = () => {
       if (index + 1 < parts.length) window.setTimeout(() => speakPart(index + 1), ELLIPSIS_PAUSE_MS);

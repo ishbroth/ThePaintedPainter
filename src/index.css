@@ -1059,32 +1059,26 @@ button, .nav a, .cta-button, .nav-cta {
 
 /* Mobile Responsive */
 @media (max-width: 768px) {
+  /* The header links are spread across the whole bar on a phone (no hamburger menu). */
   .header-container {
-    justify-content: space-between;
+    padding: 0 10px;
   }
 
   .nav {
-    display: none;
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    background: var(--bg-page);
-    flex-direction: column;
-    padding: 15px;
-  }
-
-  .nav.active {
-    display: flex;
+    width: 100%;
+    justify-content: space-evenly;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px 10px;
   }
 
   .nav a {
-    padding: 12px 0;
-    border-bottom: 1px solid var(--border);
+    font-size: 0.66rem;
+    letter-spacing: 0.6px;
   }
 
-  .mobile-menu {
-    display: block;
+  .nav a.nav-cta {
+    padding: 5px 10px;
   }
 
   /* Hero fills most of the first screen on mobile — the composite image is

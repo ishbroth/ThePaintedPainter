@@ -984,3 +984,17 @@
 .chat-estimator-section.keyboard-open .chat-input-hint {
   display: none;
 }
+
+/* Mute sits at the bottom left, beside the "Getting off track?" line */
+.chat-footer-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px 12px;
+}
+
+.chat-footer-row .chat-input-hint {
+  flex: 1;
+  padding: 0;
+  text-align: center;
+}

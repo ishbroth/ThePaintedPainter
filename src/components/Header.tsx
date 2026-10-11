@@ -1,21 +1,13 @@
-import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { hapticLight, hapticMedium } from '../lib/haptics';
 
 const Header = () => {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { user, profile, signOut } = useAuth();
   const navigate = useNavigate();
 
-  const toggleNav = () => {
-    hapticLight();
-    setIsMenuOpen(!isMenuOpen);
-  };
-
   const closeMenu = () => {
     hapticLight();
-    setIsMenuOpen(false);
   };
 
   const dashboardPath = profile?.role === 'painter'
@@ -34,10 +26,7 @@ const Header = () => {
   return (
     <header className="header">
       <div className="header-container">
-        <Link to="/" className="logo" onClick={closeMenu}>
-          The Painted Painter
-        </Link>
-        <nav className={`nav ${isMenuOpen ? 'active' : ''}`} id="nav">
+        <nav className="nav" id="nav">
           <Link to="/#estimator" onClick={closeMenu}>
             Get Your Price
           </Link>
@@ -76,9 +65,6 @@ const Header = () => {
             </Link>
           )}
         </nav>
-        <button className="mobile-menu" onClick={toggleNav} aria-label="Toggle navigation">
-          &#9776;
-        </button>
       </div>
     </header>
   );
