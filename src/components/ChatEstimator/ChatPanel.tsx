@@ -479,6 +479,8 @@ const ChatPanel = () => {
       root.style.setProperty('--vvtop', `${Math.round(vv ? vv.offsetTop : 0)}px`);
       const full = window.innerHeight > window.innerWidth ? Math.max(screen.width, screen.height) : Math.min(screen.width, screen.height);
       const nowOpen = focused && height < full * 0.78;
+      // the window just changed size (the keypad moved): keep the latest line in view
+      if (nowOpen && messagesRef.current) messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
       if (nowOpen === open) return;
       open = nowOpen;
       if (open) {
@@ -517,6 +519,22 @@ const ChatPanel = () => {
       section.classList.remove('keyboard-open');
       section.style.minHeight = '';
     };
+  }, [keyboardDevice]);
+
+  // Phones and tablets: the conversation stays scrolled to the bottom inside its window whenever anything in it changes (a new
+  // bubble, the reply arriving, the "..." while it thinks, or the words being typed growing the typing line), so what is being
+  // typed is always in view and the conversation follows along.
+  useEffect(() => {
+    if (keyboardDevice) return;
+    const box = messagesRef.current;
+    if (!box) return;
+    const stick = () => {
+      box.scrollTop = box.scrollHeight;
+    };
+    const observer = new MutationObserver(stick);
+    observer.observe(box, { childList: true, subtree: true, characterData: true });
+    stick();
+    return () => observer.disconnect();
   }, [keyboardDevice]);
 
   // Typing while focus is elsewhere on the page (after clicking the background, say) goes to the box too.
