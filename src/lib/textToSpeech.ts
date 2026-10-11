@@ -109,28 +109,32 @@ function loadVoices(): Promise<SpeechSynthesisVoice[]> {
 
 /** Ranks available voices for how natural/human they sound, best first. */
 function pickBestVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
-  // American English first (en-US); other English accents only if no US voice is installed.
-  const allEnglish = voices.filter((v) => v.lang?.toLowerCase().replace('_', '-').startsWith('en'));
-  const american = allEnglish.filter((v) => v.lang.toLowerCase().replace('_', '-') === 'en-us');
-  const english = american.length > 0 ? american : allEnglish;
+  // Every English voice competes. A male voice beats a female one whatever the accent; among male voices American comes first,
+  // then British, then the other English accents.
+  const english = voices.filter((v) => v.lang?.toLowerCase().replace('_', '-').startsWith('en'));
   if (english.length === 0) return null;
+  const accentBonus = (v: SpeechSynthesisVoice): number => {
+    const lang = v.lang.toLowerCase().replace('_', '-');
+    return lang === 'en-us' ? 60 : lang === 'en-gb' ? 35 : 0;
+  };
 
   // Browsers don't say which voices are male, so known male voice names (Edge, Google, Apple, Windows) get a big lead and known
   // female ones a penalty.
   // Real male voices: Edge/Windows (Guy, Davis, Christopher, Eric, Roger, Steffan, Brian, Andrew, Ryan, David, Mark), iPhone/Mac
   // (Aaron, Evan, Nathan, Tom, Alex), plus the British ones as a last resort. The old robotic Apple voices (Fred, Ralph, Junior,
   // Albert) and the novelty ones are deliberately NOT here, and are pushed down below.
-  const MALE = /\b(guy|davis|christopher|eric|roger|steffan|brian|andrew|ryan|tony|jason|david|mark|james|aaron|alex|tom|evan|nathan|daniel|arthur|oliver|rishi|male)\b/;
+  const MALE = /\b(guy|davis|christopher|eric|roger|steffan|brian|andrew|ryan|tony|jason|david|mark|james|aaron|alex|tom|evan|nathan|daniel|arthur|oliver|rishi|lee|gordon|martin|thomas|malcolm|gerard|male)\b/;
   // iPhone and Mac ship joke and robot voices; they must never be picked.
-  const NOVELTY = /\b(fred|ralph|junior|albert|sandy|shelley|flo|grandma|grandpa|bad news|good news|whisper|zarvox|trinoids|bubbles|bells|boing|cellos|organ|wobble|jester|superstar|bahh|kathy|princess|agnes|bruce|victoria|compact)\b/;
+  const NOVELTY = /\b(fred|ralph|junior|albert|sandy|shelley|flo|grandma|grandpa|bad news|good news|whisper|zarvox|trinoids|bubbles|bells|boing|cellos|organ|wobble|jester|superstar|bahh|kathy|princess|agnes|bruce|victoria)\b/;
   // Apple's other American male voices (a step below Aaron, Evan, Nathan and Tom) and Android's male voice codes: still male, so they beat any female default
-  const MALE_FALLBACK = /\b(eddy|reed|rocko)\b|en-us-x-(?:iol|iom|tpd)\b/;
+  const MALE_FALLBACK = /\b(eddy|reed|rocko)\b/;
+  const ANDROID_MALE = /en-us-x-(?:iol|iom|tpd)/;
   const FEMALE = /\b(aria|jenny|sara|jane|ana|michelle|emma|ava|allison|susan|karen|moira|tessa|zoe|nicky|samantha|victoria|kathy|fiona|zira|hazel|catherine|female|siri)\b/;
   const score = (v: SpeechSynthesisVoice): number => {
     const name = v.name.toLowerCase();
     // the best-sounding iPhone male voices first (Enhanced and Premium downloads, then Evan, Nathan, Tom, Aaron)
     const iosPreferred = /\b(evan|nathan|tom|aaron)\b/.test(name) ? 40 : 0;
-    return baseScore(v, name) + (MALE.test(name) ? 200 : MALE_FALLBACK.test(name) ? 120 : 0) + iosPreferred - (FEMALE.test(name) ? 50 : 0) - (NOVELTY.test(name) ? 1000 : 0);
+    return baseScore(v, name) + (MALE.test(name) || ANDROID_MALE.test(name) ? 200 : MALE_FALLBACK.test(name) ? 120 : 0) + accentBonus(v) + iosPreferred - (FEMALE.test(name) ? 50 : 0) - (NOVELTY.test(name) ? 1000 : 0);
   };
   const baseScore = (v: SpeechSynthesisVoice, name: string): number => {
     // Modern neural/cloud voices (Edge's "Online (Natural)" voices, Google's
@@ -172,6 +176,14 @@ async function getPreferredVoice(): Promise<SpeechSynthesisVoice | null> {
   if (best) selectedVoice = best;
   else voicesPromise = null; // none yet (iPhone loads them late): ask again next time instead of settling for the default
   return best;
+}
+
+/** Every voice this device offers and the one that would be used (for the ?voices check page). */
+export function describeVoices(): { all: string[]; chosen: string } {
+  if (!isTTSSupported()) return { all: [], chosen: '(speech not supported)' };
+  const voices = window.speechSynthesis.getVoices();
+  const best = pickBestVoice(voices);
+  return { all: voices.map((v) => `${v.name} [${v.lang}]${v.localService ? '' : ' (online)'}`), chosen: best ? `${best.name} [${best.lang}]` : '(none found: the default voice is used)' };
 }
 
 /** Starts loading and choosing the voice ahead of time, so the first spoken words can start inside a tap. */

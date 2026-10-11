@@ -6,6 +6,7 @@ import Header from './components/Header';
 import ThemeToggle from './components/ThemeToggle';
 import SiteBackground from './components/SiteBackground';
 import { ThemeAccountSync } from './components/ThemeAccountSync';
+import VoiceCheck from './components/VoiceCheck';
 import AuthRedirectBanner from './components/AuthRedirectBanner';
 import Footer from './components/Footer';
 import Home from './pages/Home';
@@ -90,6 +91,7 @@ function App() {
         <AuthProvider>
           <ThemeAccountSync />
           <SiteBackground />
+          <VoiceCheck />
           <div className="min-h-screen flex flex-col" style={{ position: 'relative', zIndex: 1 }}>
             <ThemeToggle />
             <Header />
