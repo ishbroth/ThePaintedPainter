@@ -16,6 +16,7 @@
 //      speaking the link text, so only the surrounding sentence is heard.
 
 import { splitPrompt } from './promptHints';
+import { neuralVoiceAvailable, speakNeural, stopNeural, unlockNeuralAudio, isNeuralBusy, prefetchNeural } from './neuralVoice';
 
 export function isTTSSupported(): boolean {
   return typeof window !== 'undefined' && 'speechSynthesis' in window;
@@ -200,7 +201,54 @@ export function prepareVoice(): void {
  * ahead of time (prepareVoice) so it is normally already known here.
  */
 export function speak(text: string): Promise<void> {
-  if (!isTTSSupported()) return Promise.resolve();
+  lastSpeakAt = Date.now();
+  // Phones and tablets get the natural server voice when it is set up (their built-in voices sound robotic); otherwise the built-in one.
+  if (isPhoneLike() && neuralVoiceAvailable()) {
+    if (isTTSSupported() && (window.speechSynthesis.speaking || window.speechSynthesis.pending)) window.speechSynthesis.cancel();
+    const myRun = ++speakRun;
+    const spoken = naturalizeForSpeech(forVoice(text).replace(/\.{3,}|\u2026/g, '. '));
+    void speakNeural(spoken).then((played) => {
+      if (!played && myRun === speakRun) speakWeb(text); // not set up or not reachable: the phone's own voice
+    });
+    return Promise.resolve();
+  }
+  speakWeb(text);
+  return Promise.resolve();
+}
+
+/** What is said aloud: a question is trimmed to just the question (its options go in the typing box); anything else is read in full. */
+function forVoice(text: string): string {
+  return text.includes('?') ? splitPrompt(text).spoken : text;
+}
+
+/** Phones and tablets (a touch screen as the main pointer). */
+function isPhoneLike(): boolean {
+  return typeof window !== 'undefined' && !!window.matchMedia?.('(pointer: coarse)').matches;
+}
+
+/** When the last speak() was called: speech takes a moment to begin, and that moment still counts as "speaking". */
+let lastSpeakAt = 0;
+
+/** Starts getting the audio for this text ready (phones with the server voice), so it plays the instant it is needed. */
+export function prefetchSpeech(text: string): void {
+  if (isPhoneLike() && neuralVoiceAvailable()) {
+    void prefetchNeural(naturalizeForSpeech(forVoice(text).replace(/\.{3,}|\u2026/g, '. ')));
+  }
+}
+
+/** Resolves when nothing is being spoken any more (or after maxMs, so a stuck voice can never hold the page back). */
+export async function waitForSpeechEnd(maxMs = 120000): Promise<void> {
+  const started = Date.now();
+  while (Date.now() - started < maxMs) {
+    await new Promise((r) => window.setTimeout(r, 250));
+    const web = isTTSSupported() && (window.speechSynthesis.speaking || window.speechSynthesis.pending);
+    const startingUp = Date.now() - lastSpeakAt < 1500;
+    if (!web && !isNeuralBusy() && !startingUp) return;
+  }
+}
+
+function speakWeb(text: string): void {
+  if (!isTTSSupported()) return;
   const synth = window.speechSynthesis;
   // choose the voice now, from what the phone already knows (the list is often there even before the async lookup finishes)
   if (!selectedVoice) {
@@ -214,7 +262,7 @@ export function speak(text: string): Promise<void> {
   synth.resume?.(); // a phone can leave the engine paused
   const myRun = ++speakRun;
   // "Hello, citizen...": a "..." is a real pause, so each side is spoken separately with a beat between.
-  const parts = splitPrompt(text).spoken.split(/\.{3,}|\u2026/).map((p) => p.trim()).filter(Boolean);
+  const parts = forVoice(text).split(/\.{3,}|\u2026/).map((p) => p.trim()).filter(Boolean);
   const speakPart = (index: number) => {
     if (myRun !== speakRun || index >= parts.length) return;
     const voice = selectedVoice ?? null;
@@ -232,7 +280,6 @@ export function speak(text: string): Promise<void> {
   };
   if (mustCancel) window.setTimeout(() => speakPart(0), 80);
   else speakPart(0);
-  return Promise.resolve();
 }
 
 /** Bumped every time speech starts or stops, so a pending second half of a sentence is dropped. */
@@ -240,8 +287,9 @@ let speakRun = 0;
 const ELLIPSIS_PAUSE_MS = 250;
 
 export function stopSpeaking(): void {
-  if (!isTTSSupported()) return;
   speakRun++;
+  stopNeural();
+  if (!isTTSSupported()) return;
   window.speechSynthesis.cancel();
 }
 
@@ -287,6 +335,7 @@ export function setupSpeechUnlock(): () => void {
   const handler = () => {
     prepareVoice();
     unlockSpeechSynthesis();
+    if (isPhoneLike()) unlockNeuralAudio();
   };
   document.addEventListener('touchstart', handler, { once: true, passive: true });
   document.addEventListener('click', handler, { once: true });

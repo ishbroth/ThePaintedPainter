@@ -968,9 +968,11 @@
 /* Keypad open (phones, tablets): the estimator is a window filling exactly the space above the keypad; the conversation scrolls inside */
 .chat-estimator-section.keyboard-open {
   position: fixed;
-  top: var(--vvtop, 0px);
+  top: 0;
   left: 0;
   right: 0;
+  /* follows the part of the screen that is actually visible above the keypad, even if the phone pans the page */
+  transform: translate3d(0, var(--vvtop, 0px), 0);
   height: var(--vvh, 50vh);
   z-index: 2000;
   padding: 0;
@@ -1055,4 +1057,11 @@
   .chat-send-inline {
     font-size: 0.8rem;
   }
+}
+
+/* While the keypad window is up the page behind it does not scroll */
+html.chat-kbd-lock,
+html.chat-kbd-lock body {
+  overflow: hidden;
+  overscroll-behavior: none;
 }

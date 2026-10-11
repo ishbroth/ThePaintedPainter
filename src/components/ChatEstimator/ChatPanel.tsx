@@ -14,7 +14,7 @@ import {
 import { hapticLight } from '../../lib/haptics';
 import { CHAT_STATE_KEY, QUOTE_EXPIRES_KEY, QUOTE_RESULT_KEY, PRICE_HOLD_MINUTES, startedFromHomeReload, clearEstimatorSession, isExpiredFinishedChat, readWorkWithAgain, clearWorkWithAgain } from '../../lib/chatEstimator/persistence';
 import { composerPrompt, GENERIC_PROMPT } from '../../lib/promptHints';
-import { isTTSSupported, speak, stopSpeaking, setupSpeechUnlock } from '../../lib/textToSpeech';
+import { isTTSSupported, speak, stopSpeaking, setupSpeechUnlock, prefetchSpeech, waitForSpeechEnd } from '../../lib/textToSpeech';
 import { uploadQuotePhoto, analyzeQuotePhoto } from '../../lib/chatEstimator/photoUpload';
 import PhotoPopup from './PhotoPopup';
 import { loadAccountChatState, saveAccountChatState, deleteAccountChatState } from '../../lib/chatEstimator/accountPersistence';
@@ -121,6 +121,11 @@ const ChatPanel = () => {
   }
   const playIntroIfFreshRef = useRef(playIntroIfFresh);
   playIntroIfFreshRef.current = playIntroIfFresh;
+
+  useEffect(() => {
+    if (isFreshRef.current && ttsSupported) prefetchSpeech(state.history[0].text);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     // Auto-read the intro when the estimator card scrolls to the vertical
@@ -288,45 +293,56 @@ const ChatPanel = () => {
     saveAccountChatState(user.id, state);
   }, [user, state]);
 
+  // The price is shown here first. The page where the painters are picked comes after the voice has finished reading it (a moment
+  // longer than that if nothing is being spoken), unless the customer taps "View painters" sooner.
+  const pendingNavRef = useRef<ChatState['finalEstimate']>(null);
+  const finalPayloadRef = useRef<Record<string, unknown> | null>(null);
   useEffect(() => {
-    // When the conversation completes, route to the results page — but only
-    // for a FRESH completion, never for one restored already-done from a
-    // prior visit (see restoredAlreadyFinishedRef above).
-    if (state.finalEstimate && !restoredAlreadyFinishedRef.current) {
-      const t = setTimeout(() => {
-        const payload = {
-          estimate: state.finalEstimate!.estimate,
-          ctx: state.finalEstimate!.ctx,
-          assumptions: state.finalEstimate!.assumptions,
-          matchedSituations: state.finalEstimate!.matchedSituations,
-          transcript: state.transcript,
-          loyaltyDiscountPercent: state.finalEstimate!.loyaltyDiscountPercent ?? 0,
-          // every reply the customer typed, in order; it goes to painters with the job
-          userMessages: state.history.filter((m) => m.role === 'user').map((m) => m.text),
-        };
-        try {
-          // Always a fresh hold window here — this whole block only runs for
-          // a genuinely NEW completion (see the `!restoredAlreadyFinishedRef`
-          // guard above), never for remounting/returning to an
-          // already-computed quote, so there's no old timer that's actually
-          // still valid to reuse. Previously this read back whatever
-          // QUOTE_EXPIRES_KEY already had, which meant starting a new
-          // estimate right after a previous one just inherited however much
-          // time was left on THAT quote's hold instead of getting its own.
-          const expiresAt = Date.now() + PRICE_HOLD_MINUTES * 60 * 1000;
-          sessionStorage.setItem(QUOTE_EXPIRES_KEY, String(expiresAt));
-          sessionStorage.setItem(QUOTE_RESULT_KEY, JSON.stringify({ ...payload, expiresAt }));
-          navigate('/quote-results', { state: { ...payload, expiresAt } });
-        } catch {
-          navigate('/quote-results', { state: payload });
-        }
-      }, 1500); // the paintbrush spinner shows for 1.5 seconds, then the customer moves on to pick their painter
-      return () => clearTimeout(t);
+    // When the conversation completes, route to the results page, but only for a FRESH completion, never for one restored
+    // already-done from a prior visit (see restoredAlreadyFinishedRef above).
+    const estimate = state.finalEstimate;
+    if (!estimate || restoredAlreadyFinishedRef.current || pendingNavRef.current === estimate) return;
+    pendingNavRef.current = estimate;
+    const payload = {
+      estimate: estimate.estimate,
+      ctx: estimate.ctx,
+      assumptions: estimate.assumptions,
+      matchedSituations: estimate.matchedSituations,
+      transcript: state.transcript,
+      loyaltyDiscountPercent: estimate.loyaltyDiscountPercent ?? 0,
+      // every reply the customer typed, in order; it goes to painters with the job
+      userMessages: state.history.filter((m) => m.role === 'user').map((m) => m.text),
+    };
+    // Always a fresh hold window here: this whole block only runs for a genuinely NEW completion, never for returning to an
+    // already-computed price, so there's no old timer that's actually still valid to reuse.
+    let navState: Record<string, unknown> = payload;
+    try {
+      const expiresAt = Date.now() + PRICE_HOLD_MINUTES * 60 * 1000;
+      sessionStorage.setItem(QUOTE_EXPIRES_KEY, String(expiresAt));
+      sessionStorage.setItem(QUOTE_RESULT_KEY, JSON.stringify({ ...payload, expiresAt }));
+      navState = { ...payload, expiresAt };
+    } catch {
+      // storage unavailable: the page still gets the price through navigation state
     }
-  }, [state.finalEstimate, state.transcript, navigate]);
+    finalPayloadRef.current = navState;
+    void (async () => {
+      await new Promise((r) => window.setTimeout(r, 1500));
+      if (readAloudRef.current && ttsSupported) await waitForSpeechEnd();
+      if (pendingNavRef.current === estimate) navigate('/quote-results', { state: navState });
+    })();
+  }, [state.finalEstimate, state.transcript, state.history, ttsSupported, navigate]);
+
+  function viewPainters() {
+    stopSpeaking();
+    pendingNavRef.current = null;
+    if (finalPayloadRef.current) navigate('/quote-results', { state: finalPayloadRef.current });
+    else navigate('/quote-results');
+  }
 
   function startNewEstimate() {
     stopSpeaking();
+    pendingNavRef.current = null;
+    finalPayloadRef.current = null;
     restoredAlreadyFinishedRef.current = false;
     try {
       sessionStorage.removeItem(CHAT_STATE_KEY);
@@ -487,9 +503,11 @@ const ChatPanel = () => {
         // keep the page the same length while the card is lifted out of it
         section.style.minHeight = `${section.offsetHeight}px`;
         section.classList.add('keyboard-open');
+        root.classList.add('chat-kbd-lock');
         window.setTimeout(() => messagesRef.current?.scrollTo({ top: messagesRef.current.scrollHeight }), 30);
       } else {
         section.classList.remove('keyboard-open');
+        root.classList.remove('chat-kbd-lock');
         section.style.minHeight = '';
       }
     };
@@ -517,6 +535,7 @@ const ChatPanel = () => {
       vv?.removeEventListener('resize', update);
       vv?.removeEventListener('scroll', update);
       section.classList.remove('keyboard-open');
+      root.classList.remove('chat-kbd-lock');
       section.style.minHeight = '';
     };
   }, [keyboardDevice]);
@@ -626,7 +645,7 @@ const ChatPanel = () => {
           {waiting && !restoredAlreadyFinishedRef.current && (
             <div className="chat-bubble chat-bubble-bot">
               <div className="chat-bubble-text chat-loading chat-preparing">
-                <span>Preparing your results…</span>
+                <span>Getting your painters ready…</span>
                 <svg className="chat-brush-spinner" viewBox="0 0 48 48" width="30" height="30" aria-hidden="true">
                   <circle cx="24" cy="24" r="18" fill="none" stroke="#f3d9c4" strokeWidth="3" />
                   <g className="chat-brush-orbit">
@@ -672,6 +691,7 @@ const ChatPanel = () => {
                 spellCheck
                 autoCapitalize="sentences"
                 data-placeholder={composerPlaceholder}
+                enterKeyHint="send"
                 onFocus={() => {
                   if (!keyboardDevice) playIntroIfFreshRef.current(); // phones: focusing the line (the tap that opens the keypad) starts the greeting
                 }}
@@ -682,6 +702,13 @@ const ChatPanel = () => {
               <button
                 type="button"
                 className="chat-send-inline"
+                // tapping Send must not move focus off the typing line: on a phone that closes the keypad and the window with it
+                onMouseDown={(e) => e.preventDefault()}
+                onTouchEnd={(e) => {
+                  e.preventDefault(); // also stops the follow-up click, so it is not sent twice
+                  e.stopPropagation();
+                  send();
+                }}
                 onClick={(e) => {
                   e.stopPropagation();
                   send();
@@ -697,11 +724,9 @@ const ChatPanel = () => {
 
         {waiting && (
           <div className="chat-post-actions">
-            {restoredAlreadyFinishedRef.current && (
-              <button type="button" className="chat-action-button chat-action-primary" onClick={() => navigate('/quote-results')}>
-                View My Price
-              </button>
-            )}
+            <button type="button" className="chat-action-button chat-action-primary" onClick={viewPainters}>
+              View painters
+            </button>
             <button type="button" className="chat-action-button chat-action-secondary" onClick={startNewEstimate}>
               Get a New Price
             </button>
