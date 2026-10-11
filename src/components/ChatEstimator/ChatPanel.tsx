@@ -129,6 +129,9 @@ const ChatPanel = () => {
     // when the card crosses it.
     const el = sectionRef.current;
     if (!el || !ttsSupported) return;
+    // Phones only play speech that starts from a tap, so scrolling does not start it there (the tap on the typing bubble does).
+    // If the scroll trigger spoke into silence it would also use up the one automatic greeting before the tap could play it.
+    if (!window.matchMedia?.('(hover: hover) and (pointer: fine)').matches) return;
     // IntersectionObserver always reports the element's CURRENT state as
     // soon as observe() is called, even with no scroll at all — on a short
     // viewport (most phones) the card already overlaps the center band on

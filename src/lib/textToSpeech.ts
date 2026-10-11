@@ -172,17 +172,31 @@ async function getPreferredVoice(): Promise<SpeechSynthesisVoice | null> {
   return best;
 }
 
-/** Cancels whatever is currently speaking (if anything) and speaks new text. */
-export async function speak(text: string): Promise<void> {
+/** Starts loading and choosing the voice ahead of time, so the first spoken words can start inside a tap. */
+export function prepareVoice(): void {
   if (!isTTSSupported()) return;
-  window.speechSynthesis.cancel();
+  void getPreferredVoice();
+}
+
+/**
+ * Cancels whatever is currently speaking (if anything) and speaks new text.
+ *
+ * It starts speaking right away, in the same moment it is called. Phones (iPhone especially) only play speech that starts from a
+ * real touch; waiting for the voice list first (an await) made the greeting silent when it came from a tap. The voice is chosen
+ * ahead of time (prepareVoice) so it is normally already known here.
+ */
+export function speak(text: string): Promise<void> {
+  if (!isTTSSupported()) return Promise.resolve();
+  const synth = window.speechSynthesis;
+  if (synth.speaking || synth.pending) synth.cancel();
+  synth.resume?.(); // a phone can leave the engine paused
   const myRun = ++speakRun;
-  // "Hello citizen...what do you need painted?": the "..." is a real pause, so each side is spoken separately with a beat between.
+  if (selectedVoice === undefined) prepareVoice();
+  // "Hello, citizen...": a "..." is a real pause, so each side is spoken separately with a beat between.
   const parts = splitPrompt(text).spoken.split(/\.{3,}|\u2026/).map((p) => p.trim()).filter(Boolean);
-  const voice = await getPreferredVoice();
-  if (myRun !== speakRun) return; // something newer started speaking while the voice loaded
   const speakPart = (index: number) => {
     if (myRun !== speakRun || index >= parts.length) return;
+    const voice = selectedVoice ?? null;
     const utterance = new SpeechSynthesisUtterance(naturalizeForSpeech(parts[index]));
     // A hair slower than the 1.0 default reads as noticeably less rushed/
     // robotic without dragging.
@@ -193,9 +207,10 @@ export async function speak(text: string): Promise<void> {
     utterance.onend = () => {
       if (index + 1 < parts.length) window.setTimeout(() => speakPart(index + 1), ELLIPSIS_PAUSE_MS);
     };
-    window.speechSynthesis.speak(utterance);
+    synth.speak(utterance);
   };
   speakPart(0);
+  return Promise.resolve();
 }
 
 /** Bumped every time speech starts or stops, so a pending second half of a sentence is dropped. */
@@ -239,7 +254,11 @@ function unlockSpeechSynthesis(): void {
  */
 export function setupSpeechUnlock(): () => void {
   if (!isTTSSupported() || typeof document === 'undefined') return () => {};
-  const handler = () => unlockSpeechSynthesis();
+  prepareVoice();
+  const handler = () => {
+    prepareVoice();
+    unlockSpeechSynthesis();
+  };
   document.addEventListener('touchstart', handler, { once: true, passive: true });
   document.addEventListener('click', handler, { once: true });
   return () => {
