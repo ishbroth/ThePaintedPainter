@@ -1030,3 +1030,10 @@
   padding: 0;
   text-align: center;
 }
+
+/* Phones: the words in the conversation bubbles are a bit bigger (the layout, the keypad window and the buttons are unchanged) */
+@media (max-width: 640px) {
+  .chat-bubble {
+    font-size: 1rem;
+  }
+}
