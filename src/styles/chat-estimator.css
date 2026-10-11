@@ -16,6 +16,9 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  /* roomy rather than wide and short: about square, with the extra space as blank room in the open chat window below the typing line
+     (the conversation window stretches; nothing inside it changes size) */
+  min-height: min(640px, calc(100vw - 40px));
 }
 
 .chat-estimator-header {
@@ -966,6 +969,10 @@
 .chat-estimator-section.keyboard-open {
   padding-top: 8px;
   padding-bottom: 8px;
+}
+
+.chat-estimator-section.keyboard-open .chat-estimator-card {
+  min-height: 0;
 }
 
 .chat-estimator-section.keyboard-open .chat-messages {
