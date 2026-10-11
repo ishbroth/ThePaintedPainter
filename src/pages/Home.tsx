@@ -154,7 +154,7 @@ const Home = () => {
       <ChatPanel />
 
       {/* The carousel that was at the top of the page (under the header, resting on Superman's eyes), now right under the estimator, same size as the others */}
-      <SmoothCarousel triplets={carousel2Triplets} speed={43.75} />
+      <SmoothCarousel triplets={carousel2Triplets} speed={50.3} />
 
       <div className="divider"></div>
 
@@ -174,7 +174,7 @@ const Home = () => {
       <div className="divider"></div>
 
       {/* Carousel 1 */}
-      <SmoothCarousel triplets={carousel1Triplets} speed={50} />
+      <SmoothCarousel triplets={carousel1Triplets} speed={57.5} />
 
       <div className="divider"></div>
 
@@ -199,7 +199,7 @@ const Home = () => {
       <div className="divider"></div>
 
       {/* Carousel 3 */}
-      <SmoothCarousel triplets={carousel3Triplets} speed={43.75} />
+      <SmoothCarousel triplets={carousel3Triplets} speed={50.3} />
 
       <div className="divider"></div>
 
@@ -209,7 +209,7 @@ const Home = () => {
       <div className="divider"></div>
 
       {/* Carousel 4 (firefighter, Kool-Aid Man), at the very bottom under the map */}
-      <SmoothCarousel triplets={carousel4Triplets} speed={50} />
+      <SmoothCarousel triplets={carousel4Triplets} speed={57.5} />
     </div>
   );
 };
