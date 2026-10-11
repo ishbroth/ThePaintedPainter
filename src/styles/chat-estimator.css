@@ -18,7 +18,7 @@
   flex-direction: column;
   /* roomy rather than wide and short: about square, with the extra space as blank room in the open chat window below the typing line
      (the conversation window stretches; nothing inside it changes size) */
-  min-height: min(640px, calc(100vw - 40px));
+  min-height: min(465px, calc(0.6 * (100vw - 40px) + 81px));
 }
 
 .chat-estimator-header {
