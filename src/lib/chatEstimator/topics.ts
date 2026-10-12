@@ -307,11 +307,18 @@ export const TOPICS: Topic[] = [
   {
     id: 'ext_trim',
     priority: 48.1,
-    relevant: (c) => isExteriorJob(c) && c.exteriorTrim !== 'yes',
-    alreadyAnswered: (c) => c.exteriorTrim === 'yes' || extDone(c, 'ext_trim'),
-    ask: (c) => pick(["Are we painting the trim too? That's the fascia boards and the trim around the windows and doors.", "What about the trim, the fascia and the trim around the windows and doors?"], seed(c)),
-    clarify: () => "The trim is the boards that frame the roofline, windows and doors. It's usually painted along with the siding.",
-    example: () => "Just say 'yes, the trim too' or 'no, just the siding'.",
+    relevant: (c) => isExteriorJob(c) && c.exteriorTrim !== 'yes' && c.soffitsEaves !== 'yes',
+    alreadyAnswered: (c) => c.exteriorTrim === 'yes' || c.soffitsEaves === 'yes' || extDone(c, 'ext_trim'),
+    ask: (c) =>
+      pick(
+        [
+          "Are we painting the trim, fascia, soffits and eaves too?",
+          "What about the trim, fascia, eaves and soffits, are those getting painted?",
+        ],
+        seed(c),
+      ),
+    clarify: () => "That's the boards around the roofline and around the windows and doors (trim and fascia), plus the underside of the roof overhang (eaves and soffits). They're usually painted along with the siding.",
+    example: () => "Just say 'yes, all of it' or 'no, just the siding'.",
   },
   {
     id: 'ext_doors',
@@ -348,15 +355,6 @@ export const TOPICS: Topic[] = [
     ask: (c) => pick(["Do the gutters and downspouts need painting too?", "What about the gutters and downspouts, are those getting painted?"], seed(c)),
     clarify: () => "Gutters and downspouts can be painted to match the house.",
     example: () => "Just say 'yes, the gutters too' or 'no'.",
-  },
-  {
-    id: 'ext_eaves',
-    priority: 48.5,
-    relevant: (c) => isExteriorJob(c) && c.soffitsEaves !== 'yes',
-    alreadyAnswered: (c) => c.soffitsEaves === 'yes' || extDone(c, 'ext_eaves'),
-    ask: (c) => pick(["And the eaves and soffits, the underside of the roof overhang?", "Should we include the eaves and soffits?"], seed(c)),
-    clarify: () => "The eaves and soffits are the underside of the part of the roof that hangs out past the walls.",
-    example: () => "Just say 'yes, the eaves too' or 'no'.",
   },
   {
     id: 'ext_windows',

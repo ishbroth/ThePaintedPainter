@@ -499,23 +499,15 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
       });
     }
 
-    // Trim/fascia
-    if (ctx.exteriorTrim === 'yes' && !off('ext_trim')) {
+    // Trim, fascia, soffits and eaves are one item: the boards around the roofline and the underside of the overhang
+    if ((ctx.exteriorTrim === 'yes' || ctx.soffitsEaves === 'yes') && !off('ext_trim')) {
+      const trimPart = ctx.exteriorTrim === 'yes' ? extSurface.trimLinFt * BASE_RATES.exterior.fascia_per_linft : 0;
+      const soffitPart = ctx.soffitsEaves === 'yes' ? extSurface.soffitSqFt * BASE_RATES.exterior.soffit_per_sqft : 0;
       lineItems.push({
         category: 'Exterior',
-        description: 'Exterior Trim & Fascia',
-        amount: extSurface.trimLinFt * BASE_RATES.exterior.fascia_per_linft * regionalMult,
+        description: 'Trim, Fascia, Soffits & Eaves',
+        amount: (trimPart + soffitPart) * regionalMult,
         key: 'ext_trim',
-      });
-    }
-
-    // Soffits/eaves
-    if (ctx.soffitsEaves === 'yes' && !off('soffits')) {
-      lineItems.push({
-        category: 'Exterior',
-        description: 'Soffits & Eaves',
-        amount: extSurface.soffitSqFt * BASE_RATES.exterior.soffit_per_sqft * regionalMult,
-        key: 'soffits',
       });
     }
 

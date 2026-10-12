@@ -564,12 +564,12 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
         ext_doors: { field: 'entryDoor', on: 'yes' },
         ext_garage: { field: 'garageDoor', on: 'single' },
         ext_gutters: { field: 'gutters', on: 'yes' },
-        ext_eaves: { field: 'soffitsEaves', on: 'yes' },
       };
       const offer = yesNo[asked];
       if (offer) {
-        if (yes && !no) target[offer.field] = offer.on;
-        else if (no) target[offer.field] = (state.ctx as unknown as Record<string, unknown>)[offer.field];
+        const fields = asked === 'ext_trim' ? [offer.field, 'soffitsEaves'] : [offer.field]; // trim, fascia, soffits and eaves go together
+        if (yes && !no) for (const field of fields) target[field] = offer.on;
+        else if (no) for (const field of fields) target[field] = (state.ctx as unknown as Record<string, unknown>)[field];
         if (asked === 'ext_garage' && /\b(?:two|2|double|both|pair)\b/.test(low) && !no) target.garageDoor = 'double';
       }
       if (asked === 'ext_size' && !ctxWithExplicit.squareFeet) {
@@ -742,6 +742,12 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
     }
   } else if (!ctxNext.zipCode) {
     ctxNext.zipCity = '';
+  }
+
+  // Trim, fascia, soffits and eaves are one item on an outside job: either one named brings the other.
+  if ((ctxNext.projectType === 'exterior' || ctxNext.projectType === 'both') && (ctxNext.exteriorTrim === 'yes' || ctxNext.soffitsEaves === 'yes')) {
+    ctxNext.exteriorTrim = 'yes';
+    ctxNext.soffitsEaves = 'yes';
   }
 
   // Surfaces added at the estimator's suggestion stay in, even though the transcript also says "just walls".
