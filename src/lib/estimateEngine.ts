@@ -890,6 +890,14 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
     multipliers.push({ label: 'Pre-1978 Lead-Safe Practices', factor: 1.15 });
   }
 
+  // The paint grade the customer chose. Premium lines cost a good deal more per gallon (and take a bit more care); economy paint costs a
+  // little less. "Standard" and "painter's choice" are the usual mid-grade assumption already built into the base rates.
+  if (ctx.paintGrade === 'premium') {
+    multipliers.push({ label: 'Premium Paint', factor: 1.08 });
+  } else if (ctx.paintGrade === 'economy') {
+    multipliers.push({ label: 'Economy Paint', factor: 0.97 });
+  }
+
   // Low-VOC / eco-friendly paint requested — premium material line costs more per gallon.
   if (ctx.lowVocRequested === 'yes') {
     multipliers.push({ label: 'Low-VOC / Eco-Friendly Paint', factor: 1.05 });

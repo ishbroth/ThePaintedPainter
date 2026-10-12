@@ -550,6 +550,51 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
     }
   }
 
+  // Answers about the paint (brand, grade, finish). Anything said earlier about them is read too ("we want Benjamin Moore").
+  {
+    const asked = state.lastBotTopic?.id;
+    const low = trimmed.toLowerCase();
+    const brands: [RegExp, string][] = [
+      [/\bsherwin[- ]?williams\b|\bsw\b/, 'Sherwin-Williams'],
+      [/\bbenjamin[- ]?moore\b|\bbm\b/, 'Benjamin Moore'],
+      [/\bbehr\b/, 'Behr'],
+      [/\bdunn[- ]?edwards\b/, 'Dunn-Edwards'],
+      [/\bkelly[- ]?moore\b/, 'Kelly-Moore'],
+      [/\bfarrow ?(?:and|&) ?ball\b/, 'Farrow & Ball'],
+      [/\bvalspar\b/, 'Valspar'],
+      [/\bppg\b/, 'PPG'],
+      [/\bglidden\b/, 'Glidden'],
+      [/\bfrazee\b/, 'Frazee'],
+      [/\bvista\b/, 'Vista'],
+    ];
+    const painterChoice = /\b(?:painter'?s? (?:choice|call|pick|decision)|up to (?:the )?painter|you (?:pick|choose|decide)|their choice|your choice|doesn'?t matter|don'?t care|no preference|no brand|any(?:thing)? (?:is )?(?:fine|works|ok|okay)|whatever (?:they|you)|not picky|let (?:them|him|her|the painter) (?:pick|choose|decide))\b/.test(low);
+    if (!state.ctx.paintBrand) {
+      const named = brands.find(([re]) => re.test(low));
+      if (named) ctxWithExplicit.paintBrand = named[1];
+      else if (asked === 'paint_brand' && painterChoice) ctxWithExplicit.paintBrand = 'painter_choice';
+      else if (asked === 'paint_brand' && /\b(?:no|none|nope)\b/.test(low) && !/\bbrand\b/.test(low)) ctxWithExplicit.paintBrand = 'painter_choice';
+    }
+    if (!state.ctx.paintGrade) {
+      if (/\b(?:premium|deluxe|top[- ]?(?:of[- ]the[- ]line|shelf|tier)|high[- ]?end|luxury|best|highest quality|emerald|aura|regal select|duration|super ?paint|the good stuff|nice paint)\b/.test(low)) ctxWithExplicit.paintGrade = 'premium';
+      else if (/\b(?:budget|cheap|cheapest|economy|basic|bargain|lowest cost|inexpensive|builder'?s? grade)\b/.test(low) && (asked === 'paint_grade' || /\bpaint\b/.test(low))) ctxWithExplicit.paintGrade = 'economy';
+      else if (asked === 'paint_grade' && /\b(?:standard|regular|normal|mid|mid-?grade|middle|average|typical|usual|default|good|decent|medium|ok|okay|fine)\b/.test(low)) ctxWithExplicit.paintGrade = 'standard';
+      else if (asked === 'paint_grade' && painterChoice) ctxWithExplicit.paintGrade = 'standard';
+      else if (/\b(?:benjamin[- ]?moore|farrow ?(?:and|&) ?ball)\b/.test(low) && asked === 'paint_brand') ctxWithExplicit.paintGrade = 'premium'; // these brands are premium lines by default
+    }
+    if (!state.ctx.paintFinish) {
+      const finish = low.match(/\b(flat|matte|eggshell|satin|semi[- ]?gloss|high[- ]?gloss|gloss|velvet)\b/);
+      if (finish) ctxWithExplicit.paintFinish = finish[1].replace(/\s+/g, ' ');
+      else if (asked === 'paint_finish' && (painterChoice || /\b(?:no|none|nope)\b/.test(low))) ctxWithExplicit.paintFinish = 'painter_choice';
+    }
+    if (asked && (asked === 'paint_brand' || asked === 'paint_grade' || asked === 'paint_finish') && !trimmed.endsWith('?')) {
+      ctxWithExplicit.extAnswered = [...new Set([...(ctxWithExplicit.extAnswered ?? state.ctx.extAnswered ?? []), asked])];
+      // answering one of the paint questions with the others in the same breath ("premium Benjamin Moore") covers them
+      if (ctxWithExplicit.paintBrand && ctxWithExplicit.paintGrade) {
+        ctxWithExplicit.extAnswered = [...new Set([...(ctxWithExplicit.extAnswered ?? []), 'paint_brand', 'paint_grade'])];
+      }
+    }
+  }
+
   // Answers to the exterior questions (ext_*): yes adds the thing, no leaves it out, and each answer is recorded so the question isn't
   // asked again (or counted as answered when it wasn't).
   {

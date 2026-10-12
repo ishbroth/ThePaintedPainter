@@ -30,6 +30,10 @@ const EXCLUDED_KEYS = new Set<keyof EstimatorContext>([
   'specialtyReferrals',
   'isHighCostArea',
   'stateComplianceNotes',
+  'extAnswered',
+  'excludedSurfaces',
+  'addedSurfaces',
+  'zipCity',
 ]);
 
 /** Human-readable labels for fields whose camelCase key wouldn't read well auto-titled. */
@@ -43,6 +47,9 @@ const LABEL_OVERRIDES: Partial<Record<keyof EstimatorContext, string>> = {
   hoa: 'HOA',
   afterHoursRequired: 'After-hours/weekend scheduling needed',
   lowVocRequested: 'Low-VOC paint requested',
+  paintBrand: 'Paint brand',
+  paintGrade: 'Paint grade',
+  paintFinish: 'Paint finish',
   excludedRooms: 'Rooms the customer took off the price',
   excludedItems: 'Items the customer took off the price',
   trimLinearFeet: 'Trim (linear feet)',

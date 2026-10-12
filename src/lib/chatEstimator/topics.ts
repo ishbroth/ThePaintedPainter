@@ -93,6 +93,13 @@ function isExteriorJob(c: EstimatorContext): boolean {
   return (c.projectType === 'exterior' || c.projectType === 'both') && c.exteriorBody !== 'no' && !c.standaloneStructure;
 }
 
+/** Something is actually being painted (not just washed), so the paint questions apply. */
+function paintingJob(c: EstimatorContext): boolean {
+  if (!c.projectType) return false;
+  const washOnly = c.projectType === 'exterior' && c.exteriorBody === 'no' && c.prepWork.includes('power_washing') && c.fence === 'none' && c.deck === 'none' && !c.standaloneStructure;
+  return !washOnly;
+}
+
 /** An exterior question (ext_*) the customer has already answered. */
 function extDone(c: EstimatorContext, id: string): boolean {
   return (c.extAnswered ?? []).includes(id);
@@ -400,6 +407,59 @@ export const TOPICS: Topic[] = [
     ask: (c) => pick(["Is the house staying the same color, or going a different color?", "Are you keeping the current color, or changing it?"], seed(c)),
     clarify: () => "A new color usually takes an extra coat, and a big change like dark to light takes more.",
     example: () => "Just say 'same color' or 'a different color'.",
+  },
+
+  // ——————————————————————————————————————————
+  // The paint itself: a brand if they have one, how nice, and the finish. These change the price (premium paint costs more, and a
+  // customer who says the painter can choose gets the usual mid-grade assumption) and are passed to painters.
+  // ——————————————————————————————————————————
+  {
+    id: 'paint_brand',
+    priority: 37,
+    relevant: (c) => paintingJob(c),
+    alreadyAnswered: (c) => !!c.paintBrand || extDone(c, 'paint_brand'),
+    ask: (c) =>
+      pick(
+        [
+          'Do you have a paint brand in mind, or should the painter choose?',
+          'Is there a paint brand you prefer, or is it up to the painter?',
+        ],
+        seed(c),
+      ),
+    clarify: () => "Some customers love a particular brand, like Sherwin-Williams, Benjamin Moore or Behr. If you don't have a preference, the painter picks a good one.",
+    example: () => "Just say a brand like 'Benjamin Moore', or 'painter's choice'.",
+  },
+  {
+    id: 'paint_grade',
+    priority: 38,
+    relevant: (c) => paintingJob(c),
+    alreadyAnswered: (c) => !!c.paintGrade || extDone(c, 'paint_grade'),
+    ask: (c) =>
+      pick(
+        [
+          'Would you like standard mid-grade paint, or a premium line?',
+          'Standard mid-grade paint, or a deluxe premium paint?',
+        ],
+        seed(c),
+      ),
+    clarify: () => "Standard mid-grade paint is what most painters use and holds up well. Premium lines (like Emerald or Aura) cost more per gallon but cover better, last longer and look richer.",
+    example: () => "Just say 'standard', 'premium', or 'budget'.",
+  },
+  {
+    id: 'paint_finish',
+    priority: 39,
+    relevant: (c) => paintingJob(c),
+    alreadyAnswered: (c) => !!c.paintFinish || extDone(c, 'paint_finish'),
+    ask: (c) =>
+      pick(
+        [
+          'Do you have a finish in mind, or should the painter pick the right one for each surface?',
+          'Any particular finish you want, or is the painter free to choose?',
+        ],
+        seed(c),
+      ),
+    clarify: () => "The finish is how shiny the paint is: flat or matte, eggshell, satin, semi-gloss or gloss. Painters normally choose the right one for each surface, like flat on ceilings and semi-gloss on trim.",
+    example: () => "Just say 'eggshell', 'satin', or 'painter's choice'.",
   },
 
   // ——————————————————————————————————————————
