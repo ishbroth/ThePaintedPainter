@@ -53,6 +53,9 @@ const EMAIL_TYPE_MAP: Record<string, string> = {
   painter_rejected: 'Update on your painter application',
   new_notification: 'You have a new notification',
   claim_received: 'We received your request — your price is locked',
+  no_painter_alert: 'A job needs a painter',
+  claim_searching: 'We\'re finding a painter for you',
+  no_painter_closed: 'We couldn\'t find a painter this time',
   painter_suspended: 'A painter was paused — needs re-verification',
   painter_suspended_notice: 'New leads are paused while we re-verify you',
 }
@@ -517,6 +520,50 @@ ${body}
         ${data.profileUrl ? `${button(data.profileUrl, `Open your dashboard`)}` : ''}
       `)
 
+    case 'no_painter_alert': {
+      // To the owner: a customer claimed a price where there is no approved painter yet. Everything needed to find one.
+      const qa = (Array.isArray(data.qa) ? data.qa : []) as { question: string; answer: string }[]
+      const bd = (Array.isArray(data.breakdown) ? data.breakdown : []) as { description: string; amount: number; removed?: boolean }[]
+      const conv = Array.isArray(data.conversation) ? (data.conversation as string[]) : []
+      const photoList = (Array.isArray(data.photos) ? data.photos : []) as { url: string; description?: string; label?: string }[]
+      const bdHtml = bd.length > 0
+        ? `<p style="margin:24px 0 6px;font-size:12px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#6b7280;">What the price covers (customer's amounts)</p>
+           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-size:14px;">${bd.map((l) => l.removed
+             ? `<tr><td style="padding:3px 0;color:#9ca3af;text-decoration:line-through;">${escapeHtml(l.description)}</td><td align="right" style="padding:3px 0;color:#9ca3af;text-decoration:line-through;">${formatMoney(l.amount)}</td></tr>`
+             : `<tr><td style="padding:3px 0;color:#374151;">${escapeHtml(l.description)}</td><td align="right" style="padding:3px 0;color:#111827;">${formatMoney(l.amount)}</td></tr>`).join('')}</table>`
+        : ''
+      return wrap(`
+        <p style="margin-top:0;"><strong>A customer claimed a price in ZIP ${escapeHtml(data.zipCode)}, but no approved painter is within range.</strong></p>
+        <p>The job is saved as <em>searching for a painter</em>. If none has taken it within 48 hours, the job closes and the customer is told (any deposit is refunded automatically). Local painting companies are being invited to claim it.</p>
+        ${detailTable('Customer', [['Name', data.customerName], ['Email', data.customerEmail], ['Phone', data.customerPhone], ['Address', data.customerAddress]])}
+        ${detailTable('Job', [['Customer price', formatMoney(data.guaranteedPrice)], ['Painter payout (after the platform fee)', formatMoney(data.payoutAmount)], ['Timeline', data.timelineLabel], ['Dates', data.datesText], ['Requested start date', data.preferredDate], ['Job id', data.jobId]])}
+        ${bdHtml}
+        ${detailTable('What the customer told the estimator', qa.map((r) => [r.question, r.answer] as [string, unknown]))}
+        ${conv.length > 0 ? `<p style="margin:24px 0 6px;font-size:12px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#6b7280;">Everything the customer typed</p><ol style="margin:8px 0;padding-left:20px;font-size:13px;color:#374151;">${conv.map((l) => `<li style="margin:3px 0;">${escapeHtml(l)}</li>`).join('')}</ol>` : ''}
+        ${photoList.length > 0 ? `<p style="margin:24px 0 6px;font-size:12px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#6b7280;">Photos</p>${photoList.map((p) => `<p style="margin:2px 0;font-size:14px;"><a href="${escapeHtml(p.url)}" style="color:#2563eb;">${escapeHtml(p.description || p.label || 'Photo')}</a></p>`).join('')}` : ''}
+      `)
+    }
+
+    case 'claim_searching':
+      return wrap(`
+        <p style="margin-top:0;">Hi ${data.customerName || 'there'}, we've got your request.</p>
+        <p>There isn't a painter featured in your area yet, so we're finding one for you now. <strong>We'll find you a painter within the next 48 hours.</strong> We'll email you the moment one accepts your job.</p>
+        ${detailTable('Your request', [['Price', formatMoney(data.guaranteedPrice)], ['ZIP code', data.zipCode], ['Requested start date', data.preferredDate]])}
+        <p style="margin:24px 0 6px;font-weight:700;">What happens next</p>
+        <ol style="margin:0 0 0 20px;padding:0;">
+          <li>Nothing is charged now. You only pay a deposit after a painter accepts and you agree on a start date.</li>
+          <li>If we can't find a painter within 48 hours, we'll let you know. If you've paid a deposit by then, it is refunded automatically.</li>
+        </ol>
+      `)
+
+    case 'no_painter_closed':
+      return wrap(`
+        <p style="margin-top:0;">Hi ${data.customerName || 'there'},</p>
+        <p>We weren't able to find a painter for your job in ZIP ${escapeHtml(data.zipCode)} within 48 hours, so we've closed the request. <strong>You haven't been charged, and any deposit you paid has been refunded automatically.</strong></p>
+        <p>We're sorry we couldn't make it happen this time. You're welcome to start a new price any time. We're adding painters all the time.</p>
+        ${data.link ? button(data.link, 'Start a new price') : ''}
+      `)
+
     case 'claim_received':
       return wrap(`
         <p style="margin-top:0;">Hi ${data.customerName || 'there'}, we've got your request and your price is locked in.</p>
@@ -726,7 +773,7 @@ serve(async (req: Request) => {
     if (!subject) {
       console.warn(`Unknown email type: "${type}". Using fallback subject.`)
     }
-    const emailSubject = isInternal && type === 'new_review' && rawData?.subject
+    const emailSubject = isInternal && (type === 'new_review' || type === 'no_painter_alert') && rawData?.subject
       ? String(rawData.subject).slice(0, 150)
       : subject || 'Update from The Painted Painter'
 

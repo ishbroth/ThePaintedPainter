@@ -447,9 +447,10 @@ const ClaimPriceModal = ({
   onPriceExpired: () => void;
   onClose: () => void;
 }) => {
-  const [name, setName] = useState(ctx.contactName || '');
-  const [email, setEmail] = useState(ctx.contactEmail || '');
-  const [phone, setPhone] = useState(ctx.contactPhone || '');
+  const { user, profile } = useAuth();
+  const [name, setName] = useState(ctx.contactName || profile?.display_name || '');
+  const [email, setEmail] = useState(ctx.contactEmail || user?.email || '');
+  const [phone, setPhone] = useState(ctx.contactPhone || profile?.phone || '');
   const [streetAddress, setStreetAddress] = useState('');
   const [city, setCity] = useState('');
   const [state_, setState_] = useState(ctx.state || '');
@@ -457,7 +458,16 @@ const ClaimPriceModal = ({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState<{ notifiedCount: number } | null>(null);
-  const { user } = useAuth();
+  // No approved painter within range yet: a second popup explains what happens
+  const [noPainters, setNoPainters] = useState(false);
+  // The account loads a moment after the page does: fill the blank fields from it, never over what has been typed or changed
+  const filled = useRef({ name: false, email: false, phone: false });
+  useEffect(() => {
+    if (!filled.current.name && !name && profile?.display_name) { filled.current.name = true; setName(profile.display_name); }
+    if (!filled.current.email && !email && user?.email) { filled.current.email = true; setEmail(user.email); }
+    if (!filled.current.phone && !phone && profile?.phone) { filled.current.phone = true; setPhone(profile.phone); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile, user]);
 
   const handleSubmit = async () => {
     if (!name.trim() || !email.trim() || !phone.trim() || !streetAddress.trim() || !city.trim() || !state_.trim()) {
@@ -503,6 +513,10 @@ const ClaimPriceModal = ({
         return;
       }
 
+      if (data.noPainters) {
+        setNoPainters(true);
+        return;
+      }
       setResult({ notifiedCount: data.notifiedCount });
     } catch {
       setError('Something went wrong. Please try again.');
@@ -523,7 +537,22 @@ const ClaimPriceModal = ({
         style={{ background: 'var(--bg-surface)', borderRadius: 14, padding: 28, maxWidth: 460, width: '100%', maxHeight: '90vh', overflowY: 'auto' }}
         onClick={(e) => e.stopPropagation()}
       >
-        {result ? (
+        {noPainters ? (
+          <>
+            <h2 style={{ marginTop: 0 }}>No painter in your area yet</h2>
+            <p>
+              There isn't a painter featured in your area yet, but <strong>The Painted Painter will find one for you within the next 48 hours.</strong>
+            </p>
+            <ul style={{ margin: '12px 0 0 18px', padding: 0, color: 'var(--text-secondary)', fontSize: '0.92rem', lineHeight: 1.6 }}>
+              <li>You haven't been charged. A deposit is only collected after a painter accepts your job and you agree on a start date.</li>
+              <li>If we can't find a painter within 48 hours, we'll let you know. Any deposit you've paid for this job is refunded automatically.</li>
+              <li>The details of your job have been sent to us, and we're inviting local painting companies to take it. We'll email you at <strong>{email}</strong> the moment a painter accepts.</li>
+            </ul>
+            <button onClick={onClose} style={{ marginTop: 16, padding: '10px 20px', borderRadius: 10, border: 'none', background: 'var(--accent-blue)', color: 'var(--accent-blue-ink)', fontWeight: 700, cursor: 'pointer' }}>
+              Got it
+            </button>
+          </>
+        ) : result ? (
           <>
             <h2 style={{ marginTop: 0 }}>You're all set!</h2>
             <p>

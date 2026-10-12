@@ -84,7 +84,7 @@ serve(async (req: Request) => {
         fallback_token, fallback_expires_at, fallback_suggestions
       `)
       .or(orFilter)
-      .in('status', ['offer_sent', 'painter_accepted', 'confirmed', 'completed', 'needs_new_painter'])
+      .in('status', ['offer_sent', 'searching_painter', 'painter_accepted', 'confirmed', 'completed', 'needs_new_painter'])
       .order('scheduled_date', { ascending: true, nullsFirst: false })
 
     if (error) throw error

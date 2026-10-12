@@ -14,6 +14,7 @@
 //   confirm_nudge   painter sent dates, customer silent (24h) -> customer
 //   suggestions_expired  72-hour "pick another painter" window ended -> job closed, customer told
 //   complete_nudge  confirmed job started 2+ days ago         -> painter ("mark completed")
+//   no_painter_expired  a job nobody in the area took within 48 hours -> job closed, customer told (nothing charged)
 //
 // Deploy:
 //   supabase functions deploy send-reminders --no-verify-jwt
@@ -152,6 +153,30 @@ serve(async (req: Request) => {
         title: 'Your painter request expired', body: 'The 72 hours to choose another painter have ended. You can start a new search any time.', link: frontendUrl,
       })
       counts.suggestions_expired = (counts.suggestions_expired ?? 0) + 1
+    }
+  }
+
+  // ---- no_painter_expired: nobody in the area took the job within 48 hours ----
+  // (A deposit is only ever collected after a painter accepts, so a job still searching has nothing to refund; the customer is told
+  // they were not charged.)
+  {
+    const { data: jobs } = await supabase
+      .from('quote_selections').select('id, customer_id, customer_email, customer_name, quote_zip, deposit_status')
+      .eq('status', 'searching_painter')
+      .lt('offer_sent_at', new Date(Date.now() - 2 * DAY).toISOString())
+    for (const j of jobs ?? []) {
+      const { error } = await supabase.from('quote_selections')
+        .update({ status: 'expired' })
+        .eq('id', j.id).eq('status', 'searching_painter')
+      if (error) continue
+      await notify(supabase, {
+        userId: j.customer_id, type: 'request_expired', title: 'We couldn\'t find a painter this time',
+        body: 'No painter in your area took the job within 48 hours. You were not charged.', link: '/',
+      })
+      await email(j.customer_email, 'no_painter_closed', {
+        customerName: String(j.customer_name ?? '').trim().split(/\s+/)[0] || 'there', zipCode: j.quote_zip, link: frontendUrl,
+      })
+      counts.no_painter_expired = (counts.no_painter_expired ?? 0) + 1
     }
   }
 

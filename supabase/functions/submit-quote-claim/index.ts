@@ -25,6 +25,9 @@ import { estimateWorkingDays } from '../_shared/duration.ts'
 import { describeTiming } from '../_shared/offers.ts'
 import { cleanConversation, conversationRejected, conversationNote } from '../_shared/conversationLog.ts'
 import { painterBreakdown } from '../_shared/priceBreakdown.ts'
+import { ADMIN_EMAIL } from '../_shared/adminLink.ts'
+
+const formatUsd = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n)
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -232,12 +235,8 @@ serve(async (req: Request) => {
         .slice(0, MYSTERY_BROADCAST_CAP)
     }
 
-    if (notifiedPainters.length === 0) {
-      return new Response(
-        JSON.stringify({ error: 'No eligible painters found in your area yet. We’ll reach out as soon as one joins.' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-      )
-    }
+    // Nobody in range yet (only the first-available choice can get here): the job is kept and a painter is found for it
+    const searching = notifiedPainters.length === 0
 
     // --------------------------------------------------------------------
     // Create the job record
@@ -263,7 +262,7 @@ serve(async (req: Request) => {
         project_summary: { qa, timeline, timelineLabel, conversation, breakdown },
         photos: photos ?? [],
         notified_painters: notifiedPainters.map((p) => p.id),
-        status: 'offer_sent',
+        status: searching ? 'searching_painter' : 'offer_sent',
         offer_sent_at: new Date().toISOString(),
         commission_rate: COMMISSION_RATE,
         painter_payout_amount: painterPayoutAmount,
@@ -291,6 +290,57 @@ serve(async (req: Request) => {
         .update({ status: 'cancelled', fallback_token: null, fallback_expires_at: null, fallback_suggestions: null })
         .eq('fallback_token', resumeToken)
         .eq('status', 'needs_new_painter')
+    }
+
+    // No approved painter within range (only the "first available painter" choice gets here): keep the job, tell the customer we're
+    // finding one, tell the owner everything about it, and start inviting local painting companies to claim it.
+    if (searching) {
+      const frontendUrl = Deno.env.get('FRONTEND_URL') ?? 'https://thepaintedpainter.com'
+      const sendMail = (to: string, type: string, data: Record<string, unknown>) =>
+        fetch(`${supabaseUrl}/functions/v1/send-email`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${serviceRoleKey}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ to, type, data }),
+        }).catch((err) => console.error(`${type} email failed:`, err))
+      const ownerBreakdown = Array.isArray(body.breakdown)
+        ? body.breakdown.slice(0, 60).filter((l) => l && typeof l.description === 'string' && typeof l.amount === 'number')
+        : []
+      await Promise.allSettled([
+        sendMail(ADMIN_EMAIL(), 'no_painter_alert', {
+          subject: `No painter in ZIP ${quoteZip}: ${formatUsd(guaranteedPrice)} job needs one`,
+          jobId: inserted.id,
+          zipCode: quoteZip,
+          customerName: customer.name,
+          customerEmail: customer.email,
+          customerPhone: customer.phone,
+          customerAddress: [customer.streetAddress, customer.city, customer.state].filter(Boolean).join(', '),
+          guaranteedPrice,
+          payoutAmount: painterPayoutAmount,
+          timelineLabel,
+          datesText: describeTiming({ customer_start_date: claimTiming.startDate, customer_end_date: claimTiming.endDate, dates_flexible: claimTiming.flexible, timeline: claimTiming.timeline, customer_preferred_date: preferredDate || null }),
+          preferredDate: preferredDate || null,
+          qa,
+          breakdown: ownerBreakdown,
+          conversation,
+          photos: photos ?? [],
+        }),
+        sendMail(customer.email, 'claim_searching', {
+          customerName: customer.name.trim().split(/\s+/)[0],
+          guaranteedPrice,
+          zipCode: quoteZip,
+          preferredDate: preferredDate || null,
+        }),
+        // Invite local painting companies (best effort: this does nothing until the discovery keys are set up)
+        fetch(`${supabaseUrl}/functions/v1/outreach-painters`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${serviceRoleKey}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jobId: inserted.id }),
+        }).catch((err) => console.error('outreach failed:', err)),
+      ])
+      return new Response(
+        JSON.stringify({ success: true, noPainters: true, quoteSelectionId: inserted.id, notifiedCount: 0 }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      )
     }
 
     // --------------------------------------------------------------------

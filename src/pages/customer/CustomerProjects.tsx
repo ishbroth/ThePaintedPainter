@@ -41,6 +41,7 @@ const statusLabels: Record<string, string> = {
   cancelled: 'Cancelled',
   expired: 'Expired',
   offer_sent: 'Finding a Painter',
+  searching_painter: 'Finding a Painter',
   painter_accepted: 'Awaiting Deposit',
   confirmed: 'Confirmed',
   completed: 'Completed',
@@ -49,13 +50,14 @@ const statusLabels: Record<string, string> = {
 const statusColors: Record<string, string> = {
   needs_new_painter: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/40',
   offer_sent: 'bg-gray-500/20 text-[var(--text-secondary)] border-gray-500/40',
+  searching_painter: 'bg-gray-500/20 text-[var(--text-secondary)] border-gray-500/40',
   painter_accepted: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/40',
   confirmed: 'bg-green-500/20 text-green-400 border-green-500/40',
   completed: 'bg-blue-500/20 text-[var(--accent-blue)] border-blue-500/40',
 };
 
 const STEPS = ['Offer sent', 'Painter accepted', 'Deposit paid', 'Completed'];
-const STEP_INDEX: Record<string, number> = { offer_sent: 0, painter_accepted: 1, confirmed: 2, completed: 3 };
+const STEP_INDEX: Record<string, number> = { offer_sent: 0, searching_painter: 0, painter_accepted: 1, confirmed: 2, completed: 3 };
 
 function ProgressSteps({ status }: { status: string }) {
   const current = STEP_INDEX[status] ?? 0;
@@ -181,6 +183,12 @@ function ProjectCard({ project }: { project: Project }) {
             : (project.scheduledDate ? fmtRange(project.scheduledDate, project.scheduledEndDate) : project.preferredDate || 'Not yet set')}
         </p>
       </div>
+
+      {project.status === 'searching_painter' && (
+        <p className="mt-4 pt-4 border-t border-[var(--border)] text-sm text-[var(--text-faint)]">
+          There isn't a painter featured in your area yet, so we're finding one for you. We'll find you a painter within 48 hours and email you as soon as one accepts. You haven't been charged.
+        </p>
+      )}
 
       {project.status === 'offer_sent' && (
         <p className="mt-4 pt-4 border-t border-[var(--border)] text-sm text-[var(--text-faint)]">
