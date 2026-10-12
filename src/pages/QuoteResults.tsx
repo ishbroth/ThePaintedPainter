@@ -145,10 +145,13 @@ const QuoteResults = () => {
       if (cancelled) return;
       if (!r) return setResultsFailed(true);
       setResults(r);
-      // The server decides how long these prices can be claimed; the countdown follows it.
-      expiresAtRef.current = r.holdUntil;
+      // The countdown keeps running from when the price was first shown. A reload (a browser that was minimized and reopened), or
+      // changing the price, fetches fresh painter prices, and the server offers a new full hold for those: that must not restart the
+      // clock. The server's time is only used when it is sooner than ours, or when ours has already run out (a new price).
+      const current = expiresAtRef.current;
+      expiresAtRef.current = current > Date.now() ? Math.min(current, r.holdUntil) : r.holdUntil;
       try {
-        sessionStorage.setItem(QUOTE_EXPIRES_KEY, String(r.holdUntil));
+        sessionStorage.setItem(QUOTE_EXPIRES_KEY, String(expiresAtRef.current));
       } catch {
         // ignore
       }
