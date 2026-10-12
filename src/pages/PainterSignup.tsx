@@ -381,7 +381,12 @@ const styles = {
 
 const PainterSignup = () => {
   const [currentStep, setCurrentStep] = useState(1);
-  const [formData, setFormData] = useState<PainterFormData>(initialFormData);
+  // An invitation email (a free job near the company) links here with the company's name and email already filled in
+  const [formData, setFormData] = useState<PainterFormData>(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has('invite')) return initialFormData;
+    return { ...initialFormData, companyName: (params.get('company') ?? '').slice(0, 120), email: (params.get('email') ?? '').slice(0, 120) };
+  });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [needsEmailConfirmation, setNeedsEmailConfirmation] = useState(false);

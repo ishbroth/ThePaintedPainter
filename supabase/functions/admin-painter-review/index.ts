@@ -19,6 +19,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
 import { verifyReviewLink } from '../_shared/adminLink.ts'
 import { notify } from '../_shared/notify.ts'
+import { attachOpenJobsToPainter } from '../_shared/openJobs.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -95,6 +96,8 @@ serve(async (req: Request) => {
         userId: painter.user_id, type: 'application_approved', title: 'You\'re approved!',
         body: 'Your painter application was approved. You\'ll now receive job offers.', link: '/painter/dashboard',
       })
+      // jobs that were waiting for a painter in this area are offered to them right away
+      await attachOpenJobsToPainter(supabase, { supabaseUrl, serviceRoleKey }, id).catch((err) => console.error('attaching open jobs failed:', err))
       return json({ success: true, status: 'approved' })
     }
 

@@ -54,6 +54,7 @@ const EMAIL_TYPE_MAP: Record<string, string> = {
   new_notification: 'You have a new notification',
   claim_received: 'We received your request — your price is locked',
   no_painter_alert: 'A job needs a painter',
+  cold_job_invite: 'A free painting job near you',
   claim_searching: 'We\'re finding a painter for you',
   no_painter_closed: 'We couldn\'t find a painter this time',
   painter_suspended: 'A painter was paused — needs re-verification',
@@ -520,6 +521,53 @@ ${body}
         ${data.profileUrl ? `${button(data.profileUrl, `Open your dashboard`)}` : ''}
       `)
 
+    case 'cold_job_invite': {
+      // To a local painting company that has never heard from us: a free job near them, with no customer name, address or contact details.
+      const qa = (Array.isArray(data.qa) ? data.qa : []) as { question: string; answer: string }[]
+      const bd = (Array.isArray(data.breakdown) ? data.breakdown : []) as { description: string; amount: number; removed?: boolean }[]
+      const bdHtml = bd.length > 0
+        ? `<p style="margin:24px 0 6px;font-size:12px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#6b7280;">What the job includes (your payout for each part)</p>
+           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-size:14px;">${bd.map((l) => l.removed
+             ? `<tr><td style="padding:3px 0;color:#9ca3af;text-decoration:line-through;">${escapeHtml(l.description)}</td><td align="right" style="padding:3px 0;color:#9ca3af;text-decoration:line-through;">${formatMoney(l.amount)}</td></tr>`
+             : `<tr><td style="padding:3px 0;color:#374151;">${escapeHtml(l.description)}</td><td align="right" style="padding:3px 0;color:#111827;">${formatMoney(l.amount)}</td></tr>`).join('')}</table>
+           ${bd.some((l) => l.removed) ? '<p style="margin:6px 0 0;font-size:12px;color:#6b7280;">Struck-through items are ones the customer took off; you are welcome to suggest them.</p>' : ''}`
+        : ''
+      const company = escapeHtml(data.companyName || 'there')
+      return `<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="color-scheme" content="light" /><title>A free painting job near ${escapeHtml(data.zipCode)}</title></head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:${FONT};color:#1a1a1a;line-height:1.6;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f3f4f6;"><tr><td align="center" style="padding:24px 12px;">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;">
+<tr><td align="center" style="padding:6px 0 18px;font-family:${FONT};font-size:24px;font-weight:700;color:#2563eb;">The Painted Painter</td></tr>
+<tr><td style="background:#ffffff;border:1px solid #e5e7eb;border-radius:8px;padding:28px;font-family:${FONT};font-size:16px;line-height:1.6;color:#1a1a1a;">
+  <p style="margin-top:0;">Hi ${company},</p>
+  <p>This is an invitation from The Painted Painter, a marketplace that connects homeowners with local painting companies. A homeowner near <strong>ZIP ${escapeHtml(data.zipCode)}</strong> just asked us for a painter, and we'd like you to have the job. <strong>It's a free lead.</strong></p>
+  <p style="margin:18px 0 6px;font-weight:700;">The price you see is the price you make</p>
+  <ul style="margin:0 0 0 20px;padding:0;">
+    <li>Your payout for this job is <strong>${formatMoney(data.payoutAmount)}</strong>. That's what you can make from it. No lead fee, no bidding, no strings attached.</li>
+    <li>You control the contracting and the scheduling. When you accept, we put you in direct contact with the customer and you work out the details together. Suggesting upgrades and add-ons is welcome.</li>
+  </ul>
+  ${detailTable('The job', [['Where', `Near ZIP ${data.zipCode}`], ['When', data.datesText || data.timelineLabel], ...qa.map((r) => [r.question, r.answer] as [string, unknown])])}
+  ${bdHtml}
+  <p style="margin:24px 0 6px;font-weight:700;">How to claim it</p>
+  <p style="margin:0 0 4px;">Create your free painter profile (a few minutes; we check your license and insurance). As soon as you're approved, this job is offered to you automatically. The first approved painter to accept gets it.</p>
+  ${button(data.inviteUrl, 'Claim this job', '#16a34a', true)}
+  <p style="margin:24px 0 6px;font-weight:700;">How working with us goes</p>
+  <ul style="margin:0 0 0 20px;padding:0;">
+    <li>Honor the price you accept. Upselling is fine.</li>
+    <li>Be licensed and insured, show up on the dates you agree, and keep the customer posted.</li>
+    <li>When the job is done, the customer reports back. Painters whose jobs are reported as satisfactory, at the agreed price, get more jobs sent to them.</li>
+  </ul>
+</td></tr>
+<tr><td align="center" style="padding:20px 8px;font-family:${FONT};font-size:12px;line-height:1.6;color:#6b7280;">
+  You're receiving this one-time invitation because your company is listed publicly as a painting contractor near ZIP ${escapeHtml(data.zipCode)}. This message is a solicitation from The Painted Painter.<br />
+  <a href="${escapeHtml(data.unsubscribeUrl)}" style="color:#6b7280;">Unsubscribe</a> and we won't contact you again.<br />
+  ${escapeHtml(data.postalAddress)}
+</td></tr>
+</table></td></tr></table>
+</body></html>`
+    }
+
     case 'no_painter_alert': {
       // To the owner: a customer claimed a price where there is no approved painter yet. Everything needed to find one.
       const qa = (Array.isArray(data.qa) ? data.qa : []) as { question: string; answer: string }[]
@@ -747,7 +795,7 @@ serve(async (req: Request) => {
 
     // Everything except job_offer_available (which escapes its own fields) is
     // interpolated raw into HTML, so escape string values up front.
-    const data = type === 'job_offer_available' ? rawData : escapeStrings(rawData)
+    const data = type === 'job_offer_available' || type === 'no_painter_alert' || type === 'cold_job_invite' ? rawData : escapeStrings(rawData)
 
     if (!to || !type) {
       return new Response(
@@ -773,7 +821,7 @@ serve(async (req: Request) => {
     if (!subject) {
       console.warn(`Unknown email type: "${type}". Using fallback subject.`)
     }
-    const emailSubject = isInternal && (type === 'new_review' || type === 'no_painter_alert') && rawData?.subject
+    const emailSubject = isInternal && (type === 'new_review' || type === 'no_painter_alert' || type === 'cold_job_invite') && rawData?.subject
       ? String(rawData.subject).slice(0, 150)
       : subject || 'Update from The Painted Painter'
 
@@ -817,6 +865,9 @@ serve(async (req: Request) => {
         html,
         text: htmlToText(html),
         reply_to: replyTo,
+        ...(type === 'cold_job_invite' && rawData?.unsubscribeUrl
+          ? { headers: { 'List-Unsubscribe': `<${String(rawData.unsubscribeUrl)}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' } }
+          : {}),
         ...(isInternal && Array.isArray(body.attachments) ? { attachments: body.attachments } : {}),
       }),
     })
