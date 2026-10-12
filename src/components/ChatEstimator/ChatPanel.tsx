@@ -489,28 +489,82 @@ const ChatPanel = () => {
     const vv = window.visualViewport;
     let focused = false;
     let open = false;
+    // The conversation area gets an exact height in pixels while the keypad window is up (the visible height minus the title and the
+    // footer), so it always scrolls inside itself instead of stretching to fit its content, and is kept scrolled to the latest line.
+    const fit = () => {
+      const box = messagesRef.current;
+      const card = box?.parentElement;
+      if (!box || !card) return;
+      const visible = vv ? vv.height : window.innerHeight;
+      let others = 0;
+      for (const child of Array.from(card.children)) if (child !== box) others += (child as HTMLElement).offsetHeight;
+      const h = Math.max(80, Math.floor(visible - others));
+      box.style.flex = 'none';
+      box.style.height = `${h}px`;
+      box.style.maxHeight = `${h}px`;
+      box.style.minHeight = '0';
+      box.scrollTop = box.scrollHeight;
+    };
+    const unfit = () => {
+      const box = messagesRef.current;
+      if (!box) return;
+      box.style.flex = '';
+      box.style.height = '';
+      box.style.maxHeight = '';
+      box.style.minHeight = '';
+    };
+    // ?kbdebug on the address shows the numbers below on screen (to see what a real phone reports)
+    let debugBox: HTMLDivElement | null = null;
+    if (new URLSearchParams(window.location.search).has('kbdebug')) {
+      debugBox = document.createElement('div');
+      debugBox.style.cssText = 'position:fixed;left:4px;bottom:4px;z-index:9999;background:rgba(0,0,0,.8);color:#0f0;font:11px monospace;padding:4px 6px;border-radius:4px;pointer-events:none;max-width:90vw';
+      document.body.appendChild(debugBox);
+    }
+    const showDebug = () => {
+      const box = messagesRef.current;
+      if (!debugBox || !box) return;
+      debugBox.textContent = `open=${open} vvh=${Math.round(vv?.height ?? 0)} top=${Math.round(vv?.offsetTop ?? 0)} box h=${box.clientHeight} content=${box.scrollHeight} scroll=${Math.round(box.scrollTop)}`;
+    };
     const update = () => {
       const height = vv ? vv.height : window.innerHeight;
       root.style.setProperty('--vvh', `${Math.round(height)}px`);
       root.style.setProperty('--vvtop', `${Math.round(vv ? vv.offsetTop : 0)}px`);
       const full = window.innerHeight > window.innerWidth ? Math.max(screen.width, screen.height) : Math.min(screen.width, screen.height);
       const nowOpen = focused && height < full * 0.78;
-      // the window just changed size (the keypad moved): keep the latest line in view
-      if (nowOpen && messagesRef.current) messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
-      if (nowOpen === open) return;
+      // the window just changed size (the keypad moved): keep the exact height right and the latest line in view
+      if (nowOpen && open) fit();
+      if (nowOpen === open) {
+        showDebug();
+        return;
+      }
       open = nowOpen;
       if (open) {
         // keep the page the same length while the card is lifted out of it
         section.style.minHeight = `${section.offsetHeight}px`;
         section.classList.add('keyboard-open');
         root.classList.add('chat-kbd-lock');
-        window.setTimeout(() => messagesRef.current?.scrollTo({ top: messagesRef.current.scrollHeight }), 30);
+        fit();
+        window.requestAnimationFrame(fit);
+        window.setTimeout(fit, 60);
+        window.setTimeout(fit, 300);
       } else {
         section.classList.remove('keyboard-open');
         root.classList.remove('chat-kbd-lock');
         section.style.minHeight = '';
+        unfit();
       }
+      showDebug();
     };
+    // anything that changes in the conversation while the keypad is up (a new line, a reply, the words being typed) refits and scrolls
+    const box = messagesRef.current;
+    const observer = new MutationObserver(() => {
+      if (open) {
+        fit();
+        window.requestAnimationFrame(fit);
+      }
+      showDebug();
+    });
+    if (box) observer.observe(box, { childList: true, subtree: true, characterData: true });
     const onFocusIn = (ev: FocusEvent) => {
       if (!(ev.target as HTMLElement | null)?.closest?.('.chat-composer')) return;
       focused = true;
@@ -534,6 +588,9 @@ const ChatPanel = () => {
       section.removeEventListener('focusout', onFocusOut);
       vv?.removeEventListener('resize', update);
       vv?.removeEventListener('scroll', update);
+      observer.disconnect();
+      debugBox?.remove();
+      unfit();
       section.classList.remove('keyboard-open');
       root.classList.remove('chat-kbd-lock');
       section.style.minHeight = '';
