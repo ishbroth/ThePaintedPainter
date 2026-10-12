@@ -133,7 +133,7 @@ serve(async (req: Request) => {
 
     // Preview: what the accept page shows before the painter presses the button (nothing changes).
     if (previewOnly) {
-      const summary = (job.project_summary ?? {}) as { timelineLabel?: string; qa?: { question: string; answer: string }[]; conversation?: string[] }
+      const summary = (job.project_summary ?? {}) as { timelineLabel?: string; qa?: { question: string; answer: string }[]; conversation?: string[]; breakdown?: { description: string; amount: number; removed?: boolean }[] }
       return json({
         open: job.status === 'offer_sent',
         zip: job.quote_zip,
@@ -144,6 +144,7 @@ serve(async (req: Request) => {
         estimatedDays: estimateWorkingDays(Number(job.guaranteed_price) || 0, claimer.crew_size),
         qa: summary.qa ?? [],
         conversation: summary.conversation ?? [],
+        breakdown: summary.breakdown ?? [],
         conversationNote: conversationNote(summary.conversation ?? []),
         photos: job.photos ?? [],
       })

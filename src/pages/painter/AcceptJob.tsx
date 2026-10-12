@@ -13,6 +13,8 @@ interface Preview {
   qa: { question: string; answer: string }[];
   /** Everything the customer typed in the chat, in order. */
   conversation?: string[];
+  /** What the price covers, line by line, in the painter's payout amounts. */
+  breakdown?: { description: string; amount: number; removed?: boolean }[];
   conversationNote?: string | null;
   photos: { url: string; description: string; label: string }[];
 }
@@ -114,6 +116,22 @@ export default function AcceptJob() {
                 <p key={i} style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: '4px 0' }}>
                   <strong>{item.question}:</strong> {item.answer}
                 </p>
+              ))}
+            </div>
+          )}
+
+          {preview.breakdown && preview.breakdown.length > 0 && (
+            <div style={card}>
+              <p style={{ color: 'var(--text-primary)', fontWeight: 600, margin: '0 0 4px' }}>What this job includes</p>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: '0 0 8px' }}>
+                Amounts are your payout for each part of the job.
+                {preview.breakdown.some((l) => l.removed) && ' Struck-through items are ones the customer took off: you are welcome to suggest them when you talk.'}
+              </p>
+              {preview.breakdown.map((line, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '3px 0', fontSize: '0.92rem', ...(line.removed ? { textDecoration: 'line-through', opacity: 0.55 } : {}) }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>{line.description}</span>
+                  <span style={{ color: 'var(--text-primary)' }}>{new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(line.amount)}</span>
+                </div>
               ))}
             </div>
           )}

@@ -24,6 +24,7 @@ import { evaluateAvailability, isIsoDate } from '../_shared/availability.ts'
 import { estimateWorkingDays } from '../_shared/duration.ts'
 import { describeTiming } from '../_shared/offers.ts'
 import { cleanConversation, conversationRejected, conversationNote } from '../_shared/conversationLog.ts'
+import { painterBreakdown } from '../_shared/priceBreakdown.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -65,6 +66,8 @@ interface ClaimRequest {
   qa: ResponseQA[]
   /** Everything the customer typed in the chat, in order, so painters can read it. */
   conversation?: string[]
+  /** The itemized price the customer saw: [{ description, amount, removed? }] (removed = the customer took it off). Shown to the painter scaled to their payout. */
+  breakdown?: { description: string; amount: number; removed?: boolean }[]
   /** Optional — a request, not a commitment. The painter sets the actual scheduled_date when accepting. */
   preferredDate?: string
   /** Set when the customer was logged in at claim time, so My Projects can find this row without relying on email matching. */
@@ -240,6 +243,7 @@ serve(async (req: Request) => {
     // Create the job record
     // --------------------------------------------------------------------
     const painterPayoutAmount = Math.round(guaranteedPrice * (1 - COMMISSION_RATE) * 100) / 100
+    const breakdown = painterBreakdown(body.breakdown, painterPayoutAmount)
     const depositAmount = Math.round(guaranteedPrice * 0.10 * 100) / 100
 
     const { data: inserted, error: insertError } = await supabase
@@ -256,7 +260,7 @@ serve(async (req: Request) => {
         guaranteed_price: guaranteedPrice,
         selected_painter_id: selectionType === 'specific_painter' ? selectedPainterId : null,
         selected_painter_price: guaranteedPrice,
-        project_summary: { qa, timeline, timelineLabel, conversation },
+        project_summary: { qa, timeline, timelineLabel, conversation, breakdown },
         photos: photos ?? [],
         notified_painters: notifiedPainters.map((p) => p.id),
         status: 'offer_sent',
@@ -322,6 +326,7 @@ serve(async (req: Request) => {
               qa,
               conversation,
               conversationNote: conversationNote(conversation),
+              breakdown,
               photos: photos ?? [],
             },
           }),

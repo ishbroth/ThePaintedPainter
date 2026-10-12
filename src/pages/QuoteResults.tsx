@@ -398,6 +398,12 @@ const QuoteResults = () => {
           priceToken={claimTarget.selectionType === 'specific_painter' ? claimTarget.priceToken : (results?.mystery.priceToken ?? '')}
           resumeToken={state.resumeToken}
           conversation={state.userMessages ?? state.transcript.split('\n').filter(Boolean)}
+          breakdown={[
+            ...estimate.lineItems.map((l) => ({ description: l.description, amount: l.amount })),
+            // what the customer took off the price, so the painter can suggest it
+            ...(view?.rows ?? []).filter((r) => r.removed).map((r) => ({ description: r.label, amount: r.amount, removed: true })),
+            ...(view?.rooms ?? []).filter((r) => r.removed).map((r) => ({ description: `${r.label} (room)`, amount: Math.abs(r.change), removed: true })),
+          ]}
           resumeState={{ ctx, estimate, assumptions, transcript: state.transcript, userMessages: state.userMessages, loyaltyDiscountPercent: state.loyaltyDiscountPercent }}
           onPriceExpired={() => { setClaimTarget(null); setResults(null); loadResults(); }}
           onClose={() => setClaimTarget(null)}
@@ -422,6 +428,7 @@ const ClaimPriceModal = ({
   priceToken,
   resumeToken,
   conversation,
+  breakdown,
   resumeState,
   onPriceExpired,
   onClose,
@@ -432,6 +439,7 @@ const ClaimPriceModal = ({
   priceToken: string;
   resumeToken?: string;
   conversation: string[];
+  breakdown: { description: string; amount: number; removed?: boolean }[];
   resumeState: unknown;
   onPriceExpired: () => void;
   onClose: () => void;
@@ -467,6 +475,7 @@ const ClaimPriceModal = ({
           timelineLabel: timelineLabel(ctx.timeline),
           qa: buildResponseSummary(ctx),
           conversation,
+          breakdown,
           preferredDate: preferredDate || undefined,
           customerId: user?.id,
           photos: ctx.photos.length > 0 ? ctx.photos : undefined,

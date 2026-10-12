@@ -391,6 +391,20 @@ ${body}
         .map((item) => `<p style="margin: 4px 0;"><strong>${escapeHtml(item.question)}:</strong> ${escapeHtml(item.answer)}</p>`)
         .join('')
 
+      // what the price covers, line by line, in the painter's own payout amounts
+      const breakdown = Array.isArray(data.breakdown) ? (data.breakdown as { description: string; amount: number; removed?: boolean }[]) : []
+      const money = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n)
+      const breakdownHtml = breakdown.length > 0
+        ? `
+          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
+          <p style="font-weight: 600; margin-bottom: 4px;">What this job includes</p>
+          <p style="margin: 0 0 8px; font-size: 13px; color: #6b7280;">Amounts are your payout for each part of the job.${breakdown.some((l) => l.removed) ? ' Struck-through items are ones the customer took off: you are welcome to suggest them when you talk.' : ''}</p>
+          <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+            ${breakdown.map((l) => l.removed ? `<tr><td style="padding: 4px 0; color: #9ca3af; text-decoration: line-through;">${escapeHtml(l.description)}</td><td style="padding: 4px 0; text-align: right; color: #9ca3af; text-decoration: line-through;">${money(l.amount)}</td></tr>` : `<tr><td style="padding: 4px 0; color: #374151;">${escapeHtml(l.description)}</td><td style="padding: 4px 0; text-align: right; color: #111827;">${money(l.amount)}</td></tr>`).join('')}
+          </table>
+        `
+        : ''
+
       // every reply the customer typed, in order, so the painter can judge for themselves
       const conversation = Array.isArray(data.conversation) ? (data.conversation as string[]) : []
       const conversationHtml = conversation.length > 0
@@ -436,6 +450,7 @@ ${body}
         <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
         <p style="font-weight: 600; margin-bottom: 12px;">Job details</p>
         ${qaHtml}
+        ${breakdownHtml}
         ${conversationHtml}
         ${photosHtml}
       `)

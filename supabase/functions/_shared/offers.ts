@@ -18,7 +18,7 @@ export interface OfferJob {
   timeline: string | null
   estimated_days: number | null
   painter_payout_amount: number | null
-  project_summary: { qa?: unknown[]; timelineLabel?: string; conversation?: string[] } | null
+  project_summary: { qa?: unknown[]; timelineLabel?: string; conversation?: string[]; breakdown?: { description: string; amount: number; removed?: boolean }[] } | null
   photos: unknown[] | null
 }
 
@@ -75,6 +75,7 @@ export async function sendPainterOffer(
         acceptUrl: `${frontendUrl}/painter/accept-job?token=${job.claim_token}&painter_id=${painter.id}`,
         qa: job.project_summary?.qa ?? [],
         conversation: job.project_summary?.conversation ?? [],
+        breakdown: job.project_summary?.breakdown ?? [],
         conversationNote: conversationNote(job.project_summary?.conversation ?? []),
         photos: job.photos ?? [],
       },
