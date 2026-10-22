@@ -19,6 +19,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
 import { notify } from '../_shared/notify.ts'
+import { awardAchievements } from '../_shared/achievements.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -62,7 +63,7 @@ serve(async (req: Request) => {
 
     const { data: painter, error: painterError } = await supabase
       .from('painters')
-      .select('id, company_name')
+      .select('id, user_id, company_name')
       .eq('user_id', userData.user.id)
       .maybeSingle()
 
@@ -83,6 +84,12 @@ serve(async (req: Request) => {
 
     if (updateError) throw updateError
     if (!job) return jsonError('Job not found, not yours, or not in a completable state', 404)
+
+    try {
+      await awardAchievements(supabase, painter)
+    } catch (err) {
+      console.error('Failed to award achievements:', err)
+    }
 
     await notify(supabase, {
       userId: job.customer_id, type: 'project_completed', title: 'Your project is complete',

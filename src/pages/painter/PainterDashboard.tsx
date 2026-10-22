@@ -1,6 +1,17 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../lib/auth';
-import { supabaseUrl } from '../../lib/supabase';
+import { Link } from 'react-router-dom';
+import { supabase, supabaseUrl } from '../../lib/supabase';
+
+interface NoteRow {
+  id: string;
+  type: string;
+  title: string;
+  body: string | null;
+  link: string | null;
+  is_read: boolean;
+  created_at: string;
+}
 
 interface DashboardData {
   companyName: string;
@@ -26,8 +37,18 @@ function formatWhen(iso: string): string {
   return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
 
-function buildActivity(data: DashboardData): ActivityItem[] {
+function buildActivity(data: DashboardData, notes: NoteRow[]): ActivityItem[] {
   const items: ActivityItem[] = [];
+
+  for (const n of notes) {
+    items.push({
+      id: `note-${n.id}`,
+      text: n.title,
+      icon: n.type === 'achievement' ? '\u{1F3C6}' : n.type === 'review_followup' ? '⚠️' : '⭐',
+      time: formatWhen(n.created_at),
+      timestamp: new Date(n.created_at).getTime(),
+    });
+  }
 
   for (const offer of data.offers) {
     if (!offer.offerSentAt) continue;
@@ -71,6 +92,24 @@ export default function PainterDashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [notes, setNotes] = useState<NoteRow[]>([]);
+
+  // Review / achievement notes for the feed; unread review_followup rows are the pending items.
+  useEffect(() => {
+    if (!session?.user?.id) return;
+    supabase
+      .from('notifications')
+      .select('id, type, title, body, link, is_read, created_at')
+      .in('type', ['review_followup', 'new_review', 'achievement'])
+      .order('created_at', { ascending: false })
+      .limit(30)
+      .then(({ data: rows }) => setNotes((rows as NoteRow[]) ?? []));
+  }, [session?.user?.id]);
+
+  const resolveNote = async (id: string) => {
+    setNotes((prev) => prev.map((n) => (n.id === id ? { ...n, is_read: true } : n)));
+    await supabase.from('notifications').update({ is_read: true }).eq('id', id);
+  };
 
   useEffect(() => {
     if (!session?.access_token) return;
@@ -92,7 +131,8 @@ export default function PainterDashboard() {
 
   const activeJobs = data.confirmed.length;
   const totalJobs = activeJobs + data.completed.length;
-  const activity = buildActivity(data);
+  const activity = buildActivity(data, notes);
+  const pending = notes.filter((n) => n.type === 'review_followup' && !n.is_read);
 
   const stats = [
     { label: 'Total Jobs', value: String(totalJobs), icon: '\u{1F3E0}' },
@@ -108,6 +148,35 @@ export default function PainterDashboard() {
         Here is an overview of your painting business.
         {data.totalEarnings > 0 && <> You've earned <strong className="text-[var(--accent)]">{currency(data.totalEarnings)}</strong> through The Painted Painter.</>}
       </p>
+
+      {pending.length > 0 && (
+        <div className="mb-8 rounded-xl p-5 border" style={{ borderColor: 'var(--danger)', background: 'var(--bg-surface)' }}>
+          <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-3">Needs your attention</h2>
+          <ul className="space-y-3">
+            {pending.map((n) => (
+              <li key={n.id} className="flex items-start justify-between gap-3 flex-wrap">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-[var(--text-primary)]">{n.title}</p>
+                  {n.body && <p className="text-sm text-[var(--text-secondary)] mt-1">{n.body}</p>}
+                </div>
+                <div className="flex gap-2 shrink-0">
+                  {n.link && (
+                    <Link to={n.link} className="px-3 py-1.5 text-sm font-semibold rounded-lg bg-[var(--accent)] text-[var(--accent-ink)]">
+                      See customers
+                    </Link>
+                  )}
+                  <button
+                    onClick={() => resolveNote(n.id)}
+                    className="px-3 py-1.5 text-sm rounded-lg border border-[var(--border)] text-[var(--text-primary)]"
+                  >
+                    Mark resolved
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* Stats cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">

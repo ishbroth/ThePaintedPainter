@@ -16,6 +16,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
 import { notify } from '../_shared/notify.ts'
+import { awardAchievements, LOW_REVIEW_MAX_RATING } from '../_shared/achievements.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -62,7 +63,7 @@ serve(async (req: Request) => {
 
     const { data: painter, error: painterError } = await supabase
       .from('painters')
-      .select('user_id, email, owner_name, company_name')
+      .select('id, user_id, email, owner_name, company_name')
       .eq('id', job.accepted_by)
       .maybeSingle()
 
@@ -125,13 +126,25 @@ serve(async (req: Request) => {
           }),
         })
       }
-      await notify(supabase, {
-        userId: painter.user_id,
-        type: 'new_review',
-        title: `New ${rating}-star review from ${reviewerName}`,
-        body: body?.trim() ? body.trim().slice(0, 120) : undefined,
-        link: '/painter/dashboard/reviews',
-      })
+      if (rating <= LOW_REVIEW_MAX_RATING) {
+        // A pending item for the painter's feed: try to make it right with this customer.
+        await notify(supabase, {
+          userId: painter.user_id,
+          type: 'review_followup',
+          title: `A customer wrote a ${rating}-star review about you`,
+          body: `${reviewerName} wasn't happy with the job. Reach out and try to resolve it — a quick call or message can often turn this around.`,
+          link: '/painter/dashboard/business',
+        })
+      } else {
+        await notify(supabase, {
+          userId: painter.user_id,
+          type: 'new_review',
+          title: `New ${rating}-star review from ${reviewerName}`,
+          body: body?.trim() ? body.trim().slice(0, 120) : undefined,
+          link: '/painter/dashboard/reviews',
+        })
+      }
+      await awardAchievements(supabase, painter)
     } catch (notifyErr) {
       console.error('Failed to notify painter of review:', notifyErr)
     }

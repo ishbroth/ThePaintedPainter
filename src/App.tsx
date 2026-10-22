@@ -39,6 +39,8 @@ import PainterProjects from './pages/painter/PainterProjects.tsx';
 import PainterReviews from './pages/painter/PainterReviews.tsx';
 import PainterSettings from './pages/painter/PainterSettings.tsx';
 import PainterNotifications from './pages/painter/PainterNotifications.tsx';
+import PainterBusiness from './pages/painter/PainterBusiness.tsx';
+import PainterRewards from './pages/painter/PainterRewards.tsx';
 import CustomerDashboard from './pages/customer/CustomerDashboard.tsx';
 import CustomerProfile from './pages/customer/CustomerProfile.tsx';
 import CustomerProjects from './pages/customer/CustomerProjects.tsx';
@@ -56,7 +58,9 @@ const painterSidebarItems: SidebarItem[] = [
   { label: 'Profile', icon: '\u{1F464}', path: '/painter/dashboard/profile' },
   { label: 'Portfolio', icon: '\u{1F5BC}', path: '/painter/dashboard/portfolio' },
   { label: 'My Projects', icon: '\u{1F4CB}', path: '/painter/dashboard/projects' },
+  { label: 'My Business', icon: '\u{1F4C8}', path: '/painter/dashboard/business' },
   { label: 'Reviews', icon: '\u2B50', path: '/painter/dashboard/reviews' },
+  { label: 'Rewards', icon: '\u{1F3C6}', path: '/painter/dashboard/rewards' },
   { label: 'Settings', icon: '\u2699', path: '/painter/dashboard/settings' },
   { label: 'Notifications', icon: '\u{1F514}', path: '/painter/dashboard/notifications' },
 ];
@@ -149,7 +153,9 @@ function App() {
                   <Route path="profile" element={<PainterProfile />} />
                   <Route path="portfolio" element={<PainterPortfolio />} />
                   <Route path="projects" element={<PainterProjects />} />
+                  <Route path="business" element={<PainterBusiness />} />
                   <Route path="reviews" element={<PainterReviews />} />
+                  <Route path="rewards" element={<PainterRewards />} />
                   <Route path="settings" element={<PainterSettings />} />
                   <Route path="notifications" element={<PainterNotifications />} />
                 </Route>
