@@ -180,8 +180,18 @@ const ChatPanel = () => {
     if (location.hash === '#estimator' && processedHashRef.current !== location.key) {
       processedHashRef.current = location.key;
       sectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      // Already on the page, so the link has nothing to scroll to: puff the window up and light it for a moment instead.
+      const card = sectionRef.current?.querySelector('.chat-estimator-card');
+      if (card) {
+        card.classList.remove('chat-puff');
+        void (card as HTMLElement).offsetWidth; // restart the animation if the link is tapped again mid-puff
+        card.classList.add('chat-puff');
+        window.setTimeout(() => card.classList.remove('chat-puff'), 1200);
+      }
+      // The greeting plays once: if scrolling or typing already played it, tapping the link doesn't say it again.
+      const introAlreadyPlayed = hasAutoPlayedRef.current && isFreshRef.current;
       hasAutoPlayedRef.current = true;
-      if (readAloudRef.current && ttsSupported) {
+      if (!introAlreadyPlayed && readAloudRef.current && ttsSupported) {
         const lastBotMessage = [...state.history].reverse().find((m) => m.role === 'bot');
         if (lastBotMessage) speak(lastBotMessage.text);
       }
@@ -457,6 +467,9 @@ const ChatPanel = () => {
   }
 
   function onKeyDown(e: KeyboardEvent<HTMLSpanElement>) {
+    // The first real keypress starts the greeting (a keypress is a gesture the browser always lets speech start from; the input event
+    // that follows is not, in Safari). It plays once: whichever of scrolling, clicking or typing comes first uses it up.
+    if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) playIntroIfFreshRef.current();
     // Enter to send; Shift+Enter for newline
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -622,6 +635,7 @@ const ChatPanel = () => {
       const active = document.activeElement as HTMLElement | null;
       if (active && (active === el || active.isContentEditable || /^(INPUT|TEXTAREA|SELECT|BUTTON)$/.test(active.tagName))) return;
       el.focus({ preventScroll: true });
+      playIntroIfFreshRef.current(); // typing with focus elsewhere on the page still starts the greeting (on the keypress itself)
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);

@@ -568,7 +568,7 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
       [/\bvista\b/, 'Vista'],
     ];
     const painterChoice = /\b(?:painter'?s? (?:choice|call|pick|decision)|up to (?:the )?painter|you (?:pick|choose|decide)|their choice|your choice|doesn'?t matter|don'?t care|no preference|no brand|any(?:thing)? (?:is )?(?:fine|works|ok|okay)|whatever (?:they|you)|not picky|let (?:them|him|her|the painter) (?:pick|choose|decide))\b/.test(low);
-    if (!state.ctx.paintBrand) {
+    if (!state.ctx.paintBrand || state.ctx.paintBrand === 'painter_choice') {
       const named = brands.find(([re]) => re.test(low));
       if (named) ctxWithExplicit.paintBrand = named[1];
       else if (asked === 'paint_brand' && painterChoice) ctxWithExplicit.paintBrand = 'painter_choice';

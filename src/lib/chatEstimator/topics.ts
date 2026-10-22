@@ -433,7 +433,7 @@ export const TOPICS: Topic[] = [
     id: 'paint_grade',
     priority: 38,
     relevant: (c) => paintingJob(c),
-    alreadyAnswered: (c) => !!c.paintGrade || extDone(c, 'paint_grade'),
+    alreadyAnswered: (c) => !!c.paintGrade || extDone(c, 'paint_grade') || c.paintBrand === 'painter_choice', // "the painter can choose" covers the grade too (a grade they volunteer is still noted)
     ask: (c) =>
       pick(
         [
@@ -449,7 +449,7 @@ export const TOPICS: Topic[] = [
     id: 'paint_finish',
     priority: 39,
     relevant: (c) => paintingJob(c),
-    alreadyAnswered: (c) => !!c.paintFinish || extDone(c, 'paint_finish'),
+    alreadyAnswered: (c) => !!c.paintFinish || extDone(c, 'paint_finish') || c.paintBrand === 'painter_choice', // ...and the finish
     ask: (c) =>
       pick(
         [
@@ -501,7 +501,7 @@ export const TOPICS: Topic[] = [
   {
     id: 'upsell_doors',
     priority: 29,
-    relevant: (c) => (c.projectType === 'interior' || c.projectType === 'both') && c.surfacesAddressed && c.interiorDoors === 'none' && !(c.excludedSurfaces ?? []).includes('doors'),
+    relevant: (c) => (c.projectType === 'interior' || c.projectType === 'both') && c.surfacesAddressed && c.interiorDoors === 'none' && !(c.excludedSurfaces ?? []).includes('doors') && !(c.excludedSurfaces ?? []).includes('trim'), // turned down the baseboards: nobody paints doors without trim, so don't suggest them (the closing "anything else?" still lets them mention doors)
     alreadyAnswered: (c) => c.interiorDoors !== 'none',
     ask: (c) =>
       pick(
