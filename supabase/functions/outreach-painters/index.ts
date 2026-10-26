@@ -26,6 +26,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
 import { describeTiming } from '../_shared/offers.ts'
 import { ADMIN_EMAIL } from '../_shared/adminLink.ts'
+import { isServiceCaller } from '../_shared/serviceCaller.ts'
 
 const MAX_INVITES_PER_JOB = 12
 const PAGE_TIMEOUT_MS = 6000
@@ -41,7 +42,7 @@ function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
 }
 
-interface Place { name: string; website: string; phone: string; address: string }
+interface Place { name: string; website: string; phone: string; address: string; email?: string }
 
 /** Painting companies near a ZIP, from Google Places (the company's own listing: name, website, phone). */
 async function findPaintingCompanies(zip: string, apiKey: string): Promise<Place[]> {
@@ -139,15 +140,18 @@ serve(async (req: Request) => {
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
     if (!supabaseUrl || !serviceRoleKey) return json({ error: 'Not configured' }, 500)
     // Only our own server may call this
-    if ((req.headers.get('Authorization') ?? '') !== `Bearer ${serviceRoleKey}`) return json({ error: 'Forbidden' }, 403)
+    if (!(await isServiceCaller(req, supabaseUrl, serviceRoleKey))) return json({ error: 'Forbidden' }, 403)
 
     // the unrestricted server key first (the other one may be locked to website referrers for the map)
     const placesKey = Deno.env.get('GOOGLE_GEOCODING_API_KEY') ?? Deno.env.get('GOOGLE_PLACES_API_KEY')
     const postalAddress = Deno.env.get('OUTREACH_POSTAL_ADDRESS')
-    if (!placesKey) return json({ ok: false, reason: 'GOOGLE_GEOCODING_API_KEY (or GOOGLE_PLACES_API_KEY) is not set: no painters were looked up' })
+    // Service-role callers (tests) may pass `testPlaces` instead of searching Google: the companies and emails given are used as they are.
+    const body = await req.json() as { jobId?: string; testPlaces?: Place[] }
+    const testPlaces = Array.isArray(body.testPlaces) ? body.testPlaces : null
+    if (!placesKey && !testPlaces) return json({ ok: false, reason: 'GOOGLE_GEOCODING_API_KEY (or GOOGLE_PLACES_API_KEY) is not set: no painters were looked up' })
     if (!postalAddress) return json({ ok: false, reason: 'OUTREACH_POSTAL_ADDRESS is not set: commercial email must carry a postal address, so nothing was sent' })
 
-    const { jobId } = await req.json() as { jobId?: string }
+    const jobId = body.jobId
     if (!jobId) return json({ error: 'Missing jobId' }, 400)
 
     const supabase = createClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
@@ -155,13 +159,15 @@ serve(async (req: Request) => {
 
     const { data: job } = await supabase
       .from('quote_selections')
-      .select('id, status, quote_zip, painter_payout_amount, customer_preferred_date, customer_start_date, customer_end_date, dates_flexible, timeline, project_summary')
+      .select('id, status, customer_email, quote_zip, painter_payout_amount, customer_preferred_date, customer_start_date, customer_end_date, dates_flexible, timeline, project_summary')
       .eq('id', jobId)
       .maybeSingle()
     if (!job || job.status !== 'searching_painter' || !job.quote_zip) return json({ ok: false, reason: 'Job is not waiting for a painter' })
+    // a made-up customer (demonstration or test, ".invalid" address) never triggers a real search; tests pass testPlaces instead
+    if (!testPlaces && /@[^@]*\.invalid$/i.test(String(job.customer_email ?? ''))) return json({ ok: false, reason: 'Demonstration job: no real companies were contacted' })
 
 
-    const places = await findPaintingCompanies(job.quote_zip, placesKey)
+    const places = testPlaces ?? await findPaintingCompanies(job.quote_zip, placesKey as string)
 
     // companies already on the platform, or who asked not to be contacted, are never invited
     const { data: members } = await supabase.from('painters').select('email')
@@ -174,7 +180,7 @@ serve(async (req: Request) => {
 
     for (const place of places) {
       if (invited.length >= MAX_INVITES_PER_JOB) break
-      const email = await findEmail(place.website)
+      const email = place.email ?? await findEmail(place.website)
       if (!email || memberEmails.has(email) || optedOut.has(email)) continue
       const { data: lead, error: leadError } = await supabase
         .from('outreach_leads')
@@ -213,8 +219,8 @@ serve(async (req: Request) => {
       }
     }
 
-    // tell the owner who was invited (names only), so they know what is going on
-    await fetch(`${supabaseUrl}/functions/v1/send-email`, {
+    // tell the owner who was invited (names only), so they know what is going on (not for test runs)
+    if (!testPlaces) await fetch(`${supabaseUrl}/functions/v1/send-email`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${serviceRoleKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
