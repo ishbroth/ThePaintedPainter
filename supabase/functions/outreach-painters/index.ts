@@ -19,14 +19,15 @@
 //   3. supabase functions deploy outreach-painters --no-verify-jwt
 //      supabase functions deploy outreach-unsubscribe --no-verify-jwt
 //
-// No cap on invitations: every job with no painter in range invites every company it can find near that ZIP (Google returns up to 20 per
-// search). A company is never invited twice for the same job, and anyone who unsubscribed is never emailed again.
+// Limit: at most MAX_INVITES_PER_JOB companies per job, and no limit on how many jobs (or invitations) there are per day. A company is
+// never invited twice for the same job, and anyone who unsubscribed is never emailed again.
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
 import { describeTiming } from '../_shared/offers.ts'
 import { ADMIN_EMAIL } from '../_shared/adminLink.ts'
 
+const MAX_INVITES_PER_JOB = 12
 const PAGE_TIMEOUT_MS = 6000
 const MAX_PAGE_BYTES = 300_000
 
@@ -172,6 +173,7 @@ serve(async (req: Request) => {
     const invited: string[] = []
 
     for (const place of places) {
+      if (invited.length >= MAX_INVITES_PER_JOB) break
       const email = await findEmail(place.website)
       if (!email || memberEmails.has(email) || optedOut.has(email)) continue
       const { data: lead, error: leadError } = await supabase
