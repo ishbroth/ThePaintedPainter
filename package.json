@@ -12,6 +12,7 @@
     "mobile:android": "npm run mobile:sync && cap open android",
     "mobile:ios": "npm run mobile:sync && cap open ios",
     "lint": "eslint .",
+    "seed:demo": "npx --yes tsx supabase/seed/seedDemoPainters.ts",
     "preview": "vite preview"
   },
   "dependencies": {

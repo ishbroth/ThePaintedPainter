@@ -102,7 +102,7 @@ serve(async (req: Request) => {
       },
       external: cleanExternalReviews(p.external_reviews),
       photos: (portfolio ?? []).map((row) => ({
-        url: `${supabaseUrl}/storage/v1/object/public/painter-portfolio/${row.storage_path}`,
+        url: /^https?:\/\//.test(row.storage_path) ? row.storage_path : `${supabaseUrl}/storage/v1/object/public/painter-portfolio/${row.storage_path}`, // full URLs are demonstration photos
         caption: row.caption,
       })),
       rating: { average, count: all.length },

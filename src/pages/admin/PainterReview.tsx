@@ -43,6 +43,8 @@ interface Painter {
   service_types: string[] | null;
   service_area_zips: string | null;
   status: string;
+  is_demo?: boolean;
+  previously_removed_note?: string | null;
   application_tasks: { id: string; label: string; done: boolean }[];
   admin_message: string | null;
 }
@@ -84,8 +86,9 @@ export default function PainterReview() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, exp, sig]);
 
-  const act = async (action: 'approve' | 'request_info' | 'reject') => {
+  const act = async (action: 'approve' | 'request_info' | 'reject' | 'remove') => {
     if (action === 'reject' && !window.confirm('Decline this application? The painter will be emailed.')) return;
+    if (action === 'remove' && !window.confirm('Remove this painter from the network? They disappear from the map, results and job offers immediately, and are emailed.')) return;
     setBusy(true);
     setError('');
     try {
@@ -97,6 +100,8 @@ export default function PainterReview() {
           ? 'Approved — the painter has been emailed and can start receiving jobs.'
           : action === 'request_info'
           ? 'Sent — the painter was emailed and sees these as tasks on their profile.'
+          : action === 'remove'
+          ? 'Removed — they are off the map, out of results and offers, and have been emailed.'
           : 'Declined — the painter has been emailed.',
       );
     } catch (e) {
@@ -130,6 +135,28 @@ export default function PainterReview() {
         <div style={card}><p style={{ color: 'var(--text-primary)', margin: 0 }}>{done}</p></div>
       ) : (
         <>
+          {painter.previously_removed_note && (
+            <div style={{ ...card, borderColor: 'var(--danger)' }}>
+              <p style={{ color: 'var(--danger)', fontWeight: 700, margin: '0 0 6px' }}>Previously removed from the network</p>
+              <p style={{ color: 'var(--text-primary)', fontSize: '0.9rem', margin: 0 }}>{painter.previously_removed_note}</p>
+            </div>
+          )}
+          {intent === 'remove' && painter.status !== 'removed' && (
+            <div style={{ ...card, borderColor: 'var(--danger)' }}>
+              <p style={{ color: 'var(--text-primary)', fontWeight: 700, margin: '0 0 6px' }}>Remove {painter.company_name} from the network?</p>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: '0 0 12px' }}>
+                They leave the map, customer results and job offers right away and are emailed. If they apply again with the same name, address, phone or license number, you'll be told they were removed before. Jobs they already hold stay open for you to sort out; you'll get a list.
+              </p>
+              <textarea
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                placeholder="Optional note (kept in the record and shown to them)"
+                rows={2}
+                style={{ width: '100%', marginBottom: 10, padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-surface)', color: 'var(--text-primary)' }}
+              />
+              <button style={btn('var(--danger)')} disabled={busy} onClick={() => act('remove')}>Yes, remove them</button>
+            </div>
+          )}
           {intent === 'approve' && (
             <div style={{ ...card, borderColor: 'var(--success)' }}>
               <p style={{ color: 'var(--text-primary)', fontWeight: 700, margin: '0 0 6px' }}>Approve {painter.company_name}?</p>
@@ -212,6 +239,9 @@ export default function PainterReview() {
               Request these items
             </button>
             <button style={btn('var(--danger)')} disabled={busy || !message.trim()} onClick={() => act('reject')}>Decline</button>
+            {painter.status === 'approved' && (
+              <button style={btn('#7f1d1d')} disabled={busy} onClick={() => act('remove')}>Remove from network</button>
+            )}
           </div>
         </>
       )}

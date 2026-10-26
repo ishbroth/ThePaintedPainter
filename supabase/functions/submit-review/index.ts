@@ -17,6 +17,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
 import { notify } from '../_shared/notify.ts'
 import { awardAchievements, LOW_REVIEW_MAX_RATING } from '../_shared/achievements.ts'
+import { checkLowReviews } from '../_shared/removal.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -63,7 +64,7 @@ serve(async (req: Request) => {
 
     const { data: painter, error: painterError } = await supabase
       .from('painters')
-      .select('id, user_id, email, owner_name, company_name')
+      .select('id, user_id, email, owner_name, company_name, phone, street_address, zip_code, license_number')
       .eq('id', job.accepted_by)
       .maybeSingle()
 
@@ -145,6 +146,9 @@ serve(async (req: Request) => {
         })
       }
       await awardAchievements(supabase, painter)
+
+      // Three low reviews and the painter is out of the network (the owner is alerted at each one).
+      await checkLowReviews(supabase, { supabaseUrl, serviceRoleKey }, painter, { rating, reviewerName, title: title?.trim() || null, body: body?.trim() || null })
     } catch (notifyErr) {
       console.error('Failed to notify painter of review:', notifyErr)
     }

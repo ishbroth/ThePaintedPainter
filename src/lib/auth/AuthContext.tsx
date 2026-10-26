@@ -7,6 +7,7 @@ export interface UserProfile {
   display_name: string | null;
   avatar_url: string | null;
   phone: string | null;
+  zip_code: string | null;
   theme_preference: 'light' | 'dark' | null;
   loyalty_points_balance: number;
   loyalty_points_lifetime: number;

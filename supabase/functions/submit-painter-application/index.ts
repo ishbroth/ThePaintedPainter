@@ -67,6 +67,12 @@ serve(async (req: Request) => {
       if (typeof form[field] !== 'string' || !(form[field] as string).trim()) return json({ error: 'Please fill in all required company and address fields.' }, 400)
     }
 
+    // An address that belongs to a painter who was removed can't simply sign up again; it goes to the owner instead.
+    const { data: removedAccount } = await supabase.from('painters').select('id').ilike('email', email).eq('status', 'removed').limit(1)
+    if (removedAccount && removedAccount.length > 0) {
+      return json({ error: 'This account was removed from our network. If you think that was a mistake, please contact us at iw@thepaintedpainter.com.' }, 403)
+    }
+
     const { data: exists } = await supabase.rpc('auth_email_exists', { p_email: email })
     if (exists) return json({ error: 'An account with this email already exists. Try signing in instead.' }, 409)
 

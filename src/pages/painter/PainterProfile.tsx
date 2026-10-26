@@ -119,6 +119,8 @@ export default function PainterProfile() {
     setSaving(false);
     if (error) setMessage({ kind: 'error', text: 'We couldn\'t save your changes. Please try again.' });
     else {
+      // keep the map position in step with the ZIP (best effort)
+      supabase.functions.invoke('geocode-painter', { body: {} }).catch(() => {});
       setSavedCrew(form.crew_size ?? 0);
       setMessage({ kind: 'ok', text: 'Profile saved.' });
     }

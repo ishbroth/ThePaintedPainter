@@ -20,6 +20,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
 import { buildReviewUrl, ADMIN_EMAIL } from '../_shared/adminLink.ts'
 import { sha256Hex } from '../_shared/hash.ts'
+import { findPreviousRemoval } from '../_shared/removal.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -90,6 +91,9 @@ serve(async (req: Request) => {
     }
     createdUserId = created.id as string
 
+    // Does this applicant match someone who was removed from the network before? The owner is told in the application email.
+    const previouslyRemoved = await findPreviousRemoval(supabase, payload as never).catch((err) => { console.error('removal match failed:', err); return null })
+
     // 2. Painter record, always pending. Starts the 30-day "remind" clock.
     const { data: painter, error: insertError } = await supabase
       .from('painters')
@@ -100,6 +104,7 @@ serve(async (req: Request) => {
         status: 'pending',
         verified: false,
         last_reminder_at: new Date().toISOString(),
+        previously_removed_note: previouslyRemoved,
       })
       .select('id')
       .single()
@@ -123,6 +128,7 @@ serve(async (req: Request) => {
           type: 'painter_application_received',
           data: {
             application: { ...payload, email: request.email },
+            previouslyRemoved,
             reviewUrl,
           },
         }),

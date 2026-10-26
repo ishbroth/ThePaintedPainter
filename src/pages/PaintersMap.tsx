@@ -1,6 +1,10 @@
 import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { fakePainters } from '../lib/fakePainters';
+import { useNetworkPainters } from '../lib/networkPainters';
+import { useGoogleMaps } from '../lib/googleMaps';
+import { useAuth } from '../lib/auth';
+import { estimatorZip } from '../lib/mapCenter';
+import PaintersMapView from '../components/PaintersMapView';
 
 const ALL_SERVICES = [
   'Interior Painting',
@@ -20,23 +24,27 @@ const ALL_SERVICES = [
 const PaintersMap = () => {
   const [locationQuery, setLocationQuery] = useState('');
   const [serviceFilter, setServiceFilter] = useState('');
+  const { painters, loading } = useNetworkPainters();
+  const mapStatus = useGoogleMaps();
+  const { profile } = useAuth();
+  const centerZip = profile?.zip_code || estimatorZip();
 
   const filtered = useMemo(() => {
     const q = locationQuery.trim().toLowerCase();
-    return fakePainters.filter((p) => {
+    return painters.filter((p) => {
       if (q) {
         const matchesLocation =
-          p.city.toLowerCase().includes(q) ||
-          p.state.toLowerCase().includes(q) ||
-          p.zip_code.includes(q);
+          (p.city ?? '').toLowerCase().includes(q) ||
+          (p.state ?? '').toLowerCase().includes(q) ||
+          (p.zip_code ?? '').includes(q);
         if (!matchesLocation) return false;
       }
       if (serviceFilter) {
-        if (!p.services.includes(serviceFilter)) return false;
+        if (!p.service_types.includes(serviceFilter)) return false;
       }
       return true;
     });
-  }, [locationQuery, serviceFilter]);
+  }, [painters, locationQuery, serviceFilter]);
 
   const clearFilters = () => {
     setLocationQuery('');
@@ -54,7 +62,7 @@ const PaintersMap = () => {
             Find Painters <span className="text-[var(--accent)]">Nationwide</span>
           </h1>
           <p className="text-lg text-[var(--text-secondary)] max-w-2xl">
-            Browse our network of 50 vetted, professional painters across the
+            Browse our network of {painters.length} vetted, professional painters across the
             country. Filter by location or service to find the right team for
             your project.
           </p>
@@ -95,14 +103,16 @@ const PaintersMap = () => {
           )}
 
           <span className="ml-auto text-sm text-[var(--text-secondary)]">
-            Showing {filtered.length} of {fakePainters.length} painters
+            Showing {filtered.length} of {painters.length} painters
           </span>
         </div>
       </section>
 
       {/* Results */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {filtered.length === 0 ? (
+        {loading ? (
+          <p className="text-center py-24 text-[var(--text-secondary)]">Loading painters…</p>
+        ) : filtered.length === 0 ? (
           <div className="text-center py-24">
             <p className="text-xl text-[var(--text-secondary)]">
               No painters found matching your filters.
@@ -133,26 +143,28 @@ const PaintersMap = () => {
                         {p.company_name}
                       </Link>
                       <p className="text-sm text-[var(--text-secondary)]">
-                        {p.city}, {p.state}
+                        {[p.city, p.state].filter(Boolean).join(', ')}
                       </p>
                     </div>
 
                     {/* Rating */}
                     <div className="flex items-center gap-1 shrink-0">
-                      <span className="text-yellow-400">&#9733;</span>
-                      <span className="font-semibold text-sm">
-                        {p.rating.toFixed(1)}
-                      </span>
-                      <span className="text-xs text-[var(--text-faint)]">
-                        ({p.review_count})
-                      </span>
+                      {p.review_count > 0 ? (
+                        <>
+                          <span className="text-yellow-400">&#9733;</span>
+                          <span className="font-semibold text-sm">{Number(p.avg_rating).toFixed(1)}</span>
+                          <span className="text-xs text-[var(--text-faint)]">({p.review_count})</span>
+                        </>
+                      ) : (
+                        <span className="text-xs text-[var(--text-faint)]">New to the network</span>
+                      )}
                     </div>
                   </div>
 
                   {/* Meta row */}
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[var(--text-secondary)] mb-3">
-                    <span>{p.years_experience} yrs exp</span>
-                    <span>Crew of {p.crew_size}</span>
+                    {p.years_in_business != null && <span>{p.years_in_business} yrs in business</span>}
+                    {p.crew_size != null && <span>Crew of {p.crew_size}</span>}
 
                     {/* Badges */}
                     <span className="flex items-center gap-1">
@@ -183,7 +195,7 @@ const PaintersMap = () => {
 
                   {/* Top 3 services */}
                   <div className="flex flex-wrap gap-2 mb-3">
-                    {p.services.slice(0, 3).map((s) => (
+                    {p.service_types.slice(0, 3).map((s) => (
                       <span
                         key={s}
                         className="bg-[var(--bg-surface-hover)] border border-[var(--border-strong)] rounded-full px-3 py-0.5 text-xs text-[var(--text-secondary)]"
@@ -193,35 +205,23 @@ const PaintersMap = () => {
                     ))}
                   </div>
 
-                  {/* Current deal */}
-                  {p.deals.length > 0 && (
-                    <div className="bg-[color-mix(in_srgb,var(--accent)_12%,transparent)] border border-[color-mix(in_srgb,var(--accent)_30%,transparent)] rounded-lg px-3 py-2 text-sm">
-                      <span className="font-semibold text-[var(--accent)]">
-                        {p.deals[0].title}
-                      </span>
-                      <span className="text-[var(--text-secondary)]">
-                        {' '}
-                        &mdash; {p.deals[0].description} &middot;{' '}
-                        {p.deals[0].price}
-                      </span>
-                    </div>
-                  )}
                 </div>
               ))}
             </div>
 
-            {/* Right — map placeholder */}
+            {/* Right: the live map (the same painters, updated as they join or leave) */}
             <div className="hidden lg:block">
-              <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-xl h-[calc(100vh-220px)] sticky top-[90px] flex flex-col items-center justify-center text-center px-6">
-                <div className="text-[var(--text-faint)] text-5xl mb-4">&#128506;</div>
-                <p className="text-[var(--text-secondary)] text-lg font-medium mb-2">
-                  Map view &mdash; Google Maps API key required
-                </p>
-                <p className="text-[var(--text-secondary)] text-sm max-w-xs">
-                  Set <code className="text-[var(--text-secondary)]">VITE_GOOGLE_MAPS_API_KEY</code>{' '}
-                  in your <code className="text-[var(--text-secondary)]">.env</code> file to
-                  enable the interactive map.
-                </p>
+              <div className="rounded-xl overflow-hidden border border-[var(--border)] h-[calc(100vh-220px)] sticky top-[90px]">
+                {mapStatus === 'ready' ? (
+                  <PaintersMapView painters={filtered} centerZip={centerZip} height="100%" />
+                ) : (
+                  <div className="h-full flex flex-col items-center justify-center text-center px-6 bg-[var(--bg-surface)]">
+                    <div className="text-[var(--text-faint)] text-5xl mb-4">&#128506;</div>
+                    <p className="text-[var(--text-secondary)] text-lg font-medium">
+                      {mapStatus === 'loading' ? 'Loading the map…' : 'The map is coming soon.'}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           </div>

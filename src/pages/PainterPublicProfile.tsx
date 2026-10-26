@@ -1,42 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { fakePainters } from '../lib/fakePainters';
-
-// ---------------------------------------------------------------------------
-// Fake reviews (static, realistic)
-// ---------------------------------------------------------------------------
-const fakeReviews = [
-  {
-    name: 'Sarah M.',
-    rating: 5,
-    date: 'February 2026',
-    text: 'Absolutely phenomenal work. The crew was on time, professional, and meticulous about taping and prep. Our living room and kitchen look brand new. Would hire again in a heartbeat.',
-  },
-  {
-    name: 'David L.',
-    rating: 5,
-    date: 'January 2026',
-    text: 'We had the entire exterior of our home repainted and the results exceeded our expectations. They even pointed out some minor wood rot that we were able to fix before painting. Great communication throughout.',
-  },
-  {
-    name: 'Jennifer K.',
-    rating: 4,
-    date: 'December 2025',
-    text: 'Very happy with the quality of work. The color consultation was incredibly helpful — they suggested a palette we never would have considered and it looks amazing. Only minor scheduling hiccup but they made it right.',
-  },
-  {
-    name: 'Marcus T.',
-    rating: 5,
-    date: 'November 2025',
-    text: 'Third time using this crew and they never disappoint. Fair pricing, clean work, and they always leave the place spotless. Highly recommend to anyone looking for reliable painters.',
-  },
-  {
-    name: 'Amy R.',
-    rating: 4,
-    date: 'October 2025',
-    text: 'Solid job on our bedroom and hallway. The finish is smooth and even, and they were careful around our furniture. Price was reasonable compared to other prices we received.',
-  },
-];
+import { fetchPainterDetail, type PainterDetail } from '../lib/realPainterMatcher';
 
 // ---------------------------------------------------------------------------
 // Star display helper
@@ -145,19 +109,40 @@ function Lightbox({
 
 // ---------------------------------------------------------------------------
 // Main component
+//
+// One page for every painter on the network (real and demonstration alike), loaded from the same
+// painter-detail function the results use. Private details (phone, address, license number) are never shown.
 // ---------------------------------------------------------------------------
 const PainterPublicProfile = () => {
   const { id } = useParams<{ id: string }>();
-  const painter = fakePainters.find((p) => p.id === id);
-
+  // the answer remembers which painter it is for, so a different link shows "Loading" until its own answer arrives
+  const [loaded, setLoaded] = useState<{ id: string; detail: PainterDetail | null } | null>(null);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
-  // 404
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
+    fetchPainterDetail(id).then((detail) => {
+      if (!cancelled) setLoaded({ id, detail });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
+  const current = loaded && loaded.id === id ? loaded : null;
+  const painter = current?.detail ?? null;
+
+  if (!current) {
+    return <div className="min-h-[60vh] flex items-center justify-center text-[var(--text-secondary)]">Loading…</div>;
+  }
+
+  // 404 (also what a removed painter's old link shows)
   if (!painter) {
     return (
       <div className="text-[var(--text-primary)] min-h-[60vh] flex flex-col items-center justify-center gap-4">
         <h1 className="text-3xl font-bold">Painter Not Found</h1>
-        <p className="text-[var(--text-secondary)]">We couldn't find a painter with that ID.</p>
+        <p className="text-[var(--text-secondary)]">This painter isn't on the network right now.</p>
         <Link to="/painters-map" className="cta-button mt-4">
           Browse Painters Map
         </Link>
@@ -165,120 +150,116 @@ const PainterPublicProfile = () => {
     );
   }
 
-  // Average rating from fake reviews (weighted with painter.rating)
-  const avgReviewRating =
-    Math.round(
-      ((fakeReviews.reduce((sum, r) => sum + r.rating, 0) / fakeReviews.length + painter.rating) / 2) * 10
-    ) / 10;
+  const images = painter.photos.map((ph) => ph.url);
+  const { license, insurance, bond, workersComp, certifications } = painter.credentials;
 
   return (
     <div className="text-[var(--text-primary)]">
-      {/* ----------------------------------------------------------------- */}
-      {/* 1. Hero Section */}
-      {/* ----------------------------------------------------------------- */}
       <section className="bg-[var(--bg-chrome)] py-16 border-b border-[var(--border)]">
         <div className="container-custom text-center">
-          <h1 className="text-3xl md:text-4xl font-bold mb-3">{painter.company_name}</h1>
-          <p className="text-[var(--text-secondary)] text-lg mb-4">
-            {painter.city}, {painter.state} {painter.zip_code}
-          </p>
+          <h1 className="text-3xl md:text-4xl font-bold mb-3">{painter.companyName}</h1>
+          <p className="text-[var(--text-secondary)] text-lg mb-4">{[painter.city, painter.state].filter(Boolean).join(', ')}</p>
 
           <div className="flex items-center justify-center gap-3 mb-4">
-            <Stars rating={painter.rating} size="text-2xl" />
-            <span className="text-[var(--text-primary)] font-semibold text-lg">{painter.rating.toFixed(1)}</span>
-            <span className="text-[var(--text-secondary)]">({painter.review_count} reviews)</span>
-          </div>
-
-          <span className="inline-block bg-[var(--accent)] text-[var(--accent-ink)] font-bold px-4 py-1.5 rounded-full text-sm">
-            {painter.years_experience} Years Experience
-          </span>
-        </div>
-      </section>
-
-      {/* ----------------------------------------------------------------- */}
-      {/* 2. Company Info */}
-      {/* ----------------------------------------------------------------- */}
-      <section className="py-12">
-        <div className="container-custom max-w-3xl">
-          <h2 className="text-2xl font-bold mb-6 text-center">Company Info</h2>
-
-          <div className="grid sm:grid-cols-2 gap-6 mb-8">
-            <div className="bg-[var(--bg-surface)] rounded-lg p-5 border border-[var(--border)]">
-              <p className="text-[var(--text-secondary)] text-sm mb-1">Owner</p>
-              <p className="text-[var(--text-primary)] font-semibold">{painter.owner_name}</p>
-            </div>
-            <div className="bg-[var(--bg-surface)] rounded-lg p-5 border border-[var(--border)]">
-              <p className="text-[var(--text-secondary)] text-sm mb-1">Phone</p>
-              <p className="text-[var(--text-primary)] font-semibold">{painter.phone}</p>
-            </div>
-            <div className="bg-[var(--bg-surface)] rounded-lg p-5 border border-[var(--border)]">
-              <p className="text-[var(--text-secondary)] text-sm mb-1">Crew Size</p>
-              <p className="text-[var(--text-primary)] font-semibold">{painter.crew_size} members</p>
-            </div>
-            {painter.license_number && (
-              <div className="bg-[var(--bg-surface)] rounded-lg p-5 border border-[var(--border)]">
-                <p className="text-[var(--text-secondary)] text-sm mb-1">License #</p>
-                <p className="text-[var(--text-primary)] font-semibold">{painter.license_number}</p>
-              </div>
+            {painter.rating.count > 0 && painter.rating.average !== null ? (
+              <>
+                <Stars rating={painter.rating.average} size="text-2xl" />
+                <span className="text-[var(--text-primary)] font-semibold text-lg">{painter.rating.average.toFixed(1)}</span>
+                <span className="text-[var(--text-secondary)]">({painter.rating.count} review{painter.rating.count === 1 ? '' : 's'})</span>
+              </>
+            ) : (
+              <span className="text-[var(--text-secondary)]">No reviews yet</span>
             )}
           </div>
 
-          <div className="flex flex-wrap justify-center gap-3">
-            <Badge label="Licensed" active={painter.is_licensed} />
-            <Badge label="Insured" active={painter.is_insured} />
-            <Badge label="Bonded" active={painter.is_bonded} />
-          </div>
+          {painter.yearsInBusiness != null && (
+            <span className="inline-block bg-[var(--accent)] text-[var(--accent-ink)] font-bold px-4 py-1.5 rounded-full text-sm">
+              {painter.yearsInBusiness} Years in Business
+            </span>
+          )}
         </div>
       </section>
 
-      {/* ----------------------------------------------------------------- */}
-      {/* 3. Bio Section */}
-      {/* ----------------------------------------------------------------- */}
-      <section className="py-12 bg-[var(--bg-surface)]">
-        <div className="container-custom max-w-3xl">
-          <h2 className="text-2xl font-bold mb-6 text-center">About Us</h2>
-          <p className="text-[var(--text-secondary)] leading-relaxed text-center">{painter.bio}</p>
-        </div>
-      </section>
-
-      {/* ----------------------------------------------------------------- */}
-      {/* 4. Services Section */}
-      {/* ----------------------------------------------------------------- */}
       <section className="py-12">
         <div className="container-custom max-w-3xl">
-          <h2 className="text-2xl font-bold mb-6 text-center">Services Offered</h2>
-          <div className="flex flex-wrap justify-center gap-3">
-            {painter.services.map((service) => (
-              <span
-                key={service}
-                className="bg-[var(--border)] text-[var(--text-primary)] px-4 py-2 rounded-full text-sm font-medium border border-[var(--border-strong)] hover:border-[var(--accent)] transition-colors"
-              >
-                {service}
-              </span>
-            ))}
+          <h2 className="text-2xl font-bold mb-6 text-center">Company Info</h2>
+          <div className="grid sm:grid-cols-2 gap-6 mb-8">
+            {painter.crewSize != null && (
+              <div className="bg-[var(--bg-surface)] rounded-lg p-5 border border-[var(--border)]">
+                <p className="text-[var(--text-secondary)] text-sm mb-1">Crew Size</p>
+                <p className="text-[var(--text-primary)] font-semibold">{painter.crewSize} members</p>
+              </div>
+            )}
+            {painter.jobsPerMonth != null && (
+              <div className="bg-[var(--bg-surface)] rounded-lg p-5 border border-[var(--border)]">
+                <p className="text-[var(--text-secondary)] text-sm mb-1">Jobs per month</p>
+                <p className="text-[var(--text-primary)] font-semibold">{painter.jobsPerMonth}</p>
+              </div>
+            )}
+            {painter.warranty && (
+              <div className="bg-[var(--bg-surface)] rounded-lg p-5 border border-[var(--border)]">
+                <p className="text-[var(--text-secondary)] text-sm mb-1">Warranty</p>
+                <p className="text-[var(--text-primary)] font-semibold">{painter.warranty}</p>
+              </div>
+            )}
+            {painter.offersEstimates != null && (
+              <div className="bg-[var(--bg-surface)] rounded-lg p-5 border border-[var(--border)]">
+                <p className="text-[var(--text-secondary)] text-sm mb-1">Free estimates</p>
+                <p className="text-[var(--text-primary)] font-semibold">{painter.offersEstimates ? 'Yes' : 'No'}</p>
+              </div>
+            )}
           </div>
+          <div className="flex flex-wrap justify-center gap-3">
+            <Badge label="Licensed" active={license.has} />
+            <Badge label="Insured" active={insurance.has} />
+            <Badge label="Bonded" active={bond.has} />
+            <Badge label="Workers' comp" active={workersComp.has} />
+          </div>
+          {certifications.length > 0 && (
+            <p className="text-center text-[var(--text-secondary)] text-sm mt-4">Certifications: {certifications.join(', ')}</p>
+          )}
         </div>
       </section>
 
-      {/* ----------------------------------------------------------------- */}
-      {/* 5. Portfolio Gallery */}
-      {/* ----------------------------------------------------------------- */}
-      {painter.portfolio_images.length > 0 && (
+      {painter.bio && (
+        <section className="py-12 bg-[var(--bg-surface)]">
+          <div className="container-custom max-w-3xl">
+            <h2 className="text-2xl font-bold mb-6 text-center">About Us</h2>
+            <p className="text-[var(--text-secondary)] leading-relaxed text-center">{painter.bio}</p>
+          </div>
+        </section>
+      )}
+
+      {painter.services.length > 0 && (
+        <section className="py-12">
+          <div className="container-custom max-w-3xl">
+            <h2 className="text-2xl font-bold mb-6 text-center">Services Offered</h2>
+            <div className="flex flex-wrap justify-center gap-3">
+              {painter.services.map((service) => (
+                <span
+                  key={service}
+                  className="bg-[var(--border)] text-[var(--text-primary)] px-4 py-2 rounded-full text-sm font-medium border border-[var(--border-strong)] hover:border-[var(--accent)] transition-colors"
+                >
+                  {service}
+                </span>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {images.length > 0 && (
         <section className="py-12 bg-[var(--bg-surface)]">
           <div className="container-custom">
             <h2 className="text-2xl font-bold mb-8 text-center">Portfolio</h2>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 max-w-4xl mx-auto">
-              {painter.portfolio_images.map((img, i) => (
+              {images.map((img, i) => (
                 <button
                   key={i}
                   onClick={() => setLightboxIndex(i)}
                   className="overflow-hidden rounded-lg border border-[var(--border)] hover:border-[var(--accent)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
                 >
-                  <img
-                    src={img}
-                    alt={`Portfolio ${i + 1}`}
-                    className="w-full h-48 object-cover hover:scale-105 transition-transform duration-300"
-                  />
+                  <img src={img} alt={painter.photos[i]?.caption || `Portfolio ${i + 1}`} className="w-full h-48 object-cover hover:scale-105 transition-transform duration-300" />
                 </button>
               ))}
             </div>
@@ -286,92 +267,44 @@ const PainterPublicProfile = () => {
 
           {lightboxIndex !== null && (
             <Lightbox
-              images={painter.portfolio_images}
+              images={images}
               index={lightboxIndex}
               onClose={() => setLightboxIndex(null)}
-              onPrev={() =>
-                setLightboxIndex((prev) =>
-                  prev !== null
-                    ? (prev - 1 + painter.portfolio_images.length) % painter.portfolio_images.length
-                    : 0
-                )
-              }
-              onNext={() =>
-                setLightboxIndex((prev) =>
-                  prev !== null
-                    ? (prev + 1) % painter.portfolio_images.length
-                    : 0
-                )
-              }
+              onPrev={() => setLightboxIndex((prev) => (prev !== null ? (prev - 1 + images.length) % images.length : 0))}
+              onNext={() => setLightboxIndex((prev) => (prev !== null ? (prev + 1) % images.length : 0))}
             />
           )}
         </section>
       )}
 
-      {/* ----------------------------------------------------------------- */}
-      {/* 6. Active Deals */}
-      {/* ----------------------------------------------------------------- */}
-      {painter.deals.length > 0 && (
-        <section className="py-12">
-          <div className="container-custom max-w-3xl">
-            <h2 className="text-2xl font-bold mb-8 text-center">Active Deals</h2>
-            <div className="grid sm:grid-cols-2 gap-6">
-              {painter.deals.map((deal, i) => (
-                <div
-                  key={i}
-                  className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-lg p-6 relative overflow-hidden"
-                >
-                  <span className="absolute top-3 right-3 bg-[var(--accent)] text-[var(--accent-ink)] text-xs font-bold px-2 py-1 rounded">
-                    DEAL
-                  </span>
-                  <h3 className="text-lg font-bold mb-2 pr-16">{deal.title}</h3>
-                  <p className="text-[var(--text-secondary)] text-sm mb-4">{deal.description}</p>
-                  <p className="text-[var(--accent)] text-2xl font-bold">{deal.price}</p>
+      <section className="py-12">
+        <div className="container-custom max-w-3xl">
+          <h2 className="text-2xl font-bold mb-2 text-center">Customer Reviews</h2>
+          {painter.reviews.length === 0 ? (
+            <p className="text-center text-[var(--text-secondary)] mt-4">No reviews yet.</p>
+          ) : (
+            <div className="space-y-6 mt-6">
+              {painter.reviews.map((review, i) => (
+                <div key={i} className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-lg p-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <p className="font-semibold text-[var(--text-primary)]">{review.reviewer}</p>
+                      <p className="text-[var(--text-faint)] text-sm">{review.date}</p>
+                    </div>
+                    <Stars rating={review.rating} />
+                  </div>
+                  {review.title && <p className="font-medium text-[var(--text-primary)] mb-1">{review.title}</p>}
+                  {review.body && <p className="text-[var(--text-secondary)] leading-relaxed">{review.body}</p>}
                 </div>
               ))}
             </div>
-          </div>
-        </section>
-      )}
-
-      {/* ----------------------------------------------------------------- */}
-      {/* 7. Reviews Section */}
-      {/* ----------------------------------------------------------------- */}
-      <section className="py-12 bg-[var(--bg-surface)]">
-        <div className="container-custom max-w-3xl">
-          <h2 className="text-2xl font-bold mb-2 text-center">Customer Reviews</h2>
-
-          <div className="text-center mb-8">
-            <div className="flex items-center justify-center gap-3 mt-2">
-              <Stars rating={avgReviewRating} size="text-3xl" />
-              <span className="text-2xl font-bold text-[var(--text-primary)]">{avgReviewRating.toFixed(1)}</span>
-            </div>
-            <p className="text-[var(--text-secondary)] mt-1">Based on {painter.review_count} reviews</p>
-          </div>
-
-          <div className="space-y-6">
-            {fakeReviews.map((review, i) => (
-              <div key={i} className="bg-[var(--bg-page)] border border-[var(--border)] rounded-lg p-5">
-                <div className="flex items-center justify-between mb-3">
-                  <div>
-                    <p className="font-semibold text-[var(--text-primary)]">{review.name}</p>
-                    <p className="text-[var(--text-faint)] text-sm">{review.date}</p>
-                  </div>
-                  <Stars rating={review.rating} />
-                </div>
-                <p className="text-[var(--text-secondary)] leading-relaxed">{review.text}</p>
-              </div>
-            ))}
-          </div>
+          )}
         </div>
       </section>
 
-      {/* ----------------------------------------------------------------- */}
-      {/* 8. CTA Section */}
-      {/* ----------------------------------------------------------------- */}
       <section className="py-12 bg-[var(--bg-chrome)] text-center border-t border-[var(--border)]">
         <div className="container-custom">
-          <h2 className="text-2xl font-bold mb-4">Interested in {painter.company_name}?</h2>
+          <h2 className="text-2xl font-bold mb-4">Interested in {painter.companyName}?</h2>
           <p className="text-[var(--text-secondary)] mb-8">Get a free price or browse more painters in your area.</p>
           <div className="flex flex-wrap justify-center gap-4">
             <Link to="/" className="cta-button">

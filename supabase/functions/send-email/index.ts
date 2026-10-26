@@ -59,6 +59,9 @@ const EMAIL_TYPE_MAP: Record<string, string> = {
   no_painter_closed: 'We couldn\'t find a painter this time',
   painter_suspended: 'A painter was paused — needs re-verification',
   painter_suspended_notice: 'New leads are paused while we re-verify you',
+  painter_removed: 'Your Painted Painter account has been removed from the network',
+  painter_removed_admin: 'A painter was removed from the network',
+  painter_bad_review_admin: 'A painter received a low review',
 }
 
 // The sender address for all outgoing emails
@@ -299,6 +302,7 @@ ${body}
       return wrap(`
         <p style="margin:0 0 4px;font-size:20px;"><strong>${escapeHtml(a.company_name) || 'A painter'}</strong> applied to join the network</p>
         <p style="margin:0 0 6px;color:#6b7280;font-size:14px;">Review below, then decide right from this email.</p>
+        ${data.previouslyRemoved ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:10px 0;"><tr><td style="background:#fef2f2;border:1px solid #b91c1c;border-radius:6px;padding:12px 14px;font-size:15px;color:#7f1d1d;"><strong>Previously removed from the network.</strong> ${data.previouslyRemoved}</td></tr></table>` : ''}
         ${data.reviewUrl ? approvalButtons(data.reviewUrl) : ''}
         ${detailTable('Company', [
           ['Company', a.company_name], ['Owner', a.owner_name], ['Email', a.email], ['Phone', a.phone],
@@ -642,6 +646,37 @@ ${body}
       `)
     }
 
+    case 'painter_bad_review_admin': {
+      const rating = Math.max(1, Math.min(5, Math.round(Number(data.rating) || 0)))
+      const left = Math.max(0, Number(data.limit) - Number(data.badCount))
+      return wrap(`
+        <p style="margin-top:0;"><strong>${data.companyName || 'A painter'}</strong> just received a <strong>${rating}-star</strong> review from ${data.reviewerName || 'a customer'}.</p>
+        ${data.title ? `<p style="margin:0 0 6px;font-weight:700;">${data.title}</p>` : ''}
+        ${data.body ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="background:#f9fafb;border-left:4px solid #b91c1c;border-radius:4px;padding:12px 14px;font-size:15px;color:#374151;">${String(data.body).replace(/\n/g, '<br />')}</td></tr></table>` : ''}
+        <p style="margin:14px 0 4px;">That is low review <strong>${data.badCount} of ${data.limit}</strong>. ${left > 0 ? `At ${data.limit} they are removed from the network automatically (${left} more to go).` : 'They have been removed from the network automatically.'}</p>
+        ${data.manageUrl && left > 0 ? button(`${data.manageUrl}&amp;action=remove`, 'Remove them from the network now', '#b91c1c', true) : ''}
+        <p style="margin:6px 0 0;font-size:13px;color:#6b7280;">The painter was told to reach out to the customer and try to resolve it.</p>
+      `)
+    }
+
+    case 'painter_removed_admin': {
+      const jobs = (Array.isArray(data.activeJobs) ? (data.activeJobs as string[]) : []).map((t) => `<li>${escapeHtml(t)}</li>`).join('')
+      return wrap(`
+        <p style="margin-top:0;"><strong>${data.companyName || 'A painter'}</strong> was removed from the network (${data.reason === 'bad_reviews' ? 'automatically, after repeated low reviews' : 'by you'}).</p>
+        ${data.details ? `<p style="margin:0 0 8px;color:#374151;">${data.details}</p>` : ''}
+        ${jobs ? `<p style="margin:12px 0 4px;"><strong>Jobs they still hold, which need your attention:</strong></p><ul style="margin:0 0 8px 20px;padding:0;">${jobs}</ul>` : '<p style="margin:12px 0 0;color:#6b7280;">They had no open jobs.</p>'}
+        <p style="margin:12px 0 0;font-size:13px;color:#6b7280;">They are off the map and out of results and job offers. If they apply again with the same name, address, phone or license number, the application email will say they were removed before.</p>
+      `)
+    }
+
+    case 'painter_removed':
+      return wrap(`
+        <p style="margin-top:0;">Hi ${data.ownerName || 'there'},</p>
+        <p>${data.companyName || 'Your company'} has been removed from The Painted Painter network${data.reason === 'bad_reviews' ? ' after several low customer reviews' : ''}. You will no longer appear on the map or in customer results, and you won't receive new job offers.</p>
+        ${data.message ? `<p>${data.message}</p>` : ''}
+        <p>If you think this was a mistake, or you'd like to be considered again, reply to this email.</p>
+      `)
+
     case 'painter_suspended_notice': {
       const items = (Array.isArray(data.turnedOff) ? (data.turnedOff as string[]) : []).map((t) => `<li>${escapeHtml(t)}</li>`).join('')
       return wrap(`
@@ -811,6 +846,14 @@ serve(async (req: Request) => {
         JSON.stringify({ error: 'Invalid email address' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       )
+    }
+
+    // Demonstration painters and their made-up customers use the reserved ".invalid" domain, which can never receive
+    // mail. Skip them quietly so testing the flows doesn't generate bounces.
+    if (/@[^@]*\.invalid$/i.test(to)) {
+      return new Response(JSON.stringify({ success: true, skipped: 'demonstration address' }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
     }
 
     // ------------------------------------------------------------------------

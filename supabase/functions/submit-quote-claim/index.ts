@@ -18,7 +18,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
 import { notify } from '../_shared/notify.ts'
-import { zipDistanceMiles } from '../_shared/geo.ts'
+import { getZipCoords, milesBetweenZips } from '../_shared/geo.ts'
 import { verifyPrice } from '../_shared/priceToken.ts'
 import { evaluateAvailability, isIsoDate } from '../_shared/availability.ts'
 import { estimateWorkingDays } from '../_shared/duration.ts'
@@ -203,6 +203,7 @@ serve(async (req: Request) => {
         .eq('id', selectedPainterId)
         .eq('verified', true)
         .eq('status', 'approved')
+        .eq('is_demo', false)
         .maybeSingle()
 
       if (painterError || !painter) {
@@ -224,11 +225,13 @@ serve(async (req: Request) => {
         .select('id, user_id, email, company_name, owner_name, phone, zip_code, leads_paused, paused_until, blackout_dates')
         .eq('verified', true)
         .eq('status', 'approved')
+        .eq('is_demo', false) // demonstration painters never get real jobs
 
       if (paintersError) throw paintersError
 
+      const coords = await getZipCoords(supabase, [quoteZip ?? '', ...(painters ?? []).map((p) => p.zip_code)])
       notifiedPainters = (painters ?? [])
-        .map((p) => ({ ...p, distance: quoteZip ? zipDistanceMiles(quoteZip, p.zip_code) : null }))
+        .map((p) => ({ ...p, distance: quoteZip ? milesBetweenZips(coords, quoteZip, p.zip_code) : null }))
         .filter((p) => p.distance !== null && p.distance <= SERVICE_RADIUS_MILES)
         .filter((p) => evaluateAvailability(p, claimTiming, durationDays).show)
         .sort((a, b) => (a.distance ?? Infinity) - (b.distance ?? Infinity))

@@ -2,6 +2,9 @@ import { useState } from 'react';
 import { useGoogleMaps } from '../lib/googleMaps';
 import PaintersMapView from './PaintersMapView';
 import { hapticMedium } from '../lib/haptics';
+import { useAuth } from '../lib/auth';
+import { useNetworkPainters } from '../lib/networkPainters';
+import { estimatorZip } from '../lib/mapCenter';
 
 /** "Find Painters Near You": a button that opens a real map right on the home page (the page grows downward). */
 export default function PaintersMapSection() {
@@ -33,6 +36,10 @@ export default function PaintersMapSection() {
 /** Only mounted once the map is opened, so Google Maps isn't loaded for people who never open it. */
 function MapBody() {
   const status = useGoogleMaps();
+  const { profile } = useAuth();
+  const { painters } = useNetworkPainters();
+  // signed in with a ZIP on their profile: that area; otherwise the ZIP they gave the estimator; otherwise the whole US
+  const centerZip = profile?.zip_code || estimatorZip();
   if (status === 'no-key' || status === 'error') {
     return (
       <div className="home-map-placeholder" style={{ height: 300 }}>
@@ -48,5 +55,5 @@ function MapBody() {
       </div>
     );
   }
-  return <PaintersMapView height="min(500px, 70vh)" />;
+  return <PaintersMapView painters={painters} centerZip={centerZip} height="min(500px, 70vh)" />;
 }

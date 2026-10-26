@@ -11,6 +11,8 @@
 //        action 'request_info' -> status needs_info; tasks (labels) saved to the
 //                                 painter's profile as a checklist; emailed + notified
 //        action 'reject'       -> status rejected with the reason in `message`
+//        action 'remove'       -> take an approved painter out of the network (off the map, results and offers);
+//                                 the painter and the owner are emailed, and a later application matching them is flagged
 //
 // Deploy:
 //   supabase functions deploy admin-painter-review --no-verify-jwt
@@ -20,6 +22,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
 import { verifyReviewLink } from '../_shared/adminLink.ts'
 import { notify } from '../_shared/notify.ts'
 import { attachOpenJobsToPainter } from '../_shared/openJobs.ts'
+import { removePainter } from '../_shared/removal.ts'
+import { getZipCoords } from '../_shared/geo.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -66,7 +70,7 @@ serve(async (req: Request) => {
 
     const { data: painter, error } = await supabase
       .from('painters')
-      .select('id, user_id, company_name, owner_name, email, phone, street_address, city, state, zip_code, website, years_in_business, crew_size, has_license, license_number, license_state, license_expiration, is_bonded, bonding_company, bond_amount, is_insured, insurance_company, policy_number, coverage_amount, has_workers_comp, workers_comp_carrier, certifications, service_types, service_area_zips, status, application_tasks, admin_message, created_at')
+      .select('id, user_id, company_name, owner_name, email, phone, street_address, city, state, zip_code, website, years_in_business, crew_size, has_license, license_number, license_state, license_expiration, is_bonded, bonding_company, bond_amount, is_insured, insurance_company, policy_number, coverage_amount, has_workers_comp, workers_comp_carrier, certifications, service_types, service_area_zips, status, is_demo, previously_removed_note, removal_reason, application_tasks, admin_message, created_at')
       .eq('id', id)
       .maybeSingle()
     if (error || !painter) return json({ error: 'Application not found' }, 404)
@@ -86,9 +90,16 @@ serve(async (req: Request) => {
     const now = new Date().toISOString()
 
     if (body.action === 'approve') {
+      // Their position on the map comes from their exact ZIP; the map row appears the moment they are approved.
+      const coords = await getZipCoords(supabase, [painter.zip_code ?? ''])
+      const at = coords.get(String(painter.zip_code ?? '').slice(0, 5))
       const { error: upErr } = await supabase
         .from('painters')
-        .update({ status: 'approved', verified: true, reviewed_at: now, admin_message: message || null, application_tasks: [] })
+        .update({
+          status: 'approved', verified: true, reviewed_at: now, admin_message: message || null, application_tasks: [],
+          removed_at: null, removal_reason: null,
+          ...(at ? { latitude: at[0], longitude: at[1] } : {}),
+        })
         .eq('id', id)
       if (upErr) throw upErr
       await send('painter_application_approved', { ownerName: painter.owner_name, companyName: painter.company_name, profileUrl })
@@ -124,6 +135,12 @@ serve(async (req: Request) => {
         link: '/painter/dashboard',
       })
       return json({ success: true, status: 'needs_info' })
+    }
+
+    if (body.action === 'remove') {
+      if (painter.status === 'removed') return json({ error: 'This painter was already removed.' }, 409)
+      await removePainter(supabase, { supabaseUrl, serviceRoleKey }, painter, 'admin', message || 'Removed by the owner.')
+      return json({ success: true, status: 'removed' })
     }
 
     if (body.action === 'reject') {

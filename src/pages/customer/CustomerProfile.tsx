@@ -8,6 +8,7 @@ export default function CustomerProfile() {
 
   const [displayName, setDisplayName] = useState(profile?.display_name ?? '');
   const [phone, setPhone] = useState(profile?.phone ?? '');
+  const [zip, setZip] = useState(profile?.zip_code ?? '');
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
 
@@ -27,11 +28,13 @@ export default function CustomerProfile() {
     e.preventDefault();
     if (!user) return;
     if (!displayName.trim()) return setMessage({ kind: 'error', text: 'Please enter your name.' });
+    const zipClean = zip.trim();
+    if (zipClean && !/^d{5}$/.test(zipClean)) return setMessage({ kind: 'error', text: 'Please enter a 5-digit ZIP code.' });
     setSaving(true);
     setMessage(null);
     const { error } = await supabase
       .from('profiles')
-      .update({ display_name: displayName.trim(), phone: phone.trim() || null })
+      .update({ display_name: displayName.trim(), phone: phone.trim() || null, zip_code: zipClean || null })
       .eq('id', user.id);
     if (error) {
       setMessage({ kind: 'error', text: 'We couldn\'t save your changes. Please try again.' });
@@ -79,6 +82,21 @@ export default function CustomerProfile() {
             className="w-full px-4 py-3 bg-[var(--bg-surface)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] transition-colors"
             placeholder="(555) 123-4567"
           />
+        </div>
+
+        <div>
+          <label htmlFor="zip" className="block text-[var(--text-secondary)] text-sm mb-2">ZIP code</label>
+          <input
+            id="zip"
+            type="text"
+            inputMode="numeric"
+            maxLength={5}
+            value={zip}
+            onChange={(e) => { setZip(e.target.value.replace(/D/g, '')); setMessage(null); }}
+            className="w-full px-4 py-3 bg-[var(--bg-surface)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] transition-colors"
+            placeholder="91941"
+          />
+          <p className="text-xs text-[var(--text-faint)] mt-1">The painters map opens on your area.</p>
         </div>
 
         <div className="flex items-center gap-4">

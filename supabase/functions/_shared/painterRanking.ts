@@ -7,7 +7,7 @@
 // license/policy numbers never leave the server. See painter-results for the
 // full description of the hotel-style card this feeds.
 
-import { zipDistanceMiles } from './geo.ts'
+import { getZipCoords, milesBetweenZips } from './geo.ts'
 import { estimatePainterPrice } from './painterPricing.ts'
 import { cleanExternalReviews, type ExternalReview } from './externalReviews.ts'
 import { evaluateAvailability, todayIso, type CustomerTiming } from './availability.ts'
@@ -123,7 +123,12 @@ export async function rankPainters(
     .select('id, user_id, company_name, city, state, zip_code, service_types, external_reviews, leads_paused, paused_until, blackout_dates, price_1br_full, price_3br_walls, price_3br_trim_doors, price_3br_ceilings, price_5br_full, price_5br_cabinets')
     .eq('status', 'approved')
     .eq('verified', true)
+    .eq('is_demo', false) // demonstration painters appear on the map, never in a real customer's results
   if (error) throw error
+
+  // Exact positions of the customer's ZIP and every painter's ZIP (looked up once, then remembered).
+  const coords = await getZipCoords(supabase, [zip, ...(rows ?? []).map((r: { zip_code: string }) => r.zip_code)])
+  const zipDistanceMiles = (a: string, b: string) => milesBetweenZips(coords, a, b)
 
   const excluded = new Set(opts.exclude ?? [])
   const timing = timingFromCtx(ctx)
