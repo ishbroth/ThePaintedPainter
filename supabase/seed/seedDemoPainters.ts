@@ -25,6 +25,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { createHash, randomBytes } from 'node:crypto';
 import { fakePainters, type FakePainter } from '../../src/lib/fakePainters.ts';
+import { buildTerms, cleanPainterTerms, type PainterTerms } from '../functions/_shared/contract.ts';
 
 const url = process.env.SUPABASE_URL;
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -361,7 +362,21 @@ async function seedFlagshipJobs(p: RosterEntry, userId: string, index: number) {
       selected_painter_price: j.price,
       painter_payout_amount: payout,
       phase_label: j.phase,
-      project_summary: { timelineLabel: 'Within the next month', qa: [], demo: true },
+      project_summary: {
+        timelineLabel: 'Within the next month',
+        qa: [
+          { question: 'Which rooms are being painted?', answer: j.phase },
+          { question: 'What shape are the walls in?', answer: 'Good condition, a few small nail holes to patch' },
+          { question: 'Paint?', answer: "Painter's choice, standard grade, eggshell finish" },
+        ],
+        conversation: [`I'd like the ${j.phase.toLowerCase()} painted. Everything is empty except a few pieces of furniture we can move.`],
+        breakdown: [
+          { description: 'Walls', amount: Math.round(j.price * 0.7) },
+          { description: 'Ceilings', amount: Math.round(j.price * 0.2) },
+          { description: 'Prep and patching', amount: j.price - Math.round(j.price * 0.7) - Math.round(j.price * 0.2) },
+        ],
+        demo: true,
+      },
       photos: [],
       notified_painters: [p.id],
       status: j.status,
@@ -371,11 +386,11 @@ async function seedFlagshipJobs(p: RosterEntry, userId: string, index: number) {
       customer_preferred_date: daysFromNow(14),
       deposit_amount: Math.round(j.price * 0.1 * 100) / 100,
       deposit_status: j.status === 'confirmed' || j.status === 'completed' ? 'paid' : 'unpaid',
+      date_state: j.dateState ?? (j.status === 'offer_sent' ? 'awaiting_painter_dates' : 'agreed'),
     };
     if (j.status !== 'offer_sent') {
       row.accepted_by = p.id;
       row.accepted_at = timestampDaysAgo((j.completedDaysAgo ?? 0) + 12 + n);
-      row.date_state = j.dateState ?? 'agreed';
     }
     if (j.status === 'painter_accepted') {
       if (j.dateState === 'painter_offered' && start && end) {
@@ -423,6 +438,7 @@ async function seedFlagshipJobs(p: RosterEntry, userId: string, index: number) {
   });
 
   must(await supabase.from('quote_selections').insert(jobRows).select('id'), 'insert demo jobs');
+  await seedContracts(p, index, jobRows);
 
   // one unhappy customer on the first flagship, so "Needs your attention" and the follow-up flow can be tried
   const firstFlagship = [...FLAGSHIP_IDS][0] === p.id;
@@ -463,6 +479,89 @@ async function seedFlagshipJobs(p: RosterEntry, userId: string, index: number) {
     ...(confirmed ? [{ type: 'deposit_paid', title: 'Deposit received', body: `${confirmed.phase_label} is confirmed`, link: '/painter/dashboard/projects', is_read: true, created_at: timestampDaysAgo(5) }] : []),
   ];
   if (notes.length) must(await supabase.from('notifications').insert(notes.map((n) => ({ user_id: userId, ...n }))).select('id'), 'insert demo notifications');
+}
+
+// ---------------------------------------------------------------------------
+// Contracts for the flagship jobs, in every state the contract screens have to handle
+// ---------------------------------------------------------------------------
+const DEMO_PDF = [
+  '%PDF-1.4',
+  '1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj',
+  '2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj',
+  '3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]/Contents 4 0 R/Resources<</Font<</F1 5 0 R>>>>>>endobj',
+  '4 0 obj<</Length 66>>stream',
+  'BT /F1 18 Tf 72 700 Td (Demonstration painter contract terms) Tj ET',
+  'endstream endobj',
+  '5 0 obj<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>endobj',
+  'trailer<</Root 1 0 R/Size 6>>',
+  '%%EOF',
+].join('\n');
+
+async function seedContracts(p: RosterEntry, index: number, jobRows: Record<string, unknown>[]) {
+  const painter = {
+    company_name: p.company_name,
+    has_license: p.is_licensed,
+    license_state: p.state,
+    is_insured: p.is_insured,
+    is_bonded: p.is_bonded,
+    offers_warranty: index % 2 === 0,
+    warranty_length: index % 2 === 0 ? '2 years' : null,
+  };
+  const rows: Record<string, unknown>[] = [];
+  const make = (job: Record<string, unknown>, version: number, status: string, painterTerms: PainterTerms, extra: Record<string, unknown> = {}) => {
+    const terms = buildTerms({ job: job as never, painter, painterTerms: cleanPainterTerms(painterTerms), documentName: (extra.document_name as string | undefined) ?? null });
+    rows.push({ job_id: job.id, version, status, terms, painter_terms: painterTerms, ...extra });
+  };
+  const when = (daysAgo: number) => timestampDaysAgo(daysAgo);
+  const accept = (job: Record<string, unknown>, daysAgo: number) => ({ sent_at: when(daysAgo + 1), responded_at: when(daysAgo), accepted_name: String(job.customer_name), accepted_ip: '203.0.113.7', accepted_user_agent: 'demo seed' });
+
+  for (const job of jobRows) {
+    const status = job.status as string;
+    const state = job.date_state as string;
+    if (status === 'painter_accepted') {
+      // working copy only until the dates are agreed; once they are, the first version is waiting for the customer
+      if (state === 'agreed') make(job, 1, 'sent', { scopeNotes: 'Furniture will be moved to the center of each room and covered.' }, { sent_at: when(1) });
+      else make(job, 1, 'draft', {});
+    } else if (status === 'confirmed' || status === 'completed') {
+      const base: PainterTerms = { scopeNotes: 'Patch and sand nail holes, two coats on walls, one coat on ceilings.', warranty: index % 3 === 0 ? 'Two-year warranty on workmanship; touch-ups free in the first 90 days.' : '' };
+      make(job, 1, 'accepted', base, accept(job, 8));
+    }
+  }
+
+  // an update waiting for the customer, an accepted change order, and a painter's own attached document
+  const confirmed = jobRows.filter((j) => j.status === 'confirmed');
+  const completed = jobRows.filter((j) => j.status === 'completed');
+  if (confirmed[1]) {
+    const j = confirmed[1];
+    const base: PainterTerms = { scopeNotes: 'Patch and sand nail holes, two coats on walls, one coat on ceilings.' };
+    make(j, 2, 'sent', { ...base, changeOrders: [{ description: 'Add the hallway closet doors', amount: 320 }] }, { sent_at: when(1), change_summary: 'Added the hallway closet doors for $320.' });
+  }
+  if (confirmed[0]) {
+    const j = confirmed[0];
+    const base: PainterTerms = { scopeNotes: 'Patch and sand nail holes, two coats on walls, one coat on ceilings.' };
+    // the first version was superseded by the accepted change
+    const v1 = rows.find((r) => r.job_id === j.id && r.version === 1);
+    if (v1) v1.status = 'superseded';
+    make(j, 2, 'accepted', { ...base, changeOrders: [{ description: 'Paint the garage entry door', amount: 180 }] }, { ...accept(j, 4), change_summary: 'Added the garage entry door for $180.' });
+  }
+  if (confirmed[2]) {
+    const j = confirmed[2];
+    const path = `${j.id}/demo-painter-contract.pdf`;
+    const up = await supabase.storage.from('contract-documents').upload(path, new TextEncoder().encode(DEMO_PDF), { contentType: 'application/pdf', upsert: true });
+    if (up.error) throw new Error(`demo contract document: ${up.error.message}`);
+    const v1 = rows.find((r) => r.job_id === j.id && r.version === 1);
+    if (v1) {
+      const terms = buildTerms({ job: j as never, painter, painterTerms: cleanPainterTerms({}), documentName: 'Company contract terms.pdf' });
+      Object.assign(v1, { terms, document_path: path, document_name: 'Company contract terms.pdf', document_size: DEMO_PDF.length });
+    }
+  }
+  // a customer who declined an update, with a note
+  if (completed[0]) {
+    const j = completed[0];
+    make(j, 2, 'declined', { changeOrders: [{ description: 'Extra coat on the trim', amount: 150 }] }, { sent_at: when(10), responded_at: when(9), change_summary: 'Extra coat on the trim for $150.', customer_note: "I'd rather keep the original price, thanks." });
+  }
+
+  if (rows.length) must(await supabase.from('job_contracts').insert(rows).select('id'), 'insert demo contracts');
 }
 
 /** An ISO date `offsetDays` from a timestamp. */

@@ -303,6 +303,9 @@ const QuoteResults = () => {
       )}
       <div className="painter-list-header">
         <h2>Painters who can do this job</h2>
+        <p style={{ marginBottom: 6, fontSize: '0.85rem', color: 'var(--text-faint)' }}>
+          Every painter here is in good standing. Painters with a pattern of poor reviews are removed from our network.
+        </p>
         <p>
           {painterMatches === null ? (
             <>Finding painters near you…</>

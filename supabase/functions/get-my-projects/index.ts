@@ -101,8 +101,21 @@ serve(async (req: Request) => {
       }
     }
 
+    // where each job's contract stands (a customer never sees a draft the painter is still writing)
+    const jobIds = (rows ?? []).map((r) => r.id)
+    const contractStates: Record<string, { pending: boolean; accepted: boolean }> = {}
+    if (jobIds.length > 0) {
+      const { data: cs } = await supabase.from('job_contracts').select('job_id, status').in('job_id', jobIds).in('status', ['sent', 'accepted'])
+      for (const c of cs ?? []) {
+        const s = (contractStates[c.job_id] ??= { pending: false, accepted: false })
+        if (c.status === 'sent') s.pending = true
+        if (c.status === 'accepted') s.accepted = true
+      }
+    }
+
     const projects = (rows ?? []).map((r) => ({
       id: r.id,
+      contract: contractStates[r.id] ?? { pending: false, accepted: false },
       status: r.status,
       price: r.guaranteed_price ?? r.selected_painter_price,
       // for "Work with again" on a finished job: which painter, and the ZIP of that job

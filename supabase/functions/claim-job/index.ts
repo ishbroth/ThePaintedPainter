@@ -25,6 +25,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { conversationNote } from '../_shared/conversationLog.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
+import { ensureDraft } from '../_shared/contractStore.ts'
 import { notify } from '../_shared/notify.ts'
 import { describeTiming } from '../_shared/offers.ts'
 import { estimateWorkingDays } from '../_shared/duration.ts'
@@ -164,6 +165,9 @@ serve(async (req: Request) => {
     if (!updated) {
       return fail('Already claimed', 'Another painter already accepted this job. Keep an eye out for the next one!', 409)
     }
+
+    // Start the painter's working copy of the contract (the standard terms, filled in from this job).
+    await ensureDraft(supabase, job.id).catch((err) => console.error('contract draft failed:', err))
 
     // Best-effort notifications — never block the painter's redirect on them.
     try {

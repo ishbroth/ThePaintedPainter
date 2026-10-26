@@ -41,6 +41,8 @@ import PainterSettings from './pages/painter/PainterSettings.tsx';
 import PainterNotifications from './pages/painter/PainterNotifications.tsx';
 import PainterBusiness from './pages/painter/PainterBusiness.tsx';
 import PainterRewards from './pages/painter/PainterRewards.tsx';
+import PainterContract from './pages/painter/PainterContract.tsx';
+import CustomerContract from './pages/customer/CustomerContract.tsx';
 import CustomerDashboard from './pages/customer/CustomerDashboard.tsx';
 import CustomerProfile from './pages/customer/CustomerProfile.tsx';
 import CustomerProjects from './pages/customer/CustomerProjects.tsx';
@@ -153,6 +155,7 @@ function App() {
                   <Route path="profile" element={<PainterProfile />} />
                   <Route path="portfolio" element={<PainterPortfolio />} />
                   <Route path="projects" element={<PainterProjects />} />
+                  <Route path="contract/:jobId" element={<PainterContract />} />
                   <Route path="business" element={<PainterBusiness />} />
                   <Route path="reviews" element={<PainterReviews />} />
                   <Route path="rewards" element={<PainterRewards />} />
@@ -172,6 +175,7 @@ function App() {
                   <Route index element={<CustomerDashboard />} />
                   <Route path="profile" element={<CustomerProfile />} />
                   <Route path="projects" element={<CustomerProjects />} />
+                  <Route path="contract/:jobId" element={<CustomerContract />} />
                   <Route path="notifications" element={<CustomerNotifications />} />
                 </Route>
               </Routes>

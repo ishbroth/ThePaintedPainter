@@ -21,6 +21,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
 import Stripe from 'https://esm.sh/stripe@13.10.0?target=deno'
+import { contractGate } from '../_shared/contractStore.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -57,6 +58,9 @@ serve(async (req: Request) => {
     if (job.deposit_status === 'paid' || job.status === 'confirmed') return json({ error: 'This deposit has already been paid.' }, 409)
     if (job.status !== 'painter_accepted' || !job.accepted_by) return json({ error: 'This job isn\'t ready for a deposit.' }, 409)
     if (job.date_state !== 'agreed' || !job.scheduled_date) return json({ error: 'Confirm your dates before paying the deposit.' }, 409)
+
+    const gate = await contractGate(supabase, job.id)
+    if (!gate.ok) return json({ error: gate.reason, code: 'contract_required' }, 409)
 
     const depositCents = Math.round(Number(job.deposit_amount) * 100)
     if (!Number.isFinite(depositCents) || depositCents < 50) return json({ error: 'This job has no valid deposit amount.' }, 409)

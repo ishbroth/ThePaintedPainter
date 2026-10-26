@@ -62,6 +62,8 @@ const EMAIL_TYPE_MAP: Record<string, string> = {
   painter_removed: 'Your Painted Painter account has been removed from the network',
   painter_removed_admin: 'A painter was removed from the network',
   painter_bad_review_admin: 'A painter received a low review',
+  contract_update: 'Your painter sent a contract update: please review',
+  contract_response: 'The customer responded to your contract',
 }
 
 // The sender address for all outgoing emails
@@ -454,6 +456,7 @@ ${body}
           You'd be paid: ${formatMoney(data.payoutAmount)}
         </p>
         ${data.acceptUrl ? `${button(escapeHtml(data.acceptUrl), `View job &amp; respond`, '#16a34a')}` : ''}
+        <p style="margin:10px 0 0;font-size:13px;color:#6b7280;">When you accept, we prepare a standard contract from everything above (scope, price, schedule) with your company name on it. You can add your own terms or attach your own PDF or Word contract, and the customer accepts it in the same step as confirming their dates.</p>
         <p style="margin-top: 8px; font-size: 13px; color: #6b7280;">This job is offered on a first-come, first-served basis — the first painter to accept gets it. Not a fit (booked, too far, wrong type of job)? You can decline on the same page and we'll offer the customer other painters.</p>
         <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
         <p style="font-weight: 600; margin-bottom: 12px;">Job details</p>
@@ -643,6 +646,25 @@ ${body}
         <ul style="margin:0 0 8px 20px;padding:0;">${items}</ul>
         ${data.reviewUrl ? button(`${data.reviewUrl}&amp;action=approve`, 'Re-verified — reinstate them', '#16a34a', true) + button(`${data.reviewUrl}&amp;action=request`, 'Ask for proof', '#2563eb', true) : ''}
         <p style="margin:6px 0 0;font-size:13px;color:#6b7280;">They've been told to expect 1\u20133 days and can upload proof from their profile; you'll get another email when they do. Jobs they already accepted aren't affected. Replying to this email writes to the painter directly.</p>
+      `)
+    }
+
+    case 'contract_update':
+      return wrap(`
+        <p style="margin-top:0;">Hi ${data.customerFirstName || 'there'},</p>
+        <p><strong>${data.painterCompanyName || 'Your painter'}</strong> sent an update to your painting contract. The earlier version stays in force until you accept this one.</p>
+        ${data.changeSummary ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="background:#f9fafb;border-left:4px solid #2563eb;border-radius:4px;padding:12px 14px;font-size:15px;color:#374151;">${String(data.changeSummary).replace(/\n/g, '<br />')}</td></tr></table>` : ''}
+        ${data.reviewUrl ? button(data.reviewUrl, 'Review and respond') : ''}
+        <p style="margin:6px 0 0;font-size:13px;color:#6b7280;">You can accept it, or decline it and tell your painter why. Nothing changes until you accept.</p>
+      `)
+
+    case 'contract_response': {
+      const accepted = data.outcome === 'accepted'
+      return wrap(`
+        <p style="margin-top:0;"><strong>${data.customerFirstName || 'The customer'}</strong> ${accepted ? 'accepted' : 'declined'} ${data.isUpdate ? 'your contract update' : 'your contract'}.</p>
+        ${!accepted && data.note ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="background:#f9fafb;border-left:4px solid #b91c1c;border-radius:4px;padding:12px 14px;font-size:15px;color:#374151;">${String(data.note).replace(/\n/g, '<br />')}</td></tr></table>` : ''}
+        <p>${accepted ? 'It is now in force.' : 'The last accepted version stays in force. You can change the contract and send it again.'}</p>
+        ${data.link ? button(data.link, 'Open the contract') : ''}
       `)
     }
 

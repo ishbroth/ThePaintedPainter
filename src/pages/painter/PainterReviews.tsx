@@ -50,7 +50,12 @@ export default function PainterReviews() {
 
   return (
     <div className="max-w-4xl mx-auto">
-      <h1 className="text-2xl font-bold text-[var(--text-primary)] mb-6">Reviews</h1>
+      <h1 className="text-2xl font-bold text-[var(--text-primary)] mb-2">Reviews</h1>
+      <p className="text-sm text-[var(--text-secondary)] mb-6">
+        Ours is an exclusive network of quality painters, and customers are promised that nobody with a habitual bad record is offered to them.
+        A painter is removed when they have at least 3 reviews of 2 stars or fewer and those are 3 out of every 10 of their reviews or more.
+        If a customer leaves you a low review, reach out and try to put it right.
+      </p>
 
       {loading && <p className="text-[var(--text-secondary)]">Loading reviews…</p>}
       {error && <p className="text-[var(--danger)]">{error}</p>}

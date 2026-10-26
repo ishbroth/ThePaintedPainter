@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../../lib/auth';
 import { supabaseUrl } from '../../lib/supabase';
 import AddToCalendar from '../../components/AddToCalendar';
@@ -42,6 +43,7 @@ interface Job {
   confirmedAt: string | null;
   photos: JobPhoto[];
   setDateUrl: string | null;
+  contract?: { draft: boolean; pending: boolean; accepted: boolean; declined: boolean };
 }
 
 interface PainterProjectsData {
@@ -169,6 +171,10 @@ function JobCard({ job, onMarkCompleted, onReschedule, marking }: { job: Job; on
         </div>
         <div style={{ textAlign: 'right', flexShrink: 0 }}>
           <p style={{ color: 'var(--text-primary)', fontWeight: 700, margin: '0 0 4px' }}>{currency(job.payoutAmount ?? job.price)}</p>
+          <Link to={`/painter/dashboard/contract/${job.id}`} style={{ display: 'inline-block', color: 'var(--accent-blue)', fontSize: '0.85rem', margin: '0 0 6px' }}>
+            Contract{job.contract?.declined && !job.contract.pending ? ' · customer declined' : job.contract?.pending ? ' · waiting for the customer' : job.contract?.accepted ? ' · accepted' : ' · prepare'}
+          </Link>
+          <br />
           {job.status === 'painter_accepted' && (
             <>
               <span style={{ display: 'inline-block', padding: '4px 10px', borderRadius: 999, background: 'var(--tint-warning-bg)', border: '1px solid var(--tint-warning-border)', color: 'var(--text-secondary)', fontSize: '0.75rem' }}>

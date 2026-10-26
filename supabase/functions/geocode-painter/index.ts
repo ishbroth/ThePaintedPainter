@@ -48,7 +48,10 @@ serve(async (req: Request) => {
     const body = await req.json().catch(() => ({})) as { all?: boolean }
 
     let query = supabase.from('painters').select('id, zip_code, latitude, longitude, geocoded_zip')
-    if (bearer === serviceRoleKey && body.all) {
+    // the platform has already verified the token's signature (JWT verification is on), so its role can be trusted
+    let tokenRole = '';
+    try { tokenRole = JSON.parse(atob(bearer.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).role ?? ''; } catch { /* not a JWT */ }
+    if ((bearer === serviceRoleKey || tokenRole === 'service_role') && body.all) {
       // everyone whose position is missing or out of date
       query = query.or('latitude.is.null,geocoded_zip.is.null')
     } else {

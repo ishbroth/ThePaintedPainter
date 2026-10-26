@@ -168,6 +168,10 @@ const Home = () => {
           service — you pick the option that works for you, lock it in with a small deposit, and your
           painter handles the rest.
         </p>
+        <p>
+          Our network is deliberately small and exclusive. Painters with a pattern of poor reviews are removed
+          automatically, so you are only ever offered painters who have earned their place.
+        </p>
         <p className="slogan">Transparent pricing. Verified painters. Nationwide coverage.</p>
       </section>
 

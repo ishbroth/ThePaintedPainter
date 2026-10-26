@@ -150,7 +150,20 @@ serve(async (req: Request) => {
     };
     }
 
-    const accepted = (acceptedRes.data ?? []).map(shapeJob)
+    const acceptedIds = (acceptedRes.data ?? []).map((r) => r.id as string)
+    const contractStates: Record<string, { draft: boolean; pending: boolean; accepted: boolean; declined: boolean }> = {}
+    if (acceptedIds.length > 0) {
+      const { data: cs } = await supabase.from('job_contracts').select('job_id, status').in('job_id', acceptedIds).in('status', ['draft', 'sent', 'accepted', 'declined'])
+      for (const c of cs ?? []) {
+        const s = (contractStates[c.job_id] ??= { draft: false, pending: false, accepted: false, declined: false })
+        if (c.status === 'draft') s.draft = true
+        if (c.status === 'sent') s.pending = true
+        if (c.status === 'accepted') s.accepted = true
+        if (c.status === 'declined') s.declined = true
+      }
+    }
+
+    const accepted = (acceptedRes.data ?? []).map((r) => ({ ...shapeJob(r), contract: contractStates[r.id as string] ?? { draft: false, pending: false, accepted: false, declined: false } }))
     const confirmed = accepted.filter((j) => j.status === 'painter_accepted' || j.status === 'confirmed')
     const completed = accepted.filter((j) => j.status === 'completed')
 

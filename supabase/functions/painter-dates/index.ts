@@ -30,6 +30,7 @@ import { addDays, isIsoDate, todayIso, workingDaysBetween } from '../_shared/ava
 import { estimateWorkingDays } from '../_shared/duration.ts'
 import { describeTiming } from '../_shared/offers.ts'
 import { notify } from '../_shared/notify.ts'
+import { sendInitialContract } from '../_shared/contractStore.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -110,6 +111,7 @@ serve(async (req: Request) => {
         .eq('id', job.id)
         .eq('status', 'painter_accepted')
       if (error) throw error
+      await sendInitialContract(supabase, { supabaseUrl, serviceRoleKey }, job.id).catch((err) => console.error('contract send failed:', err))
 
       await fetch(`${supabaseUrl}/functions/v1/send-email`, {
         method: 'POST',

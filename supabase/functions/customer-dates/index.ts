@@ -23,6 +23,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
 import { addDays, addWorkingDays, isIsoDate, todayIso } from '../_shared/availability.ts'
 import { notify } from '../_shared/notify.ts'
+import { sendInitialContract } from '../_shared/contractStore.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -83,6 +84,7 @@ serve(async (req: Request) => {
         .update({ scheduled_date: w.start, scheduled_end_date: w.end, date_state: 'agreed', customer_counter: null, date_confirmed_at: new Date().toISOString() })
         .eq('id', job.id).eq('status', 'painter_accepted')
       if (error) throw error
+      await sendInitialContract(supabase, { supabaseUrl, serviceRoleKey }, job.id).catch((err) => console.error('contract send failed:', err))
       return json({ success: true, scheduled: { start: w.start, end: w.end } })
     }
 
@@ -101,6 +103,7 @@ serve(async (req: Request) => {
         .update({ scheduled_date: start, scheduled_end_date: end, date_state: 'agreed', customer_counter: null, date_confirmed_at: new Date().toISOString() })
         .eq('id', job.id).eq('status', 'painter_accepted')
       if (error) throw error
+      await sendInitialContract(supabase, { supabaseUrl, serviceRoleKey }, job.id).catch((err) => console.error('contract send failed:', err))
       return json({ success: true, scheduled: { start, end } })
     }
 

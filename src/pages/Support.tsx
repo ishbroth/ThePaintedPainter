@@ -22,12 +22,17 @@ const faqs = [
   {
     question: 'How are painters vetted?',
     answer:
-      'All painters on our platform must provide license information (where required by their state), proof of insurance, and bonding documentation. We verify credentials before they can accept jobs, and we collect customer reviews after every project to maintain quality standards.',
+      'All painters on our platform must provide license information (where required by their state), proof of insurance, and bonding documentation. We verify credentials before they can accept jobs, and we collect customer reviews after every project to maintain quality standards. Our network is exclusive: we only offer jobs to quality painters, and a painter whose reviews show a pattern of poor performance is removed and no longer offered to anyone.',
+  },
+  {
+    question: 'Who is my contract with?',
+    answer:
+      'Your contract is with the painter who confirms your job, not with The Painted Painter. We are a marketplace, like a booking site for hotels: we introduce you to the painter, give you and your painter a standard contract to review and accept in one step, and take your deposit. The painter is responsible for the work and for managing any change orders or extras. You can find your contract, and any changes your painter sends you to accept, under My Projects.',
   },
   {
     question: "What if I'm not happy with the work?",
     answer:
-      'Your painter handles all touch-ups directly — that is part of their commitment when they accept a job. Our review and rating system helps maintain high quality across the platform. Painters with consistently low ratings are removed.',
+      'Your painter handles all touch-ups directly — that is part of their commitment when they accept a job. Our review and rating system helps maintain high quality across the platform. Painters whose reviews show a pattern of poor work are removed from the network automatically, so you will not be offered a painter with a habitual bad performance record.',
   },
   {
     question: 'How do I become a painter on the platform?',
@@ -209,6 +214,7 @@ const Support = () => {
               <li>Fair, transparent pricing — no race to the bottom</li>
               <li>Dashboard to manage jobs, schedule, and earnings</li>
               <li>Build your reputation with verified customer reviews</li>
+              <li>An exclusive network: we only offer jobs to quality painters, and painters with a pattern of poor reviews are removed</li>
             </ul>
             <Link to="/painter-signup" className="cta-button">
               Sign Up as a Painter

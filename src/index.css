@@ -1945,3 +1945,10 @@ button, .nav a, .cta-button, .nav-cta {
     font-size: 1.05rem;
   }
 }
+
+/* Printing a contract prints only the contract itself */
+@media print {
+  body * { visibility: hidden !important; }
+  .contract-print, .contract-print * { visibility: visible !important; }
+  .contract-print { position: absolute; left: 0; top: 0; width: 100%; border: none !important; padding: 0 !important; }
+}

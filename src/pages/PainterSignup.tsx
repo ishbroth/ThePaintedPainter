@@ -1187,6 +1187,11 @@ const PainterSignup = () => {
             Join Our Network
           </h1>
           <p className="text-[var(--text-secondary)]">Partner with The Painted Painter</p>
+          <p className="text-[var(--text-secondary)] text-sm max-w-2xl mx-auto mt-3">
+            This is an exclusive network. We only offer jobs to quality painters, and we promise customers that nobody with a habitual
+            bad performance record is offered to them. Painters whose reviews show a pattern of poor work, three or more low reviews that
+            make up 3 out of every 10 of their reviews or more, are removed from the network.
+          </p>
         </div>
       </section>
 

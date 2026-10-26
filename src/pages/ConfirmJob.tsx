@@ -4,6 +4,7 @@ import { supabaseUrl, supabaseAnonKey } from '../lib/supabase';
 import { createDepositCheckout } from '../lib/payments/stripe';
 import { addDaysIso, fmtDate, fmtRange, todayIso } from '../lib/dates';
 import AddToCalendar from '../components/AddToCalendar';
+import ContractWorkspace from '../components/contracts/ContractWorkspace';
 
 interface JobDetails {
   jobId: string;
@@ -19,6 +20,8 @@ interface JobDetails {
   counter: null | { start: string; end: string; note?: string };
   estimatedDays: number | null;
   customerTiming: string;
+  /** Where the contract stands: the deposit can only be paid once a version is accepted and nothing newer waits for an answer. */
+  contract?: { ok: boolean; pending: boolean; accepted: boolean; reason?: string };
   // Contact details arrive only after the deposit is paid.
   painter: { companyName: string; ownerName?: string; email?: string; phone?: string } | null;
 }
@@ -170,6 +173,12 @@ const ConfirmJob = () => {
           <p style={{ marginTop: 12, color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
             Remaining balance: {currency(job.guaranteedPrice - job.depositAmount)}, paid directly to your painter.
           </p>
+          {token && (
+            <>
+              <h2 style={{ marginTop: 28 }}>Your contract</h2>
+              <ContractWorkspace auth={{ kind: 'token', token }} compact onChange={load} />
+            </>
+          )}
         </>
       )}
 
@@ -247,12 +256,6 @@ const ConfirmJob = () => {
                 </>
               )}
 
-              {job.dateState === 'agreed' && (
-                <button style={{ ...primaryBtn, opacity: busy ? 0.6 : 1, marginRight: 10 }} disabled={busy} onClick={handleConfirmAndPay}>
-                  {busy ? 'Starting checkout…' : `Confirm & pay ${currency(job.depositAmount)} deposit`}
-                </button>
-              )}
-
               {!suggesting && (
                 <button style={{ ...secondaryBtn, marginTop: 10 }} onClick={() => setSuggesting(true)}>
                   {job.dateState === 'agreed' ? 'Change my dates' : 'None of these work — suggest other dates'}
@@ -283,6 +286,24 @@ const ConfirmJob = () => {
                 </div>
               )}
             </div>
+          )}
+
+          {job.dateState === 'agreed' && token && (
+            <>
+              <h2 style={{ marginTop: 24 }}>Your contract</h2>
+              <p style={{ margin: '0 0 10px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                Your agreement is with {job.painter?.companyName ?? 'your painter'}, who is responsible for the work. Read it and accept it below, then pay your deposit to lock everything in.
+              </p>
+              <ContractWorkspace auth={{ kind: 'token', token }} compact onChange={load} />
+              <div style={card}>
+                <button style={{ ...primaryBtn, opacity: busy || !job.contract?.ok ? 0.6 : 1 }} disabled={busy || !job.contract?.ok} onClick={handleConfirmAndPay}>
+                  {busy ? 'Starting checkout…' : `Confirm & pay ${currency(job.depositAmount)} deposit`}
+                </button>
+                {!job.contract?.ok && (
+                  <p style={{ margin: '8px 0 0', color: 'var(--text-faint)', fontSize: '0.85rem' }}>{job.contract?.reason ?? 'Accept your contract above to continue to the deposit.'}</p>
+                )}
+              </div>
+            </>
           )}
 
           {error && <p style={{ color: 'var(--danger)' }}>{error}</p>}

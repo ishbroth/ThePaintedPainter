@@ -15,6 +15,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
 import { describeTiming } from '../_shared/offers.ts'
+import { contractGate } from '../_shared/contractStore.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -70,6 +71,7 @@ serve(async (req: Request) => {
       counter: job.customer_counter,
       estimatedDays: job.estimated_days,
       customerTiming: describeTiming(job),
+      contract: await contractGate(supabase, job.id),
       // Contact details only once the deposit is paid.
       painter: painter
         ? paid

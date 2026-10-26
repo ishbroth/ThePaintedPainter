@@ -24,6 +24,7 @@ interface Project {
   confirmedAt: string | null;
   completedAt: string | null;
   confirmUrl: string | null;
+  contract?: { pending: boolean; accepted: boolean };
   reviewToken: string | null;
   reviewSubmitted: boolean;
   /** Finished jobs only: the painter's id and the ZIP of the job, for "Work with again". */
@@ -213,6 +214,18 @@ function ProjectCard({ project }: { project: Project }) {
           ) : (
             <p className="text-sm text-[var(--text-faint)]">The window to pick another painter has ended.</p>
           )}
+        </div>
+      )}
+
+      {(project.contract?.pending || project.contract?.accepted) && (
+        <div className="mt-4 pt-4 border-t border-[var(--border)] flex items-center gap-3 flex-wrap">
+          <Link
+            to={`/customer/dashboard/contract/${project.id}`}
+            className="inline-block px-4 py-2 border border-[var(--accent-blue)] text-[var(--accent-blue)] text-sm font-semibold rounded-lg hover:bg-[var(--accent-blue)] hover:text-white transition-colors"
+          >
+            {project.contract.pending ? 'Review your contract' : 'View your contract'}
+          </Link>
+          {project.contract.pending && <span className="text-sm text-[var(--accent)]">Waiting for your answer</span>}
         </div>
       )}
 
