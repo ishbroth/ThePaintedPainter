@@ -15,8 +15,26 @@ type Supabase = any
 
 /** A review at or below this many stars is a "low review". */
 export const BAD_REVIEW_MAX_RATING = 2
-/** This many low reviews and the painter is removed. */
-export const BAD_REVIEWS_TO_REMOVE = 3
+/**
+ * A painter is removed when BOTH hold: at least BAD_REVIEWS_MIN low reviews, and low reviews are at least 3 out of every 10 of all their
+ * reviews. So 3 low reviews out of 11 is not enough (27%), 6 out of 20 is (30%), and 2 low reviews out of 5 isn't yet, because the
+ * third hasn't happened. With 50 reviews, 14 low ones are still fine and 15 are not.
+ */
+export const BAD_REVIEWS_MIN = 3
+export const BAD_SHARE_NUMERATOR = 3
+export const BAD_SHARE_DENOMINATOR = 10
+
+/** True when this many low reviews out of this many in total is grounds for removal. */
+export function overRemovalLine(bad: number, total: number): boolean {
+  return bad >= BAD_REVIEWS_MIN && bad * BAD_SHARE_DENOMINATOR >= total * BAD_SHARE_NUMERATOR
+}
+
+/** How many more low reviews, with nothing good in between, would put a painter over the line (0 = already over). */
+export function lowReviewsUntilRemoval(bad: number, total: number): number {
+  let k = 0
+  while (!overRemovalLine(bad + k, total + k)) k++
+  return k
+}
 
 const key = (s: unknown) => String(s ?? '').toLowerCase().replace(/[^a-z0-9]/g, '')
 const phoneKey = (s: unknown) => String(s ?? '').replace(/\D/g, '').slice(-10)
@@ -141,11 +159,13 @@ export async function checkLowReviews(
     .eq('painter_id', painter.user_id)
     .lte('rating', BAD_REVIEW_MAX_RATING)
   const badCount = count ?? 0
+  const { count: allCount } = await supabase.from('reviews').select('id', { count: 'exact', head: true }).eq('painter_id', painter.user_id)
+  const totalCount = Math.max(allCount ?? 0, badCount)
 
   const { data: row } = await supabase.from('painters').select('status, is_demo').eq('id', painter.id).maybeSingle()
   if (!row || row.is_demo) return badCount // demonstration painters are never removed
 
-  const willRemove = badCount >= BAD_REVIEWS_TO_REMOVE && row.status !== 'removed'
+  const willRemove = overRemovalLine(badCount, totalCount) && row.status !== 'removed'
   await fetch(`${env.supabaseUrl}/functions/v1/send-email`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${env.serviceRoleKey}`, 'Content-Type': 'application/json' },
@@ -154,14 +174,14 @@ export async function checkLowReviews(
       type: 'painter_bad_review_admin',
       data: {
         companyName: painter.company_name, rating: latest.rating, reviewerName: latest.reviewerName,
-        title: latest.title ?? null, body: latest.body ?? null, badCount, limit: BAD_REVIEWS_TO_REMOVE,
+        title: latest.title ?? null, body: latest.body ?? null, badCount, totalCount, moreToGo: lowReviewsUntilRemoval(badCount, totalCount),
         manageUrl: await buildReviewUrl(painter.id),
       },
     }),
   }).catch((err) => console.error('low review alert failed:', err))
 
   if (willRemove) {
-    await removePainter(supabase, env, painter, 'bad_reviews', `${badCount} reviews of ${BAD_REVIEW_MAX_RATING} stars or fewer.`)
+    await removePainter(supabase, env, painter, 'bad_reviews', `${badCount} of ${totalCount} reviews were ${BAD_REVIEW_MAX_RATING} stars or fewer (${Math.round((badCount / totalCount) * 100)}%).`)
   }
   return badCount
 }

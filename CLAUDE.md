@@ -27,6 +27,6 @@ reserved `.invalid` domain; `send-email` skips those addresses.
 - Distances between a customer and painters use exact ZIP coordinates from `zip_geocodes` (filled by `_shared/geo.ts`
   `getZipCoords`), not the rough 3-digit centers.
 - Removing a painter goes through `_shared/removal.ts` (`removePainter`), never a bare status update, so the snapshot, emails and
-  "previously removed" matching all happen. Three reviews of 2 stars or fewer remove a painter automatically.
+  "previously removed" matching all happen. A painter is removed automatically at 3 or more reviews of 2 stars or fewer once those are 3 out of every 10 (or more) of all their reviews (`overRemovalLine` in `removal.ts`).
 - Edge functions are deployed by hand: `supabase functions deploy <name>` (add `--no-verify-jwt` for the ones that already use it).
   The site deploys itself from `main` through GitHub Pages.

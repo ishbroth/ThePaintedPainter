@@ -648,12 +648,12 @@ ${body}
 
     case 'painter_bad_review_admin': {
       const rating = Math.max(1, Math.min(5, Math.round(Number(data.rating) || 0)))
-      const left = Math.max(0, Number(data.limit) - Number(data.badCount))
+      const left = Math.max(0, Number(data.moreToGo) || 0)
       return wrap(`
         <p style="margin-top:0;"><strong>${data.companyName || 'A painter'}</strong> just received a <strong>${rating}-star</strong> review from ${data.reviewerName || 'a customer'}.</p>
         ${data.title ? `<p style="margin:0 0 6px;font-weight:700;">${data.title}</p>` : ''}
         ${data.body ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="background:#f9fafb;border-left:4px solid #b91c1c;border-radius:4px;padding:12px 14px;font-size:15px;color:#374151;">${String(data.body).replace(/\n/g, '<br />')}</td></tr></table>` : ''}
-        <p style="margin:14px 0 4px;">That is low review <strong>${data.badCount} of ${data.limit}</strong>. ${left > 0 ? `At ${data.limit} they are removed from the network automatically (${left} more to go).` : 'They have been removed from the network automatically.'}</p>
+        <p style="margin:14px 0 4px;">That makes <strong>${data.badCount} low review${Number(data.badCount) === 1 ? '' : 's'} out of ${data.totalCount}</strong>. Painters are removed automatically at 3 or more low reviews once low reviews are 3 out of every 10 or more. ${left > 0 ? `${left === 1 ? 'One more low review' : `${left} more low reviews in a row`} would remove them.` : 'They have been removed from the network automatically.'}</p>
         ${data.manageUrl && left > 0 ? button(`${data.manageUrl}&amp;action=remove`, 'Remove them from the network now', '#b91c1c', true) : ''}
         <p style="margin:6px 0 0;font-size:13px;color:#6b7280;">The painter was told to reach out to the customer and try to resolve it.</p>
       `)
