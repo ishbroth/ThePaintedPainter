@@ -3,7 +3,7 @@
 // Supabase Edge Function: invite local painting companies to take a job that has no painter yet.
 //
 // Called by submit-quote-claim (with the service role key) when a customer claims a price in a ZIP with no approved painter in range.
-//   1. Finds painting companies near the job's ZIP with Google Places (needs GOOGLE_PLACES_API_KEY).
+//   1. Finds painting companies near the job's ZIP with Google Places (needs GOOGLE_GEOCODING_API_KEY or GOOGLE_PLACES_API_KEY, with Places API (New) enabled).
 //   2. Reads each company's own public website (home page and contact page) for a business email address.
 //   3. Emails each one an invitation with the job details (no customer name, address or contact details; only the ZIP) and a button
 //      to claim it. Claiming means signing up as a painter (free; the application is reviewed); once approved, the job is offered to
@@ -19,15 +19,14 @@
 //   3. supabase functions deploy outreach-painters --no-verify-jwt
 //      supabase functions deploy outreach-unsubscribe --no-verify-jwt
 //
-// Limits: at most MAX_INVITES_PER_JOB companies per job and MAX_INVITES_PER_DAY across all jobs.
+// No cap on invitations: every job with no painter in range invites every company it can find near that ZIP (Google returns up to 20 per
+// search). A company is never invited twice for the same job, and anyone who unsubscribed is never emailed again.
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
 import { describeTiming } from '../_shared/offers.ts'
 import { ADMIN_EMAIL } from '../_shared/adminLink.ts'
 
-const MAX_INVITES_PER_JOB = 12
-const MAX_INVITES_PER_DAY = 60
 const PAGE_TIMEOUT_MS = 6000
 const MAX_PAGE_BYTES = 300_000
 
@@ -141,9 +140,10 @@ serve(async (req: Request) => {
     // Only our own server may call this
     if ((req.headers.get('Authorization') ?? '') !== `Bearer ${serviceRoleKey}`) return json({ error: 'Forbidden' }, 403)
 
-    const placesKey = Deno.env.get('GOOGLE_PLACES_API_KEY')
+    // the unrestricted server key first (the other one may be locked to website referrers for the map)
+    const placesKey = Deno.env.get('GOOGLE_GEOCODING_API_KEY') ?? Deno.env.get('GOOGLE_PLACES_API_KEY')
     const postalAddress = Deno.env.get('OUTREACH_POSTAL_ADDRESS')
-    if (!placesKey) return json({ ok: false, reason: 'GOOGLE_PLACES_API_KEY is not set: no painters were looked up' })
+    if (!placesKey) return json({ ok: false, reason: 'GOOGLE_GEOCODING_API_KEY (or GOOGLE_PLACES_API_KEY) is not set: no painters were looked up' })
     if (!postalAddress) return json({ ok: false, reason: 'OUTREACH_POSTAL_ADDRESS is not set: commercial email must carry a postal address, so nothing was sent' })
 
     const { jobId } = await req.json() as { jobId?: string }
@@ -159,11 +159,6 @@ serve(async (req: Request) => {
       .maybeSingle()
     if (!job || job.status !== 'searching_painter' || !job.quote_zip) return json({ ok: false, reason: 'Job is not waiting for a painter' })
 
-    // how many invitations have gone out today, across all jobs
-    const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-    const { count: sentToday } = await supabase.from('outreach_leads').select('id', { count: 'exact', head: true }).gte('invited_at', dayAgo)
-    let budget = Math.min(MAX_INVITES_PER_JOB, MAX_INVITES_PER_DAY - (sentToday ?? 0))
-    if (budget <= 0) return json({ ok: false, reason: 'Daily invitation limit reached' })
 
     const places = await findPaintingCompanies(job.quote_zip, placesKey)
 
@@ -177,7 +172,6 @@ serve(async (req: Request) => {
     const invited: string[] = []
 
     for (const place of places) {
-      if (budget <= 0) break
       const email = await findEmail(place.website)
       if (!email || memberEmails.has(email) || optedOut.has(email)) continue
       const { data: lead, error: leadError } = await supabase
@@ -212,7 +206,6 @@ serve(async (req: Request) => {
       }).catch(() => null)
       if (res && res.ok) {
         invited.push(place.name)
-        budget--
       } else {
         await supabase.from('outreach_leads').delete().eq('invite_token', lead.invite_token) // not sent: try again another time
       }
