@@ -3,7 +3,8 @@
 // Supabase Edge Function: invite local painting companies to take a job that has no painter yet.
 //
 // Called by submit-quote-claim (with the service role key) when a customer claims a price in a ZIP with no approved painter in range.
-//   1. Finds painting companies near the job's ZIP with Google Places (needs GOOGLE_GEOCODING_API_KEY or GOOGLE_PLACES_API_KEY, with Places API (New) enabled).
+//   1. Finds painting companies near the job's ZIP with three Google Places searches (different wordings: established, affordable,
+//      professional/quality), removes duplicates and puts the nearest first (needs GOOGLE_GEOCODING_API_KEY or GOOGLE_PLACES_API_KEY, with Places API (New) enabled).
 //   2. Reads each company's own public website (home page and contact page) for a business email address.
 //   3. Emails each one an invitation with the job details (no customer name, address or contact details; only the ZIP) and a button
 //      to claim it. Claiming means signing up as a painter (free; the application is reviewed); once approved, the job is offered to
@@ -27,6 +28,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
 import { describeTiming } from '../_shared/offers.ts'
 import { ADMIN_EMAIL } from '../_shared/adminLink.ts'
 import { isServiceCaller } from '../_shared/serviceCaller.ts'
+import { getZipCoords, type Coords } from '../_shared/geo.ts'
 
 const MAX_INVITES_PER_JOB = 12
 const PAGE_TIMEOUT_MS = 6000
@@ -42,28 +44,80 @@ function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
 }
 
-interface Place { name: string; website: string; phone: string; address: string; email?: string }
+interface Place { name: string; website: string; phone: string; address: string; email?: string; lat?: number; lng?: number }
 
-/** Painting companies near a ZIP, from Google Places (the company's own listing: name, website, phone). */
-async function findPaintingCompanies(zip: string, apiKey: string): Promise<Place[]> {
+/**
+ * Different wordings bring back different companies: the big established firms, the budget ones, the small quality-focused shops.
+ * Each is its own Google search around the customer's ZIP, run at the same time.
+ */
+const SEARCH_WORDINGS = [
+  (zip: string) => `house painting contractor near ${zip}`,
+  (zip: string) => `affordable cheap house painters near ${zip}`,
+  (zip: string) => `professional quality painting company near ${zip}`,
+]
+
+type GooglePlace = { displayName?: { text?: string }; websiteUri?: string; nationalPhoneNumber?: string; formattedAddress?: string; businessStatus?: string; location?: { latitude?: number; longitude?: number } }
+
+async function searchOnce(textQuery: string, apiKey: string, center: Coords | null): Promise<GooglePlace[]> {
   const res = await fetch('https://places.googleapis.com/v1/places:searchText', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'X-Goog-Api-Key': apiKey,
-      'X-Goog-FieldMask': 'places.displayName,places.websiteUri,places.nationalPhoneNumber,places.formattedAddress,places.businessStatus',
+      'X-Goog-FieldMask': 'places.displayName,places.websiteUri,places.nationalPhoneNumber,places.formattedAddress,places.businessStatus,places.location',
     },
-    body: JSON.stringify({ textQuery: `house painting contractor near ${zip}`, maxResultCount: 20, regionCode: 'US' }),
+    body: JSON.stringify({
+      textQuery,
+      maxResultCount: 20,
+      regionCode: 'US',
+      // keep every wording local to the customer: a circle of about 25 miles around their ZIP
+      ...(center ? { locationBias: { circle: { center: { latitude: center[0], longitude: center[1] }, radius: 40000 } } } : {}),
+    }),
   })
   if (!res.ok) {
     console.error('Places search failed:', res.status, await res.text())
     return []
   }
-  const data = await res.json() as { places?: { displayName?: { text?: string }; websiteUri?: string; nationalPhoneNumber?: string; formattedAddress?: string; businessStatus?: string }[] }
-  return (data.places ?? [])
-    .filter((p) => p.websiteUri && (!p.businessStatus || p.businessStatus === 'OPERATIONAL'))
-    .map((p) => ({ name: p.displayName?.text ?? '', website: p.websiteUri as string, phone: p.nationalPhoneNumber ?? '', address: p.formattedAddress ?? '' }))
-    .filter((p) => p.name)
+  const data = await res.json() as { places?: GooglePlace[] }
+  return data.places ?? []
+}
+
+const hostOf = (url: string) => {
+  try { return new URL(url).hostname.replace(/^www\./, '').toLowerCase() } catch { return url.toLowerCase() }
+}
+const nameKey = (name: string) => name.toLowerCase().replace(/[^a-z0-9]/g, '')
+const miles = (a: Coords, b: Coords) => {
+  const toRad = (d: number) => (d * Math.PI) / 180
+  const dLat = toRad(b[0] - a[0])
+  const dLng = toRad(b[1] - a[1])
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a[0])) * Math.cos(toRad(b[0])) * Math.sin(dLng / 2) ** 2
+  return 3958.8 * 2 * Math.asin(Math.sqrt(h))
+}
+
+/**
+ * Painting companies near a ZIP from several Google searches, with no company listed twice (same website or same name), nearest to the
+ * customer first, so the invitations go to the closest companies in every direction rather than to whichever side Google favored.
+ */
+async function findPaintingCompanies(zip: string, apiKey: string, center: Coords | null): Promise<Place[]> {
+  const results = await Promise.all(SEARCH_WORDINGS.map((w) => searchOnce(w(zip), apiKey, center).catch(() => [])))
+  const seen = new Set<string>()
+  const places: Place[] = []
+  for (const list of results) {
+    for (const p of list) {
+      if (!p.websiteUri || (p.businessStatus && p.businessStatus !== 'OPERATIONAL')) continue
+      const name = p.displayName?.text ?? ''
+      if (!name) continue
+      const keys = [hostOf(p.websiteUri), nameKey(name)]
+      if (keys.some((k) => seen.has(k))) continue
+      keys.forEach((k) => seen.add(k))
+      places.push({ name, website: p.websiteUri, phone: p.nationalPhoneNumber ?? '', address: p.formattedAddress ?? '', lat: p.location?.latitude, lng: p.location?.longitude })
+    }
+  }
+  if (center) {
+    const away = (p: Place) => (typeof p.lat === 'number' && typeof p.lng === 'number' ? miles(center, [p.lat, p.lng]) : Infinity)
+    places.sort((x, y) => away(x) - away(y))
+  }
+  return places
 }
 
 async function fetchPage(url: string): Promise<string> {
@@ -146,10 +200,19 @@ serve(async (req: Request) => {
     const placesKey = Deno.env.get('GOOGLE_GEOCODING_API_KEY') ?? Deno.env.get('GOOGLE_PLACES_API_KEY')
     const postalAddress = Deno.env.get('OUTREACH_POSTAL_ADDRESS')
     // Service-role callers (tests) may pass `testPlaces` instead of searching Google: the companies and emails given are used as they are.
-    const body = await req.json() as { jobId?: string; testPlaces?: Place[] }
+    const body = await req.json() as { jobId?: string; testPlaces?: Place[]; dryRunZip?: string }
     const testPlaces = Array.isArray(body.testPlaces) ? body.testPlaces : null
     if (!placesKey && !testPlaces) return json({ ok: false, reason: 'GOOGLE_GEOCODING_API_KEY (or GOOGLE_PLACES_API_KEY) is not set: no painters were looked up' })
     if (!postalAddress) return json({ ok: false, reason: 'OUTREACH_POSTAL_ADDRESS is not set: commercial email must carry a postal address, so nothing was sent' })
+
+    // Dry run (service role only): show who a search for this ZIP would find, in the order they would be invited. Contacts no one.
+    if (body.dryRunZip && placesKey) {
+      const zip = String(body.dryRunZip)
+      const sb = createClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
+      const c = (await getZipCoords(sb, [zip])).get(zip) ?? null
+      const found = await findPaintingCompanies(zip, placesKey, c)
+      return json({ ok: true, dryRun: true, count: found.length, companies: found.map((p) => ({ name: p.name, website: p.website, miles: c && p.lat != null && p.lng != null ? Math.round(miles(c, [p.lat, p.lng])) : null })) })
+    }
 
     const jobId = body.jobId
     if (!jobId) return json({ error: 'Missing jobId' }, 400)
@@ -167,7 +230,8 @@ serve(async (req: Request) => {
     if (!testPlaces && /@[^@]*\.invalid$/i.test(String(job.customer_email ?? ''))) return json({ ok: false, reason: 'Demonstration job: no real companies were contacted' })
 
 
-    const places = testPlaces ?? await findPaintingCompanies(job.quote_zip, placesKey as string)
+    const zipCoords = (await getZipCoords(supabase, [job.quote_zip])).get(String(job.quote_zip).slice(0, 5)) ?? null
+    const places = testPlaces ?? await findPaintingCompanies(job.quote_zip, placesKey as string, zipCoords)
 
     // companies already on the platform, or who asked not to be contacted, are never invited
     const { data: members } = await supabase.from('painters').select('email')
