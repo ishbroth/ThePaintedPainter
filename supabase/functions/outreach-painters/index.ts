@@ -3,10 +3,13 @@
 // Supabase Edge Function: invite local painting companies to take a job that has no painter yet.
 //
 // Called by submit-quote-claim (with the service role key) when a customer claims a price in a ZIP with no approved painter in range.
-//   1. Finds painting companies near the job's ZIP with three Google Places searches (different wordings: established, affordable,
-//      professional/quality), removes duplicates and puts the nearest first (needs GOOGLE_GEOCODING_API_KEY or GOOGLE_PLACES_API_KEY, with Places API (New) enabled).
-//   2. Reads each company's own public website (home page and contact page) for a business email address.
-//   3. Emails each one an invitation with the job details (no customer name, address or contact details; only the ZIP) and a button
+//   1. Looks at the directory of companies found so far (outreach_companies). The ZIP is searched on Google (three wordings: established,
+//      affordable, professional/quality) only when it has never been searched, the list is thin, or the last search is old; every company
+//      found is kept (needs GOOGLE_GEOCODING_API_KEY or GOOGLE_PLACES_API_KEY, with Places API (New) enabled).
+//   2. Picks who to invite by rotation (see _shared/outreachPlan.ts): companies not invited for 7 days, least-invited first; a company that
+//      has had 5 invitations without signing up moves to the back of the line but stays in the directory. Nobody twice in one day.
+//   3. Reads each company's own public website for a business email address (once; the result is kept).
+//   4. Emails each one an invitation with the job details (no customer name, address or contact details; only the ZIP) and a button
 //      to claim it. Claiming means signing up as a painter (free; the application is reviewed); once approved, the job is offered to
 //      them automatically (see _shared/openJobs.ts).
 //
@@ -20,8 +23,8 @@
 //   3. supabase functions deploy outreach-painters --no-verify-jwt
 //      supabase functions deploy outreach-unsubscribe --no-verify-jwt
 //
-// Limit: at most MAX_INVITES_PER_JOB companies per job, and no limit on how many jobs (or invitations) there are per day. A company is
-// never invited twice for the same job, and anyone who unsubscribed is never emailed again.
+// Limit: at most MAX_INVITES_PER_JOB companies per job, and no limit on how many jobs there are per day. A company is never invited twice
+// for the same job, and a company that unsubscribed, or signed up, is never invited again.
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
@@ -29,6 +32,7 @@ import { describeTiming } from '../_shared/offers.ts'
 import { ADMIN_EMAIL } from '../_shared/adminLink.ts'
 import { isServiceCaller } from '../_shared/serviceCaller.ts'
 import { getZipCoords, type Coords } from '../_shared/geo.ts'
+import { orderCandidates, type Candidate, type Tier } from '../_shared/outreachPlan.ts'
 
 const MAX_INVITES_PER_JOB = 12
 const PAGE_TIMEOUT_MS = 6000
@@ -185,6 +189,77 @@ async function findEmail(website: string): Promise<string | null> {
   return null
 }
 
+// ---------------------------------------------------------------------------
+// The directory of companies, and who to invite from it
+// ---------------------------------------------------------------------------
+const SEARCH_RADIUS_MILES = 30
+/** Search Google again when the ZIP was never searched, or its stored list is shorter than this and the last search is a week old. */
+const THIN_LIST = MAX_INVITES_PER_JOB * 2
+const SEARCH_MAX_AGE_DAYS = 60
+const THIN_RESEARCH_DAYS = 7
+const EMAIL_RECHECK_DAYS = 60
+const MAX_SITE_READS_PER_JOB = 25
+
+// deno-lint-ignore no-explicit-any
+type Supabase = any
+
+interface Company {
+  id: string; site_key: string; name: string; website: string | null; phone: string | null; address: string | null
+  latitude: number | null; longitude: number | null; email: string | null; email_checked_at: string | null
+  invite_count: number; last_invited_at: string | null; signed_up: boolean; opted_out: boolean
+}
+
+const siteKey = (url: string) => {
+  try {
+    const u = new URL(url)
+    return (u.hostname.replace(/^www\./, '') + u.pathname.replace(/\/+$/, '')).toLowerCase()
+  } catch {
+    return url.toLowerCase()
+  }
+}
+
+/** Stored companies within SEARCH_RADIUS_MILES of the customer, with their distance. */
+async function companiesNear(supabase: Supabase, center: Coords): Promise<(Company & { distance: number })[]> {
+  const dLat = SEARCH_RADIUS_MILES / 69
+  const dLng = SEARCH_RADIUS_MILES / (69 * Math.max(0.2, Math.cos((center[0] * Math.PI) / 180)))
+  const { data } = await supabase
+    .from('outreach_companies')
+    .select('*')
+    .gte('latitude', center[0] - dLat).lte('latitude', center[0] + dLat)
+    .gte('longitude', center[1] - dLng).lte('longitude', center[1] + dLng)
+  return ((data ?? []) as Company[])
+    .map((c) => ({ ...c, distance: c.latitude != null && c.longitude != null ? miles(center, [c.latitude, c.longitude]) : Infinity }))
+    .filter((c) => c.distance <= SEARCH_RADIUS_MILES)
+}
+
+/** Makes sure the directory is good enough for this ZIP, searching Google (and keeping what it finds) only when it has to. */
+async function refreshDirectory(supabase: Supabase, zip: string, center: Coords, apiKey: string): Promise<void> {
+  const { data: log } = await supabase.from('outreach_searches').select('searched_at').eq('zip', zip).maybeSingle()
+  const ageDays = log ? (Date.now() - new Date(log.searched_at).getTime()) / 86_400_000 : Infinity
+  const known = (await companiesNear(supabase, center)).filter((c) => !c.opted_out && !c.signed_up)
+  const needsSearch = ageDays > SEARCH_MAX_AGE_DAYS || (known.length < THIN_LIST && ageDays > THIN_RESEARCH_DAYS)
+  if (!needsSearch) return
+
+  const found = await findPaintingCompanies(zip, apiKey, center)
+  if (found.length > 0) {
+    // only what Google tells us is written; email, invitations and flags already on a company are left alone
+    await supabase.from('outreach_companies').upsert(
+      found.map((p) => ({ site_key: siteKey(p.website), name: p.name, website: p.website, phone: p.phone, address: p.address, latitude: p.lat ?? null, longitude: p.lng ?? null, last_found_at: new Date().toISOString() })),
+      { onConflict: 'site_key' },
+    )
+  }
+  await supabase.from('outreach_searches').upsert({ zip, searched_at: new Date().toISOString(), found: found.length }, { onConflict: 'zip' })
+}
+
+/** The rotation for this ZIP: who would be invited, in order. */
+async function planFor(supabase: Supabase, zip: string, center: Coords, apiKey: string) {
+  await refreshDirectory(supabase, zip, center, apiKey)
+  const all = (await companiesNear(supabase, center)).filter((c) => !c.opted_out && !c.signed_up)
+  const byId = new Map(all.map((c) => [c.id, c]))
+  const ordered = orderCandidates(all.map((c): Candidate => ({ id: c.id, inviteCount: c.invite_count, lastInvitedAt: c.last_invited_at, distance: c.distance })))
+  return ordered.map((o) => ({ company: byId.get(o.id) as Company & { distance: number }, tier: o.tier as Tier }))
+}
+
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
@@ -205,13 +280,18 @@ serve(async (req: Request) => {
     if (!placesKey && !testPlaces) return json({ ok: false, reason: 'GOOGLE_GEOCODING_API_KEY (or GOOGLE_PLACES_API_KEY) is not set: no painters were looked up' })
     if (!postalAddress) return json({ ok: false, reason: 'OUTREACH_POSTAL_ADDRESS is not set: commercial email must carry a postal address, so nothing was sent' })
 
-    // Dry run (service role only): show who a search for this ZIP would find, in the order they would be invited. Contacts no one.
+    // Dry run (service role only): the rotation for this ZIP, in the order companies would be invited, with each one's history. Refreshes
+    // the directory from Google if it needs it, but sends nothing and contacts no one.
     if (body.dryRunZip && placesKey) {
       const zip = String(body.dryRunZip)
       const sb = createClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
       const c = (await getZipCoords(sb, [zip])).get(zip) ?? null
-      const found = await findPaintingCompanies(zip, placesKey, c)
-      return json({ ok: true, dryRun: true, count: found.length, companies: found.map((p) => ({ name: p.name, website: p.website, miles: c && p.lat != null && p.lng != null ? Math.round(miles(c, [p.lat, p.lng])) : null })) })
+      if (!c) return json({ ok: false, reason: 'Could not place that ZIP' })
+      const plan = await planFor(sb, zip, c, placesKey)
+      return json({
+        ok: true, dryRun: true, count: plan.length,
+        companies: plan.slice(0, 40).map(({ company, tier }) => ({ name: company.name, tier, miles: Math.round(company.distance), invites: company.invite_count, lastInvited: company.last_invited_at, hasEmail: company.email ? true : company.email_checked_at ? false : null })),
+      })
     }
 
     const jobId = body.jobId
@@ -230,30 +310,31 @@ serve(async (req: Request) => {
     if (!testPlaces && /@[^@]*\.invalid$/i.test(String(job.customer_email ?? ''))) return json({ ok: false, reason: 'Demonstration job: no real companies were contacted' })
 
 
-    const zipCoords = (await getZipCoords(supabase, [job.quote_zip])).get(String(job.quote_zip).slice(0, 5)) ?? null
-    const places = testPlaces ?? await findPaintingCompanies(job.quote_zip, placesKey as string, zipCoords)
+    const zip5 = String(job.quote_zip).slice(0, 5)
+    const zipCoords = (await getZipCoords(supabase, [zip5])).get(zip5) ?? null
 
     // companies already on the platform, or who asked not to be contacted, are never invited
-    const { data: members } = await supabase.from('painters').select('email')
+    const { data: members } = await supabase.from('painters').select('email, website')
     const memberEmails = new Set((members ?? []).map((m: { email: string }) => String(m.email).toLowerCase()))
+    const memberSites = new Set((members ?? []).map((m: { website: string | null }) => (m.website ? siteKey(m.website) : '')).filter(Boolean))
     const { data: optouts } = await supabase.from('outreach_optouts').select('email')
     const optedOut = new Set((optouts ?? []).map((o: { email: string }) => String(o.email).toLowerCase()))
 
     const summary = (job.project_summary ?? {}) as { qa?: { question: string; answer: string }[]; breakdown?: { description: string; amount: number; removed?: boolean }[]; timelineLabel?: string }
     const invited: string[] = []
+    let considered = 0
+    const tiers: Record<string, number> = { fresh: 0, cooling: 0, moved_on: 0 }
 
-    for (const place of places) {
-      if (invited.length >= MAX_INVITES_PER_JOB) break
-      const email = place.email ?? await findEmail(place.website)
-      if (!email || memberEmails.has(email) || optedOut.has(email)) continue
+    // One invitation: log it, send it, and report whether it went out.
+    const invite = async (companyName: string, email: string, website: string | null, phone: string | null): Promise<boolean> => {
       const { data: lead, error: leadError } = await supabase
         .from('outreach_leads')
-        .insert({ job_id: job.id, company_name: place.name, email, website: place.website, phone: place.phone, zip: job.quote_zip })
+        .insert({ job_id: job.id, company_name: companyName, email, website, phone, zip: job.quote_zip })
         .select('invite_token')
         .single()
-      if (leadError || !lead) continue // already invited for this job
+      if (leadError || !lead) return false // already invited for this job
 
-      const inviteUrl = `${frontendUrl}/painter-signup?invite=${lead.invite_token}&email=${encodeURIComponent(email)}&company=${encodeURIComponent(place.name)}`
+      const inviteUrl = `${frontendUrl}/painter-signup?invite=${lead.invite_token}&email=${encodeURIComponent(email)}&company=${encodeURIComponent(companyName)}`
       const unsubscribeUrl = `${supabaseUrl}/functions/v1/outreach-unsubscribe?token=${lead.invite_token}`
       const res = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
         method: 'POST',
@@ -263,7 +344,7 @@ serve(async (req: Request) => {
           type: 'cold_job_invite',
           data: {
             subject: `A free painting job near ${job.quote_zip}: $${Math.round(Number(job.painter_payout_amount) || 0).toLocaleString('en-US')} payout, yours to claim`,
-            companyName: place.name,
+            companyName,
             zipCode: job.quote_zip,
             payoutAmount: job.painter_payout_amount,
             timelineLabel: summary.timelineLabel,
@@ -276,10 +357,55 @@ serve(async (req: Request) => {
           },
         }),
       }).catch(() => null)
-      if (res && res.ok) {
-        invited.push(place.name)
-      } else {
-        await supabase.from('outreach_leads').delete().eq('invite_token', lead.invite_token) // not sent: try again another time
+      if (res && res.ok) return true
+      await supabase.from('outreach_leads').delete().eq('invite_token', lead.invite_token) // not sent: try again another time
+      return false
+    }
+
+    let found = 0
+    if (testPlaces) {
+      // tests supply their own companies and emails: no directory, no rotation
+      found = testPlaces.length
+      for (const place of testPlaces) {
+        if (invited.length >= MAX_INVITES_PER_JOB) break
+        const email = String(place.email ?? '').toLowerCase()
+        if (!email || memberEmails.has(email) || optedOut.has(email)) continue
+        if (await invite(place.name, email, place.website, place.phone)) invited.push(place.name)
+      }
+    } else {
+      if (!zipCoords) return json({ ok: false, reason: 'Could not place the job ZIP' })
+      const plan = await planFor(supabase, zip5, zipCoords, placesKey as string)
+      found = plan.length
+      let siteReads = 0
+      for (const { company, tier } of plan) {
+        if (invited.length >= MAX_INVITES_PER_JOB) break
+        considered++
+        if (company.website && memberSites.has(siteKey(company.website))) {
+          await supabase.from('outreach_companies').update({ signed_up: true }).eq('id', company.id)
+          continue
+        }
+        // the business email: read once from their own site and kept (looked at again only after a couple of months)
+        let email = company.email ? company.email.toLowerCase() : null
+        const stale = !company.email_checked_at || (Date.now() - new Date(company.email_checked_at).getTime()) / 86_400_000 > EMAIL_RECHECK_DAYS
+        if (!email && stale && company.website && siteReads < MAX_SITE_READS_PER_JOB) {
+          siteReads++
+          email = (await findEmail(company.website))?.toLowerCase() ?? null
+          await supabase.from('outreach_companies').update({ email, email_checked_at: new Date().toISOString() }).eq('id', company.id)
+        }
+        if (!email) continue
+        if (memberEmails.has(email)) {
+          await supabase.from('outreach_companies').update({ signed_up: true }).eq('id', company.id)
+          continue
+        }
+        if (optedOut.has(email)) {
+          await supabase.from('outreach_companies').update({ opted_out: true }).eq('id', company.id)
+          continue
+        }
+        if (await invite(company.name, email, company.website, company.phone)) {
+          invited.push(company.name)
+          tiers[tier]++
+          await supabase.from('outreach_companies').update({ invite_count: company.invite_count + 1, last_invited_at: new Date().toISOString() }).eq('id', company.id)
+        }
       }
     }
 
@@ -298,7 +424,7 @@ serve(async (req: Request) => {
       }),
     }).catch(() => null)
 
-    return json({ ok: true, found: places.length, invited: invited.length })
+    return json({ ok: true, found, considered, invited: invited.length, ...(testPlaces ? {} : { fromTier: tiers }) })
   } catch (error) {
     console.error('outreach-painters failed:', error)
     return json({ error: 'failed' }, 500)

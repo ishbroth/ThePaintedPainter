@@ -37,6 +37,15 @@ serve(async (req: Request) => {
     const email = String(lead.email).toLowerCase()
     await supabase.from('outreach_optouts').upsert({ email }, { onConflict: 'email' })
     await supabase.from('outreach_leads').update({ status: 'unsubscribed' }).ilike('email', email).eq('status', 'invited')
+    // the whole company stops being invited, whichever address a later search might find for it
+    await supabase.from('outreach_companies').update({ opted_out: true }).ilike('email', email)
+    const { data: leadSite } = await supabase.from('outreach_leads').select('website').eq('invite_token', token).maybeSingle()
+    if (leadSite?.website) {
+      try {
+        const u = new URL(leadSite.website)
+        await supabase.from('outreach_companies').update({ opted_out: true }).eq('site_key', (u.hostname.replace(/^www\./, '') + u.pathname.replace(/\/+$/, '')).toLowerCase())
+      } catch { /* not a URL */ }
+    }
 
     return page('You\'re unsubscribed', `We won't send any more invitations to ${email.replace(/</g, '')}. We're sorry to have bothered you.`)
   } catch (error) {

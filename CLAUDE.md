@@ -30,3 +30,7 @@ reserved `.invalid` domain; `send-email` skips those addresses.
   "previously removed" matching all happen. A painter is removed automatically at 3 or more reviews of 2 stars or fewer once those are 3 out of every 10 (or more) of all their reviews (`overRemovalLine` in `removal.ts`).
 - Edge functions are deployed by hand: `supabase functions deploy <name>` (add `--no-verify-jwt` for the ones that already use it).
   The site deploys itself from `main` through GitHub Pages.
+- Outreach to outside painting companies keeps a directory (`outreach_companies`) and rotates through it (`_shared/outreachPlan.ts`): 7 days
+  between invitations to the same company when there are enough others, after 5 invitations without a response a company moves to the back
+  of the line (never deleted), never twice in one day, and a company that signs up or unsubscribes leaves the rotation. At most 12 invitations
+  per job. `outreach-painters` with `{"dryRunZip":"<zip>"}` (service role) shows the rotation for a ZIP without contacting anyone.

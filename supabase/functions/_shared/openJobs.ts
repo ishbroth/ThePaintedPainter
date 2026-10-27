@@ -52,6 +52,7 @@ export async function attachOpenJobsToPainter(
     if (!updated || updated.length === 0) continue
     await sendPainterOffer(supabase, env, job as OfferJob, painter)
     await supabase.from('outreach_leads').update({ status: 'signed_up' }).eq('job_id', job.id).ilike('email', painter.email)
+    await supabase.from('outreach_companies').update({ signed_up: true }).ilike('email', painter.email)
     attached++
   }
   return attached
