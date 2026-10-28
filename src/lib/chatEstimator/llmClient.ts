@@ -57,7 +57,7 @@ interface ChatTurn {
 }
 
 const VALID_INTENTS: Intent[] = [
-  'greeting', 'ask_clarification', 'ask_example', 'express_uncertainty',
+  'greeting', 'ask_clarification', 'ask_example', 'express_uncertainty', 'dismissive',
   'meta_cost', 'meta_how_it_works', 'meta_bot_check', 'meta_real_person',
   'meta_time', 'meta_privacy', 'off_topic', 'deflection', 'negation',
   'confirmation', 'scope_limiter', 'frustration', 'already_answered',
@@ -256,6 +256,14 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   });
 }
 
+type Reader = (message: string, ctx: EstimatorContext, history: ChatTurn[], lastBotQuestion: string | null) => Promise<LLMExtractResult | null>;
+let testReader: Reader | null | undefined; // undefined = the real AI reader; null = none (rules only); a function = a stand-in
+
+/** Tests only: replace the AI reader (null = no reader at all, so the plain rules engine runs; a function = a recorded reading). */
+export function setLLMReaderForTests(reader: Reader | null | undefined): void {
+  testReader = reader;
+}
+
 /**
  * Ask the LLM to interpret the user's latest message. Returns null on any
  * failure so the caller can fall back to the local rules engine — this
@@ -267,6 +275,7 @@ export async function extractWithLLM(
   history: ChatTurn[],
   lastBotQuestion: string | null,
 ): Promise<LLMExtractResult | null> {
+  if (testReader !== undefined) return testReader === null ? null : testReader(message, ctx, history, lastBotQuestion);
   try {
     const { data, error } = await withTimeout(
       supabase.functions.invoke('chat-estimator-extract', {

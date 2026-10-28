@@ -60,7 +60,7 @@ const ROOM_KEYS = [
 ]
 
 const INTENTS = [
-  'greeting', 'ask_clarification', 'ask_example', 'express_uncertainty',
+  'greeting', 'ask_clarification', 'ask_example', 'express_uncertainty', 'dismissive',
   'meta_cost', 'meta_how_it_works', 'meta_bot_check', 'meta_real_person',
   'meta_time', 'meta_privacy', 'off_topic', 'deflection', 'negation',
   'confirmation', 'scope_limiter', 'frustration', 'already_answered',
@@ -77,7 +77,7 @@ const UPDATE_TOOL = {
       intents: {
         type: 'array',
         items: { type: 'string', enum: INTENTS },
-        description: 'One or more intents for the LATEST user message, most confident first. Always include at least one; default to "provide_info" if the message is just describing the job. "restart" covers any request to clear/reset/wipe everything and start over ("clear this", "start fresh", "reset", "forget what I said"), not just the literal word "restart". "already_answered" covers the user asserting they already gave an answer ("I already told you", "I said that already", "I just told you that") — tag this whenever the user says it, REGARDLESS of whether you can actually find that fact in "Already known" or recent history; a separate step re-checks the full transcript and handles the reply, so your only job here is recognizing the assertion.',
+        description: 'One or more intents for the LATEST user message, most confident first. Always include at least one; default to "provide_info" if the message is just describing the job. "dismissive" = the customer is brushing the question off rather than answering it ("doesn\'t matter, just want it done", "whatever", "I don\'t care", "just do it"). That is NOT "deflection" (asking for a ballpark or an email) and NOT "express_uncertainty" (genuinely not knowing); tag it "dismissive" and extract any real job facts that came with it. "restart" covers any request to clear/reset/wipe everything and start over ("clear this", "start fresh", "reset", "forget what I said"), not just the literal word "restart". "already_answered" covers the user asserting they already gave an answer ("I already told you", "I said that already", "I just told you that") — tag this whenever the user says it, REGARDLESS of whether you can actually find that fact in "Already known" or recent history; a separate step re-checks the full transcript and handles the reply, so your only job here is recognizing the assertion.',
       },
       acknowledgements: {
         type: 'array',
@@ -126,7 +126,7 @@ const UPDATE_TOOL = {
       },
       projectType: {
         type: 'string', enum: ['interior', 'exterior', 'both'],
-        description: 'ONLY set this when the message actually signals interior vs exterior — either the word itself, specific ROOMS (implies interior), or specific EXTERIOR surfaces (siding/deck/fence/garage-door/roofline — implies exterior). A rental unit/apartment/condo/duplex/studio repaint is almost always interior (living units don\'t typically include exterior work). But a bare "I need my house/building/property painted" with NO further qualifier is genuinely ambiguous — leave projectType UNSET in that case so the bot asks directly, rather than guessing. Guessing wrong here derails the whole conversation (it leads to asking interior-only questions about an exterior-only job, or vice versa).',
+        description: 'ONLY set this when the message actually signals interior vs exterior — either the word itself, specific ROOMS (implies interior), or specific EXTERIOR surfaces (siding/deck/fence/garage-door/roofline — implies exterior). A rental unit/apartment/condo/duplex/studio repaint is almost always interior (living units don\'t typically include exterior work). But a bare "I need my house/building/property painted" with NO further qualifier is genuinely ambiguous, and so is "a house with trim painted" (trim, doors, ceilings and railings exist inside AND outside, so the word "trim" alone says nothing about which) — leave projectType UNSET in that case so the bot asks directly, rather than guessing. Guessing wrong here derails the whole conversation (it leads to asking interior-only questions about an exterior-only job, or vice versa).',
       },
       projectCondition: { type: 'string', enum: ['repaint', 'new_construction', 'renovation'] },
       interiorScope: {

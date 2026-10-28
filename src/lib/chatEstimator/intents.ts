@@ -15,6 +15,7 @@ export type Intent =
   | 'ask_clarification'     // "like what?" / "what do you mean?" / "huh?"
   | 'ask_example'           // "give me an example" / "such as?"
   | 'express_uncertainty'   // "not sure" / "I don't know" / "idk"
+  | 'dismissive'            // "doesn't matter, just want it done" / "whatever" / "I don't care": brushing the question off
   | 'meta_cost'             // "how much do you charge?" / "is this free?"
   | 'meta_how_it_works'     // "how does this work?" / "what is this?"
   | 'meta_bot_check'        // "am I talking to a bot?" / "are you ai?"
@@ -141,6 +142,18 @@ export function classifyIntent(rawText: string): IntentResult {
   }
   if (has(t, /^example/, /\bgive\s+me\s+(an\s+)?example/, /\blike\s+(what|how)\b.*\?$/, /^such\s+as\??$/, /^e\.?g\b/)) {
     intents.push('ask_example');
+  }
+
+  // Dismissive: the customer is brushing the question off ("doesn't matter", "just want it done", "whatever"). Not the same as not knowing.
+  if (has(t,
+    /\bdoes\s?n'?t\s+(?:really\s+)?matter\b/, /\bdon'?t\s+(?:really\s+)?matter\b/, /\bit\s+(?:really\s+)?does\s?n'?t\b.*\bmatter\b/,
+    /\b(?:i\s+)?(?:don'?t|dont|do\s+not)\s+(?:really\s+)?care\b/, /\bwho\s+cares\b/, /\bidc\b/, /^\s*(?:meh|whatever)\b/, /\bwhatever\b(?!\s+(?:the\s+)?painter)/,
+    /\bjust\s+(?:want|need)\s+(?:it|this|them|the\s+(?:job|work|house|place))\s+(?:done|painted|finished)\b/,
+    /\bjust\s+(?:do|paint|get)\s+(?:it|the\s+(?:job|house))(?:\s+done)?\b/, /\bjust\s+have\s+it\s+done\b/,
+    /\bwhy\s+does\s+(?:that|it|this)\s+matter\b/, /\bnot\s+(?:important|relevant)\b/, /\bstop\s+asking\b/,
+    /\bany\s*way\s+is\s+(?:fine|ok|okay)\b/, /\beither\s+(?:way|one)\s+(?:is\s+)?(?:fine|ok|okay)\b/,
+  )) {
+    intents.push('dismissive');
   }
 
   // Uncertainty

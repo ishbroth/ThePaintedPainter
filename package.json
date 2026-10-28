@@ -12,6 +12,7 @@
     "mobile:android": "npm run mobile:sync && cap open android",
     "mobile:ios": "npm run mobile:sync && cap open ios",
     "lint": "eslint .",
+    "check:estimator": "npx --yes esbuild scripts/estimatorConversations.ts --bundle --platform=node --format=esm --define:import.meta.env={} --log-level=error --outfile=_sim/estimatorConversations.mjs && node _sim/estimatorConversations.mjs",
     "seed:demo": "npx --yes tsx supabase/seed/seedDemoPainters.ts",
     "preview": "vite preview"
   },

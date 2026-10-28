@@ -38,6 +38,7 @@ import { classifyIntent, hasIntent, type Intent, type IntentResult } from './int
 import { derive, applyDerivations } from './derivation';
 import { pickNextTopic, pickRetryTopic, findTopic, metaBank, isStandaloneOnlyJob, type Topic } from './topics';
 import { extractWithLLM } from './llmClient';
+import { highestPriceAssumption, sanitizeLlmPatch } from './dismissive';
 import { makeInitialContext } from './defaultContext';
 
 // ===== Message / state =====
@@ -341,9 +342,14 @@ async function understand(
     state.lastBotTopic ? state.lastBotTopic.ask(state.ctx) : null,
   );
   if (llm) {
+    // Anything the reader concluded that the customer didn't say (inside/outside from a bare "house with trim") is dropped.
+    const patch = sanitizeLlmPatch(trimmed, state.ctx, state.lastBotTopic?.id ?? null, llm.patch);
+    // "Doesn't matter, just want it done" has been tagged as a deflection or plain info: our own check says what it is.
+    const dismissive = classifyIntent(trimmed).intents.includes('dismissive');
+    const intents: Intent[] = dismissive ? ['dismissive', ...llm.intents.filter((i) => i !== 'deflection' && i !== 'off_topic' && i !== 'provide_info' && i !== 'dismissive')] : llm.intents;
     return {
-      intent: { intents: llm.intents, normalized: trimmed.toLowerCase(), isQuestion: trimmed.trim().endsWith('?') },
-      patch: llm.patch,
+      intent: { intents, normalized: trimmed.toLowerCase(), isQuestion: trimmed.trim().endsWith('?') },
+      patch,
       acknowledgements: llm.acknowledgements,
     };
   }
@@ -567,7 +573,7 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
       [/\bfrazee\b/, 'Frazee'],
       [/\bvista\b/, 'Vista'],
     ];
-    const painterChoice = /\b(?:painter'?s? (?:choice|call|pick|decision)|up to (?:the )?painter|you (?:pick|choose|decide)|their choice|your choice|doesn'?t matter|don'?t care|no preference|no brand|any(?:thing)? (?:is )?(?:fine|works|ok|okay)|whatever (?:they|you)|not picky|let (?:them|him|her|the painter) (?:pick|choose|decide))\b/.test(low);
+    const painterChoice = hasIntent(intent, 'dismissive') || /\b(?:painter'?s? (?:choice|call|picks?|decision)|up to (?:the )?painter|you (?:pick|choose|decide)|their choice|your choice|doesn'?t matter|don'?t care|no preference|no brand|any(?:thing)? (?:is )?(?:fine|works|ok|okay)|whatever (?:they|you)|not picky|let (?:them|him|her|the painter) (?:pick|choose|decide))\b/.test(low);
     if (!state.ctx.paintBrand || state.ctx.paintBrand === 'painter_choice') {
       const named = brands.find(([re]) => re.test(low));
       if (named) ctxWithExplicit.paintBrand = named[1];
@@ -662,8 +668,8 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
         if (/\b(?:same|keep|keeping|current|existing|match|matching|stay|staying)\b/.test(low) && !/\bdifferent|new color|change\b/.test(low)) ctxWithExplicit.exteriorColorChange = 'same';
         else if (/\b(?:different|new|change|changing|switch|switching|another|dark|light|paint it)\b/.test(low)) ctxWithExplicit.exteriorColorChange = 'different';
       }
-      // a question back ("what do you mean?") is not an answer
-      if (!trimmed.endsWith('?')) {
+      // a question back ("what do you mean?") is not an answer, and neither is a brush-off (the dismissive rule answers it, at the higher price)
+      if (!trimmed.endsWith('?') && !hasIntent(intent, 'dismissive')) {
         ctxWithExplicit.extAnswered = [...new Set([...(state.ctx.extAnswered ?? []), asked])];
       }
     }
@@ -789,6 +795,12 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
     ctxNext.zipCity = '';
   }
 
+  // "House with trim" said before the inside/outside question: once it turns out to be the outside, the trim was already asked for.
+  if ((ctxNext.projectType === 'exterior' || ctxNext.projectType === 'both') && ctxNext.exteriorTrim !== 'yes' && !state.ctx.projectType
+    && /\btrim\b/i.test(newTranscript) && !/\b(?:no|not|without|skip|except)\s+(?:the\s+)?trim\b/i.test(newTranscript)) {
+    ctxNext.exteriorTrim = 'yes';
+  }
+
   // Trim, fascia, soffits and eaves are one item on an outside job: either one named brings the other.
   if ((ctxNext.projectType === 'exterior' || ctxNext.projectType === 'both') && (ctxNext.exteriorTrim === 'yes' || ctxNext.soffitsEaves === 'yes')) {
     ctxNext.exteriorTrim = 'yes';
@@ -836,6 +848,35 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
     history: [...state.history, userMsg],
     transcript: newTranscript,
   };
+
+  // A dismissive answer ("doesn't matter, just want it done", "whatever") to a question that is still open: don't ask it again and don't
+  // guess low. Take the highest-priced answer to that question, say so, and move on. Anything useful in the same message was already read.
+  if (hasIntent(intent, 'dismissive') && s.lastBotTopic && !s.lastBotTopic.alreadyAnswered(ctxNext)) {
+    const topic = s.lastBotTopic;
+    const assumption = highestPriceAssumption(topic.id, ctxNext);
+    if (assumption?.reask && !s.retriedIds.includes(topic.id)) {
+      // something that can't be assumed (a ZIP code): say why it's needed, once, and ask again in the same breath
+      const again = topic.ask(ctxNext);
+      return {
+        state: {
+          ...s,
+          retriedIds: [...s.retriedIds, topic.id],
+          history: [...s.history, botMessage(`${assumption.say} ${again.charAt(0).toUpperCase()}${again.slice(1)}`)],
+        },
+        done: null,
+      };
+    }
+    if (!assumption?.reask) {
+      s = {
+        ...s,
+        ctx: { ...ctxNext, ...(assumption?.patch ?? {}) },
+        askedIds: s.askedIds.includes(topic.id) ? s.askedIds : [...s.askedIds, topic.id],
+        retriedIds: s.retriedIds.includes(topic.id) ? s.retriedIds : [...s.retriedIds, topic.id],
+        history: [...s.history, botMessage(assumption?.say ?? "No problem, I'll go with the higher-priced option so the price won't come in short, and keep moving.")],
+      };
+      return await advanceAfterUncertainty(s, customerId);
+    }
+  }
 
   // 2. Ready-to-finish — jump to finalize if we have enough. Checked BEFORE
   // the softer meta-chatter checks below (step 3): terse phrases like "run
