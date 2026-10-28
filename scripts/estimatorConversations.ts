@@ -77,8 +77,12 @@ async function dismissAt(setup: string[], topicWords: RegExp, dismissal = 'doesn
 // 2. The rule for any dismissive answer: highest price
 // ---------------------------------------------------------------------------------------------------------------------------------
 {
-  const a = await play(['i need my house painted', 'doesnt matter']);
-  check('dismissive about inside or outside: priced as both', a.state.ctx.projectType === 'both', JSON.stringify(a.state.ctx.projectType));
+  const a = await play(['i need my house painted', 'doesnt matter', 'whatever']);
+  check('dismissive about inside or outside: never assumed, asked again every time', a.state.ctx.projectType === '' && /inside|interior/i.test(a.last) && /outside|exterior/i.test(a.last), JSON.stringify({ p: a.state.ctx.projectType, last: a.last }));
+  const a2 = await play(['i need my house painted', 'doesnt matter', 'the walls and baseboards and ceilings in the bedrooms']);
+  check('...later hints about walls, ceilings, baseboards mean inside', a2.state.ctx.projectType === 'interior', JSON.stringify(a2.state.ctx.projectType));
+  const a3 = await play(['i need my house painted', 'doesnt matter', 'the siding, soffits and eaves']);
+  check('...later hints about siding, soffits, eaves mean outside', a3.state.ctx.projectType === 'exterior', JSON.stringify(a3.state.ctx.projectType));
 
   const b = await dismissAt(['exterior of the house', '2000 sq ft'], /material|siding/i);
   check('dismissive about the siding: the priciest siding in the price table', b.reached && !!b.after.sidingType && b.after.sidingType !== '' && /higher-priced/.test(b.reply), JSON.stringify({ asked: b.asked, siding: b.after.sidingType }));

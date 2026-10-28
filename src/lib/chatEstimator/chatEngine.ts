@@ -854,7 +854,7 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
   if (hasIntent(intent, 'dismissive') && s.lastBotTopic && !s.lastBotTopic.alreadyAnswered(ctxNext)) {
     const topic = s.lastBotTopic;
     const assumption = highestPriceAssumption(topic.id, ctxNext);
-    if (assumption?.reask && !s.retriedIds.includes(topic.id)) {
+    if (assumption?.reask && (assumption.askUntilClear || !s.retriedIds.includes(topic.id))) {
       // something that can't be assumed (a ZIP code): say why it's needed, once, and ask again in the same breath
       const again = topic.ask(ctxNext);
       return {

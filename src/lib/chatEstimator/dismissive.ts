@@ -21,6 +21,8 @@ export interface Assumption {
   say: string;
   /** The answer can't be assumed (a ZIP code): explain why it is needed and ask again instead of moving on. */
   reask?: boolean;
+  /** Re-ask every time it is brushed off, not just once (inside/outside has no safe default). */
+  askUntilClear?: boolean;
 }
 
 /**
@@ -48,7 +50,8 @@ const withExt = (ctx: EstimatorContext, id: string): string[] => [...new Set([..
 export function highestPriceAssumption(topicId: string, ctx: EstimatorContext): Assumption | null {
   switch (topicId) {
     case 'project_type':
-      return { patch: { projectType: 'both', interiorScope: ctx.interiorScope || 'whole_house' }, say: higher('both the inside and the outside') };
+      // never assumed: inside or outside changes the whole job, so it is asked again (any hint in later messages is picked up first)
+      return { patch: {}, reask: true, say: "I do need to know which one, since inside and outside are priced very differently.", askUntilClear: true };
     case 'which_rooms':
       return { patch: { interiorScope: 'whole_house' }, say: higher('the whole inside') };
     case 'room_size':
