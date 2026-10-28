@@ -801,6 +801,20 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
     ctxNext.exteriorTrim = 'yes';
   }
 
+  // Inside AND outside: a bare "both" to the inside-or-outside question, or a later message that brings in the other side (an inside job
+  // that now mentions siding or eaves, an outside job that now mentions ceilings or baseboards), makes it both. Said-no ("not the inside") doesn't.
+  if (ctxNext.projectType === 'interior' || ctxNext.projectType === 'exterior' || !ctxNext.projectType) {
+    const msg = trimmed.toLowerCase();
+    const bareBoth = state.lastBotTopic?.id === 'project_type' && /^\W*(?:both|all of it|everything|the whole (?:thing|house)|inside and out(?:side)?|in and out)\W*$/.test(msg);
+    const otherSide = ctxNext.projectType === 'interior'
+      ? /\b(?:siding|stucco|soffits?|fascia|eaves|gutters?|exterior|outside(?! of the (?:closet|room|cabinet))|outdoors?)\b/
+      : ctxNext.projectType === 'exterior'
+        ? /\b(?:interior|inside|indoors?|ceilings?|baseboards?|bedrooms?|living room|kitchen|bathrooms?|hallways?)\b/
+        : null;
+    const negated = /\b(?:not|no|except|without|skip|don'?t need|doesn'?t need)\b[^.,;]{0,25}\b(?:siding|soffits?|fascia|eaves|gutters?|exterior|outside|interior|inside|ceilings?|baseboards?|bedrooms?|kitchen|bathrooms?)\b/.test(msg);
+    if (bareBoth || (otherSide && otherSide.test(msg) && !negated && !hasIntent(intent, 'ask_clarification'))) ctxNext.projectType = 'both';
+  }
+
   // Trim, fascia, soffits and eaves are one item on an outside job: either one named brings the other.
   if ((ctxNext.projectType === 'exterior' || ctxNext.projectType === 'both') && (ctxNext.exteriorTrim === 'yes' || ctxNext.soffitsEaves === 'yes')) {
     ctxNext.exteriorTrim = 'yes';

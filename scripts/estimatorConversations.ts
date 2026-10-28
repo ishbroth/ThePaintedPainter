@@ -84,6 +84,18 @@ async function dismissAt(setup: string[], topicWords: RegExp, dismissal = 'doesn
   const a3 = await play(['i need my house painted', 'doesnt matter', 'the siding, soffits and eaves']);
   check('...later hints about siding, soffits, eaves mean outside', a3.state.ctx.projectType === 'exterior', JSON.stringify(a3.state.ctx.projectType));
 
+  const both1 = await play(['i need my house painted', 'doesnt matter', 'the inside color is gray and the outside color will be white']);
+  check('...inside AND outside named in one message means both', both1.state.ctx.projectType === 'both', JSON.stringify(both1.state.ctx.projectType));
+  const both2 = await play(['i need my house painted', 'doesnt matter', 'the walls and ceilings inside and also the siding and eaves']);
+  check('...walls/ceilings plus siding/eaves across messages means both', both2.state.ctx.projectType === 'both', JSON.stringify(both2.state.ctx.projectType));
+  const both3 = await play(['i need my house painted', 'doesnt matter', 'the bedroom walls', 'and the siding too']);
+  check('...an inside hint, then an outside hint later, becomes both', both3.state.ctx.projectType === 'both', JSON.stringify(both3.state.ctx.projectType));
+  const both4 = await play(['i need my house painted', 'both']);
+  check('answering "both" directly', both4.state.ctx.projectType === 'both', JSON.stringify(both4.state.ctx.projectType));
+
+  const keep = await play(['i need my house painted', 'inside', 'just the bedroom walls, not the siding or eaves']);
+  check('an inside job that says "not the siding or eaves" stays inside only', keep.state.ctx.projectType === 'interior', JSON.stringify(keep.state.ctx.projectType));
+
   const b = await dismissAt(['exterior of the house', '2000 sq ft'], /material|siding/i);
   check('dismissive about the siding: the priciest siding in the price table', b.reached && !!b.after.sidingType && b.after.sidingType !== '' && /higher-priced/.test(b.reply), JSON.stringify({ asked: b.asked, siding: b.after.sidingType }));
 

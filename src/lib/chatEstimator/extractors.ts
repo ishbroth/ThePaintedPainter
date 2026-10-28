@@ -58,6 +58,7 @@ export function extractProjectType(text: string): 'interior' | 'exterior' | 'bot
   const hasIn = /\b(interior|inside|indoors?|inside the house|inside the home)\b/.test(t);
   const hasEx = /\b(exterior|outside|outdoors?|outside the house|siding|stucco)\b/.test(t);
   if (hasIn && hasEx) return 'both';
+  if (/\b(?:inside and out|in and out|inside & out|inside\/outside)\b/.test(t)) return 'both';
   if (/\b(both\s+(?:interior|inside)\s+and\s+(?:exterior|outside))\b/.test(t)) return 'both';
   if (hasEx) return 'exterior';
   if (hasIn) return 'interior';
