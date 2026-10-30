@@ -17,6 +17,27 @@ export interface PainterAvailabilityFields {
   blackout_dates: unknown
 }
 
+/** A job this short (working days) can go to a one- or two-person crew that is already booked. */
+export const SMALL_JOB_MAX_DAYS = 2
+/** A crew this big (or bigger) that keeps accepting jobs while booked is offered any job. */
+export const LARGE_CREW = 3
+
+export interface OverbookFields {
+  crew_size?: number | null
+  accepts_when_booked?: boolean | null
+}
+
+/**
+ * Painters can turn on "keep accepting jobs even when I'm booked" (profile > Availability). They only come into play when EVERY painter
+ * in the area is booked on the customer's dates, in two tiers: crews of three or more first, for any job; one- and two-person crews only
+ * for small jobs. Painters who paused their leads are never offered anything.
+ */
+export function overbookTier(p: OverbookFields & PainterAvailabilityFields, durationDays: number): 'large' | 'small' | null {
+  if (!p.accepts_when_booked || p.leads_paused) return null
+  if ((Number(p.crew_size) || 1) >= LARGE_CREW) return 'large'
+  return durationDays <= SMALL_JOB_MAX_DAYS ? 'small' : null
+}
+
 export interface CustomerTiming {
   startDate?: string | null
   endDate?: string | null

@@ -10,7 +10,7 @@
 import { getZipCoords, milesBetweenZips } from './geo.ts'
 import { estimatePainterPrice } from './painterPricing.ts'
 import { cleanExternalReviews, type ExternalReview } from './externalReviews.ts'
-import { evaluateAvailability, todayIso, type CustomerTiming } from './availability.ts'
+import { evaluateAvailability, overbookTier, todayIso, type CustomerTiming } from './availability.ts'
 import { estimateDayRange } from './duration.ts'
 import { signPrice } from './priceToken.ts'
 
@@ -139,12 +139,16 @@ export async function rankPainters(
   const mysteryAt = async (price: number) => ({ price, priceToken: await signPrice('mystery', price, zip, holdUntil) })
   const mystery = await mysteryAt(Math.round(baseTotal))
 
-  const { data: rows, error } = await supabase
+  const baseColumns = 'id, user_id, company_name, city, state, zip_code, service_types, external_reviews, leads_paused, paused_until, blackout_dates, crew_size, price_1br_full, price_3br_walls, price_3br_trim_doors, price_3br_ceilings, price_5br_full, price_5br_cabinets'
+  const loadRows = (columns: string) => supabase
     .from('painters')
-    .select('id, user_id, company_name, city, state, zip_code, service_types, external_reviews, leads_paused, paused_until, blackout_dates, price_1br_full, price_3br_walls, price_3br_trim_doors, price_3br_ceilings, price_5br_full, price_5br_cabinets')
+    .select(columns)
     .eq('status', 'approved')
     .eq('verified', true)
     .eq('is_demo', false) // demonstration painters appear on the map, never in a real customer's results
+  // accepts_when_booked is a newer column: until it exists in the database, the list simply works without it
+  let { data: rows, error } = await loadRows(baseColumns + ', accepts_when_booked')
+  if (error && /accepts_when_booked/.test(String(error.message))) ({ data: rows, error } = await loadRows(baseColumns))
   if (error) throw error
 
   // Exact positions of the customer's ZIP and every painter's ZIP (looked up once, then remembered).
@@ -172,14 +176,26 @@ export async function rankPainters(
     }
   }
 
-  // Nearby, not excluded, and available for what the customer asked — nearest first.
-  const nearby = (rows ?? [])
+  // Nearby and not excluded, with whether each is free for what the customer asked.
+  const inRange = (rows ?? [])
     .filter((p: { id: string }) => !excluded.has(p.id))
     .map((p: Record<string, unknown>) => ({ p, distance: zipDistanceMiles(zip, p.zip_code as string) }))
     .filter((x: { distance: number | null }): x is { p: Record<string, unknown>; distance: number } => x.distance !== null && x.distance <= SERVICE_RADIUS_MILES)
     .map((x: { p: Record<string, unknown>; distance: number }) => ({ ...x, avail: evaluateAvailability(x.p as never, timing, duration.days, today) }))
-    .filter((x: { avail: { show: boolean } }) => x.avail.show)
-    .sort((a: { distance: number }, b: { distance: number }) => a.distance - b.distance)
+
+  // Painters free on the customer's dates, nearest first. Only when nobody is, painters who keep accepting jobs while booked are listed:
+  // crews of three or more first (any job), then one- and two-person crews (small jobs only).
+  let nearby = inRange.filter((x: { avail: { show: boolean } }) => x.avail.show).sort((a: { distance: number }, b: { distance: number }) => a.distance - b.distance)
+  let bookedButTakingJobs = false
+  if (nearby.length === 0) {
+    const tiered = inRange
+      .map((x: { p: Record<string, unknown> }) => ({ ...x, tier: overbookTier(x.p as never, duration.days) }))
+      .filter((x: { tier: string | null }) => x.tier !== null)
+    tiered.sort((a: { tier: string; distance: number }, b: { tier: string; distance: number }) =>
+      (a.tier === 'large' ? 0 : 1) - (b.tier === 'large' ? 0 : 1) || a.distance - b.distance)
+    nearby = tiered
+    bookedButTakingJobs = tiered.length > 0
+  }
 
   if (nearby.length === 0) return { painters: [], mystery, holdUntil, duration, preferred }
 
@@ -236,6 +252,7 @@ export async function rankPainters(
   for (let i = 0; i < nearby.length; i++) {
     const { p, distance, avail } = nearby[i] as { p: Record<string, unknown>; distance: number; avail: { availableFrom: string | null } }
     const reasons: string[] = [distance < 5 ? 'right in your area' : `~${Math.round(distance)} mi away`]
+    if (bookedButTakingJobs) reasons.push('booked on your dates, but takes jobs anyway')
     const overlaps = ((p.service_types as string[]) ?? []).filter((s) => wanted.some((w) => s.toLowerCase().includes(w)))
     if (overlaps.length > 0) reasons.push(`specializes in ${overlaps.slice(0, 2).join(' & ')}`)
 

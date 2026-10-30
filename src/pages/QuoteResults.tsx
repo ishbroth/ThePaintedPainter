@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { useLocation, Navigate, useNavigate } from 'react-router-dom';
 import type { EstimatorContext, EstimateBreakdown } from '../lib/types';
 import type { Assumption } from '../lib/chatEstimator/defaultAssumptions';
@@ -7,6 +7,7 @@ import { fetchPainterResults, type PainterResult, type PainterResults } from '..
 import { estimateDayRange } from '../lib/duration';
 import PainterResultCard from '../components/results/PainterResultCard';
 import PriceBreakdown from '../components/results/PriceBreakdown';
+import TimingCalendar from '../components/results/TimingCalendar';
 import { baseFromResult, buildPriceEditor } from '../lib/priceEditing';
 import { buildResponseSummary, timelineLabel } from '../lib/chatEstimator/responseSummary';
 import { supabase } from '../lib/supabase';
@@ -205,6 +206,7 @@ const QuoteResults = () => {
     return <Navigate to="/" replace />;
   }
 
+  const timingPicked = edits.fields.startDate !== undefined;
   const estimate = liveEstimate ?? state.estimate;
   const ctx = liveCtx ?? state.ctx;
   const { assumptions } = state;
@@ -216,6 +218,54 @@ const QuoteResults = () => {
   const preferredOutcome = results?.preferred;
   const duration = results?.duration ?? estimateDayRange(estimate.total);
 
+
+  const mysteryCard = (key: string) => (
+    <div key={key} className="mystery-painter-card" style={{ opacity: expired ? 0.55 : 1 }}>
+      <div>
+        <div className="mystery-painter-title">
+          Mystery Painter
+          <span className="mystery-badge">Guaranteed Price</span>
+        </div>
+        <p className="mystery-painter-desc">
+          {(painterMatches?.length ?? 0) > 0 ? (
+            <>Accept the guaranteed price and we'll match you with a verified, licensed painter who bids on your job.</>
+          ) : (
+            <>
+              Accept the guaranteed price and we'll actively recruit a verified, licensed painter in your area to take the job at this rate. We
+              don't have one in our roster there yet, but we guarantee the price regardless.
+            </>
+          )}
+        </p>
+      </div>
+      <div className="mystery-painter-price">
+        <div className="mystery-painter-price-main">{currency(results?.mystery.price ?? estimate.total)}</div>
+        <button
+          style={{
+            marginTop: 6,
+            padding: '8px 16px',
+            background: expired || claimed ? 'var(--border-strong)' : 'var(--accent-blue)',
+            color: expired || claimed ? 'var(--text-faint)' : 'var(--accent-blue-ink)',
+            border: 'none',
+            borderRadius: 10,
+            fontWeight: 700,
+            fontFamily: 'Cabin, sans-serif',
+            textTransform: 'uppercase',
+            letterSpacing: 1,
+            fontSize: '0.78rem',
+            cursor: expired || claimed ? 'not-allowed' : 'pointer',
+          }}
+          disabled={expired || claimed}
+          onClick={() => {
+            if (claimed) return;
+            hapticMedium();
+            setClaimTarget({ selectionType: 'guaranteed' });
+          }}
+        >
+          {claimed ? 'Request sent' : expired ? 'Expired' : 'Book Guaranteed'}
+        </button>
+      </div>
+    </div>
+  );
 
   return (
     <div className="quote-results-page">
@@ -258,9 +308,6 @@ const QuoteResults = () => {
       {/* Hero / price */}
       <div className="quote-results-hero">
         <h1>Your Price</h1>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-          {describeJob(ctx)}
-        </p>
         {firstPainter?.workedWithBefore && (
           <div style={{ color: 'var(--accent-blue)', fontWeight: 700, fontSize: '0.95rem', marginBottom: 4 }}>Your price with {firstPainter.companyName}</div>
         )}
@@ -268,9 +315,21 @@ const QuoteResults = () => {
         <div className="quote-results-range">
           Likely range: {currency(Math.round(estimate.lowRange * priceScale))} – {currency(Math.round(estimate.highRange * priceScale))}
         </div>
-        <div style={{ marginTop: 10, color: 'var(--text-secondary)', fontSize: '0.88rem' }}>
+        <div style={{ marginTop: 6, color: 'var(--text-secondary)', fontSize: '0.86rem' }}>
           Expected time on site: <strong>about {duration.low === duration.high ? duration.low : `${duration.low}–${duration.high}`} working day{duration.high === 1 ? '' : 's'}</strong>
           {' · '}Your timing: <strong>{timingSummary(ctx)}</strong>
+          <TimingCalendar
+            start={ctx.startDate || null}
+            end={ctx.endDate || null}
+            changed={timingPicked}
+            disabled={expired}
+            onApply={(a, b) => setEdits((e) => ({ ...e, fields: { ...e.fields, startDate: a, endDate: b, datesFlexible: false, timeline: '' } as Partial<EstimatorContext> }))}
+            onClear={() => setEdits((e) => {
+              const fields = { ...e.fields } as Record<string, unknown>;
+              for (const k of ['startDate', 'endDate', 'datesFlexible', 'timeline']) delete fields[k];
+              return { ...e, fields: fields as Partial<EstimatorContext> };
+            })}
+          />
         </div>
       </div>
 
@@ -296,6 +355,7 @@ const QuoteResults = () => {
         <PriceBreakdown
           view={shownView}
           assumptions={assumptions}
+          jobSummary={describeJob(ctx)}
           canEdit={!!editBase}
           edited={edited}
           disabled={expired}
@@ -320,7 +380,7 @@ const QuoteResults = () => {
       )}
       <div className="painter-list-header">
         <h2>Painters who can do this job</h2>
-        <p style={{ marginBottom: 6, fontSize: '0.85rem', color: 'var(--text-faint)' }}>
+        <p className="painter-standing-note" style={{ marginBottom: 6, fontSize: '0.85rem', color: 'var(--text-faint)' }}>
           Every painter here is in good standing. Painters with a pattern of poor reviews are removed from our network.
         </p>
         <p>
@@ -337,82 +397,22 @@ const QuoteResults = () => {
         </p>
       </div>
 
-      {(painterMatches ?? []).map((m) => (
-        <PainterResultCard
-          key={m.id}
-          result={m}
-          disabled={expired || claimed}
-          onSelect={() => {
-            if (expired || claimed) return;
-            hapticMedium();
-            setClaimTarget({ selectionType: 'specific_painter', painter: { id: m.id, company_name: m.companyName }, price: m.price, priceToken: m.priceToken });
-          }}
-        />
-      ))}
-
-      {/* Mystery painter */}
-      <div
-        className="mystery-painter-card"
-        style={{ opacity: expired ? 0.55 : 1 }}
-      >
-        <div>
-          <div className="mystery-painter-title">
-            Mystery Painter
-            <span className="mystery-badge">Guaranteed Price</span>
-          </div>
-          <p className="mystery-painter-desc">
-            {(painterMatches?.length ?? 0) > 0 ? (
-              <>
-                Accept the guaranteed price and we'll match you with a verified, licensed painter who
-                bids on your job. You won't choose the painter in advance — we fan the job out to every
-                qualified painter in the area and confirm the first one available. Guaranteed coverage,
-                best price.
-              </>
-            ) : (
-              <>
-                Accept the guaranteed price and we'll actively recruit a verified, licensed painter in
-                your area to take the job at this rate — we don't have one in our roster there yet,
-                but we guarantee the price regardless.
-              </>
-            )}
-          </p>
-          {(painterMatches?.length ?? 0) > 0 && (
-            <p className="mystery-painter-desc" style={{ marginTop: 8, fontSize: '0.8rem', color: 'var(--accent-blue)' }}>
-              {painterMatches!.length} painter{painterMatches!.length === 1 ? '' : 's'} in our pool could bid on this job.
-            </p>
-          )}
-        </div>
-        <div className="mystery-painter-price">
-          <div className="mystery-painter-price-main">{currency(results?.mystery.price ?? estimate.total)}</div>
-          <div className="mystery-painter-price-save">
-            Save vs. listed painters
-          </div>
-          <button
-            style={{
-              marginTop: 10,
-              padding: '10px 18px',
-              background: expired || claimed ? 'var(--border-strong)' : 'var(--accent-blue)',
-              color: expired || claimed ? 'var(--text-faint)' : 'var(--accent-blue-ink)',
-              border: 'none',
-              borderRadius: 10,
-              fontWeight: 700,
-              fontFamily: 'Cabin, sans-serif',
-              textTransform: 'uppercase',
-              letterSpacing: 1,
-              fontSize: '0.8rem',
-              cursor: expired || claimed ? 'not-allowed' : 'pointer',
-            }}
+      {(painterMatches ?? []).map((m, idx) => (
+        <Fragment key={m.id}>
+          <PainterResultCard
+            result={m}
             disabled={expired || claimed}
-            onClick={() => {
-              if (claimed) return;
+            onSelect={() => {
+              if (expired || claimed) return;
               hapticMedium();
-              setClaimTarget({ selectionType: 'guaranteed' });
+              setClaimTarget({ selectionType: 'specific_painter', painter: { id: m.id, company_name: m.companyName }, price: m.price, priceToken: m.priceToken });
             }}
-          >
-            {claimed ? 'Request sent' : expired ? 'Expired' : 'Book Guaranteed'}
-          </button>
-        </div>
-      </div>
+          />
+          {/* the Mystery Painter after the first painter, so it is on screen at once, and again after every four more */}
+          {idx % 4 === 0 && mysteryCard(`mystery-${idx}`)}
+        </Fragment>
+      ))}
+      {painterMatches !== null && painterMatches.length === 0 && mysteryCard('mystery-only')}
 
       {claimTarget && (
         <ClaimPriceModal
@@ -598,11 +598,17 @@ const ClaimPriceModal = ({
           </>
         ) : (
           <>
+            {target.selectionType === 'guaranteed' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '0 0 12px', padding: '8px 12px', borderRadius: 10, background: 'color-mix(in srgb, var(--accent-blue) 14%, transparent)', border: '1px solid var(--accent-blue)' }}>
+                <MysteryPainterIcon />
+                <span style={{ fontFamily: 'Cabin, sans-serif', fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase', color: 'var(--accent-blue)' }}>Mystery Painter</span>
+              </div>
+            )}
             <h2 style={{ marginTop: 0 }}>
               {target.selectionType === 'specific_painter' ? `Claim your price with ${target.painter.company_name}` : 'Claim your guaranteed price'}
             </h2>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-              We'll keep your contact info private until a painter accepts the job.
+              Your info is kept private and no deposit is collected until a painter accepts your job and you confirm scheduling.
             </p>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 10, marginTop: 16 }}>
@@ -642,6 +648,20 @@ const ClaimPriceModal = ({
     </div>
   );
 };
+
+/** A paintbrush with a detective's monocle: the Mystery Painter. */
+const MysteryPainterIcon = () => (
+  <svg viewBox="0 0 48 48" width="46" height="46" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ color: 'var(--accent-blue)', flexShrink: 0 }}>
+    <g transform="rotate(30 24 24)">
+      <rect x="21" y="1.5" width="6" height="19" rx="3" fill="currentColor" fillOpacity="0.25" />
+      <rect x="19.5" y="20.5" width="9" height="6" rx="1" fill="currentColor" fillOpacity="0.5" />
+      <path d="M19.5 26.5 H28.5 C28.5 33 26.5 39 24 45.5 C21.5 39 19.5 33 19.5 26.5 Z" fill="currentColor" fillOpacity="0.8" />
+      <circle cx="24" cy="33" r="5" fill="var(--bg-surface)" strokeWidth="1.8" />
+      <circle cx="24" cy="33" r="1.5" fill="currentColor" stroke="none" />
+      <path d="M29 33 C35 33 36 24 28.5 23.5" strokeWidth="1.4" />
+    </g>
+  </svg>
+);
 
 const inputStyle: CSSProperties = {
   width: '100%',

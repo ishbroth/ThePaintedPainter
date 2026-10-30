@@ -170,6 +170,8 @@ function painterRow(p: RosterEntry, userId: string, index: number) {
     website: `https://www.example.com/${slug}`,
     years_in_business: p.years_experience,
     crew_size: p.crew_size,
+    // keeps accepting jobs while booked: the bigger crews, and a few small ones, so both tiers can be tried
+    accepts_when_booked: p.crew_size >= 6 || p.crew_size <= 2,
     bio: p.bio,
     external_reviews: {
       google: { url: `https://www.google.com/maps/search/${encodeURIComponent(p.company_name)}`, rating: p.rating, count: p.review_count },

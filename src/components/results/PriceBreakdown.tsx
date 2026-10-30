@@ -19,6 +19,8 @@ interface Props {
   onToggleRoom: (key: string) => void;
   onSetField: (field: keyof EstimatorContext, value: string | number | null) => void;
   onReset: () => void;
+  /** One line describing the job (type, size, ZIP), shown at the top of the breakdown. */
+  jobSummary?: string;
 }
 
 const linkStyle = (disabled: boolean): CSSProperties => ({
@@ -43,7 +45,7 @@ const inputStyle: CSSProperties = {
 };
 
 /** The "Price Breakdown" panel: main items and rooms have small "edit" and "remove" links; surcharges recalculate on their own. */
-export default function PriceBreakdown({ view, assumptions, canEdit, edited, disabled, onToggleItem, onToggleRoom, onSetField, onReset }: Props) {
+export default function PriceBreakdown({ view, assumptions, canEdit, edited, disabled, onToggleItem, onToggleRoom, onSetField, onReset, jobSummary }: Props) {
   const { current, rows, rooms, originalTotal, canRemoveMore } = view;
   const estimate = current.estimate;
   const [openEdit, setOpenEdit] = useState<string | null>(null);
@@ -140,6 +142,10 @@ export default function PriceBreakdown({ view, assumptions, canEdit, edited, dis
             </>
           )}
         </div>
+      )}
+
+      {jobSummary && (
+        <p style={{ margin: '0 0 14px', fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-primary)' }}>{jobSummary}</p>
       )}
 
       {canEdit && rooms.length > 0 && (

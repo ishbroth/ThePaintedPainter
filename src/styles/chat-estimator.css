@@ -474,30 +474,30 @@
   display: grid;
   grid-template-columns: auto auto 1fr;
   align-items: center;
-  gap: 16px;
-  padding: 14px 20px;
+  gap: 12px;
+  padding: 7px 14px;
   border: 1px solid;
-  border-radius: 12px;
-  margin-bottom: 22px;
+  border-radius: 10px;
+  margin-bottom: 12px;
 }
 
 .price-hold-label {
-  font-size: 0.72rem;
+  font-size: 0.66rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 1.2px;
+  letter-spacing: 1px;
 }
 
 .price-hold-timer {
   font-family: 'Cabin', sans-serif;
-  font-size: 1.6rem;
+  font-size: 1.2rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   letter-spacing: 1px;
 }
 
 .price-hold-msg {
-  font-size: 0.88rem;
+  font-size: 0.8rem;
   color: var(--text-secondary);
   text-align: right;
 }
@@ -521,47 +521,64 @@
 
 @media (max-width: 520px) {
   .price-hold-banner {
-    grid-template-columns: 1fr auto;
-    gap: 8px 14px;
+    grid-template-columns: auto auto 1fr;
+    gap: 2px 10px;
+    padding: 5px 10px;
+    margin-bottom: 8px;
   }
   .price-hold-msg {
     grid-column: 1 / -1;
     text-align: left;
-    font-size: 0.82rem;
+    font-size: 0.72rem;
+    line-height: 1.25;
+  }
+  .price-hold-refresh {
+    padding: 4px 10px;
   }
 }
 
 .quote-results-hero {
   background: linear-gradient(180deg, var(--bg-surface-hover) 0%, var(--bg-chrome) 100%);
   border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 28px;
-  margin-bottom: 28px;
+  border-radius: 12px;
+  padding: 14px 18px;
+  margin-bottom: 14px;
 }
 
 .quote-results-hero h1 {
   font-family: 'Cabin', sans-serif;
-  font-size: 1.6rem;
-  margin: 0 0 6px;
+  font-size: 1.1rem;
+  margin: 0;
   color: var(--text-primary);
 }
 
 .quote-results-price {
   font-family: 'Cabin', sans-serif;
-  font-size: 2.4rem;
+  font-size: 2rem;
   font-weight: 700;
   color: var(--accent-blue);
-  margin: 14px 0 4px;
+  margin: 2px 0 0;
+  line-height: 1.15;
 }
 
 .quote-results-range {
   color: var(--text-secondary);
-  font-size: 0.95rem;
+  font-size: 0.86rem;
+}
+
+@media (max-width: 600px) {
+  .quote-results-page {
+    padding: 14px 12px 60px;
+  }
+  .quote-results-hero {
+    padding: 10px 14px;
+    margin-bottom: 10px;
+  }
 }
 
 .breakdown-toggle {
   width: 100%;
-  padding: 14px 18px;
+  padding: 10px 16px;
   background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -651,7 +668,21 @@
 /* ===== Hotwire painter list ===== */
 
 .painter-list-header {
-  margin: 36px 0 16px;
+  margin: 22px 0 10px;
+}
+
+@media (max-width: 600px) {
+  .painter-list-header {
+    margin: 14px 0 8px;
+  }
+  .painter-list-header p {
+    margin-bottom: 2px;
+    line-height: 1.35;
+  }
+  /* the first Mystery Painter card should be on screen without scrolling */
+  .painter-list-header .painter-standing-note {
+    display: none;
+  }
 }
 
 .painter-list-header h2 {
@@ -743,21 +774,21 @@
 .mystery-painter-card {
   background: linear-gradient(135deg, var(--mystery-grad-start) 0%, var(--mystery-grad-end) 100%);
   border: 2px solid var(--accent-blue);
-  border-radius: 14px;
-  padding: 22px;
-  margin-top: 20px;
+  border-radius: 12px;
+  padding: 12px 16px;
+  margin: 0 0 10px;
   display: grid;
   grid-template-columns: 1fr auto;
-  gap: 16px;
+  gap: 10px;
   align-items: center;
 }
 
 .mystery-painter-title {
   font-family: 'Cabin', sans-serif;
-  font-size: 1.25rem;
+  font-size: 1.05rem;
   font-weight: 700;
   color: var(--text-primary);
-  margin: 0 0 6px;
+  margin: 0 0 3px;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -776,9 +807,9 @@
 
 .mystery-painter-desc {
   color: var(--text-secondary);
-  font-size: 0.9rem;
+  font-size: 0.84rem;
   margin: 0;
-  line-height: 1.5;
+  line-height: 1.4;
 }
 
 .mystery-painter-price {
@@ -787,7 +818,7 @@
 
 .mystery-painter-price-main {
   font-family: 'Cabin', sans-serif;
-  font-size: 1.8rem;
+  font-size: 1.45rem;
   font-weight: 700;
   color: var(--text-primary);
   font-variant-numeric: tabular-nums;
@@ -1088,5 +1119,19 @@ html.chat-kbd-lock body {
   .chat-estimator-card.chat-puff {
     animation: none;
     box-shadow: 0 0 0 3px var(--accent), 0 10px 40px rgba(0, 0, 0, 0.35);
+  }
+}
+
+/* the Mystery Painter card stays two columns and small on a phone */
+@media (max-width: 600px) {
+  .mystery-painter-card {
+    grid-template-columns: 1fr auto;
+    padding: 10px 12px;
+  }
+  .mystery-painter-price {
+    text-align: right;
+  }
+  .mystery-painter-price-main {
+    font-size: 1.25rem;
   }
 }

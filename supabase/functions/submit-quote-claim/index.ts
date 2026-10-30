@@ -20,7 +20,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
 import { notify } from '../_shared/notify.ts'
 import { getZipCoords, milesBetweenZips } from '../_shared/geo.ts'
 import { verifyPrice, signCancel } from '../_shared/priceToken.ts'
-import { evaluateAvailability, isIsoDate } from '../_shared/availability.ts'
+import { evaluateAvailability, isIsoDate, overbookTier } from '../_shared/availability.ts'
 import { estimateWorkingDays } from '../_shared/duration.ts'
 import { describeTiming } from '../_shared/offers.ts'
 import { cleanConversation, conversationRejected, conversationNote } from '../_shared/conversationLog.ts'
@@ -222,7 +222,7 @@ serve(async (req: Request) => {
     if (selectionType === 'specific_painter') {
       const { data: painter, error: painterError } = await supabase
         .from('painters')
-        .select('id, user_id, email, company_name, owner_name, phone, zip_code, leads_paused, paused_until, blackout_dates')
+        .select('*')
         .eq('id', selectedPainterId)
         .eq('verified', true)
         .eq('status', 'approved')
@@ -235,7 +235,8 @@ serve(async (req: Request) => {
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
         )
       }
-      if (!evaluateAvailability(painter, claimTiming, durationDays).show) {
+      // booked on those dates is fine for a painter who keeps accepting jobs while booked (the customer was only shown them when everyone was booked)
+      if (!evaluateAvailability(painter, claimTiming, durationDays).show && !overbookTier(painter, durationDays)) {
         return new Response(
           JSON.stringify({ error: 'That painter isn\'t available for your dates. Please pick another painter or adjust your dates.' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
@@ -245,7 +246,7 @@ serve(async (req: Request) => {
     } else {
       const { data: painters, error: paintersError } = await supabase
         .from('painters')
-        .select('id, user_id, email, company_name, owner_name, phone, zip_code, leads_paused, paused_until, blackout_dates')
+        .select('*')
         .eq('verified', true)
         .eq('status', 'approved')
         .eq('is_demo', false) // demonstration painters never get real jobs
@@ -253,11 +254,17 @@ serve(async (req: Request) => {
       if (paintersError) throw paintersError
 
       const coords = await getZipCoords(supabase, [quoteZip ?? '', ...(painters ?? []).map((p) => p.zip_code)])
-      notifiedPainters = (painters ?? [])
+      const inRange = (painters ?? [])
         .map((p) => ({ ...p, distance: quoteZip ? milesBetweenZips(coords, quoteZip, p.zip_code) : null }))
         .filter((p) => p.distance !== null && p.distance <= SERVICE_RADIUS_MILES)
-        .filter((p) => evaluateAvailability(p, claimTiming, durationDays).show)
-        .sort((a, b) => (a.distance ?? Infinity) - (b.distance ?? Infinity))
+      const free = inRange.filter((p) => evaluateAvailability(p, claimTiming, durationDays).show)
+      // everyone booked on those dates: painters who keep accepting jobs while booked, crews of three or more first, small crews only for small jobs
+      const overbooked = free.length > 0 ? [] : inRange
+        .map((p) => ({ p, tier: overbookTier(p, durationDays) }))
+        .filter((x) => x.tier !== null)
+        .sort((a, b) => (a.tier === 'large' ? 0 : 1) - (b.tier === 'large' ? 0 : 1) || (a.p.distance ?? Infinity) - (b.p.distance ?? Infinity))
+        .map((x) => x.p)
+      notifiedPainters = (free.length > 0 ? free.sort((a, b) => (a.distance ?? Infinity) - (b.distance ?? Infinity)) : overbooked)
         .slice(0, MYSTERY_BROADCAST_CAP)
     }
 

@@ -41,6 +41,10 @@ export default function AvailabilityCard() {
   const [ranges, setRanges] = useState<Range[]>([]);
   const [newStart, setNewStart] = useState('');
   const [newEnd, setNewEnd] = useState('');
+  // "keep accepting jobs even when I'm booked": null until we know the database has it
+  const [acceptsBooked, setAcceptsBooked] = useState<boolean | null>(null);
+  const [crew, setCrew] = useState<number | null>(null);
+  const [confirmSmallCrew, setConfirmSmallCrew] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
   const today = todayIso();
@@ -58,6 +62,17 @@ export default function AvailabilityCard() {
         setPaused(!!data.leads_paused);
         if (data.paused_until) { setMode('until'); setUntil(data.paused_until); }
         setRanges(Array.isArray(data.blackout_dates) ? (data.blackout_dates as Range[]).filter((r) => r.end >= today) : []);
+        // read separately, so a database that does not have the column yet cannot break the rest of this card
+        supabase
+          .from('painters')
+          .select('crew_size, accepts_when_booked')
+          .eq('id', data.id)
+          .maybeSingle()
+          .then(({ data: extra, error }) => {
+            if (error || !extra) return;
+            setCrew(typeof extra.crew_size === 'number' ? extra.crew_size : Number(extra.crew_size) || null);
+            setAcceptsBooked(!!extra.accepts_when_booked);
+          });
       });
   }, [user, today]);
 
@@ -84,8 +99,12 @@ export default function AvailabilityCard() {
         blackout_dates: ranges,
       })
       .eq('id', painterId);
+    let bookedError = null;
+    if (acceptsBooked !== null) {
+      ({ error: bookedError } = await supabase.from('painters').update({ accepts_when_booked: acceptsBooked }).eq('id', painterId));
+    }
     setSaving(false);
-    if (error) return setMessage({ kind: 'error', text: 'We couldn\'t save that. Please try again.' });
+    if (error || bookedError) return setMessage({ kind: 'error', text: 'We couldn\'t save that. Please try again.' });
     setMessage({
       kind: 'ok',
       text: !paused
@@ -156,6 +175,65 @@ export default function AvailabilityCard() {
           </button>
         </div>
       </div>
+
+      {acceptsBooked !== null && (
+        <div className="border-t border-[var(--border)] pt-4">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-[var(--text-primary)]">Keep accepting jobs even when I'm booked</p>
+              <p className="text-xs text-[var(--text-faint)]">
+                Customers see painters whose calendars are open for their dates first. If every painter nearby is booked, painters with this on are offered the job.
+                Crews of 3 or more are offered any job; crews of 1 to 2 only get smaller jobs, after the larger crews.
+              </p>
+            </div>
+            <Toggle
+              on={acceptsBooked}
+              onChange={(v) => {
+                setMessage(null);
+                if (v && (crew ?? 1) < 3) setConfirmSmallCrew(true);
+                else setAcceptsBooked(v);
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {confirmSmallCrew && (
+        <div
+          role="dialog"
+          aria-label="Are you sure?"
+          onClick={() => setConfirmSmallCrew(false)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-[var(--bg-surface)] rounded-xl p-6 w-full max-w-md"
+            style={{ boxSizing: 'border-box' }}
+          >
+            <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-2">Are you sure?</h3>
+            <p className="text-sm text-[var(--text-secondary)] mb-4">
+              We don't guarantee you business, but if you do book more than one job on the same dates it can get tricky. With a crew of {crew ?? 1}, you'll only be
+              offered smaller jobs, and only when every other painter in the area is already booked.
+            </p>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => { setAcceptsBooked(true); setConfirmSmallCrew(false); }}
+                className="px-5 py-2 bg-[var(--accent)] text-[var(--accent-ink)] font-semibold rounded-lg text-sm"
+              >
+                Yes, keep accepting jobs
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmSmallCrew(false)}
+                className="px-5 py-2 rounded-lg border border-[var(--border)] text-[var(--text-secondary)] text-sm"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="flex items-center gap-4">
         <button

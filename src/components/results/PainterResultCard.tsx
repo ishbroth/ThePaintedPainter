@@ -246,8 +246,8 @@ export default function PainterResultCard({
     <div
       style={{ background: 'var(--bg-surface)', border: result.workedWithBefore ? '2px solid var(--accent-blue)' : '1px solid var(--border)', borderRadius: 12, marginBottom: 10, overflow: 'hidden' }}
     >
-      <div className="flex flex-col md:flex-row">
-        <div className="w-full md:w-44 md:flex-shrink-0 h-28 md:h-auto md:min-h-[8.5rem] relative">
+      <div className="flex flex-row">
+        <div className="w-24 md:w-44 flex-shrink-0 min-h-[7.5rem] md:min-h-[8.5rem] relative">
           <PhotoCarousel photos={result.photos} name={result.companyName} />
         </div>
 
@@ -288,7 +288,7 @@ export default function PainterResultCard({
             )}
 
             {result.reasons.slice(1).length > 0 && (
-              <div className="flex flex-wrap gap-2 mt-2">
+              <div className="hidden md:flex flex-wrap gap-2 mt-2">
                 {result.reasons.slice(1).map((r) => (
                   <span key={r} style={{ background: 'var(--bg-page)', color: 'var(--text-secondary)', fontSize: '0.75rem', padding: '2px 10px', borderRadius: 999 }}>
                     {r}
