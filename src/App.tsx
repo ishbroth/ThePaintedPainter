@@ -22,6 +22,7 @@ import LeaveReview from './pages/LeaveReview';
 import PainterAvailability from './pages/painter/PainterAvailability.tsx';
 import ChoosePainter from './pages/ChoosePainter.tsx';
 import CancelRequest from './pages/CancelRequest.tsx';
+import CancelClaim from './pages/CancelClaim.tsx';
 import ResumeSearch from './pages/ResumeSearch.tsx';
 import PainterReview from './pages/admin/PainterReview.tsx';
 import PainterConfirmSignup from './pages/painter/PainterConfirmSignup.tsx';
@@ -124,6 +125,7 @@ function App() {
                 <Route path="/painter/confirm-date" element={<Navigate to="/painter/dashboard/projects" replace />} />
                 <Route path="/choose-painter" element={<ChoosePainter />} />
                 <Route path="/cancel-request" element={<CancelRequest />} />
+                <Route path="/cancel-claim" element={<CancelClaim />} />
                 <Route path="/resume-search" element={<ResumeSearch />} />
                 <Route path="/admin/painter-review" element={<PainterReview />} />
                 <Route path="/painter/confirm-signup" element={<PainterConfirmSignup />} />

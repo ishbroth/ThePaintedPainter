@@ -610,6 +610,7 @@ ${body}
           <li>Nothing is charged now. You only pay a deposit after a painter accepts and you agree on a start date.</li>
           <li>If we can't find a painter within 48 hours, we'll let you know. If you've paid a deposit by then, it is refunded automatically.</li>
         </ol>
+        ${data.cancelUrl ? `<p style="margin:22px 0 4px;font-size:13px;color:#6b7280;">Changed your mind? You can cancel this request. You'll lose this guaranteed price.</p>${button(escapeHtml(data.cancelUrl), 'Cancel request', '#dc2626')}` : ''}
       `)
 
     case 'no_painter_closed':
@@ -636,6 +637,7 @@ ${body}
           <li>When a painter accepts and picks a start date, we'll email you to confirm and pay the deposit.</li>
           <li>After the deposit, we share contact details so you can coordinate directly.</li>
         </ol>
+        ${data.cancelUrl ? `<p style="margin:22px 0 4px;font-size:13px;color:#6b7280;">Changed your mind? You can cancel this request. You'll lose this guaranteed price.</p>${button(escapeHtml(data.cancelUrl), 'Cancel request', '#dc2626')}` : ''}
         ${data.projectsUrl ? button(data.projectsUrl, 'Track this in My Projects') : '<p style="font-size:13px;color:#6b7280;">Tip: create an account with this email to track your project, get reminders and earn loyalty points.</p>'}
       `)
 

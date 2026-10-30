@@ -12,7 +12,7 @@ import { buildResponseSummary, timelineLabel } from '../lib/chatEstimator/respon
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
 import { hapticMedium } from '../lib/haptics';
-import { QUOTE_RESULT_KEY, QUOTE_EXPIRES_KEY, PRICE_HOLD_MINUTES, clearEstimatorSession } from '../lib/chatEstimator/persistence';
+import { QUOTE_RESULT_KEY, QUOTE_EXPIRES_KEY, CLAIMED_KEY, PRICE_HOLD_MINUTES, clearEstimatorSession } from '../lib/chatEstimator/persistence';
 import { deleteAccountChatState } from '../lib/chatEstimator/accountPersistence';
 
 interface LocationState {
@@ -190,6 +190,17 @@ const QuoteResults = () => {
     { selectionType: 'specific_painter'; painter: { id: string; company_name: string }; price: number; priceToken: string } | { selectionType: 'guaranteed' } | null
   >(null);
 
+  // Once a request has gone out for this price it cannot be sent again (a second one would email the painters twice); the server enforces
+  // it as well. Cancelling is done from the button in the confirmation email.
+  const claimSignature = state ? `${state.ctx.zipCode}|${Math.round(state.estimate.total)}` : '';
+  const [claimed, setClaimed] = useState(() => {
+    try { return !!claimSignature && sessionStorage.getItem(CLAIMED_KEY) === claimSignature; } catch { return false; }
+  });
+  const markClaimed = () => {
+    setClaimed(true);
+    try { sessionStorage.setItem(CLAIMED_KEY, claimSignature); } catch { /* the server still blocks a second request */ }
+  };
+
   if (!state) {
     return <Navigate to="/" replace />;
   }
@@ -295,6 +306,12 @@ const QuoteResults = () => {
         />
       )}
 
+      {claimed && (
+        <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--accent-blue)', borderRadius: 10, padding: '12px 16px', margin: '0 0 16px', fontSize: '0.92rem', color: 'var(--text-secondary)' }}>
+          <strong style={{ color: 'var(--text-primary)' }}>Your request has been sent.</strong> Check your email for the confirmation. To cancel it, use the Cancel request button in that email.
+        </div>
+      )}
+
       {/* Real painter list */}
       {preferredOutcome?.status === 'unavailable' && (
         <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--accent)', borderRadius: 10, padding: '12px 16px', margin: '0 0 16px', fontSize: '0.92rem', color: 'var(--text-secondary)' }}>
@@ -324,9 +341,9 @@ const QuoteResults = () => {
         <PainterResultCard
           key={m.id}
           result={m}
-          disabled={expired}
+          disabled={expired || claimed}
           onSelect={() => {
-            if (expired) return;
+            if (expired || claimed) return;
             hapticMedium();
             setClaimTarget({ selectionType: 'specific_painter', painter: { id: m.id, company_name: m.companyName }, price: m.price, priceToken: m.priceToken });
           }}
@@ -374,8 +391,8 @@ const QuoteResults = () => {
             style={{
               marginTop: 10,
               padding: '10px 18px',
-              background: expired ? 'var(--border-strong)' : 'var(--accent-blue)',
-              color: expired ? 'var(--text-faint)' : 'var(--accent-blue-ink)',
+              background: expired || claimed ? 'var(--border-strong)' : 'var(--accent-blue)',
+              color: expired || claimed ? 'var(--text-faint)' : 'var(--accent-blue-ink)',
               border: 'none',
               borderRadius: 10,
               fontWeight: 700,
@@ -383,15 +400,16 @@ const QuoteResults = () => {
               textTransform: 'uppercase',
               letterSpacing: 1,
               fontSize: '0.8rem',
-              cursor: expired ? 'not-allowed' : 'pointer',
+              cursor: expired || claimed ? 'not-allowed' : 'pointer',
             }}
-            disabled={expired}
+            disabled={expired || claimed}
             onClick={() => {
+              if (claimed) return;
               hapticMedium();
               setClaimTarget({ selectionType: 'guaranteed' });
             }}
           >
-            {expired ? 'Expired' : 'Book Guaranteed'}
+            {claimed ? 'Request sent' : expired ? 'Expired' : 'Book Guaranteed'}
           </button>
         </div>
       </div>
@@ -411,6 +429,7 @@ const QuoteResults = () => {
             ...(view?.rooms ?? []).filter((r) => r.removed).map((r) => ({ description: `${r.label} (room)`, amount: Math.abs(r.change), removed: true })),
           ]}
           resumeState={{ ctx, estimate, assumptions, transcript: state.transcript, userMessages: state.userMessages, loyaltyDiscountPercent: state.loyaltyDiscountPercent }}
+          onClaimed={markClaimed}
           onPriceExpired={() => { setClaimTarget(null); setResults(null); loadResults(); }}
           onClose={() => setClaimTarget(null)}
         />
@@ -436,6 +455,7 @@ const ClaimPriceModal = ({
   conversation,
   breakdown,
   resumeState,
+  onClaimed,
   onPriceExpired,
   onClose,
 }: {
@@ -447,6 +467,7 @@ const ClaimPriceModal = ({
   conversation: string[];
   breakdown: { description: string; amount: number; removed?: boolean }[];
   resumeState: unknown;
+  onClaimed: () => void;
   onPriceExpired: () => void;
   onClose: () => void;
 }) => {
@@ -512,10 +533,12 @@ const ClaimPriceModal = ({
           setTimeout(onPriceExpired, 1200);
           return;
         }
+        if (body?.code === 'already_claimed') onClaimed();
         setError(body?.error || invokeError?.message || 'Something went wrong. Please try again.');
         return;
       }
 
+      onClaimed();
       if (data.noPainters) {
         setNoPainters(true);
         return;

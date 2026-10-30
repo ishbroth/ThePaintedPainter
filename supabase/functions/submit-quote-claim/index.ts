@@ -19,7 +19,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
 import { notify } from '../_shared/notify.ts'
 import { getZipCoords, milesBetweenZips } from '../_shared/geo.ts'
-import { verifyPrice } from '../_shared/priceToken.ts'
+import { verifyPrice, signCancel } from '../_shared/priceToken.ts'
 import { evaluateAvailability, isIsoDate } from '../_shared/availability.ts'
 import { estimateWorkingDays } from '../_shared/duration.ts'
 import { describeTiming } from '../_shared/offers.ts'
@@ -170,6 +170,29 @@ serve(async (req: Request) => {
       )
     }
 
+    // One request per customer and ZIP at a time: sending it again (reopening the popup, another painter) would email the painters twice.
+    // Cancelling the first one (the button in the confirmation email) frees them to send a new one. Phases of one estimate and a request
+    // reopened after a painter declined are separate by design.
+    if (!parentQuoteId && !resumeToken) {
+      const { data: already } = await supabase
+        .from('quote_selections')
+        .select('id')
+        .ilike('customer_email', String(customer.email).trim())
+        .eq('quote_zip', quoteZip)
+        .gte('offer_sent_at', new Date(Date.now() - 72 * 3600 * 1000).toISOString())
+        .not('status', 'in', '(cancelled,declined,expired,completed,needs_new_painter,superseded)')
+        .limit(1)
+      if (already && already.length > 0) {
+        return new Response(
+          JSON.stringify({
+            error: 'You have already sent this request, and the painters have it. To change it, use the "Cancel request" button in the email we sent you, then start again.',
+            code: 'already_claimed',
+          }),
+          { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        )
+      }
+    }
+
     // Link the job to an account only if the caller is actually logged in as
     // that user. Never trust a customerId from the request body: it drives
     // loyalty points, so a spoofed id would credit someone else's account.
@@ -308,6 +331,7 @@ serve(async (req: Request) => {
       const ownerBreakdown = Array.isArray(body.breakdown)
         ? body.breakdown.slice(0, 60).filter((l) => l && typeof l.description === 'string' && typeof l.amount === 'number')
         : []
+      const cancelUrl = `${frontendUrl}/cancel-claim?token=${encodeURIComponent(await signCancel(inserted.id))}`
       await Promise.allSettled([
         sendMail(ADMIN_EMAIL(), 'no_painter_alert', {
           subject: `No painter in ZIP ${quoteZip}: ${formatUsd(guaranteedPrice)} job needs one`,
@@ -332,6 +356,7 @@ serve(async (req: Request) => {
           guaranteedPrice,
           zipCode: quoteZip,
           preferredDate: preferredDate || null,
+          cancelUrl,
         }),
         // Invite local painting companies (best effort: this does nothing until the discovery keys are set up)
         fetch(`${supabaseUrl}/functions/v1/outreach-painters`, {
@@ -400,6 +425,7 @@ serve(async (req: Request) => {
           depositAmount,
           painterName: selectionType === 'specific_painter' ? notifiedPainters[0]?.company_name : null,
           preferredDate: preferredDate || null,
+          cancelUrl: `${Deno.env.get('FRONTEND_URL') ?? 'https://thepaintedpainter.com'}/cancel-claim?token=${encodeURIComponent(await signCancel(inserted.id))}`,
           projectsUrl: verifiedCustomerId ? `${Deno.env.get('FRONTEND_URL') ?? 'https://thepaintedpainter.com'}/customer/dashboard/projects` : null,
         },
       }),

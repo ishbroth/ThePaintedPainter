@@ -38,3 +38,26 @@ export async function verifyPrice(subject: string, price: number, zip: string, t
   if (diff !== 0) return 'invalid'
   return Date.now() > exp ? 'expired' : 'ok'
 }
+
+// ---- cancel links ----
+// The "Cancel request" button in the customer's confirmation email carries a token signed from the job's id, so it needs no stored token
+// (and a painter, who holds only the accept token, can never cancel a job).
+
+/** A token for cancelling one job: "<job id>.<signature>". */
+export async function signCancel(jobId: string): Promise<string> {
+  return `${jobId}.${await hmacHex(`cancel|${jobId}`)}`
+}
+
+/** The job id inside a cancel token, or null when the token is not genuine. */
+export async function verifyCancel(token: unknown): Promise<string | null> {
+  if (typeof token !== 'string') return null
+  const at = token.indexOf('.')
+  if (at < 1) return null
+  const jobId = token.slice(0, at)
+  const sig = token.slice(at + 1)
+  const expected = await hmacHex(`cancel|${jobId}`)
+  if (expected.length !== sig.length) return null
+  let diff = 0
+  for (let i = 0; i < expected.length; i++) diff |= expected.charCodeAt(i) ^ sig.charCodeAt(i)
+  return diff === 0 ? jobId : null
+}

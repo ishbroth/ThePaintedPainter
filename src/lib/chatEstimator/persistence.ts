@@ -100,11 +100,15 @@ function mirrorToLocal(): void {
 })();
 
 /** Forget everything about the current estimate in this tab (the chat, the price on screen, and its countdown). */
+/** Set once a request has been sent for the price on screen, so it cannot be sent twice. */
+export const CLAIMED_KEY = 'tpp:quote-claimed';
+
 export function clearEstimatorSession(): void {
   try {
     sessionStorage.removeItem(CHAT_STATE_KEY);
     sessionStorage.removeItem(QUOTE_RESULT_KEY);
     sessionStorage.removeItem(QUOTE_EXPIRES_KEY);
+    sessionStorage.removeItem(CLAIMED_KEY);
   } catch {
     // storage unavailable: nothing to clear
   }
