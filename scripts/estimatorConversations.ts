@@ -7,6 +7,7 @@ import { handleUserMessage, makeInitialState, type ChatState } from '../src/lib/
 import { setLLMReaderForTests } from '../src/lib/chatEstimator/llmClient.ts';
 import type { Intent } from '../src/lib/chatEstimator/intents.ts';
 import type { EstimatorContext } from '../src/lib/types.ts';
+import { calculateEstimate } from '../src/lib/estimateEngine.ts';
 
 let failures = 0;
 const check = (name: string, ok: boolean, detail = '') => {
@@ -142,6 +143,41 @@ async function dismissAt(setup: string[], topicWords: RegExp, dismissal = 'doesn
   } else {
     console.log('skip  the ZIP question did not come up in this conversation (' + z.asked + ')');
   }
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------------
+// 5. The wrap-up: "anything else?" is its own question, then photos, then the number; the answer counts
+// ---------------------------------------------------------------------------------------------------------------------------------
+{
+  /** Plays a whole interior job up to (not including) the "anything else?" answer. */
+  const toWrapUp = async () => {
+    let r = await play(['interior of my 600 sq ft one bedroom apartment', 'just the walls, no ceilings, trim or doors']);
+    const answers: [RegExp, string][] = [
+      [/home|rental/i, 'I own it'], [/brand|painter choose/i, 'painter choice'], [/zip/i, '91941'], [/timeline|when|living there|anyone/i, 'next month, nobody lives there'],
+      [/color|changing/i, 'a different color'],
+    ];
+    for (let i = 0; i < 15 && !/anything else/i.test(r.last); i++) {
+      const q = r.last.split('||').pop() ?? '';
+      r = await play([answers.find(([re]) => re.test(q))?.[1] ?? 'no'], [], r.state);
+    }
+    return r;
+  };
+  const w = await toWrapUp();
+  check('the wrap-up asks "anything else?" on its own, with no photo ask in the same message', /anything else/i.test(w.last) && !/photo/i.test(w.last), w.last);
+  check('"no ceilings, trim or doors" is a whole list: baseboards are not suggested back', !/baseboards/i.test(w.turns.join(' ')), w.turns.join(' | ').slice(0, 300));
+  const photos = await play(['no'], [], w.state);
+  check('after "no", the next message is the photo ask and says it has enough to price', /photo/i.test(photos.last) && /run it/i.test(photos.last) && !photos.state.finalEstimate, photos.last);
+  const done = await play(['run it'], [], photos.state);
+  check('"run it" then gives the price', !!done.state.finalEstimate || /guaranteed price/i.test(done.last), done.last);
+
+  const total = (s: ChatState) => calculateEstimate(s.ctx).total;
+  const base = total(photos.state);
+  for (const reply of ['20 feet', 'the ceiling height is 12 ft', '10 foot ceilings', 'about 20 ft tall']) {
+    const a = await play([reply], [], w.state);
+    check(`"${reply}" at "anything else?" is read as a ceiling height and changes the price`, a.state.ctx.ceilingHeight !== 'standard' && total(a.state) > base, JSON.stringify({ h: a.state.ctx.ceilingHeight, t: total(a.state), base }));
+  }
+  const fence = await play(['the fence is 10 ft and there is a friendly dog'], [], w.state);
+  check('a 10 ft fence is not mistaken for the ceiling height, and the note is kept for the painters', fence.state.ctx.ceilingHeight === 'standard' && /friendly dog/.test(fence.state.ctx.additionalDetails), JSON.stringify({ h: fence.state.ctx.ceilingHeight, d: fence.state.ctx.additionalDetails }));
 }
 
 setLLMReaderForTests(undefined);

@@ -498,7 +498,7 @@ export function extractInteriorSurfaceDetails(text: string): {
 }
 
 /** Ceiling height — a real multiplier on wall/ceiling square footage, independent of ceiling TYPE (flat/popcorn/vaulted). */
-export function extractCeilingHeight(text: string): 'nine_foot' | 'ten_plus' | 'vaulted_mixed' | null {
+export function extractCeilingHeight(text: string, asked = false): 'nine_foot' | 'ten_plus' | 'vaulted_mixed' | null {
   const t = text.toLowerCase();
   const WORDS: Record<string, number> = { nine: 9, ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, eighteen: 18, twenty: 20 };
   const num = (s: string) => (WORDS[s] ?? parseInt(s, 10));
@@ -509,7 +509,14 @@ export function extractCeilingHeight(text: string): 'nine_foot' | 'ten_plus' | '
   const NUM = '(\\d{1,2}|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|eighteen|twenty)';
   const a = t.match(new RegExp(NUM + "\\s*(?:-|\\s)?(?:f(?:oo|ee)?t|')\\s*(?:tall\\s+|high\\s+)?ceilings?\\b"));
   const b = t.match(new RegExp("\\bceilings?\\s*(?:are|is|run|go|measure|about|around|at|of|:)?\\s*(?:about\\s+|around\\s+|roughly\\s+)?" + NUM + "\\s*(?:-|\\s)?(?:f(?:oo|ee)?t|')"));
-  const feet = a ? num(a[1]) : b ? num(b[1]) : NaN;
+  // "ceiling height is 10 feet", "the height of the ceilings is about 12 ft", "ceilings: 20'"
+  const c = t.match(new RegExp("\\bceilings?\\s+height\\s*(?:is|are|of|:)?\\s*(?:about\\s+|around\\s+|roughly\\s+|approximately\\s+)?" + NUM + "\\s*(?:-|\\s)?(?:f(?:oo|ee)?t|')?"))
+    ?? t.match(new RegExp("\\bheight\\s+of\\s+(?:the\\s+|our\\s+)?ceilings?\\s*(?:is|are|:)?\\s*(?:about\\s+|around\\s+|roughly\\s+|approximately\\s+)?" + NUM + "\\s*(?:-|\\s)?(?:f(?:oo|ee)?t|')?"));
+  // "20 feet tall", "about 12 ft high" (just the height, in answer to the ceiling question or anywhere ceilings are mentioned)
+  const d = /\bceilings?\b/.test(t) || (asked && !/\b(?:fence|deck|gate|shed|tree|porch|railing|garage|ladder|driveway|yard|pergola)\b/.test(t)) ? t.match(new RegExp("(?:^|[^\\d.])" + NUM + "\\s*(?:-|\\s)?(?:f(?:oo|ee)?t|')\\s*(?:tall|high|up)?\\b")) : null;
+  // a bare number in answer to the question: "12", "about 20"
+  const bare = asked ? t.match(new RegExp("^\\s*(?:about\\s+|around\\s+|roughly\\s+|probably\\s+|like\\s+)?" + NUM + "\\s*(?:-|\\s)?(?:f(?:oo|ee)?t|'|ft\\.?|feet)?\\s*[.!]?\\s*$")) : null;
+  const feet = a ? num(a[1]) : b ? num(b[1]) : c ? num(c[1]) : d ? num(d[1]) : bare ? num(bare[1]) : NaN;
   if (isFinite(feet)) {
     const h = fromFeet(feet);
     if (h) return h;

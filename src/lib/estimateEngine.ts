@@ -418,7 +418,8 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
         (ctx.colorChangeScope === 'most_of_house' || ctx.colorChangeScope === 'some_rooms') && excluded > 0
           ? Math.max(0, (totalRooms - excluded) / totalRooms)
           : 1; // whole_house, multiple_colors, or unset (default assumption)
-      const extraCoatSqFt = effectiveWallSqFt * 0.3 * scopeFraction;
+      // the same extra-coat allowance as the outside (a plain color change); dark-to-light has its own, larger multiplier
+      const extraCoatSqFt = effectiveWallSqFt * (LABOR_COMPLEXITY.different_color - 1) * scopeFraction;
       lineItems.push({
         category: 'Interior',
         description: excluded > 0

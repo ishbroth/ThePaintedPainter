@@ -194,8 +194,13 @@ export function getRate(
   }
   if (!chosen) return null;
 
-  const mean =
-    chosen.items.reduce((s, i) => s + i.marketValue, 0) / chosen.items.length;
+  // Entries flagged as proxies or unit mismatches (a whole-job "interiorBase" standing in for the wall rate, a per-sqft figure for a per-foot
+  // item) are not comparable, so they are left out when anything better exists. The middle of what is left is used rather than the mean:
+  // one premium-market "high" figure used to pull every rate up, and the regional multiplier already covers expensive areas.
+  const comparable = chosen.items.filter((i) => !/mismatch|combines|proxy/i.test(i.notes ?? ''));
+  const pool = (comparable.length > 0 ? comparable : chosen.items).map((i) => i.marketValue).sort((x, y) => x - y);
+  const mid = pool.length >> 1;
+  const mean = pool.length % 2 ? pool[mid] : (pool[mid - 1] + pool[mid]) / 2;
   const final = basis === 'guaranteed' ? mean * GUARANTEED_PRICE_FACTOR : mean;
 
   return {

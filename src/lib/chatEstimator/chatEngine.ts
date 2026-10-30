@@ -20,7 +20,7 @@
 import type { EstimatorContext, EstimateBreakdown, EstimateLineItem, UserResponseStyle } from '../types';
 import { calculateEstimate } from '../estimateEngine';
 import { supabase } from '../supabase';
-import { extractAll, extractPhotoTriggers, extractTimeline, extractPropertyType, extractAccessSignals, extractZip, extractSquareFeet } from './extractors';
+import { extractAll, extractCeilingHeight, extractPhotoTriggers, extractTimeline, extractPropertyType, extractAccessSignals, extractZip, extractSquareFeet } from './extractors';
 import { getStateFromZip } from '../zipCodeData';
 import { hasScopeLimiter } from './scopeWords';
 import { lookupZipCity } from '../zipLookup';
@@ -67,6 +67,7 @@ export interface ChatSnapshot {
   retriedIds: string[];
   lastBotTopicId: string | null;
   wrapupAsked: boolean;
+  photosAsked?: boolean;
 }
 
 export interface ChatState {
@@ -82,8 +83,10 @@ export interface ChatState {
   clarifiedIds?: string[];
   /** The last topic the bot asked about, for clarification replies. */
   lastBotTopic: Topic | null;
-  /** Has the bot invited a final-wrap-up check? */
+  /** Has the bot asked its "anything else I should know?" question? */
   wrapupAsked: boolean;
+  /** Has the bot asked for photos and said it has enough to price it (the last step before the number)? */
+  photosAsked?: boolean;
   finalEstimate: ChatResult | null;
   /** State from immediately before the last processed message, restorable
    * via "back up". Single-level undo only (no redo/multi-step). */
@@ -305,6 +308,54 @@ export function chatStateFromPortable(parsed: unknown): ChatState | null {
 }
 
 // ===== Core turn handler =====
+/** Step one of the wrap-up: "anything else I should know?". Its answer is read (ceiling height, fences...) and kept with the job. */
+function notesStep(s: ChatState, ctxNext: EstimatorContext, acknowledgements: string[]): TurnResult {
+  const lead = acknowledgements.length > 0 ? `${ACK_LEAD_INS[s.askedIds.length % ACK_LEAD_INS.length]} ${acknowledgements.join(', ')}. ` : '';
+  const examples =
+    ctxNext.projectType === 'exterior'
+      ? 'fences, overhangs, chimneys, decks or shutters'
+      : ctxNext.projectType === 'both'
+        ? 'the ceiling height, fences, decks or shutters'
+        : 'the ceiling height, or anything about the place the painters should know';
+  return {
+    state: {
+      ...s,
+      wrapupAsked: true,
+      askedIds: [...s.askedIds, 'wrapup'],
+      history: [...s.history, botMessage(`${lead}Almost there. Is there anything else I should know, like ${examples}? If not, just say "no".`)],
+    },
+    done: null,
+  };
+}
+
+/** Step two: photos, and the offer to price it. Anything said here is still counted. */
+function photosStep(s: ChatState, ctxNext: EstimatorContext, acknowledgements: string[]): TurnResult {
+  // One more photo ask at the very end regardless of whether anything else triggered one: actual property photos help painters
+  // respond faster and with more confidence.
+  const alreadyAskedForProperty = ctxNext.photoRequests.some((r) => r.id === 'property');
+  const propertyMarker = alreadyAskedForProperty ? '' : '[[photos|attach photo]] ';
+  // Anything raised earlier in the conversation that never got a photo attached is mentioned here, the last natural chance.
+  const unfulfilled = ctxNext.photoRequests.filter((r) => !r.fulfilled && r.id !== 'property');
+  const reminderMarkers = unfulfilled.map((r) => `[[photo:${r.id}|${r.label}]]`).join(' ');
+  const reminderLeadIn = unfulfilled.length > 0 ? `While we're at it, I still don't have a picture for ${unfulfilled.length === 1 ? 'this' : 'these'}: ` : '';
+  const noted = acknowledgements.length > 0 ? `Noted: ${acknowledgements.join(', ')}. ` : '';
+  return {
+    state: {
+      ...s,
+      ctx: alreadyAskedForProperty ? s.ctx : { ...s.ctx, photoRequests: [...s.ctx.photoRequests, { id: 'property', label: 'the property', fulfilled: false }] },
+      photosAsked: true,
+      history: [
+        ...s.history,
+        botMessage(
+          `${noted}I think I've got enough to put a number together. ${reminderLeadIn}${reminderMarkers}${reminderMarkers ? ' ' : ''}A couple of photos of the property help painters respond faster and with more confidence, please attach some here. ${propertyMarker}` +
+            "When you're ready, just say 'run it' and I'll price it out.",
+        ),
+      ],
+    },
+    done: null,
+  };
+}
+
 
 export interface TurnResult {
   state: ChatState;
@@ -371,6 +422,7 @@ function snapshotOf(state: ChatState): ChatSnapshot {
     retriedIds: state.retriedIds,
     lastBotTopicId: state.lastBotTopic?.id ?? null,
     wrapupAsked: state.wrapupAsked,
+    photosAsked: state.photosAsked,
   };
 }
 
@@ -400,6 +452,7 @@ export async function handleUserMessage(state: ChatState, userText: string, cust
       retriedIds: snap.retriedIds,
       lastBotTopic: restoredTopic,
       wrapupAsked: snap.wrapupAsked,
+      photosAsked: snap.photosAsked,
       finalEstimate: null,
       undoSnapshot: null, // single-level undo — no redo, no chained back-ups
       history: [...state.history, userMsg, botMessage("No problem — backing up. " + reask)],
@@ -416,7 +469,16 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
   // 1. Understand the message (LLM first, local rules engine as fallback),
   //    then apply derivations against the full transcript
   const understood = await understand(trimmed, state);
-  const { intent, patch } = understood;
+  const { intent } = understood;
+  const patch = { ...understood.patch };
+  // Ceiling height is read by the plain rules as well as the AI reader, so a bare "20 feet" in answer to the ceiling question (or to
+  // "anything else?") is never lost.
+  {
+    const notesTurn = state.wrapupAsked && !state.photosAsked;
+    const askedAboutCeilings = notesTurn || /ceiling height|how (?:tall|high)/i.test(state.lastBotTopic ? state.lastBotTopic.ask(state.ctx) : '');
+    const height = extractCeilingHeight(trimmed, askedAboutCeilings);
+    if (height && (state.ctx.ceilingHeight === 'standard' || notesTurn)) patch.ceilingHeight = height;
+  }
   // the same fact can come back from more than one reader ("450 sqft, 450 sqft"): say each once
   const acknowledgements = understood.acknowledgements.filter((a, i, all) => all.findIndex((b) => b.replace(/,/g, '') === a.replace(/,/g, '')) === i);
   // ---- Ask instead of assuming ---------------------------------------------------------------------------------
@@ -504,9 +566,17 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
     const low = trimmed.toLowerCase();
     const ruledOut = new Set(state.ctx.excludedSurfaces ?? []);
     const added = new Set(state.ctx.addedSurfaces ?? []);
-    const re = /\b(?:no|not|without|skip|except|excluding|leave out|don'?t (?:paint|do|need|want))\s+(?:the\s+|any\s+|our\s+)?(ceilings?|trim|baseboards?|doors?)\b/g;
+    // "no ceilings", and the whole list: "no ceilings, trim or doors", "without the trim and doors"
+    const surfaceWord = '(?:the\\s+|any\\s+|our\\s+)?(?:ceilings?|trim|baseboards?|doors?)';
+    const re = new RegExp("\\b(?:no|not|without|skip|except|excluding|leave out|don'?t (?:paint|do|need|want))\\s+" + surfaceWord + "(?:\\s*(?:,|or|and|&|nor)\\s*" + surfaceWord + ")*", 'g');
+    // "just the walls" / "walls only" rules out the rest
+    if (/\b(?:just|only)\s+(?:the\s+|our\s+)?(?:\w+\s+)?walls?\b|\bwalls?\s+only\b/.test(low) && !/\b(?:and|plus|also|with)\s+(?:the\s+)?(?:ceilings?|trim|baseboards?|doors?)\b/.test(low)) {
+      ruledOut.add('ceilings'); ruledOut.add('trim'); ruledOut.add('doors');
+    }
     let m: RegExpExecArray | null;
-    while ((m = re.exec(low))) ruledOut.add(m[1].startsWith('ceiling') ? 'ceilings' : m[1].startsWith('door') ? 'doors' : 'trim');
+    while ((m = re.exec(low))) {
+      for (const w of m[0].match(/ceilings?|trim|baseboards?|doors?/g) ?? []) ruledOut.add(w.startsWith('ceiling') ? 'ceilings' : w.startsWith('door') ? 'doors' : 'trim');
+    }
     // the answer to a suggestion ("Want me to add the ceilings too?"): yes adds it, no leaves it out, whatever else was read into the reply
     const offer: Record<string, { field: 'interiorCeilings' | 'interiorTrim' | 'interiorDoors'; on: string; word: RegExp; key: string }> = {
       upsell_ceilings: { field: 'interiorCeilings', on: 'yes', word: /\bceilings?\b/, key: 'ceilings' },
@@ -540,6 +610,13 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
     if (ruledOut.size > 0) ctxWithExplicit.excludedSurfaces = [...ruledOut];
     for (const key of ruledOut) added.delete(key);
     if (added.size > 0) ctxWithExplicit.addedSurfaces = [...added];
+  }
+  // What the customer says to "anything else I should know?" is kept with the job, word for word, for the painters.
+  if (state.wrapupAsked && !state.photosAsked) {
+    const plain = /^(?:no|nope|nah|none|nothing|nothing else|not really|that'?s (?:all|it|everything)|all set|i'?m (?:good|done)|run it|go ahead|price it(?: out)?|finish it)\b[\s.!]*$/i.test(trimmed);
+    if (!plain && trimmed.length > 1) {
+      ctxWithExplicit.additionalDetails = `${ctxWithExplicit.additionalDetails ? ctxWithExplicit.additionalDetails + '; ' : ''}customer note: ${trimmed.replace(/\s+/g, ' ').slice(0, 400)}`;
+    }
   }
   // The "anything else?" at the end of an outside job (fences, overhangs, chimneys, decks, shutters): on an outside job these words
   // mean the outside ones, even without saying "exterior".
@@ -911,6 +988,7 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
       (ctxNext.projectType === 'exterior' || !!ctxNext.occupancy || isStandaloneOnlyJob(ctxNext)) &&
       (!!ctxNext.propertyType || isStandaloneOnlyJob(ctxNext));
     if (readyToQuote(ctxNext) && (s.wrapupAsked || essentialsKnown)) {
+      if (!s.photosAsked) return photosStep(s, ctxNext, acknowledgements);
       return await finalizeTurn(s, customerId);
     }
     {
@@ -1111,6 +1189,7 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
 
   // 6. If we're ready to quote and we already asked the wrap-up, finalize
   if (s.wrapupAsked && readyToQuote(ctxNext)) {
+    if (!s.photosAsked) return photosStep(s, ctxNext, acknowledgements);
     return await finalizeTurn(s, customerId);
   }
 
@@ -1137,48 +1216,10 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
       };
       return { state: s, done: null };
     }
-    if (!s.wrapupAsked) {
-      // One more photo ask at the very end regardless of whether anything
-      // else triggered one — actual property photos (not just the specific
-      // detail shots above) help painters respond faster and with more
-      // confidence, so it's worth inviting even for a straightforward job.
-      const alreadyAskedForProperty = ctxNext.photoRequests.some((r) => r.id === 'property');
-      const propertyMarker = alreadyAskedForProperty ? '' : '[[photos|attach photo]] ';
-
-      // Anything raised earlier in the conversation that never got a photo
-      // attached — remind here rather than letting it quietly drop, since
-      // this is the last natural chance before the estimate finalizes.
-      const unfulfilled = ctxNext.photoRequests.filter((r) => !r.fulfilled && r.id !== 'property');
-      const reminderMarkers = unfulfilled.map((r) => `[[photo:${r.id}|${r.label}]]`).join(' ');
-      const reminderLeadIn = unfulfilled.length > 0
-        ? `While we're at it, I still don't have a picture for ${unfulfilled.length === 1 ? 'this' : 'these'}: `
-        : '';
-
-      s = {
-        ...s,
-        ctx: alreadyAskedForProperty
-          ? s.ctx
-          : { ...s.ctx, photoRequests: [...s.ctx.photoRequests, { id: 'property', label: 'the property', fulfilled: false }] },
-        wrapupAsked: true,
-        askedIds: [...s.askedIds, 'wrapup'],
-        history: [
-          ...s.history,
-          botMessage(
-            `I think I've got enough to put a number together. ${reminderLeadIn}${reminderMarkers}${reminderMarkers ? ' ' : ''}A couple of photos of the property help painters respond faster and with more confidence, please attach some here. ${propertyMarker}` +
-              `Anything else I should know, like ${
-                ctxNext.projectType === 'exterior'
-                  ? 'fences, overhangs, chimneys, decks or shutters'
-                  : ctxNext.projectType === 'both'
-                    ? 'the ceiling height, fences, decks or shutters'
-                    : 'the ceiling height'
-              }? ` +
-              "Otherwise just say 'run it' and I'll price it out.",
-          ),
-        ],
-      };
-      return { state: s, done: null };
-    }
-    // We're here because wrapup was asked and there's nothing new — finalize.
+    if (!s.wrapupAsked) return notesStep(s, ctxNext, acknowledgements);
+    // The notes were asked; the last step is the photos, then the number.
+    if (!s.photosAsked) return photosStep(s, ctxNext, acknowledgements);
+    // Everything was asked and there's nothing new: finalize.
     return await finalizeTurn(s, customerId);
   }
 
