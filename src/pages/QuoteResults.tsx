@@ -581,10 +581,17 @@ const ClaimPriceModal = ({
         ) : result ? (
           <>
             <h2 style={{ marginTop: 0 }}>You're all set!</h2>
-            <p>
-              We've notified {result.notifiedCount} painter{result.notifiedCount === 1 ? '' : 's'}. As soon as one accepts,
-              we'll email you at <strong>{email}</strong> so you can confirm and secure your painter.
-            </p>
+            {target.selectionType === 'specific_painter' ? (
+              <p>
+                We've contacted <strong>{target.painter.company_name}</strong>. As soon as they accept, we'll email you at <strong>{email}</strong> so you
+                can confirm and secure your painter.
+              </p>
+            ) : (
+              <p>
+                We've notified {result.notifiedCount} painter{result.notifiedCount === 1 ? '' : 's'}. As soon as one accepts,
+                we'll email you at <strong>{email}</strong> so you can confirm and secure your painter.
+              </p>
+            )}
             <button onClick={onClose} style={{ marginTop: 12, padding: '10px 20px', borderRadius: 10, border: 'none', background: 'var(--accent-blue)', color: 'var(--accent-blue-ink)', fontWeight: 700, cursor: 'pointer' }}>
               Done
             </button>

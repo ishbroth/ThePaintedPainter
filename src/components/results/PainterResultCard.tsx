@@ -20,19 +20,17 @@ function Stars({ value, size = 14 }: { value: number; size?: number }) {
   );
 }
 
-/** Portfolio photos like the room photos on a hotel listing: swipe/arrow through, with a counter. */
+/** The photo frame: the middle third of each portfolio picture, with arrows and a counter when there are several. */
 function PhotoCarousel({ photos, name }: { photos: string[]; name: string }) {
   const [i, setI] = useState(0);
 
   if (photos.length === 0) {
-    const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+    // no photos yet: a gray frame of the same size with the silhouette of a paintbrush
     return (
-      <div
-        style={{ background: 'var(--bg-page)', color: 'var(--text-faint)' }}
-        className="w-full h-full min-h-[11rem] flex flex-col items-center justify-center gap-1"
-      >
-        <span style={{ fontSize: '2rem', fontWeight: 700, opacity: 0.6 }}>{initials}</span>
-        <span style={{ fontSize: '0.75rem' }}>No photos yet</span>
+      <div role="img" aria-label={`${name} has not added photos yet`} className="w-full h-full flex items-center justify-center" style={{ background: 'var(--bg-page)', color: 'var(--border-strong)' }}>
+        <svg viewBox="0 0 24 24" width="46" height="46" fill="currentColor" aria-hidden="true">
+          <path d="M7 14c-1.66 0-3 1.34-3 3 0 1.31-1.16 2-2 2 .92 1.22 2.49 2 4 2 2.21 0 4-1.79 4-4 0-1.66-1.34-3-3-3zm13.71-9.37l-1.34-1.34a.996.996 0 0 0-1.41 0L9 12.25 11.75 15l8.96-8.96a.996.996 0 0 0 0-1.41z" />
+        </svg>
       </div>
     );
   }
@@ -45,26 +43,33 @@ function PhotoCarousel({ photos, name }: { photos: string[]; name: string }) {
     position: 'absolute',
     top: '50%',
     transform: 'translateY(-50%)',
-    width: 32,
-    height: 32,
+    width: 26,
+    height: 26,
     borderRadius: '50%',
     border: 'none',
     background: 'rgba(0,0,0,0.55)',
     color: '#fff',
     cursor: 'pointer',
-    fontSize: 18,
-    lineHeight: '32px',
+    fontSize: 16,
+    lineHeight: '26px',
+    padding: 0,
   };
 
   return (
-    <div className="relative w-full h-full min-h-[11rem]" style={{ background: '#000' }}>
-      <img src={photos[i]} alt={`${name} — project photo ${i + 1}`} className="w-full h-full object-cover absolute inset-0" loading="lazy" />
+    <div className="relative w-full h-full overflow-hidden" style={{ background: '#000' }}>
+      {/* three times the frame's width and centered, so the frame shows the middle third of the picture */}
+      <img
+        src={photos[i]}
+        alt={`${name} — project photo ${i + 1}`}
+        loading="lazy"
+        style={{ position: 'absolute', left: '50%', top: '50%', width: '300%', minHeight: '100%', maxWidth: 'none', objectFit: 'cover', transform: 'translate(-50%, -50%)' }}
+      />
       {photos.length > 1 && (
         <>
-          <button type="button" aria-label="Previous photo" onClick={(e) => go(-1, e)} style={{ ...arrow, left: 8 }}>‹</button>
-          <button type="button" aria-label="Next photo" onClick={(e) => go(1, e)} style={{ ...arrow, right: 8 }}>›</button>
+          <button type="button" aria-label="Previous photo" onClick={(e) => go(-1, e)} style={{ ...arrow, left: 6 }}>‹</button>
+          <button type="button" aria-label="Next photo" onClick={(e) => go(1, e)} style={{ ...arrow, right: 6 }}>›</button>
           <span
-            style={{ position: 'absolute', bottom: 8, right: 8, background: 'rgba(0,0,0,0.6)', color: '#fff', fontSize: 12, padding: '2px 8px', borderRadius: 999 }}
+            style={{ position: 'absolute', bottom: 6, right: 6, background: 'rgba(0,0,0,0.6)', color: '#fff', fontSize: 11, padding: '1px 7px', borderRadius: 999 }}
           >
             {i + 1} / {photos.length}
           </span>
@@ -206,7 +211,7 @@ function Details({ d }: { d: PainterDetail }) {
 }
 
 /**
- * One painter in the results, laid out like a hotel on a booking site: photos on the
+ * One painter in the results, laid out like a hotel on a booking site: a small photo frame on the
  * left, basics in the middle (name, city, ratings), price and select on the right.
  * "See details" expands credentials, business facts and actual review text.
  */
@@ -239,24 +244,24 @@ export default function PainterResultCard({
 
   return (
     <div
-      style={{ background: 'var(--bg-surface)', border: result.workedWithBefore ? '2px solid var(--accent-blue)' : '1px solid var(--border)', borderRadius: 12, marginBottom: 14, overflow: 'hidden' }}
+      style={{ background: 'var(--bg-surface)', border: result.workedWithBefore ? '2px solid var(--accent-blue)' : '1px solid var(--border)', borderRadius: 12, marginBottom: 10, overflow: 'hidden' }}
     >
       <div className="flex flex-col md:flex-row">
-        <div className="md:w-72 md:flex-shrink-0 h-48 md:h-auto relative">
+        <div className="w-full md:w-44 md:flex-shrink-0 h-28 md:h-auto md:min-h-[8.5rem] relative">
           <PhotoCarousel photos={result.photos} name={result.companyName} />
         </div>
 
-        <div className="flex-1 p-4 flex flex-col md:flex-row gap-4 justify-between cursor-pointer" onClick={toggle}>
+        <div className="flex-1 p-3 flex flex-col md:flex-row gap-3 justify-between cursor-pointer" onClick={toggle}>
           <div className="min-w-0">
             {result.workedWithBefore && (
               <span style={{ display: 'inline-block', marginBottom: 6, padding: '2px 10px', borderRadius: 999, fontSize: '0.74rem', fontWeight: 700, color: 'var(--accent-blue)', background: 'rgba(116, 185, 255, 0.14)', border: '1px solid var(--accent-blue)' }}>
                 ★ You've worked with them before
               </span>
             )}
-            <h3 style={{ fontFamily: "'Cabin', sans-serif", fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 2px' }}>
+            <h3 style={{ fontFamily: "'Cabin', sans-serif", fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 1px' }}>
               {result.companyName}
             </h3>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', margin: '0 0 8px' }}>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.86rem', margin: '0 0 5px' }}>
               {result.city}, {result.state} · {result.reasons[0]}
             </p>
 
@@ -317,7 +322,7 @@ export default function PainterResultCard({
         type="button"
         onClick={toggle}
         aria-expanded={open}
-        style={{ width: '100%', background: 'none', border: 'none', borderTop: '1px solid var(--border)', padding: '10px 16px', color: 'var(--accent-blue)', fontSize: '0.88rem', cursor: 'pointer', textAlign: 'left' }}
+        style={{ width: '100%', background: 'none', border: 'none', borderTop: '1px solid var(--border)', padding: '7px 14px', color: 'var(--accent-blue)', fontSize: '0.85rem', cursor: 'pointer', textAlign: 'left' }}
       >
         {open ? 'Hide details ▴' : 'See details — licensing, crew, reviews ▾'}
       </button>
