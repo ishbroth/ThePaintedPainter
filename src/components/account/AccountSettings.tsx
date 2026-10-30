@@ -19,7 +19,7 @@ function Toggle({ enabled, onChange, disabled }: { enabled: boolean; onChange: (
       onClick={onChange}
       className={`w-12 h-6 rounded-full relative transition-colors disabled:opacity-50 ${enabled ? 'bg-[var(--accent)]' : 'bg-[var(--input-border)]'}`}
     >
-      <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform ${enabled ? 'translate-x-6' : 'translate-x-0.5'}`} />
+      <span className={`absolute left-0 top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${enabled ? 'translate-x-[26px]' : 'translate-x-0.5'}`} />
     </button>
   );
 }
