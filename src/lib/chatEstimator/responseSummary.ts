@@ -118,22 +118,6 @@ export function timelineLabel(timeline: string): string {
   return TIMELINE_LABELS[timeline] ?? 'Not specified';
 }
 
-// What a job description may show depends on what the job is: an inside job never lists fences, an outside job never lists ceilings.
-const EXTERIOR_KEYS = new Set<string>([
-  'exteriorScope', 'sidingType', 'exteriorTrim', 'soffitsEaves', 'exteriorShutters', 'exteriorShutterCount', 'garageDoor', 'entryDoor', 'railings',
-  'railingType', 'balconies', 'balconyCount', 'deck', 'deckSize', 'deckSqft', 'fence', 'fenceLinearFeet', 'fenceType', 'gutters', 'foundation',
-  'exteriorWindows', 'exteriorWindowCount', 'overhangs', 'overhangSqft', 'pressureWashSqft', 'accessRestrictions', 'exteriorColorChange',
-  'exteriorCondition', 'stuccoCondition', 'exteriorRailingMaterial', 'exteriorBody', 'stories', 'brickSqft', 'brickTreatment', 'epoxyGarageSqft', 'epoxyType',
-]);
-const INTERIOR_KEYS = new Set<string>([
-  'interiorScope', 'selectedRooms', 'interiorWalls', 'accentWalls', 'interiorCeilings', 'ceilingType', 'interiorTrim', 'crownMolding', 'wainscoting',
-  'baseboards', 'interiorDoors', 'doorCount', 'doorTypes', 'doorFrames', 'interiorWindows', 'windowCount', 'windowTypes', 'cabinets', 'cabinetLocations',
-  'closets', 'closetCount', 'stairways', 'stairwayCount', 'stairwayDetails', 'interiorShutters', 'interiorColorChange', 'ceilingColorChange',
-  'colorChangeScope', 'colorChangeExcludedRoomCount', 'colorCount', 'colorClarificationNeeded', 'trimLinearFeet', 'crownLinearFeet', 'accentWallCount',
-  'stairRailFeet', 'popcornCeilingSqft', 'cabinetDoorCount', 'wallTexture', 'trimCondition', 'doorMaterial', 'cabinetScope', 'closetShelving',
-  'interiorRailingMaterial', 'ceilingHeight', 'tallCeilingShare', 'wallpaperRooms', 'popcornCeilingRooms', 'fireplaceType', 'fireplaceCount',
-  'beamLinearFeet', 'beamLocation', 'builtInCount', 'furnitureItems', 'excludedRooms', 'hasStainedWood', 'woodRotExtent', 'drywallRepairExtent',
-]);
 /** A detail only means something while the thing it describes is in the job ("fence type" with no fence is just the form's resting answer). */
 const DEPENDS_ON: Record<string, string> = {
   fenceType: 'fence', fenceLinearFeet: 'fence', deckSize: 'deck', deckSqft: 'deck', railingType: 'railings', exteriorRailingMaterial: 'railings',
@@ -156,20 +140,17 @@ const isNegative = (v: unknown): boolean => {
 
 /**
  * What the customer's answers put in the job, as {question, answer} pairs for the painter: only what they actually said (a field still at the
- * interview's resting answer was never answered), only what belongs to this kind of job, and only things that are in the job. "No" and "none"
+ * interview's resting answer was never answered), and only things that are in the job (an inside job that also mentions a fence lists the fence). "No" and "none"
  * answers are left out, so the list reads as what the job includes.
  */
 export function buildResponseSummary(ctx: EstimatorContext): ResponseQA[] {
   const out: ResponseQA[] = [];
   const resting = makeInitialContext() as unknown as Record<string, unknown>;
   const outside = ctx.projectType === 'exterior';
-  const inside = ctx.projectType === 'interior';
   const current = ctx as unknown as Record<string, unknown>;
 
   for (const [key, rawValue] of Object.entries(ctx) as [keyof EstimatorContext, unknown][]) {
     if (EXCLUDED_KEYS.has(key) || key === 'photos' || key === 'photoRequests') continue;
-    if (outside && INTERIOR_KEYS.has(key)) continue;
-    if (inside && EXTERIOR_KEYS.has(key)) continue;
     if (key in DEPENDS_ON && isNegative(current[DEPENDS_ON[key]])) continue;
     if (isNegative(rawValue)) continue;
     // still the interview's resting answer: the customer never said anything different
