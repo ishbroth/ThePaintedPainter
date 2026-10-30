@@ -9,6 +9,7 @@
 // ============================================================================
 
 import type { EstimatorContext } from '../types';
+import { makeInitialContext } from './defaultContext';
 
 /** Fields never shown to a painter pre-acceptance — PII or internal bookkeeping. */
 const EXCLUDED_KEYS = new Set<keyof EstimatorContext>([
@@ -34,6 +35,12 @@ const EXCLUDED_KEYS = new Set<keyof EstimatorContext>([
   'excludedSurfaces',
   'addedSurfaces',
   'zipCity',
+  // interview bookkeeping, not answers
+  'surfacesAddressed',
+  'conditionAddressed',
+  'renoStageAddressed',
+  'trimScopeAddressed',
+  'colorClarificationNeeded',
 ]);
 
 /** Human-readable labels for fields whose camelCase key wouldn't read well auto-titled. */
@@ -61,6 +68,17 @@ const LABEL_OVERRIDES: Partial<Record<keyof EstimatorContext, string>> = {
   deckSqft: 'Deck area (sq ft)',
   pressureWashSqft: 'Pressure-wash area (sq ft)',
   exteriorBody: 'House body painted (siding/stucco/brick)',
+  soffitsEaves: 'Soffits and eaves',
+  exteriorTrim: 'Exterior trim and fascia',
+  ceilingHeight: 'Ceiling height',
+  additionalDetails: 'Notes from the customer',
+  bedroomCount: 'Bedrooms',
+  projectCondition: 'Project type (repaint, renovation, new)',
+};
+
+/** Plain words for values whose stored form reads badly. */
+const VALUE_LABELS: Record<string, Record<string, string>> = {
+  ceilingHeight: { nine_foot: '9 ft', ten_plus: '10 ft or more', vaulted_mixed: 'tall or vaulted (12 ft or more)' },
 };
 
 function titleCase(camel: string): string {
@@ -100,18 +118,87 @@ export function timelineLabel(timeline: string): string {
   return TIMELINE_LABELS[timeline] ?? 'Not specified';
 }
 
-/** Every answered, non-PII field from the AI interview, as {question, answer} pairs. */
+// What a job description may show depends on what the job is: an inside job never lists fences, an outside job never lists ceilings.
+const EXTERIOR_KEYS = new Set<string>([
+  'exteriorScope', 'sidingType', 'exteriorTrim', 'soffitsEaves', 'exteriorShutters', 'exteriorShutterCount', 'garageDoor', 'entryDoor', 'railings',
+  'railingType', 'balconies', 'balconyCount', 'deck', 'deckSize', 'deckSqft', 'fence', 'fenceLinearFeet', 'fenceType', 'gutters', 'foundation',
+  'exteriorWindows', 'exteriorWindowCount', 'overhangs', 'overhangSqft', 'pressureWashSqft', 'accessRestrictions', 'exteriorColorChange',
+  'exteriorCondition', 'stuccoCondition', 'exteriorRailingMaterial', 'exteriorBody', 'stories', 'brickSqft', 'brickTreatment', 'epoxyGarageSqft', 'epoxyType',
+]);
+const INTERIOR_KEYS = new Set<string>([
+  'interiorScope', 'selectedRooms', 'interiorWalls', 'accentWalls', 'interiorCeilings', 'ceilingType', 'interiorTrim', 'crownMolding', 'wainscoting',
+  'baseboards', 'interiorDoors', 'doorCount', 'doorTypes', 'doorFrames', 'interiorWindows', 'windowCount', 'windowTypes', 'cabinets', 'cabinetLocations',
+  'closets', 'closetCount', 'stairways', 'stairwayCount', 'stairwayDetails', 'interiorShutters', 'interiorColorChange', 'ceilingColorChange',
+  'colorChangeScope', 'colorChangeExcludedRoomCount', 'colorCount', 'colorClarificationNeeded', 'trimLinearFeet', 'crownLinearFeet', 'accentWallCount',
+  'stairRailFeet', 'popcornCeilingSqft', 'cabinetDoorCount', 'wallTexture', 'trimCondition', 'doorMaterial', 'cabinetScope', 'closetShelving',
+  'interiorRailingMaterial', 'ceilingHeight', 'tallCeilingShare', 'wallpaperRooms', 'popcornCeilingRooms', 'fireplaceType', 'fireplaceCount',
+  'beamLinearFeet', 'beamLocation', 'builtInCount', 'furnitureItems', 'excludedRooms', 'hasStainedWood', 'woodRotExtent', 'drywallRepairExtent',
+]);
+/** A detail only means something while the thing it describes is in the job ("fence type" with no fence is just the form's resting answer). */
+const DEPENDS_ON: Record<string, string> = {
+  fenceType: 'fence', fenceLinearFeet: 'fence', deckSize: 'deck', deckSqft: 'deck', railingType: 'railings', exteriorRailingMaterial: 'railings',
+  balconyCount: 'balconies', exteriorShutterCount: 'exteriorShutters', exteriorWindowCount: 'exteriorWindows', overhangSqft: 'overhangs',
+  doorCount: 'interiorDoors', doorTypes: 'interiorDoors', doorFrames: 'interiorDoors', doorMaterial: 'interiorDoors',
+  windowCount: 'interiorWindows', windowTypes: 'interiorWindows', cabinetLocations: 'cabinets', cabinetScope: 'cabinets', cabinetDoorCount: 'cabinets',
+  closetCount: 'closets', closetShelving: 'closets', stairwayCount: 'stairways', stairwayDetails: 'stairways', stairRailFeet: 'stairways',
+  interiorRailingMaterial: 'stairways', accentWallCount: 'accentWalls', brickTreatment: 'brickSqft', epoxyType: 'epoxyGarageSqft',
+  colorChangeScope: 'interiorColorChange', colorChangeExcludedRoomCount: 'interiorColorChange', colorCount: 'interiorColorChange',
+};
+/** Work the estimator adds on its own for every repaint; the customer did not ask for it, so it is not listed as theirs. */
+const AUTOMATIC_PREP = new Set(['caulking', 'power_washing']);
+
+const isNegative = (v: unknown): boolean => {
+  if (v === false || v === null || v === undefined) return true;
+  if (typeof v === 'string') return ['', 'no', 'none', 'n/a'].includes(v.trim().toLowerCase());
+  if (Array.isArray(v)) return v.length === 0;
+  return false;
+};
+
+/**
+ * What the customer's answers put in the job, as {question, answer} pairs for the painter: only what they actually said (a field still at the
+ * interview's resting answer was never answered), only what belongs to this kind of job, and only things that are in the job. "No" and "none"
+ * answers are left out, so the list reads as what the job includes.
+ */
 export function buildResponseSummary(ctx: EstimatorContext): ResponseQA[] {
   const out: ResponseQA[] = [];
+  const resting = makeInitialContext() as unknown as Record<string, unknown>;
+  const outside = ctx.projectType === 'exterior';
+  const inside = ctx.projectType === 'interior';
+  const current = ctx as unknown as Record<string, unknown>;
 
   for (const [key, rawValue] of Object.entries(ctx) as [keyof EstimatorContext, unknown][]) {
-    if (EXCLUDED_KEYS.has(key)) continue;
-    const answer = formatValue(rawValue);
-    if (answer === null) continue;
+    if (EXCLUDED_KEYS.has(key) || key === 'photos' || key === 'photoRequests') continue;
+    if (outside && INTERIOR_KEYS.has(key)) continue;
+    if (inside && EXTERIOR_KEYS.has(key)) continue;
+    if (key in DEPENDS_ON && isNegative(current[DEPENDS_ON[key]])) continue;
+    if (isNegative(rawValue)) continue;
+    // still the interview's resting answer: the customer never said anything different
+    if (JSON.stringify(rawValue) === JSON.stringify(resting[key])) continue;
 
-    const label = LABEL_OVERRIDES[key] ?? titleCase(key);
-    out.push({ question: label, answer });
+    let value = rawValue;
+    if (key === 'prepWork' && Array.isArray(value)) {
+      value = value.filter((w) => !AUTOMATIC_PREP.has(String(w)));
+      if (isNegative(value)) continue;
+    }
+    if (key === 'additionalDetails' && typeof value === 'string') {
+      // drop the interview's own room-size notes (square feet are listed already) and the "customer note:" tag
+      value = value.split(';').map((part) => part.trim()).filter((part) => part && !/^room [\dx.]+ ?(?:sq ?ft)?$/i.test(part)).map((part) => part.replace(/^customer note:\s*/i, '')).join('; ');
+      if (isNegative(value)) continue;
+    }
+    const answer = (typeof value === 'string' && VALUE_LABELS[key]?.[value]) || formatValue(value);
+    if (answer === null) continue;
+    out.push({ question: LABEL_OVERRIDES[key] ?? titleCase(key), answer });
   }
 
+  // The surfaces for an inside job: the resting answers are "yes" (walls, ceilings, trim), so they are only listed once the customer
+  // actually went through what is being painted.
+  if (!outside && ctx.surfacesAddressed) {
+    const surfaces: string[] = [];
+    if (ctx.interiorWalls === 'yes') surfaces.push('walls');
+    if (ctx.interiorCeilings === 'yes') surfaces.push('ceilings');
+    if (ctx.interiorTrim === 'yes') surfaces.push('trim and baseboards');
+    if (ctx.interiorDoors !== 'none') surfaces.push(ctx.interiorDoors === 'all' ? 'all doors' : 'some doors');
+    if (surfaces.length > 0) out.unshift({ question: 'Inside surfaces being painted', answer: surfaces.join(', ') });
+  }
   return out;
 }
