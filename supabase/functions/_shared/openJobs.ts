@@ -1,6 +1,7 @@
 // A painter who has just been approved gets the jobs that were waiting for someone in their area.
 //
-// Jobs sit in status 'searching_painter' when a customer claimed a price where no approved painter was within range. The first painter
+// Jobs sit in status 'searching_painter' when a customer claimed a price where no approved painter was within range (or in
+// 'needs_new_painter' when every painter offered a Mystery job declined, while the customer is still choosing). The first painter
 // approved near that ZIP (and free on the customer's dates) is offered the job, exactly like any other offer: they get the same email
 // and accept page. The job moves to 'offer_sent' so it shows as live to the customer.
 
@@ -29,7 +30,7 @@ export async function attachOpenJobsToPainter(
   const { data: jobs } = await supabase
     .from('quote_selections')
     .select('id, claim_token, quote_zip, customer_name, customer_preferred_date, customer_start_date, customer_end_date, dates_flexible, timeline, estimated_days, painter_payout_amount, guaranteed_price, project_summary, photos, notified_painters')
-    .eq('status', 'searching_painter')
+    .in('status', ['searching_painter', 'needs_new_painter'])
     .eq('selection_type', 'guaranteed')
     .order('offer_sent_at', { ascending: true })
 
@@ -43,11 +44,12 @@ export async function attachOpenJobsToPainter(
     const timing = { startDate: job.customer_start_date, endDate: job.customer_end_date, flexible: !!job.dates_flexible, timeline: job.timeline }
     if (!evaluateAvailability(painter, timing, days).show) continue
     // the first painter to be matched takes the job out of "searching"; the WHERE makes sure two approvals at once don't both do it
+    // (a Mystery job whose painters all declined is also open: the customer's own pick-a-painter links stop working once someone takes it)
     const { data: updated } = await supabase
       .from('quote_selections')
-      .update({ status: 'offer_sent', notified_painters: [...(job.notified_painters ?? []), painter.id], offer_sent_at: new Date().toISOString() })
+      .update({ status: 'offer_sent', notified_painters: [...(job.notified_painters ?? []), painter.id], offer_sent_at: new Date().toISOString(), fallback_token: null, fallback_expires_at: null, fallback_suggestions: null })
       .eq('id', job.id)
-      .eq('status', 'searching_painter')
+      .in('status', ['searching_painter', 'needs_new_painter'])
       .select('id')
     if (!updated || updated.length === 0) continue
     await sendPainterOffer(supabase, env, job as OfferJob, painter)

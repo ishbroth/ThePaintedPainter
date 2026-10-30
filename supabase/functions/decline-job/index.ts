@@ -141,6 +141,16 @@ serve(async (req: Request) => {
       }),
     }).catch((err) => console.error('declined email failed:', err))
 
+    // Every painter offered a Mystery Painter job said no: invite another round of local painting companies (outside the network) to take it.
+    // The rotation (outreachPlan.ts) brings back the ones who have not responded yet and adds new ones.
+    if (job.selection_type !== 'specific_painter') {
+      await fetch(`${supabaseUrl}/functions/v1/outreach-painters`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${serviceRoleKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobId: job.id }),
+      }).catch((err) => console.error('outreach failed:', err))
+    }
+
     await notify(supabase, {
       userId: job.customer_id,
       type: 'painter_declined',

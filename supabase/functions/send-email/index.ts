@@ -54,7 +54,7 @@ const EMAIL_TYPE_MAP: Record<string, string> = {
   new_notification: 'You have a new notification',
   claim_received: 'We received your request — your price is locked',
   no_painter_alert: 'A job needs a painter',
-  cold_job_invite: 'A free painting job near you',
+  cold_job_invite: 'A painting job near you, already bid and ready to confirm',
   claim_searching: 'We\'re finding a painter for you',
   no_painter_closed: 'We couldn\'t find a painter this time',
   painter_suspended: 'A painter was paused — needs re-verification',
@@ -542,24 +542,28 @@ ${body}
         : ''
       const company = escapeHtml(data.companyName || 'there')
       return `<!DOCTYPE html>
-<html lang="en"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="color-scheme" content="light" /><title>A free painting job near ${escapeHtml(data.zipCode)}</title></head>
+<html lang="en"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="color-scheme" content="light" /><title>A painting job near ${escapeHtml(data.zipCode)}, already bid</title></head>
 <body style="margin:0;padding:0;background:#f3f4f6;font-family:${FONT};color:#1a1a1a;line-height:1.6;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f3f4f6;"><tr><td align="center" style="padding:24px 12px;">
 <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;">
 <tr><td align="center" style="padding:6px 0 18px;font-family:${FONT};font-size:24px;font-weight:700;color:#2563eb;">The Painted Painter</td></tr>
 <tr><td style="background:#ffffff;border:1px solid #e5e7eb;border-radius:8px;padding:28px;font-family:${FONT};font-size:16px;line-height:1.6;color:#1a1a1a;">
   <p style="margin-top:0;">Hi ${company},</p>
-  <p>This is an invitation from The Painted Painter, a marketplace that connects homeowners with local painting companies. A homeowner near <strong>ZIP ${escapeHtml(data.zipCode)}</strong> just asked us for a painter, and we'd like you to have the job. <strong>It's a free lead.</strong></p>
-  <p style="margin:18px 0 6px;font-weight:700;">The price you see is the price you make</p>
+  <p>This is an invitation from The Painted Painter, a marketplace that connects homeowners with local painting companies. A homeowner near <strong>ZIP ${escapeHtml(data.zipCode)}</strong> just accepted a price for a painting job, and we'd like you to have it.</p>
+  <p style="margin:16px 0;padding:14px 16px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;font-size:17px;"><strong>This isn't a lead. It's a real job, already bid and ready to go.</strong> The customer has already agreed to the price. All you have to do is confirm it and schedule it.</p>
+  <p style="margin:18px 0 6px;font-weight:700;">The price you see is the price you get</p>
   <ul style="margin:0 0 0 20px;padding:0;">
-    <li>Your payout for this job is <strong>${formatMoney(data.payoutAmount)}</strong>. That's what you can make from it. No lead fee, no bidding, no strings attached.</li>
-    <li>You control the contracting and the scheduling. When you accept, we put you in direct contact with the customer and you work out the details together. Suggesting upgrades and add-ons is welcome.</li>
+    <li>Your payout for this job is <strong>${formatMoney(data.payoutAmount)}</strong>. <strong>The price you see here is the price you get for the job.</strong></li>
+    <li><strong>You pay nothing for this.</strong> No lead fee, no subscription, no charge to see it or to accept it. It costs you nothing.</li>
+    <li><strong>It's already bid.</strong> There's no estimate to write, no bidding against other painters and no leads to chase: the price is set and the customer has agreed to it.</li>
+    <li>You control the contracting and the scheduling. When you accept, we put you in direct contact with the customer and you pick your dates together. Suggesting upgrades and add-ons is welcome.</li>
   </ul>
   ${detailTable('The job', [['Where', `Near ZIP ${data.zipCode}`], ['When', data.datesText || data.timelineLabel], ...qa.map((r) => [r.question, r.answer] as [string, unknown])])}
   ${bdHtml}
-  <p style="margin:24px 0 6px;font-weight:700;">How to claim it</p>
-  <p style="margin:0 0 4px;">Create your free painter profile (a few minutes; we check your license and insurance). As soon as you're approved, this job is offered to you automatically. The first approved painter to accept gets it.</p>
-  ${button(data.inviteUrl, 'Claim this job', '#16a34a', true)}
+  <p style="margin:24px 0 6px;font-weight:700;">How to confirm and schedule it</p>
+  <p style="margin:0 0 4px;">Create your free painter profile (a few minutes; we check your license and insurance). As soon as you're approved, this job is offered to you automatically: you confirm it and set your dates. The first approved painter to accept gets it.</p>
+  ${button(data.inviteUrl, 'Confirm this job', '#16a34a', true)}
+  <p style="margin:14px 0 0;padding:12px 14px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;font-size:15px;">To say it once more: <strong>the price you see is the price you get</strong>, <strong>it costs you nothing</strong>, and <strong>it's a real job that's already bid</strong>, not a lead. You just confirm it and schedule it.</p>
   <p style="margin:24px 0 6px;font-weight:700;">How working with us goes</p>
   <ul style="margin:0 0 0 20px;padding:0;">
     <li>Honor the price you accept. Upselling is fine.</li>
@@ -568,7 +572,7 @@ ${body}
   </ul>
 </td></tr>
 <tr><td align="center" style="padding:20px 8px;font-family:${FONT};font-size:12px;line-height:1.6;color:#6b7280;">
-  You're receiving this one-time invitation because your company is listed publicly as a painting contractor near ZIP ${escapeHtml(data.zipCode)}. This message is a solicitation from The Painted Painter.<br />
+  This is a one-time invitation for this one job (the price a customer just accepted near ZIP ${escapeHtml(data.zipCode)}). You're receiving it because your company is listed publicly as a painting contractor in that area. This message is a solicitation from The Painted Painter.<br />
   <a href="${escapeHtml(data.unsubscribeUrl)}" style="color:#6b7280;">Unsubscribe</a> and we won't contact you again.<br />
   ${escapeHtml(data.postalAddress)}
 </td></tr>

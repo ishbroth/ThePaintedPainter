@@ -2,12 +2,15 @@
 //
 // Supabase Edge Function: invite local painting companies to take a job that has no painter yet.
 //
-// Called by submit-quote-claim (with the service role key) when a customer claims a price in a ZIP with no approved painter in range.
+// Called with the service role key by submit-quote-claim (a customer claims a price in a ZIP with no approved painter in range) and by
+// decline-job (every painter offered a Mystery Painter job has declined, so another round of invitations goes out).
 //   1. Looks at the directory of companies found so far (outreach_companies). The ZIP is searched on Google (three wordings: established,
 //      affordable, professional/quality) only when it has never been searched, the list is thin, or the last search is old; every company
 //      found is kept (needs GOOGLE_GEOCODING_API_KEY or GOOGLE_PLACES_API_KEY, with Places API (New) enabled).
-//   2. Picks who to invite by rotation (see _shared/outreachPlan.ts): companies not invited for 7 days, least-invited first; a company that
-//      has had 5 invitations without signing up moves to the back of the line but stays in the directory. Nobody twice in one day.
+//   2. Picks who to invite by rotation (see _shared/outreachPlan.ts): up to 12 per job. Companies already invited who have not responded come
+//      first (so 12 invited, 3 sign up, leaves 9 who are invited again plus 3 new ones), then companies never invited. A company that has had
+//      3 invitations with no response (it neither signed up nor unsubscribed) is rotated out, but stays in the directory and comes back
+//      round once the area has nobody else left. No waiting period between invitations.
 //   3. Reads each company's own public website for a business email address (once; the result is kept).
 //   4. Emails each one an invitation with the job details (no customer name, address or contact details; only the ZIP) and a button
 //      to claim it. Claiming means signing up as a painter (free; the application is reviewed); once approved, the job is offered to
@@ -305,7 +308,8 @@ serve(async (req: Request) => {
       .select('id, status, customer_email, quote_zip, painter_payout_amount, customer_preferred_date, customer_start_date, customer_end_date, dates_flexible, timeline, project_summary')
       .eq('id', jobId)
       .maybeSingle()
-    if (!job || job.status !== 'searching_painter' || !job.quote_zip) return json({ ok: false, reason: 'Job is not waiting for a painter' })
+    // waiting for a painter, or a Mystery Painter job whose painters have all declined (the customer is choosing; a newly approved painter can still take it)
+    if (!job || !['searching_painter', 'needs_new_painter'].includes(job.status) || !job.quote_zip) return json({ ok: false, reason: 'Job is not waiting for a painter' })
     // a made-up customer (demonstration or test, ".invalid" address) never triggers a real search; tests pass testPlaces instead
     if (!testPlaces && /@[^@]*\.invalid$/i.test(String(job.customer_email ?? ''))) return json({ ok: false, reason: 'Demonstration job: no real companies were contacted' })
 
@@ -323,7 +327,7 @@ serve(async (req: Request) => {
     const summary = (job.project_summary ?? {}) as { qa?: { question: string; answer: string }[]; breakdown?: { description: string; amount: number; removed?: boolean }[]; timelineLabel?: string }
     const invited: string[] = []
     let considered = 0
-    const tiers: Record<string, number> = { fresh: 0, cooling: 0, moved_on: 0 }
+    const tiers: Record<string, number> = { in_progress: 0, fresh: 0, rotated_out: 0 }
 
     // One invitation: log it, send it, and report whether it went out.
     const invite = async (companyName: string, email: string, website: string | null, phone: string | null): Promise<boolean> => {
@@ -343,7 +347,7 @@ serve(async (req: Request) => {
           to: email,
           type: 'cold_job_invite',
           data: {
-            subject: `A free painting job near ${job.quote_zip}: $${Math.round(Number(job.painter_payout_amount) || 0).toLocaleString('en-US')} payout, yours to claim`,
+            subject: `A painting job near ${job.quote_zip}, already bid at $${Math.round(Number(job.painter_payout_amount) || 0).toLocaleString('en-US')} for you: confirm and schedule it`,
             companyName,
             zipCode: job.quote_zip,
             payoutAmount: job.painter_payout_amount,
