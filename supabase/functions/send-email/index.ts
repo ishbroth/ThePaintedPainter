@@ -449,7 +449,8 @@ ${body}
         <p>
           Customer: <strong>${escapeHtml(data.customerFirstName) || 'A customer'}</strong><br />
           ZIP code: <strong>${escapeHtml(data.zipCode) || 'N/A'}</strong><br />
-          Customer's timing: <strong>${escapeHtml(data.datesText ?? data.timelineLabel) || 'Not specified'}</strong>
+          Customer's timing: <strong>${escapeHtml(data.datesText ?? data.timelineLabel) || 'Not specified'}</strong><br />
+          Pictures Included: <strong>${photos.length > 0 ? `${photos.length} (shown below)` : 'None'}</strong>
           ${data.estimatedDays ? `<br />Estimated time on site: <strong>about ${escapeHtml(data.estimatedDays)} working day${Number(data.estimatedDays) === 1 ? '' : 's'}</strong>` : ''}
         </p>
         <p style="font-size: 22px; font-weight: 700; color: #2563eb; margin: 20px 0;">
