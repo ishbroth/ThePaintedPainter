@@ -366,7 +366,7 @@ const QuoteResults = () => {
           )}
         </div>
         <div className="mystery-painter-price">
-          <div className="mystery-painter-price-main">{currency(estimate.total)}</div>
+          <div className="mystery-painter-price-main">{currency(results?.mystery.price ?? estimate.total)}</div>
           <div className="mystery-painter-price-save">
             Save vs. listed painters
           </div>
@@ -575,7 +575,7 @@ const ClaimPriceModal = ({
               We'll keep your contact info private until a painter accepts the job.
             </p>
 
-            <div style={{ display: 'grid', gap: 10, marginTop: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 10, marginTop: 16 }}>
               <input placeholder="Full name" value={name} onChange={(e) => setName(e.target.value)} style={inputStyle} />
               <input placeholder="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} style={inputStyle} />
               <input placeholder="Phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} style={inputStyle} />
@@ -614,6 +614,9 @@ const ClaimPriceModal = ({
 };
 
 const inputStyle: CSSProperties = {
+  width: '100%',
+  minWidth: 0,
+  boxSizing: 'border-box',
   padding: '10px 12px',
   borderRadius: 8,
   border: '1px solid var(--border-strong)',

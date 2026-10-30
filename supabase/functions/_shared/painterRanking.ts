@@ -97,6 +97,25 @@ export function priceDeviations(projected: (number | null)[]): number[] {
   return out
 }
 
+/**
+ * The Mystery Painter's price: the middle of the prices the listed painters are shown at (the average of the two in the middle when there
+ * is an even number: 1000, 1050, 1250, 1300 gives 1150), and never the same as one of them. When the middle lands exactly on a listed price
+ * (an odd count, or a tie) it settles halfway down to the next lower listed price. A lone painter is undercut by 2%.
+ */
+export function mysteryPrice(listed: number[], fallback: number): number {
+  const prices = listed.filter((p) => isFinite(p) && p > 0).sort((a, b) => a - b)
+  if (prices.length === 0) return Math.round(fallback)
+  if (prices.length === 1) return Math.max(1, Math.round(prices[0] * 0.98))
+  const mid = prices.length >> 1
+  let price = Math.round(prices.length % 2 ? prices[mid] : (prices[mid - 1] + prices[mid]) / 2)
+  const taken = new Set(prices)
+  if (!taken.has(price)) return price
+  const lower = [...prices].reverse().find((p) => p < price)
+  price = lower !== undefined ? Math.round((lower + price) / 2) : Math.round(price * 0.99)
+  while (taken.has(price) && price > 1) price -= 1 // never one of the listed prices, however they fall
+  return price
+}
+
 export function timingFromCtx(ctx: Record<string, unknown>): CustomerTiming {
   return {
     startDate: typeof ctx.startDate === 'string' && ctx.startDate ? ctx.startDate : null,
@@ -116,7 +135,9 @@ export async function rankPainters(
   const zip = String(ctx.zipCode ?? '')
   const holdUntil = opts.holdUntilMs ?? Date.now() + DEFAULT_HOLD_MS
   const duration = estimateDayRange(baseTotal)
-  const mystery = { price: Math.round(baseTotal), priceToken: await signPrice('mystery', baseTotal, zip, holdUntil) }
+  // with nobody listed the Mystery Painter is simply the estimate; otherwise it is set from the listed prices once they are known (below)
+  const mysteryAt = async (price: number) => ({ price, priceToken: await signPrice('mystery', price, zip, holdUntil) })
+  const mystery = await mysteryAt(Math.round(baseTotal))
 
   const { data: rows, error } = await supabase
     .from('painters')
@@ -246,5 +267,11 @@ export async function rankPainters(
     }
   }
 
-  return { painters: opts.limit ? ranked.slice(0, opts.limit) : ranked, mystery, holdUntil, duration, preferred }
+  return {
+    painters: opts.limit ? ranked.slice(0, opts.limit) : ranked,
+    mystery: await mysteryAt(mysteryPrice(ranked.map((r) => r.price), baseTotal)),
+    holdUntil,
+    duration,
+    preferred,
+  }
 }
