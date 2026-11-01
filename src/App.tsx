@@ -11,6 +11,7 @@ import AuthRedirectBanner from './components/AuthRedirectBanner';
 import Footer from './components/Footer';
 import Home from './pages/Home';
 import QuoteResults from './pages/QuoteResults';
+import NotForPainters from './components/NotForPainters.tsx';
 import Services from './pages/Services';
 import Gallery from './pages/Gallery';
 import PaintersMap from './pages/PaintersMap';
@@ -107,7 +108,7 @@ function App() {
               <Routes>
                 {/* Existing routes */}
                 <Route path="/" element={<Home />} />
-                <Route path="/quote-results" element={<QuoteResults />} />
+                <Route path="/quote-results" element={<NotForPainters><QuoteResults /></NotForPainters>} />
                 <Route path="/about" element={<Navigate to="/support" replace />} />
                 <Route path="/services" element={<Services />} />
                 <Route path="/quote" element={<Navigate to="/" replace />} />
@@ -123,10 +124,10 @@ function App() {
                 <Route path="/leave-review" element={<LeaveReview />} />
                 <Route path="/painter/availability" element={<PainterAvailability />} />
                 <Route path="/painter/confirm-date" element={<Navigate to="/painter/dashboard/projects" replace />} />
-                <Route path="/choose-painter" element={<ChoosePainter />} />
+                <Route path="/choose-painter" element={<NotForPainters><ChoosePainter /></NotForPainters>} />
                 <Route path="/cancel-request" element={<CancelRequest />} />
                 <Route path="/cancel-claim" element={<CancelClaim />} />
-                <Route path="/resume-search" element={<ResumeSearch />} />
+                <Route path="/resume-search" element={<NotForPainters><ResumeSearch /></NotForPainters>} />
                 <Route path="/admin/painter-review" element={<PainterReview />} />
                 <Route path="/painter/confirm-signup" element={<PainterConfirmSignup />} />
                 <Route path="/painter/accept-job" element={<AcceptJob />} />

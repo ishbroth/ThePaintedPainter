@@ -1,5 +1,7 @@
 import { useEffect, useLayoutEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import ChatPanel from '../components/ChatEstimator/ChatPanel';
+import { useAuth } from '../lib/auth';
 import PaintersMapSection from '../components/PaintersMapSection';
 
 // Carousel 1 (4 triplets)
@@ -117,6 +119,8 @@ const SmoothCarousel = ({
 };
 
 const Home = () => {
+  const { profile } = useAuth();
+  const isPainter = profile?.role === 'painter';
   // The home page always opens at the top (not wherever a refresh or the back button left it), unless the link points at a section
   // (the "Get your price" link goes to /#estimator and scrolls itself).
   useLayoutEffect(() => {
@@ -151,7 +155,15 @@ const Home = () => {
       <section className="hero-spacer" aria-hidden="true" />
 
       {/* AI Chat Estimator — replaces the old "Get a Free Painting Estimate" CTA card */}
-      <ChatPanel />
+      {isPainter ? (
+        <section className="about-text" id="estimator" style={{ textAlign: 'center' }}>
+          <h2>You're signed in as a painter</h2>
+          <p>The price estimator is for customers. Your jobs, schedule and profile are on your dashboard.</p>
+          <p><Link to="/painter/dashboard" className="nav-cta">Go to your dashboard</Link></p>
+        </section>
+      ) : (
+        <ChatPanel />
+      )}
 
       {/* The carousel that was at the top of the page (under the header, resting on Superman's eyes), now right under the estimator, same size as the others */}
       <SmoothCarousel triplets={carousel2Triplets} speed={50.3} />

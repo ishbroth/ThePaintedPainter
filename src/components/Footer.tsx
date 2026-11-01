@@ -1,11 +1,16 @@
 import { Link } from 'react-router-dom';
+import { useAuth } from '../lib/auth';
 
 const Footer = () => {
+  const { user, profile, loading } = useAuth();
+  const isPainter = profile?.role === 'painter';
+  const isCustomer = profile?.role === 'customer';
+  const unknown = loading || (!!user && !profile);
   return (
     <footer className="footer">
       <div className="footer-links">
-        <Link to="/">Get Your Price</Link>
-        <Link to="/painter-signup">For Painters</Link>
+        {!unknown && (isPainter ? <Link to="/painter/dashboard">Dashboard</Link> : <Link to="/">Get Your Price</Link>)}
+        {!unknown && (isPainter ? <Link to="/painter/dashboard/projects">My Projects</Link> : isCustomer ? <Link to="/customer/dashboard/projects">My Projects</Link> : <Link to="/painter-signup">For Painters</Link>)}
         <Link to="/support">Support</Link>
       </div>
       <p>Copyright &copy; 2015-{new Date().getFullYear()} The Painted Painter - All Rights Reserved.</p>
