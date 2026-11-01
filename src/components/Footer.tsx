@@ -12,6 +12,7 @@ const Footer = () => {
         {!unknown && (isPainter ? <Link to="/painter/dashboard">Dashboard</Link> : <Link to="/">Get Your Price</Link>)}
         {!unknown && (isPainter ? <Link to="/painter/dashboard/projects">My Projects</Link> : isCustomer ? <Link to="/customer/dashboard/projects">My Projects</Link> : <Link to="/painter-signup">For Painters</Link>)}
         <Link to="/support">Support</Link>
+        <Link to="/privacy">Privacy</Link>
       </div>
       <p>Copyright &copy; 2015-{new Date().getFullYear()} The Painted Painter - All Rights Reserved.</p>
       <div className="footer-social">

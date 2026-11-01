@@ -1,0 +1,47 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appIDs": [
+          "REPLACE_WITH_TEAM_ID.com.thepaintedpainter.app"
+        ],
+        "components": [
+          {
+            "/": "/confirm-job",
+            "?": {
+              "token": "*"
+            }
+          },
+          {
+            "/": "/choose-painter"
+          },
+          {
+            "/": "/painter/accept-job"
+          },
+          {
+            "/": "/leave-review"
+          },
+          {
+            "/": "/cancel-claim"
+          },
+          {
+            "/": "/cancel-request"
+          },
+          {
+            "/": "/resume-search"
+          },
+          {
+            "/": "/painter/*"
+          },
+          {
+            "/": "/customer/*"
+          },
+          {
+            "/": "/auth/*"
+          }
+        ]
+      }
+    ]
+  }
+}

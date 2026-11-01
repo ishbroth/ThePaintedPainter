@@ -1,3 +1,4 @@
+import { openExternal } from './native';
 import { supabase, supabaseAnonKey, supabaseUrl } from './supabase';
 
 // The contract between a customer and the painter who confirmed their job. Everything goes through the `contract` edge function, which
@@ -87,7 +88,7 @@ export async function contractCall<T = ContractView>(auth: ContractAuth, body: R
 
 export async function openContractDocument(auth: ContractAuth, versionId: string): Promise<void> {
   const { url } = await contractCall<{ url: string }>(auth, { action: 'document_url', versionId });
-  window.open(url, '_blank', 'noopener');
+  await openExternal(url);
 }
 
 /** Uploads the painter's own contract document (PDF or Word, up to 10 MB) and returns what to save on the draft. */

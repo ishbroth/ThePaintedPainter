@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabaseUrl, supabaseAnonKey } from '../lib/supabase';
 import { createDepositCheckout } from '../lib/payments/stripe';
+import { goToCheckout, onResume } from '../lib/native';
 import { addDaysIso, fmtDate, fmtRange, todayIso } from '../lib/dates';
 import AddToCalendar from '../components/AddToCalendar';
 import ContractWorkspace from '../components/contracts/ContractWorkspace';
@@ -75,6 +76,8 @@ const ConfirmJob = () => {
   }, [token]);
 
   useEffect(() => { load(); }, [load]);
+  // back from paying in the browser sheet (the app): show the booking as it now stands
+  useEffect(() => onResume(() => { void load(); }), [load]);
 
   // Back from Stripe: the webhook confirms the job a moment after the redirect, so poll briefly.
   useEffect(() => {
@@ -118,7 +121,7 @@ const ConfirmJob = () => {
         setError('We couldn\'t start checkout. Please try again in a moment.');
         return;
       }
-      window.location.href = url;
+      await goToCheckout(url);
     } catch {
       setError('Something went wrong starting checkout. Please try again.');
     } finally {

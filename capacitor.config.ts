@@ -19,6 +19,11 @@ const config: CapacitorConfig = {
   android: {
     backgroundColor: '#fdf9f2',
   },
+  plugins: {
+    // the launch screen stays until the page is up (src/lib/native.ts hides it)
+    SplashScreen: { launchAutoHide: false, backgroundColor: '#fdf9f2', showSpinner: false },
+    StatusBar: { style: 'LIGHT', backgroundColor: '#ffffff' },
+  },
 };
 
 export default config;

@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { ThemeContext, type Theme } from './ThemeContext';
+import { syncStatusBar } from '../native';
 
 // Bumped from 'tpp-theme' when the default flipped from dark to light —
 // every visit before that change had already written 'dark' into
@@ -27,6 +28,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
+    void syncStatusBar(theme);
     try {
       localStorage.setItem(STORAGE_KEY, theme);
     } catch {

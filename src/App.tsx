@@ -1,4 +1,7 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
+import { onAppUrl, routeFromUrl } from './lib/native.ts';
+import Privacy from './pages/Privacy.tsx';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, ProtectedRoute } from './lib/auth/index.ts';
 import { ThemeProvider } from './lib/theme/index.ts';
@@ -91,6 +94,13 @@ function CustomerDashboardLayout() {
   );
 }
 
+/** In the iOS / Android app, a link that opens the app (an emailed link on the site) goes to the matching page inside it. */
+function NativeLinks() {
+  const navigate = useNavigate();
+  useEffect(() => onAppUrl((url) => { const path = routeFromUrl(url); if (path) navigate(path); }), [navigate]);
+  return null;
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -98,6 +108,7 @@ function App() {
       <Router>
         <AuthProvider>
           <ThemeAccountSync />
+          <NativeLinks />
           <SiteBackground />
           <VoiceCheck />
           <div className="min-h-screen flex flex-col" style={{ position: 'relative', zIndex: 1 }}>
@@ -119,6 +130,7 @@ function App() {
 
                 {/* New public routes */}
                 <Route path="/support" element={<Support />} />
+                <Route path="/privacy" element={<Privacy />} />
                 <Route path="/painters/:id" element={<PainterPublicProfile />} />
                 <Route path="/confirm-job" element={<ConfirmJob />} />
                 <Route path="/leave-review" element={<LeaveReview />} />
