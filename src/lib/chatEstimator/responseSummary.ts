@@ -123,7 +123,7 @@ const DEPENDS_ON: Record<string, string> = {
   fenceType: 'fence', fenceLinearFeet: 'fence', deckSize: 'deck', deckSqft: 'deck', railingType: 'railings', exteriorRailingMaterial: 'railings',
   balconyCount: 'balconies', exteriorShutterCount: 'exteriorShutters', exteriorWindowCount: 'exteriorWindows', overhangSqft: 'overhangs',
   doorCount: 'interiorDoors', doorTypes: 'interiorDoors', doorFrames: 'interiorDoors', doorMaterial: 'interiorDoors',
-  windowCount: 'interiorWindows', windowTypes: 'interiorWindows', cabinetLocations: 'cabinets', cabinetScope: 'cabinets', cabinetDoorCount: 'cabinets',
+  windowCount: 'interiorWindows', windowTypes: 'interiorWindows', cabinetLocations: 'cabinets', cabinetScope: 'cabinets', cabinetFinish: 'cabinets', trimFinish: 'interiorTrim', doorFinish: 'interiorDoors', cabinetDoorCount: 'cabinets',
   closetCount: 'closets', closetShelving: 'closets', stairwayCount: 'stairways', stairwayDetails: 'stairways', stairRailFeet: 'stairways',
   interiorRailingMaterial: 'stairways', accentWallCount: 'accentWalls', brickTreatment: 'brickSqft', epoxyType: 'epoxyGarageSqft',
   colorChangeScope: 'interiorColorChange', colorChangeExcludedRoomCount: 'interiorColorChange', colorCount: 'interiorColorChange',

@@ -203,6 +203,31 @@ async function dismissAt(setup: string[], topicWords: RegExp, dismissal = 'doesn
   check('a kitchen with trim: the cabinets are asked about', /cabinets/i.test(kitchen.r.last), kitchen.seen.join(' | ').slice(0, 500));
 }
 
+// The current finish of cabinets, baseboards/trim and doors: asked, read, and priced (painted is the base; bare wood and stained wood cost more prep; pre-primed less).
+{
+  const priceOf = (st: ChatState) => calculateEstimate(st.ctx).total;
+  const start = ['I want the whole inside of my house painted, walls, trim and doors', '2400 sq ft', 'walls, ceilings, trim and doors', 'yes'];
+  const cab = await play([...start, 'yes']); // "...the trim: yes", then yes to the kitchen cabinets
+  check('kitchen cabinets: asked whether they are painted, bare, stained or pre-primed', /cabinets/i.test(cab.last) && /bare/i.test(cab.last), cab.last.slice(0, 300));
+  const finishes: Record<string, number> = {};
+  for (const [name, reply] of [['painted', 'they are painted white'], ['bare', 'bare wood'], ['stained', 'stained oak'], ['primed', 'pre-primed']] as const) {
+    const a2 = await play([reply], [], cab.state);
+    finishes[name] = priceOf(a2.state);
+    check(`cabinets "${reply}" is read (${a2.state.ctx.cabinetFinish})`, a2.state.ctx.cabinetFinish === { painted: 'painted', bare: 'bare_wood', stained: 'stained', primed: 'primed' }[name], JSON.stringify(a2.state.ctx.cabinetFinish));
+  }
+  check('cabinets: bare wood and stained wood cost more than painted, pre-primed costs less', finishes.bare > finishes.painted && finishes.stained > finishes.bare && finishes.primed < finishes.painted, JSON.stringify(finishes));
+  const said = await play(['I want the kitchen cabinets painted, they are stained oak']);
+  check('stained oak cabinets said up front are read', said.state.ctx.cabinetFinish === 'stained', JSON.stringify(said.state.ctx.cabinetFinish));
+
+  const trim = await play([...start, 'no']); // no to the kitchen cabinets: the trim and doors question comes next
+  check('trim and doors: asked whether they are painted, bare, stained or pre-primed', /doors/i.test(trim.last) && /bare/i.test(trim.last), trim.last.slice(0, 300));
+  const mixed = await play(['stained oak doors, painted baseboards'], [], trim.state);
+  check('"stained oak doors, painted baseboards" is read per item', mixed.state.ctx.doorFinish === 'stained' && mixed.state.ctx.trimFinish === 'painted', JSON.stringify([mixed.state.ctx.trimFinish, mixed.state.ctx.doorFinish]));
+  const allPainted = await play(['all painted white'], [], trim.state);
+  const bareAll = await play(['all bare wood'], [], trim.state);
+  check('trim and doors: bare wood costs more to prep than painted', priceOf(bareAll.state) > priceOf(allPainted.state), String([priceOf(bareAll.state), priceOf(allPainted.state)]));
+}
+
 setLLMReaderForTests(undefined);
 console.log(failures ? `\n${failures} FAILED` : '\nall conversation checks passed');
 process.exit(failures ? 1 : 0);

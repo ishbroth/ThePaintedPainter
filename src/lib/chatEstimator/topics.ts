@@ -536,6 +536,46 @@ export const TOPICS: Topic[] = [
     example: () => "Just say 'yes, the kitchen cabinets too', 'cabinets in the kitchen and bathrooms', or 'no, leave the cabinets'.",
   },
 
+  {
+    // Cabinets and vanities: what they are finished with now decides the prep (bare wood needs primer, stained wood must be deglossed and sealed against bleed-through,
+    // factory-primed needs the least, laminate needs a special adhesion primer), so it changes the price.
+    id: 'cabinet_finish',
+    priority: 29.8,
+    relevant: (c) => (c.projectType === 'interior' || c.projectType === 'both') && c.cabinets !== 'none',
+    alreadyAnswered: (c) => c.cabinetFinish !== '',
+    ask: (c) =>
+      pick(
+        [
+          "Are the cabinets (and any vanities) already painted? If not, what are they now: bare wood, stained or varnished wood, or pre-primed?",
+          "Have the cabinets been painted before? If they haven't, are they bare wood, stained, or already primed?",
+        ],
+        seed(c),
+      ),
+    clarify: () => "The current finish changes the prep. Painted ones just need a good clean and sanding. Bare wood needs primer first, and stained or varnished wood has to be deglossed and sealed with a stain-blocking primer so the stain doesn't bleed through the paint.",
+    example: () => "E.g., 'they're painted white now', 'bare wood', 'stained oak', 'pre-primed', or 'laminate'.",
+  },
+
+  {
+    // The same question for the baseboards/trim and the doors: bare wood needs primer, stained or varnished wood must be deglossed and sealed, painted needs the least.
+    id: 'trim_door_finish',
+    priority: 29.9,
+    relevant: (c) => (c.projectType === 'interior' || c.projectType === 'both') && (c.interiorTrim === 'yes' || c.interiorDoors !== 'none'),
+    alreadyAnswered: (c) => (c.interiorTrim !== 'yes' || c.trimFinish !== '') && (c.interiorDoors === 'none' || c.doorFinish !== ''),
+    ask: (c) => {
+      const what = c.interiorTrim === 'yes' && c.interiorDoors !== 'none' ? 'baseboards, trim and doors' : c.interiorTrim === 'yes' ? 'baseboards and trim' : 'doors';
+      const are = c.interiorTrim === 'yes' && c.interiorDoors !== 'none' ? 'are' : 'is';
+      return pick(
+        [
+          `Are the ${what} already painted? If not, ${are === 'are' ? 'are they' : 'is it'} bare wood, stained or varnished wood, or pre-primed?`,
+          `Have the ${what} been painted before, or ${are === 'are' ? 'are they' : 'is it'} bare, stained, or already primed?`,
+        ],
+        seed(c),
+      );
+    },
+    clarify: () => "The current finish changes the prep. Painted trim and doors just need a clean and a light sanding. Bare wood needs primer first, and stained or varnished wood has to be deglossed and sealed with a stain-blocking primer so it doesn't bleed through.",
+    example: () => "E.g., 'all painted white', 'bare wood', 'stained oak doors, painted baseboards', or 'pre-primed'.",
+  },
+
   // ——————————————————————————————————————————
   // Trim scope — "trim" alone only prices baseboards; door frames/casings,
   // closet shelving, and built-ins are each separate line items, so ask

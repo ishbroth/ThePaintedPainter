@@ -142,6 +142,69 @@ export function extractRooms(text: string): string[] {
   return found;
 }
 
+/**
+ * What the cabinets are finished with now, from what the customer says about them (null = nothing said). `answering` is true when the reply is the answer to the
+ * "already painted? bare, stained or primed?" question, where a plain "yes" means painted and a plain "no" or "not sure" is priced as stained wood (the likelier of
+ * the unpainted finishes, and the dearer to prep).
+ */
+export function extractCabinetFinish(text: string, answering: boolean): string | null {
+  const whole = text.toLowerCase();
+  const about = answering || /\bcabinet|\bcabinetry|\bvanit(?:y|ies)/.test(whole);
+  if (!about) return null;
+  // "painted doors but stained cabinets": only the part about the cabinets counts
+  const parts = whole.split(/[,;.]|\bbut\b|\bwhile\b|\bwhereas\b/);
+  const cabinetWord = /\bcabinet|\bcabinetry|\bvanit(?:y|ies)/;
+  const otherSurface = /\b(?:doors?|trim|base ?boards?|walls?|ceilings?|windows?)\b/;
+  // the clause about the cabinets, and the one right after it when that one is not about something else ("kitchen cabinets painted, they are stained oak")
+  const t = answering ? whole : parts.filter((c, k) => cabinetWord.test(c) || (k > 0 && cabinetWord.test(parts[k - 1]) && !otherSurface.test(c))).join(' ');
+  if (/\b(?:laminate|melamine|thermofoil|formica|rta|ikea)\b/.test(t)) return 'laminate';
+  if (/\b(?:pre-?primed|already primed|factory[- ]primed|primed already|primed but)\b/.test(t)) return 'primed';
+  if (/\b(?:bare|raw|unfinished|unpainted|never (?:been )?(?:painted|finished)|new wood|just the wood)\b/.test(t)) return 'bare_wood';
+  if (/\b(?:stained|varnish(?:ed)?|lacquer(?:ed)?|poly(?:urethane)?d?|natural wood|wood grain|honey oak|oak|cherry|maple|mahogany|walnut|hickory|dark wood|wood finish)\b/.test(t)) return 'stained';
+  if (/\b(?:previously painted|already (?:been )?painted|painted (?:before|already|white|in the past)|were painted|are painted|painted cabinets|currently painted|repaint(?:ing)? (?:the |my )?(?:cabinets|vanit)|(?:has|have|had) been painted)\b/.test(t)) return 'painted';
+  if (answering) {
+    if (/^\s*(?:yes|yeah|yep|yup|they are|they were|painted|it is|it was)\b/.test(t)) return 'painted';
+    if (/^\s*(?:no|nope|nah|not painted|not sure|i don'?t know|dont know|unsure|no idea|not really)\b/.test(t)) return 'stained';
+  }
+  return null;
+}
+
+/** The current finish of one kind of wood trim or door, from a bit of text about it (null = nothing said). */
+function woodFinishOf(t: string): string | null {
+  if (/\b(?:pre-?primed|already primed|factory[- ]primed|primed already)\b/.test(t)) return 'primed';
+  if (/\b(?:bare|raw|unfinished|unpainted|never (?:been )?(?:painted|finished)|new wood)\b/.test(t)) return 'bare_wood';
+  if (/\b(?:stained|varnish(?:ed)?|lacquer(?:ed)?|poly(?:urethane)?d?|natural wood|wood grain|honey oak|oak|cherry|maple|mahogany|walnut|hickory|dark wood|wood finish)\b/.test(t)) return 'stained';
+  if (/\b(?:previously painted|already (?:been )?painted|painted (?:before|already|white|in the past)|were painted|are painted|currently painted|(?:has|have|had) been painted|painted)\b/.test(t)) return 'painted';
+  return null;
+}
+
+/**
+ * What the baseboards/trim and the interior doors are finished with now. Said about one of them ("stained oak doors, painted baseboards") it applies to that one; in
+ * answer to the question about them (`answering`), an answer that names neither applies to both ("all painted", "bare wood", a plain "yes", and a plain "no" or
+ * "not sure" is priced as stained wood).
+ */
+export function extractTrimDoorFinish(text: string, answering: boolean): { trim: string | null; door: string | null } {
+  const out: { trim: string | null; door: string | null } = { trim: null, door: null };
+  const clauses = text.toLowerCase().split(/[,;.]|\bbut\b|\bwhile\b|\bwhereas\b|\band the\b/);
+  let general: string | null = null;
+  for (const c of clauses) {
+    const f = woodFinishOf(c);
+    if (!f) continue;
+    const trim = /\b(?:base ?boards?|trim|molding|moulding|casings?|crown)\b/.test(c);
+    const door = /\bdoors?\b/.test(c);
+    if (trim) out.trim = f;
+    if (door) out.door = f;
+    if (!trim && !door && answering) general = f;
+  }
+  if (answering && !out.trim && !out.door && !general) {
+    const t = text.toLowerCase();
+    if (/^\s*(?:yes|yeah|yep|yup|they are|they were|it is|it was)\b/.test(t)) general = 'painted';
+    else if (/^\s*(?:no|nope|nah|not painted|not sure|i don'?t know|dont know|unsure|no idea|not really)\b/.test(t)) general = 'stained';
+  }
+  if (general) { out.trim = out.trim ?? general; out.door = out.door ?? general; }
+  return out;
+}
+
 export function extractCabinets(text: string): { yes: boolean; locations: string[] } {
   const t = text.toLowerCase();
   // "no cabinets", "not the cabinets", "without the vanity" rule them out
@@ -1230,6 +1293,24 @@ export function extractAll(text: string, prev: EstimatorContext, lastBotTopicId:
     patch.cabinetLocations = cab.locations;
     acks.push('cabinets');
   }
+  // what the baseboards/trim and the doors are finished with now
+  {
+    const wantsTrim = (prev.interiorTrim === 'yes' || patch.interiorTrim === 'yes');
+    const wantsDoors = ((prev.interiorDoors !== 'none') || (patch.interiorDoors !== undefined && patch.interiorDoors !== 'none'));
+    if (wantsTrim || wantsDoors || lastBotTopicId === 'trim_door_finish') {
+      const f = extractTrimDoorFinish(text, lastBotTopicId === 'trim_door_finish');
+      if (f.trim && !prev.trimFinish && wantsTrim) { patch.trimFinish = f.trim; acks.push(`${f.trim === 'painted' ? 'painted' : f.trim === 'bare_wood' ? 'bare wood' : f.trim === 'stained' ? 'stained' : 'pre-primed'} trim`); }
+      if (f.door && !prev.doorFinish && wantsDoors) { patch.doorFinish = f.door; acks.push(`${f.door === 'painted' ? 'painted' : f.door === 'bare_wood' ? 'bare wood' : f.door === 'stained' ? 'stained' : 'pre-primed'} doors`); }
+    }
+  }
+  // what the cabinets are finished with now: said on the way ("stained oak cabinets") or in answer to the question about it
+  if (!prev.cabinetFinish && (prev.cabinets !== 'none' || patch.cabinets)) {
+    const finish = extractCabinetFinish(text, lastBotTopicId === 'cabinet_finish');
+    if (finish) {
+      patch.cabinetFinish = finish;
+      acks.push(finish === 'painted' ? 'painted cabinets' : finish === 'bare_wood' ? 'bare wood cabinets' : finish === 'stained' ? 'stained cabinets' : finish === 'primed' ? 'pre-primed cabinets' : 'laminate cabinets');
+    }
+  }
 
   let color = extractColorChange(text);
   if (!color && lastBotTopicId === 'color_change') {
@@ -1654,7 +1735,7 @@ export function extractAll(text: string, prev: EstimatorContext, lastBotTopicId:
 
   // Surface scope limiters. Skipped when the reply is answering a different question: "just regular trim" to the trim
   // question means baseboards, not "paint only the trim".
-  const scopeBlockedBy = ['trim_scope', 'condition', 'property_ownership', 'color_change', 'location', 'timeline_and_access', 'commercial_access', 'siding', 'stories', 'house_size', 'room_size', 'reno_context', 'popcorn_extent'];
+  const scopeBlockedBy = ['trim_door_finish', 'cabinet_finish', 'trim_scope', 'condition', 'property_ownership', 'color_change', 'location', 'timeline_and_access', 'commercial_access', 'siding', 'stories', 'house_size', 'room_size', 'reno_context', 'popcorn_extent'];
   const surf = lastBotTopicId && (scopeBlockedBy.includes(lastBotTopicId) || lastBotTopicId.startsWith('ext_')) ? ({} as ReturnType<typeof extractSurfaceScope>) : extractSurfaceScope(text);
   // A plain list as the answer to "which surfaces?" ("walls", "walls and ceilings", "walls ceilings trim") means exactly those.
   const onlySurfaceWords = /^\s*(?:(?:just|only|and|the|with|plus|also|,|&|\+)\s*)*(?:(?:walls?|ceilings?|trim|baseboards?|doors?)\s*(?:,|and|&|\+|\/)?\s*)+[.!]?\s*$/i.test(text);

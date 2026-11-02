@@ -67,6 +67,10 @@ export function highestPriceAssumption(topicId: string, ctx: EstimatorContext): 
         patch: { interiorWalls: 'yes', interiorCeilings: 'yes', interiorTrim: 'yes', interiorDoors: 'all', surfacesAddressed: true, trimScopeAddressed: true },
         say: higher('everything: walls, ceilings, trim and doors'),
       };
+    case 'trim_door_finish':
+      return { patch: { trimFinish: 'stained', doorFinish: 'stained' }, say: higher('stained wood trim and doors, with the degloss and primer they need') };
+    case 'cabinet_finish':
+      return { patch: { cabinetFinish: 'stained' }, say: higher('stained wood cabinets, with the degloss and stain-blocking primer they need') };
     case 'upsell_cabinets':
       return { patch: { cabinets: 'kitchen' }, say: higher('painting the kitchen cabinets too') };
     case 'trim_scope':

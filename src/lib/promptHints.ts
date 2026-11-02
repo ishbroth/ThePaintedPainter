@@ -37,6 +37,8 @@ const TOPIC_PROMPTS: Record<string, string> = {
   upsell_trim: 'Add the baseboards?',
   upsell_doors: 'Add the doors?',
   upsell_cabinets: 'Add the kitchen cabinets?',
+  cabinet_finish: 'Are the cabinets painted, bare wood, stained or pre-primed?',
+  trim_door_finish: 'Are the trim and doors painted, bare wood, stained or pre-primed?',
   trim_scope: 'What does the trim include?',
   condition: 'What shape are the surfaces in?',
   popcorn_extent: 'How many rooms have popcorn ceilings?',

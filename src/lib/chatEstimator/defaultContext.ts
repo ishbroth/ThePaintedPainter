@@ -37,7 +37,7 @@ export function makeInitialContext(): EstimatorContext {
     contactName: '', contactPhone: '', contactEmail: '', contactNotes: '',
     projectCondition: '', hasStainedWood: 'no', bedroomCount: null,
     trimCondition: 'existing_good', wallTexture: 'smooth', doorMaterial: 'wood',
-    cabinetScope: 'fronts_only', closetShelving: 'none', stuccoCondition: 'good',
+    cabinetScope: 'fronts_only', cabinetFinish: '', trimFinish: '', doorFinish: '', closetShelving: 'none', stuccoCondition: 'good',
     exteriorRailingMaterial: 'wood', interiorRailingMaterial: 'wood', additionalDetails: '',
     specialtyServices: [], fireplaceType: '', fireplaceCount: null, beamLinearFeet: null,
     beamLocation: 'standard', builtInCount: null, epoxyGarageSqft: null, epoxyType: 'basic',

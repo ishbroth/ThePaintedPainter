@@ -12,6 +12,14 @@ import {
 
 // ===== Main Estimate Calculation =====
 
+/** How the cabinets' current finish changes the price of painting them (1 = already painted and in sound shape). */
+const CABINET_FINISH_MULTIPLIER: Record<string, number> = { painted: 1.0, primed: 0.93, bare_wood: 1.18, stained: 1.25, laminate: 1.28 };
+/** The same for trim and doors (stained wood already has its own prep line and condition factor when stained trim was spotted elsewhere, so it is not counted twice). */
+const WOOD_FINISH_MULTIPLIER: Record<string, number> = { painted: 1.0, primed: 0.95, bare_wood: 1.15, stained: 1.3 };
+const WOOD_FINISH_NOTE: Record<string, string> = { bare_wood: 'bare wood: sand + prime', stained: 'stained: degloss + prime', primed: 'pre-primed', painted: '' };
+const woodFinishFactor = (finish: string, ctx: EstimatorContext): number => (ctx.hasStainedWood === 'yes' ? 1 : WOOD_FINISH_MULTIPLIER[finish] ?? 1);
+const CABINET_FINISH_NOTE: Record<string, string> = { bare_wood: ', bare wood: sand + primer', stained: ', stained: degloss + stain-blocking primer', laminate: ', laminate: adhesion primer', primed: ', pre-primed', painted: '' };
+
 export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
   const lineItems: EstimateLineItem[] = [];
   let volumeEfficiencyUsed = 1;
@@ -111,8 +119,8 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
       const trimCond = ctx.trimCondition || (ctx.projectCondition === 'new_construction' ? 'new' : 'existing_good');
       lineItems.push({
         category: 'Interior',
-        description: ctx.trimLinearFeet ? `Trim & Baseboards (${trimLinFt} lin ft)` : 'Trim & Baseboards',
-        amount: trimLinFt * trimRate * regionalMult * conditionMultiplier * volEff,
+        description: `Trim & Baseboards${ctx.trimLinearFeet ? ` (${trimLinFt} lin ft)` : ''}${WOOD_FINISH_NOTE[ctx.trimFinish] ? ` (${WOOD_FINISH_NOTE[ctx.trimFinish]})` : ''}`,
+        amount: trimLinFt * trimRate * regionalMult * conditionMultiplier * volEff * woodFinishFactor(ctx.trimFinish, ctx),
         key: 'trim',
       });
 
@@ -180,8 +188,8 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
 
       lineItems.push({
         category: 'Interior',
-        description: `Interior Doors (${doorCount})`,
-        amount: doorTotal * materialFactor * regionalMult * conditionMultiplier * volEff,
+        description: `Interior Doors (${doorCount})${WOOD_FINISH_NOTE[ctx.doorFinish] ? ` (${WOOD_FINISH_NOTE[ctx.doorFinish]})` : ''}`,
+        amount: doorTotal * materialFactor * regionalMult * conditionMultiplier * volEff * woodFinishFactor(ctx.doorFinish, ctx),
         key: 'doors',
       });
 
@@ -223,7 +231,12 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
       const locations = (ctx.cabinetLocations.length > 0 ? ctx.cabinetLocations : inferred).filter(
         (l) => !off(`cabinets:${l}`) && !(l === 'kitchen' && roomGone('kitchen')) && !(l === 'bathroom' && allBathsGone) && !(l === 'laundry' && roomGone('laundry')),
       );
-      const cabinetComplexity = ctx.hasStainedWood === 'yes' ? LABOR_COMPLEXITY.cabinet_refinish : 1.0;
+      // The finish they have now sets the prep: painted is the base case (clean, scuff-sand, bonding primer); bare wood needs sanding and a full primer coat
+      // (more if the grain is open, as in oak); stained or varnished wood must be deglossed and sealed with a stain-blocking primer; factory-primed needs the least;
+      // laminate and thermofoil need a special adhesion primer and slower, careful work. When it isn't known, stained trim elsewhere stands in as before.
+      const finishMultiplier = CABINET_FINISH_MULTIPLIER[ctx.cabinetFinish];
+      const cabinetComplexity = finishMultiplier ?? (ctx.hasStainedWood === 'yes' ? LABOR_COMPLEXITY.cabinet_refinish : 1.0);
+      const finishNote = CABINET_FINISH_NOTE[ctx.cabinetFinish] ?? '';
       // Painting inside cabinets adds 40-60% (more surfaces, tighter access, more coats)
       const scopeMultiplier = ctx.cabinetScope === 'inside_too' ? 1.50 : 1.0;
       for (const loc of locations) {
@@ -233,8 +246,8 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
           ? ctx.cabinetDoorCount * BASE_RATES.cabinets.per_door + BASE_RATES.cabinets.kitchen_setup
           : getCabinetRate(loc, sqft);
         const desc = ctx.cabinetScope === 'inside_too'
-          ? `${capitalize(loc)} Cabinets (inside + out)`
-          : `${capitalize(loc)} Cabinets`;
+          ? `${capitalize(loc)} Cabinets (inside + out${finishNote})`
+          : `${capitalize(loc)} Cabinets${finishNote ? ` (${finishNote.replace(/^, /, '')})` : ''}`;
         lineItems.push({
           category: 'Interior',
           description: desc,

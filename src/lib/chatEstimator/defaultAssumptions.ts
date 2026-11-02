@@ -103,9 +103,24 @@ export function defaultAssumptions(ctx: EstimatorContext): Assumption[] {
     }
   }
 
+  // Trim and doors: the prep that goes with how they are finished now
+  if (ctx.interiorTrim === 'yes' || (ctx.interiorDoors && ctx.interiorDoors !== 'none')) {
+    const finishes = [ctx.interiorTrim === 'yes' ? ctx.trimFinish : '', ctx.interiorDoors !== 'none' ? ctx.doorFinish : ''];
+    if (finishes.includes('bare_wood')) out.push({ label: 'Bare trim/door wood: sand + primer', reason: 'Bare wood is sanded smooth and sealed with a full primer coat before the finish coats.' });
+    if (finishes.includes('stained')) out.push({ label: 'Stained trim/doors: degloss + stain-blocking primer', reason: 'Stained or varnished wood is deglossed and sealed with a stain-blocking primer so the old finish does not bleed through the paint.' });
+    if (finishes.includes('primed')) out.push({ label: 'Pre-primed trim/doors: light scuff-sand', reason: 'Factory-primed wood only needs a light scuff-sand and cleaning before the finish coats.' });
+  }
+
   // Cabinet-specific
   if (ctx.cabinets && ctx.cabinets !== 'none') {
-    out.push({
+    const byFinish: Record<string, { label: string; reason: string }> = {
+      painted: { label: 'Cabinet clean, scuff-sand + bond primer', reason: 'Already-painted cabinets get a degreasing clean, a scuff-sand and a bonding primer so the new paint holds.' },
+      bare_wood: { label: 'Bare cabinet wood: sand + primer', reason: 'Bare wood is sanded smooth and sealed with a full coat of primer (and grain filler if it is open-grain, like oak) before the finish coats.' },
+      stained: { label: 'Stained cabinets: degloss + stain-blocking primer', reason: 'Stained or varnished wood is deglossed and sealed with a stain-blocking primer so the old finish and wood tannins do not bleed through the paint.' },
+      primed: { label: 'Pre-primed cabinets: light scuff-sand', reason: 'Factory-primed cabinets only need a light scuff-sand and cleaning before the finish coats.' },
+      laminate: { label: 'Laminate cabinets: adhesion primer', reason: 'Laminate, melamine and thermofoil need a special adhesion primer and slower, careful work; the result is less durable than on wood, and some painters decline it.' },
+    };
+    out.push(byFinish[ctx.cabinetFinish] ?? {
       label: 'Cabinet degloss + bond primer',
       reason: 'Existing cabinets must be deglossed and primed with a bonding primer for paint adhesion.',
     });

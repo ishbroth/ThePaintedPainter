@@ -134,6 +134,9 @@ function sanitize(raw: Record<string, unknown>, prev: EstimatorContext): Partial
   if (isEnum(raw.doorFrames, ['yes', 'no'] as const)) patch.doorFrames = raw.doorFrames;
   if (isEnum(raw.cabinets, ['none', 'kitchen', 'bathroom', 'laundry', 'multiple'] as const)) patch.cabinets = raw.cabinets;
   if (isEnum(raw.cabinetScope, ['fronts_only', 'inside_too'] as const)) patch.cabinetScope = raw.cabinetScope;
+  if (isEnum(raw.cabinetFinish, ['painted', 'bare_wood', 'stained', 'primed', 'laminate'] as const)) patch.cabinetFinish = raw.cabinetFinish;
+  if (isEnum(raw.trimFinish, ['painted', 'bare_wood', 'stained', 'primed'] as const)) patch.trimFinish = raw.trimFinish;
+  if (isEnum(raw.doorFinish, ['painted', 'bare_wood', 'stained', 'primed'] as const)) patch.doorFinish = raw.doorFinish;
   if (isEnum(raw.closets, ['none', 'standard', 'walkin', 'both'] as const)) patch.closets = raw.closets;
   if (isEnum(raw.stairways, ['none', 'yes'] as const)) patch.stairways = raw.stairways;
   if (isEnum(raw.stairwayDetails, ['walls_only', 'walls_and_railings', 'full'] as const)) patch.stairwayDetails = raw.stairwayDetails;

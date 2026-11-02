@@ -40,14 +40,15 @@ export function fieldsForKey(key: string): FieldDef[] {
   if (key.startsWith('cabinets:')) {
     return [
       { field: 'cabinetDoorCount', label: 'Doors and drawer fronts', kind: 'number', min: 2, max: 150 },
+      { field: 'cabinetFinish', label: 'Current finish', kind: 'select', options: [{ value: 'painted', label: 'Already painted' }, { value: 'primed', label: 'Pre-primed' }, { value: 'bare_wood', label: 'Bare wood' }, { value: 'stained', label: 'Stained or varnished wood' }, { value: 'laminate', label: 'Laminate / thermofoil' }] },
       { field: 'cabinetScope', label: 'Painted', kind: 'select', options: [{ value: 'fronts_only', label: 'Outside only' }, { value: 'inside_too', label: 'Inside and out' }] },
     ];
   }
   switch (key) {
     case 'walls': return [{ field: 'interiorColorChange', label: 'Color', kind: 'select', options: COLOR }];
     case 'ceilings': return [{ field: 'ceilingType', label: 'Ceiling type', kind: 'select', options: [{ value: 'flat', label: 'Flat' }, { value: 'popcorn', label: 'Popcorn / textured' }, { value: 'vaulted', label: 'Vaulted' }] }];
-    case 'trim': return [{ field: 'trimLinearFeet', label: 'Linear feet of trim', kind: 'number', min: 10, max: 20000 }];
-    case 'doors': return [{ field: 'doorCount', label: 'Number of doors', kind: 'number', min: 1, max: 60 }];
+    case 'trim': return [{ field: 'trimLinearFeet', label: 'Linear feet of trim', kind: 'number', min: 10, max: 20000 }, { field: 'trimFinish', label: 'Current finish', kind: 'select', options: [{ value: 'painted', label: 'Already painted' }, { value: 'primed', label: 'Pre-primed' }, { value: 'bare_wood', label: 'Bare wood' }, { value: 'stained', label: 'Stained or varnished wood' }] }];
+    case 'doors': return [{ field: 'doorCount', label: 'Number of doors', kind: 'number', min: 1, max: 60 }, { field: 'doorFinish', label: 'Current finish', kind: 'select', options: [{ value: 'painted', label: 'Already painted' }, { value: 'primed', label: 'Pre-primed' }, { value: 'bare_wood', label: 'Bare wood' }, { value: 'stained', label: 'Stained or varnished wood' }] }];
     case 'windows': return [{ field: 'windowCount', label: 'Number of windows', kind: 'number', min: 1, max: 80 }];
     case 'closets': return [{ field: 'closetCount', label: 'Number of closets', kind: 'number', min: 1, max: 30 }];
     case 'stairs': return [{ field: 'stairRailFeet', label: 'Feet of railing', kind: 'number', min: 4, max: 500 }];
