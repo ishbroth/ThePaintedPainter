@@ -180,6 +180,29 @@ async function dismissAt(setup: string[], topicWords: RegExp, dismissal = 'doesn
   check('a 10 ft fence is not mistaken for the ceiling height, and the note is kept for the painters', fence.state.ctx.ceilingHeight === 'standard' && /friendly dog/.test(fence.state.ctx.additionalDetails), JSON.stringify({ h: fence.state.ctx.ceilingHeight, d: fence.state.ctx.additionalDetails }));
 }
 
+// A whole inside (or a kitchen) with the trim in: the kitchen cabinets get asked about, once; "no" leaves them out for good.
+{
+  const walk = async (opening: string[]) => {
+    let r = await play(opening);
+    const seen: string[] = [r.last];
+    for (let i = 0; i < 14 && !/cabinets/i.test(r.last); i++) {
+      const q = r.last.split('||').pop() ?? '';
+      const reply = /interior|inside|outside|exterior/i.test(q) ? 'inside' : /color|paint|brand|finish|grade/i.test(q) ? 'whatever you recommend' : /how big|square|size/i.test(q) ? '2400 sq ft' : /ceilings/i.test(q) ? 'yes' : /baseboard|trim/i.test(q) ? 'yes' : /door/i.test(q) ? 'yes' : /condition|shape|walls looking/i.test(q) ? 'good shape' : 'no';
+      r = await play([reply], [], r.state);
+      seen.push(r.last);
+    }
+    return { r, seen };
+  };
+  const whole = await walk(['I want the whole inside of my house painted, walls, trim and doors']);
+  check('a whole inside with trim and doors: the kitchen cabinets are asked about', /cabinets/i.test(whole.r.last), whole.seen.join(' | ').slice(0, 500));
+  const yes = await play(['yes'], [], whole.r.state);
+  check('"yes" adds the kitchen cabinets', yes.state.ctx.cabinets !== 'none', JSON.stringify(yes.state.ctx.cabinets));
+  const no = await play(['no'], [], whole.r.state);
+  check('"no" leaves the cabinets out and they are not asked again', no.state.ctx.cabinets === 'none' && !/cabinets/i.test(no.last), no.last);
+  const kitchen = await walk(['I want my kitchen painted, the walls and trim']);
+  check('a kitchen with trim: the cabinets are asked about', /cabinets/i.test(kitchen.r.last), kitchen.seen.join(' | ').slice(0, 500));
+}
+
 setLLMReaderForTests(undefined);
 console.log(failures ? `\n${failures} FAILED` : '\nall conversation checks passed');
 process.exit(failures ? 1 : 0);

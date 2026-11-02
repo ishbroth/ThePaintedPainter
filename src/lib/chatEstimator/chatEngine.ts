@@ -567,7 +567,7 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
     const ruledOut = new Set(state.ctx.excludedSurfaces ?? []);
     const added = new Set(state.ctx.addedSurfaces ?? []);
     // "no ceilings", and the whole list: "no ceilings, trim or doors", "without the trim and doors"
-    const surfaceWord = '(?:the\\s+|any\\s+|our\\s+)?(?:ceilings?|trim|baseboards?|doors?)';
+    const surfaceWord = '(?:the\\s+|any\\s+|our\\s+)?(?:ceilings?|trim|baseboards?|doors?|cabinets?|cabinetry)';
     const re = new RegExp("\\b(?:no|not|without|skip|except|excluding|leave out|don'?t (?:paint|do|need|want))\\s+" + surfaceWord + "(?:\\s*(?:,|or|and|&|nor)\\s*" + surfaceWord + ")*", 'g');
     // "just the walls" / "walls only" rules out the rest
     if (/\b(?:just|only)\s+(?:the\s+|our\s+)?(?:\w+\s+)?walls?\b|\bwalls?\s+only\b/.test(low) && !/\b(?:and|plus|also|with)\s+(?:the\s+)?(?:ceilings?|trim|baseboards?|doors?)\b/.test(low)) {
@@ -575,13 +575,14 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
     }
     let m: RegExpExecArray | null;
     while ((m = re.exec(low))) {
-      for (const w of m[0].match(/ceilings?|trim|baseboards?|doors?/g) ?? []) ruledOut.add(w.startsWith('ceiling') ? 'ceilings' : w.startsWith('door') ? 'doors' : 'trim');
+      for (const w of m[0].match(/ceilings?|trim|baseboards?|doors?|cabinets?|cabinetry/g) ?? []) ruledOut.add(w.startsWith('ceiling') ? 'ceilings' : w.startsWith('door') ? 'doors' : w.startsWith('cabinet') ? 'cabinets' : 'trim');
     }
     // the answer to a suggestion ("Want me to add the ceilings too?"): yes adds it, no leaves it out, whatever else was read into the reply
-    const offer: Record<string, { field: 'interiorCeilings' | 'interiorTrim' | 'interiorDoors'; on: string; word: RegExp; key: string }> = {
+    const offer: Record<string, { field: 'interiorCeilings' | 'interiorTrim' | 'interiorDoors' | 'cabinets'; on: string; word: RegExp; key: string }> = {
       upsell_ceilings: { field: 'interiorCeilings', on: 'yes', word: /\bceilings?\b/, key: 'ceilings' },
       upsell_trim: { field: 'interiorTrim', on: 'yes', word: /\b(?:baseboards?|trim|molding)\b/, key: 'trim' },
       upsell_doors: { field: 'interiorDoors', on: 'some', word: /\bdoors?\b/, key: 'doors' },
+      upsell_cabinets: { field: 'cabinets', on: 'kitchen', word: /\b(?:kitchen )?cabinet(?:s|ry)?\b/, key: 'cabinets' },
     };
     const asked = state.lastBotTopic ? offer[state.lastBotTopic.id] : undefined;
     if (asked) {

@@ -44,6 +44,7 @@ const TOPIC_LABEL: Record<string, string> = {
   upsell_ceilings: 'whether to add the ceilings',
   upsell_trim: 'whether to add the baseboards',
   upsell_doors: 'whether to add the doors',
+  upsell_cabinets: 'whether to add the kitchen cabinets',
   trim_scope: 'what the trim includes',
   condition: 'the condition of the surfaces',
   popcorn_extent: 'how much popcorn ceiling there is',

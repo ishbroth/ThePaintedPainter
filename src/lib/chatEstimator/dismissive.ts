@@ -67,6 +67,8 @@ export function highestPriceAssumption(topicId: string, ctx: EstimatorContext): 
         patch: { interiorWalls: 'yes', interiorCeilings: 'yes', interiorTrim: 'yes', interiorDoors: 'all', surfacesAddressed: true, trimScopeAddressed: true },
         say: higher('everything: walls, ceilings, trim and doors'),
       };
+    case 'upsell_cabinets':
+      return { patch: { cabinets: 'kitchen' }, say: higher('painting the kitchen cabinets too') };
     case 'trim_scope':
       return { patch: { doorFrames: 'yes', trimScopeAddressed: true }, say: higher('all of the trim, door frames included') };
     case 'condition':

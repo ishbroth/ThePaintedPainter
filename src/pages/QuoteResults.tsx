@@ -347,7 +347,10 @@ const QuoteResults = () => {
           hapticMedium();
         }}
       >
-        <span>Price Breakdown</span>
+        <span className="breakdown-title">
+          <span className="breakdown-title-main">Price Breakdown</span>
+          <span className="breakdown-title-sub">add or remove items from this price</span>
+        </span>
         <span className={`breakdown-caret ${breakdownOpen ? 'open' : ''}`}>▶</span>
       </button>
 

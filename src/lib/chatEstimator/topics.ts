@@ -515,6 +515,27 @@ export const TOPICS: Topic[] = [
     example: () => "Just say 'yes, do the doors' or 'no, skip the doors'.",
   },
 
+  {
+    // A whole inside, or a kitchen, with the trim in: the cabinets are the next thing worth asking about (they are the biggest single add-on there).
+    id: 'upsell_cabinets',
+    priority: 29.5,
+    relevant: (c) =>
+      (c.projectType === 'interior' || c.projectType === 'both') && c.surfacesAddressed && c.interiorTrim === 'yes' && c.cabinets === 'none' &&
+      (c.interiorScope === 'whole_house' || c.selectedRooms.includes('kitchen')) &&
+      !(c.excludedSurfaces ?? []).includes('cabinets'),
+    alreadyAnswered: (c) => c.cabinets !== 'none',
+    ask: (c) =>
+      pick(
+        [
+          "And the kitchen cabinets? Painted cabinets are the biggest makeover in the house. Want them included?",
+          "Are the kitchen cabinets part of this too? They're a big job on their own, so I'd like to price them in if so.",
+        ],
+        seed(c),
+      ),
+    clarify: () => "I mean the kitchen cabinets: the doors and drawer fronts and the frames. Painting them is its own line in the price, so it helps to know if you want it.",
+    example: () => "Just say 'yes, the kitchen cabinets too', 'cabinets in the kitchen and bathrooms', or 'no, leave the cabinets'.",
+  },
+
   // ——————————————————————————————————————————
   // Trim scope — "trim" alone only prices baseboards; door frames/casings,
   // closet shelving, and built-ins are each separate line items, so ask
