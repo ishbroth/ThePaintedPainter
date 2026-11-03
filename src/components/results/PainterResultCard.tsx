@@ -50,7 +50,7 @@ function PhotoCarousel({ photos, name }: { photos: string[]; name: string }) {
     background: 'rgba(0,0,0,0.55)',
     color: '#fff',
     cursor: 'pointer',
-    fontSize: 16,
+    fontSize: 18,
     lineHeight: '26px',
     padding: 0,
   };

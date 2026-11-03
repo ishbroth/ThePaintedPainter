@@ -108,6 +108,8 @@
 
 html {
   scroll-behavior: smooth;
+  /* all text a size larger: every size in the app is relative to this (16px normally) */
+  font-size: 18px;
 }
 
 body {

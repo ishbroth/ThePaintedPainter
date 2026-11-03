@@ -7,16 +7,30 @@ import { LOCAL_ZOOM, US_VIEW, zipToLatLng } from '../lib/mapCenter';
 // The Painted Painter's version of the map: orange paint-drop pins for painters, orange numbered circles where they cluster.
 const ACCENT = '#ff7a3d';
 
+/** A house painter's brush, not an artist's: a wide flat brush with a short wooden handle, a metal ferrule and thick bristles dipped in the brand orange. Its tip is the spot on the map. */
+const BRUSH_W = 38;
+const BRUSH_H = 54;
 const pinIcon = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
-  <svg xmlns="http://www.w3.org/2000/svg" width="34" height="48" viewBox="0 0 34 48">
-    <path d="M17 0C7.6 0 0 7.4 0 16.6 0 29 17 48 17 48s17-19 17-31.4C34 7.4 26.4 0 17 0z" fill="${ACCENT}"/>
-    <circle cx="17" cy="16.5" r="11" fill="white"/>
-    <!-- a paintbrush -->
-    <g transform="rotate(35 17 16.5)">
-      <rect x="15.6" y="7" width="2.8" height="8" rx="1.2" fill="#8a5a2b"/>
-      <rect x="14.6" y="14.5" width="4.8" height="2.6" fill="#b9bec6"/>
-      <path d="M14.6 17.1h4.8l-.6 5.2q-1.8 1.2-3.6 0z" fill="${ACCENT}"/>
+  <svg xmlns="http://www.w3.org/2000/svg" width="${BRUSH_W}" height="${BRUSH_H}" viewBox="0 0 38 54">
+    <!-- a white edge so it reads on any map -->
+    <g fill="#fff" stroke="#fff" stroke-width="4" stroke-linejoin="round">
+      <path d="M15 3Q19 0 23 3L24 15H14Z"/>
+      <rect x="9" y="15" width="20" height="11"/>
+      <path d="M9 26H29L30 43Q19 48 8 43Z"/>
+      <path d="M19 47Q17 51 19 53Q21 51 19 47Z"/>
     </g>
+    <!-- the handle -->
+    <path d="M15 3Q19 0 23 3L24 15H14Z" fill="#b07a3c" stroke="#5c3a14" stroke-width="1.2" stroke-linejoin="round"/>
+    <path d="M17 5.5L17.6 14M20.5 5L20.6 14" stroke="#d9a35e" stroke-width="1" fill="none"/>
+    <!-- the ferrule -->
+    <rect x="9" y="15" width="20" height="11" rx="1.5" fill="#c9ced6" stroke="#5b616b" stroke-width="1.2"/>
+    <path d="M9.6 18.5H28.4M9.6 22.5H28.4" stroke="#8f96a1" stroke-width="1"/>
+    <circle cx="12.3" cy="20.5" r="1" fill="#5b616b"/><circle cx="25.7" cy="20.5" r="1" fill="#5b616b"/>
+    <!-- the bristles, with the paint at their tips -->
+    <path d="M9 26H29L30 43Q19 48 8 43Z" fill="#f4e7c6" stroke="#85734a" stroke-width="1.2" stroke-linejoin="round"/>
+    <path d="M13 27.5L12.6 43M17 27.5L16.8 45M21 27.5L21.2 45M25 27.5L25.4 43" stroke="#cdb98a" stroke-width="0.9" fill="none"/>
+    <path d="M8.3 36.5Q19 41.5 29.7 36.5L30 43Q19 48 8 43Z" fill="${ACCENT}" stroke="#b9461a" stroke-width="1.1" stroke-linejoin="round"/>
+    <path d="M19 47Q17 51 19 53Q21 51 19 47Z" fill="${ACCENT}" stroke="#b9461a" stroke-width="0.8"/>
   </svg>`)}`;
 
 const clusterIcon = (count: number): string => {
@@ -161,7 +175,7 @@ export default function PaintersMapView({ painters, centerZip, height = '500px' 
       const marker = new google.maps.Marker({
         position: { lat: p.latitude, lng: p.longitude },
         title: p.company_name,
-        icon: { url: pinIcon, scaledSize: new google.maps.Size(34, 48), anchor: new google.maps.Point(17, 48) },
+        icon: { url: pinIcon, scaledSize: new google.maps.Size(BRUSH_W, BRUSH_H), anchor: new google.maps.Point(BRUSH_W / 2, BRUSH_H - 1) },
       });
       const show = () => {
         info.setContent(popupContent(p, open));
