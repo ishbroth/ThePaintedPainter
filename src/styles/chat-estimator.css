@@ -1026,8 +1026,10 @@
   transform: translate3d(0, var(--vvtop, 0px), 0);
   height: var(--vvh, 50vh);
   z-index: 2000;
-  padding: 0;
-  background: var(--bg-page);
+  /* on a phone the window reaches right up under the status bar: the strip behind the clock and battery is the header's own colour, with no words in it */
+  box-sizing: border-box;
+  padding: env(safe-area-inset-top, 0px) 0 0;
+  background: var(--bg-surface-hover);
   overscroll-behavior: contain;
 }
 
