@@ -34,6 +34,8 @@ export interface EstimatorContext {
   extAnswered?: string[];
   /** The customer actually said the interior doors are part of the job (interiorDoors alone is also its resting default), so the estimator asks how many. */
   doorsIncluded?: boolean;
+  /** The customer has said what the ceiling height is (including "standard"), so it is not asked again. */
+  ceilingHeightKnown?: boolean;
   /** The paint: a brand the customer wants (or 'painter_choice'), how nice it is (economy, standard, premium) and the finish. */
   paintBrand?: string;
   paintGrade?: string;
@@ -109,6 +111,12 @@ export interface EstimatorContext {
   interiorShutterCount: number | null;
   /** How many rooms the stand-alone trim details (crown, chair rail, wainscoting, baseboards) are in, for a job that is only those. */
   detailRoomCount: number | null;
+  /** Multi-unit property: how many units are being painted (interior), how many there are in all, how many buildings (exterior), and the common areas. */
+  unitCount: number | null;
+  unitsTotal: number | null;
+  buildingCount: number | null;
+  commonAreas: string; // '' (not asked), yes, no
+  commonAreaSqft: number | null;
   /** Whether the house body itself (siding/stucco/brick) is part of an exterior job. 'no' = only the listed features (fence, deck, shutters, doors, trim, washing...). */
   exteriorBody: string; // '' (not discussed), yes, no
   /** Price editing: rooms and main items the customer took off the price after seeing it. */
@@ -172,7 +180,7 @@ export interface EstimatorContext {
   // Property
   squareFeet: number | null;
   stories: number | null;
-  ceilingHeight: string; // standard, nine_foot, ten_plus, vaulted_mixed
+  ceilingHeight: string; // standard (8 ft), nine_foot, ten_plus (10-11 ft), twelve_plus (12-15 ft), vaulted_mixed (vaulted/cathedral/16 ft+)
   /** Share of the painted area that has the taller ceilings ("high ceilings in the living room" = a part, "throughout" = all). null = all of it. */
   tallCeilingShare: number | null;
   occupancy: string; // vacant, furnished, occupied

@@ -156,7 +156,7 @@ function sanitize(raw: Record<string, unknown>, prev: EstimatorContext): Partial
     patch.colorClarificationNeeded = '';
   }
   if (isEnum(raw.ceilingType, ['flat', 'popcorn', 'vaulted'] as const)) patch.ceilingType = raw.ceilingType;
-  if (isEnum(raw.ceilingHeight, ['nine_foot', 'ten_plus', 'vaulted_mixed'] as const)) patch.ceilingHeight = raw.ceilingHeight;
+  if (isEnum(raw.ceilingHeight, ['nine_foot', 'ten_plus', 'twelve_plus', 'vaulted_mixed'] as const)) patch.ceilingHeight = raw.ceilingHeight;
   if (isEnum(raw.wallTexture, ['smooth', 'textured', 'heavy_texture'] as const)) patch.wallTexture = raw.wallTexture;
   if (isEnum(raw.trimCondition, ['new', 'existing_fair'] as const)) patch.trimCondition = raw.trimCondition;
   if (isEnum(raw.crownMolding, ['yes'] as const)) patch.crownMolding = raw.crownMolding;

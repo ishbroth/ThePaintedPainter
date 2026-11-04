@@ -21,6 +21,27 @@ const WOOD_FINISH_NOTE: Record<string, string> = { bare_wood: 'bare wood: sand +
 const woodFinishFactor = (finish: string, ctx: EstimatorContext): number => (ctx.hasStainedWood === 'yes' ? 1 : WOOD_FINISH_MULTIPLIER[finish] ?? 1);
 const CABINET_FINISH_NOTE: Record<string, string> = { bare_wood: ', bare wood: sand + primer', stained: ', stained: degloss + stain-blocking primer', laminate: ', laminate: adhesion primer', primed: ', pre-primed', painted: '' };
 
+/**
+ * How the ceiling height changes the labor on the ceilings (and, by half as much, the walls): 8 ft is the base. Published cost guides price ceilings at about
+ * $1 per sq ft at 8 to 9 ft, $1.50 at 10 to 12 ft and $2.50 at 12 to 18 ft (ladders or scaffolding, slower cutting in, more coats of reach), vaulted work
+ * higher still. The wall AREA grows with the height separately (CEILING_HEIGHTS, 8 ft = 1).
+ */
+export const CEILING_HEIGHT_FACTOR: Record<string, number> = { standard: 1, nine_foot: 1.05, ten_plus: 1.25, twelve_plus: 1.6, vaulted_mixed: 2.0 };
+/** Plain words for the height tiers, for the price line and the assumptions. */
+export const CEILING_HEIGHT_LABEL: Record<string, string> = { standard: 'standard (8 ft)', nine_foot: '9 ft', ten_plus: '10 to 11 ft', twelve_plus: '12 ft or more', vaulted_mixed: 'vaulted or cathedral (16 ft and up)' };
+/** Flat access charge per unit or home for ladders, planks, a tall extension or scaffolding on ceilings that high (cost guides put access at $0 to $1,000, about $400 on average for a vault). */
+const CEILING_ACCESS_CHARGE: Record<string, number> = { twelve_plus: 300, vaulted_mixed: 600 };
+
+/**
+ * What each unit costs, against the price of the same rooms in one house, when a production crew paints many alike. The rates in this engine are what a homeowner
+ * pays for one job: furniture to move, colours to talk over, a small crew. Apartment work is a different trade: empty units, the same layout again and again, spray
+ * for the primer and finish coats, paint bought by the drum, and a crew that learns the unit. Contractors bid it by the unit, in the region of $1.50 to $3.00 per
+ * square foot of floor for a full new-construction scope (primer, two finish coats, ceilings, trim and doors) in a high-wage market like San Diego, against $4 to $8 retail.
+ */
+export function repeatUnitFactor(units: number): number {
+  return units >= 50 ? 0.33 : units >= 25 ? 0.44 : units >= 10 ? 0.55 : units >= 4 ? 0.70 : units >= 2 ? 0.88 : 1;
+}
+
 export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
   const lineItems: EstimateLineItem[] = [];
   let volumeEfficiencyUsed = 1;
@@ -57,7 +78,8 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
     // a few rooms gets none of that, and neither does a job a customer trims down after seeing the price.
     const volEff = volumeEfficiency(effectiveWallSqFt);
     // Reaching tall ceilings (ladders, planks or a lift, slower cutting-in) adds labor beyond the extra wall area itself.
-    const tallCeilingFactor = ctx.ceilingHeight === 'vaulted_mixed' ? LABOR_COMPLEXITY.vaulted : ctx.ceilingHeight === 'ten_plus' ? LABOR_COMPLEXITY.tall_ceiling : ctx.ceilingHeight === 'nine_foot' ? 1.05 : 1;
+    const tallCeilingFactor = CEILING_HEIGHT_FACTOR[ctx.ceilingHeight] ?? 1;
+    const heightNote = ctx.ceilingHeight !== 'standard' && CEILING_HEIGHT_LABEL[ctx.ceilingHeight] ? ` (${CEILING_HEIGHT_LABEL[ctx.ceilingHeight]} ceilings)` : '';
     const tallWallFactorRaw = 1 + (tallCeilingFactor - 1) / 2;
     const tallWallFactor = 1 + (tallWallFactorRaw - 1) * tallShare;
     volumeEfficiencyUsed = volEff;
@@ -75,7 +97,7 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
       const colorEfficiency = ctx.interiorColorChange === 'same' ? 0.92 : 1.0;
       lineItems.push({
         category: 'Interior',
-        description: 'Interior Walls',
+        description: `Interior Walls${heightNote}`,
         amount: effectiveWallSqFt * wallRate * textureMultiplier * colorEfficiency * regionalMult * conditionMultiplier * volEff * tallWallFactor,
         key: 'walls',
       });
@@ -102,7 +124,7 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
       const ceilingRate = getCeilingRate(ctx);
       lineItems.push({
         category: 'Interior',
-        description: 'Ceilings',
+        description: `Ceilings${heightNote}`,
         amount: ceilingSqFt * ceilingRate * regionalMult * volEff * (ctx.ceilingType === 'vaulted' ? 1 : 1 + (tallCeilingFactor - 1) * tallShare),
         key: 'ceilings',
       });
@@ -155,8 +177,8 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
       const crownLinFt = ctx.crownLinearFeet ? Math.round(ctx.crownLinearFeet * trimShare) : detailFeet ?? Math.round(layout.totalTrimLinFt * roomFraction * 0.8);
       lineItems.push({
         category: 'Interior',
-        description: ctx.crownLinearFeet ? `Crown Molding (${crownLinFt} lin ft)` : 'Crown Molding',
-        amount: crownLinFt * BASE_RATES.trim.crown_molding * regionalMult,
+        description: `${ctx.crownLinearFeet ? `Crown Molding (${crownLinFt} lin ft)` : 'Crown Molding'}${heightNote}`,
+        amount: crownLinFt * BASE_RATES.trim.crown_molding * regionalMult * (1 + (tallCeilingFactor - 1) * 0.7 * tallShare), // reaching crown at height costs more
         key: 'crown',
       });
     }
@@ -493,10 +515,46 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
     });
   }
 
+  // Tall ceilings need ladders, planks or scaffolding set up in each home, whatever the area.
+  if ((ctx.projectType === 'interior' || ctx.projectType === 'both') && CEILING_ACCESS_CHARGE[ctx.ceilingHeight] && (ctx.interiorCeilings === 'yes' || ctx.interiorWalls !== 'no' || ctx.crownMolding === 'yes') && !off('ceiling_access')) {
+    lineItems.push({
+      category: 'Interior',
+      description: `Ladder / Scaffold Access for ${CEILING_HEIGHT_LABEL[ctx.ceilingHeight]} Ceilings`,
+      amount: CEILING_ACCESS_CHARGE[ctx.ceilingHeight] * regionalMult * (ctx.tallCeilingShare ?? 1),
+      key: 'ceiling_access',
+    });
+  }
+
+  // Multi-unit property, inside: everything above was priced for ONE typical unit. Each unit repeats it, a little cheaper each time (identical layouts,
+  // one set-up, bulk paint), and the common areas (hallways, stairwells, lobby, laundry) are extra scope on top.
+  const unitsPainted = ctx.propertyType === 'multi_unit' && (ctx.projectType === 'interior' || ctx.projectType === 'both') && ctx.unitCount && ctx.unitCount > 0 ? ctx.unitCount : 0;
+  if (unitsPainted > 0 && !off('units')) {
+    if (ctx.commonAreas === 'yes' && !off('common_areas')) {
+      // about 70 sq ft of corridor, stairwell and lobby wall and ceiling per unit unless the customer gave the area; more protection and access work than a room
+      const commonSqft = ctx.commonAreaSqft ?? Math.round(unitsPainted * 70);
+      lineItems.push({
+        category: 'Interior',
+        description: `Common Areas: hallways, stairwells, lobby (${commonSqft} sq ft)`,
+        amount: commonSqft * getWallRate(ctx) * 1.15 * regionalMult,
+        key: 'common_areas',
+      });
+    }
+  }
+
   // ===== EXTERIOR =====
   const bodyPainted = ctx.exteriorBody !== 'no' && !off('ext_body');
   if (ctx.projectType === 'exterior' || ctx.projectType === 'both') {
-    const extSurface = calculateExteriorSurface(sqft, ctx.stories || 1, ctx.sidingType);
+    // Several buildings: the same total floor area spread over more footprints has more wall around it (and gutters, trim and windows with it).
+    const buildings = ctx.propertyType === 'multi_unit' && ctx.buildingCount && ctx.buildingCount > 1 ? ctx.buildingCount : 1;
+    const one = calculateExteriorSurface(sqft / buildings, ctx.stories || 1, ctx.sidingType);
+    const extSurface = buildings === 1 ? one : {
+      ...one,
+      wallSqFt: one.wallSqFt * buildings,
+      trimLinFt: one.trimLinFt * buildings,
+      soffitSqFt: one.soffitSqFt * buildings,
+      gutterLinFt: one.gutterLinFt * buildings,
+      windowTrimCount: one.windowTrimCount * buildings,
+    };
 
     // Siding / body
     const sidingRate = getSidingRate(ctx.sidingType);
@@ -709,6 +767,19 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
       });
     }
 
+    // Multi-unit buildings: three stories and up are painted from a boom lift or scaffolding (a lift rents for several hundred dollars a day and a building takes days),
+    // two stories mostly from ladders and a few days of planks; every building needs its own set-up.
+    if (bodyPainted && ctx.propertyType === 'multi_unit' && (ctx.stories || 1) >= 2 && !off('ext_access')) {
+      const nb = ctx.buildingCount && ctx.buildingCount > 0 ? ctx.buildingCount : 1;
+      const perBuilding = (ctx.stories || 1) >= 3 ? 2400 : 800;
+      lineItems.push({
+        category: 'Exterior',
+        description: `Lift / Scaffold Access (${nb} building${nb === 1 ? '' : 's'}, ${ctx.stories} stories)`,
+        amount: nb * perBuilding * regionalMult,
+        key: 'ext_access',
+      });
+    }
+
     // Access restrictions
     if (bodyPainted && (ctx.accessRestrictions === 'some' || ctx.accessRestrictions === 'significant')) {
       const factor = ctx.accessRestrictions === 'significant' ? 0.15 : 0.07;
@@ -866,6 +937,16 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
     }
   }
 
+  // Multi-unit, inside: every line above was priced for ONE typical unit (priming, caulking and filling included). Each unit repeats it, at the production price.
+  if (unitsPainted > 0 && !off('units')) {
+    const scale = unitsPainted * repeatUnitFactor(unitsPainted);
+    const inside = (item: EstimateLineItem) =>
+      item.key !== 'common_areas' && (item.category === 'Interior' || ((item.category === 'Specialty' || item.category === 'Prep Work') && (ctx.projectType === 'interior' || !/exterior|siding|stucco|pressure|wash|fence|deck|gutter|soffit|fascia/i.test(item.description))));
+    for (let i = 0; i < lineItems.length; i++) {
+      if (inside(lineItems[i])) lineItems[i] = { ...lineItems[i], amount: lineItems[i].amount * scale, description: `${lineItems[i].description} x ${unitsPainted} units` };
+    }
+  }
+
   // ===== SUBTOTAL =====
   let subtotal = lineItems.reduce((sum, item) => sum + item.amount, 0);
   // A painter won't mobilize for less than a minimum job fee, however small the item.
@@ -901,7 +982,13 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
   // Multi-unit / apartment building — bulk work runs cheaper per unit than
   // a one-off single-family job.
   if (ctx.propertyType === 'multi_unit') {
-    multipliers.push({ label: 'Multi-Unit Volume Discount', factor: 0.90 });
+    if (unitsPainted > 0) {
+      // the per-unit repeat efficiency is already in each line (see above); what is left is whether the units are lived in
+      if (ctx.occupancy === 'vacant') multipliers.push({ label: 'Vacant Units (turnover pricing)', factor: 0.95 });
+      else if (ctx.occupancy === 'furnished' || ctx.occupancy === 'occupied') multipliers.push({ label: 'Occupied Units (tenant access and scheduling)', factor: 1.10 });
+    } else {
+      multipliers.push({ label: 'Multi-Unit Volume Discount', factor: 0.90 });
+    }
   }
 
   // Rush scheduling — a tight deadline usually means pulling a crew off

@@ -20,7 +20,7 @@
 import type { EstimatorContext } from '../types';
 import { estimateHouseLayout } from '../surfaceAreaEngine';
 import { hasScopeLimiter } from './scopeWords';
-import { mentionedDetails } from './details';
+import { mentionedDetails, isMultiUnitText } from './details';
 
 export interface Derivation {
   /** Fields to merge into the context. */
@@ -56,7 +56,10 @@ export function derive(ctx: EstimatorContext, transcript: string): Derivation[] 
   const mentionsExteriorSurface =
     /\b(siding|stucco|hardie|shiplap|clapboard|concrete block|cinder block|aluminum siding|fascia|soffit|eaves|gutter|exterior|outside|outdoor|deck|fence|picket fence|shed|garage door|driveway|patio|overhang|porch|balcony|balconies|foundation|retaining wall|window frames|window trim|entry door)\b/.test(windowFramesIndoors ? t.replace(/window frames|window trim/g, ' ') : t);
 
-  if (!ctx.projectType) {
+  // A multi-unit property (duplex, apartment building, townhomes) says nothing about inside or outside by itself: the bot asks.
+  const multiUnitProperty = ctx.propertyType === 'multi_unit' || isMultiUnitText(t);
+  const saidASide = /\b(interior|inside|indoors?|exterior|outside|outdoors?|siding|stucco)\b/.test(t);
+  if (!ctx.projectType && !(multiUnitProperty && !saidASide)) {
     if (mentionsIndoorRoom && !mentionsExteriorSurface) {
       out.push({
         patch: { projectType: 'interior' },
@@ -425,13 +428,13 @@ export function derive(ctx: EstimatorContext, transcript: string): Derivation[] 
     }
   }
 
-  // Several units at an stated size each ("10 one-bedroom units, 700 sq ft each") → the total, as multi-unit work
+  // Several units at an stated size each ("10 one-bedroom units, 700 sq ft each") → the size of one unit and how many, as multi-unit work (the total, for an outside job)
   if (!ctx.squareFeet) {
     const um = t.match(/(\d{1,3})\s+(?:\w+[\s-]+){0,3}?(?:apartments?|units?|condos?|townhomes?)\b[^.]{0,60}?(\d[\d,]*)\s*(?:sq\.?\s*ft\.?|sqft|square\s*f(?:ee|oo)t)\s*(?:each|apiece|per unit)/);
     if (um) {
       const units = parseInt(um[1], 10), each = num(um[2]);
       if (units >= 2 && units <= 500 && each >= 200 && each <= 5000) {
-        out.push({ patch: { squareFeet: units * each, propertyType: 'multi_unit', interiorScope: 'whole_house', selectedRooms: [], multiPhaseRequested: /\b(one at a time|as (?:tenants?|units?) (?:leave|turn)|staggered|phases?)\b/.test(t) ? 'yes' : ctx.multiPhaseRequested }, reason: units + ' units at ' + each + ' sq ft each' });
+        out.push({ patch: { ...(ctx.projectType === 'exterior' ? { squareFeet: units * each } : { squareFeet: each, unitCount: units, unitsTotal: units }), propertyType: 'multi_unit', interiorScope: 'whole_house', selectedRooms: [], multiPhaseRequested: /\b(one at a time|as (?:tenants?|units?) (?:leave|turn)|staggered|phases?)\b/.test(t) ? 'yes' : ctx.multiPhaseRequested }, reason: units + ' units at ' + each + ' sq ft each' });
       }
     }
   }

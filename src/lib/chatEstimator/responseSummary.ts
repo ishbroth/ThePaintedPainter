@@ -89,7 +89,7 @@ const LABEL_OVERRIDES: Partial<Record<keyof EstimatorContext, string>> = {
 
 /** Plain words for values whose stored form reads badly. */
 const VALUE_LABELS: Record<string, Record<string, string>> = {
-  ceilingHeight: { nine_foot: '9 ft', ten_plus: '10 ft or more', vaulted_mixed: 'tall or vaulted (12 ft or more)' },
+  ceilingHeight: { nine_foot: '9 ft', ten_plus: '10 to 11 ft', twelve_plus: '12 ft or more', vaulted_mixed: 'vaulted, cathedral or 16 ft and up' },
 };
 
 function titleCase(camel: string): string {

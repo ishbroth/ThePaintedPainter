@@ -313,15 +313,15 @@ export function chatStateFromPortable(parsed: unknown): ChatState | null {
 }
 
 // ===== Core turn handler =====
-/** Step one of the wrap-up: "anything else I should know?". Its answer is read (ceiling height, fences...) and kept with the job. */
+/** Step one of the wrap-up: "anything else I should know?". Its answer is read (fences, notes for the painters...) and kept with the job. Ceiling height is its own question (ceiling_height), not asked here. */
 function notesStep(s: ChatState, ctxNext: EstimatorContext, acknowledgements: string[]): TurnResult {
   const lead = acknowledgements.length > 0 ? `${ACK_LEAD_INS[s.askedIds.length % ACK_LEAD_INS.length]} ${acknowledgements.join(', ')}. ` : '';
   const examples =
     ctxNext.projectType === 'exterior'
       ? 'fences, overhangs, chimneys, decks or shutters'
       : ctxNext.projectType === 'both'
-        ? 'the ceiling height, fences, decks or shutters'
-        : 'the ceiling height, or anything about the place the painters should know';
+        ? 'fences, decks or shutters'
+        : 'anything about the place the painters should know';
   return {
     state: {
       ...s,

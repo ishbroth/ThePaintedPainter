@@ -260,6 +260,7 @@ export const CEILING_HEIGHTS: Record<string, number> = {
   standard: 8,
   nine_foot: 9,
   ten_plus: 10,
+  twelve_plus: 12,
   vaulted_mixed: 12, // average for vaulted
 };
 

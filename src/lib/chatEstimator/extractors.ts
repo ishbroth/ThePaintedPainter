@@ -6,6 +6,7 @@
 // `null` and the chat engine will ask a follow-up question.
 // ============================================================================
 
+import { isMultiUnitText } from './details';
 import type { EstimatorContext } from '../types';
 
 export interface ExtractResult {
@@ -64,7 +65,7 @@ export function extractProjectType(text: string): 'interior' | 'exterior' | 'bot
   if (hasIn) return 'interior';
   // "Rental unit", "apartment", "condo", etc. — landlords/property managers
   // repainting a single dwelling unit overwhelmingly mean the interior.
-  if (extractUnitContext(text).impliesInterior) return 'interior';
+  if (extractUnitContext(text).impliesInterior && !isMultiUnitText(text)) return 'interior';
   // Implicit: "paint my house" without qualifier usually means interior in DIY contexts, but don't assume.
   return null;
 }
@@ -416,6 +417,7 @@ export function extractPropertyType(text: string): 'residential' | 'rental' | 'm
   if (/\b(multi[\s-]?unit|apartment (?:complex|building)|\d+[\s-]?unit building|several units|multiple units|(?:[2-9]|\d{2,3})\s+(?:(?!bed)\w+[\s-]+){0,3}units?\b|property manager)\b/.test(t)) {
     return 'multi_unit';
   }
+  if (isMultiUnitText(t)) return 'multi_unit';
   if (/\b(restaurant|cafe|coffee shop|bakery|salon|barber ?shop|spa|gym|fitness|church|chapel|clinic|dental|dentist|medical (?:office|practice)|warehouse|retail|storefront|boutique|showroom|brewery|daycare|day care|our business|my business|our store|my store|our shop|my shop|our office|my office suite)\b/.test(t)) {
     return 'commercial';
   }
@@ -561,12 +563,12 @@ export function extractInteriorSurfaceDetails(text: string): {
 }
 
 /** Ceiling height — a real multiplier on wall/ceiling square footage, independent of ceiling TYPE (flat/popcorn/vaulted). */
-export function extractCeilingHeight(text: string, asked = false): 'nine_foot' | 'ten_plus' | 'vaulted_mixed' | null {
+export function extractCeilingHeight(text: string, asked = false): 'nine_foot' | 'ten_plus' | 'twelve_plus' | 'vaulted_mixed' | null {
   const t = text.toLowerCase();
   const WORDS: Record<string, number> = { nine: 9, ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, eighteen: 18, twenty: 20 };
   const num = (s: string) => (WORDS[s] ?? parseInt(s, 10));
-  const fromFeet = (n: number): 'nine_foot' | 'ten_plus' | 'vaulted_mixed' | null =>
-    n >= 12 && n <= 40 ? 'vaulted_mixed' : n >= 10 && n < 12 ? 'ten_plus' : n === 9 ? 'nine_foot' : null;
+  const fromFeet = (n: number): 'nine_foot' | 'ten_plus' | 'twelve_plus' | 'vaulted_mixed' | null =>
+    n >= 16 && n <= 40 ? 'vaulted_mixed' : n >= 12 && n < 16 ? 'twelve_plus' : n >= 10 && n < 12 ? 'ten_plus' : n === 9 ? 'nine_foot' : null;
   if (/\b(vaulted|cathedral|double[\s-]height|two[\s-]stor(?:y|ey)\s+(?:foyer|entry|entryway|living room|great room|ceiling)|soaring|loft(?:ed)? ceilings?|beamed vaulted)\b/.test(t)) return 'vaulted_mixed';
   // "12 foot ceilings", "twelve-foot ceilings", "10' ceilings", "ceilings are 10 feet", "ceilings about 9 ft"
   const NUM = '(\\d{1,2}|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|eighteen|twenty)';
@@ -1580,7 +1582,7 @@ export function extractAll(text: string, prev: EstimatorContext, lastBotTopicId:
   const ceilingHeight = extractCeilingHeight(text);
   if (ceilingHeight && (!prev.ceilingHeight || prev.ceilingHeight === 'standard')) {
     patch.ceilingHeight = ceilingHeight;
-    acks.push(ceilingHeight === 'vaulted_mixed' ? 'tall or vaulted ceilings' : `${ceilingHeight === 'ten_plus' ? '10+' : '9'} ft ceilings`);
+    acks.push(ceilingHeight === 'vaulted_mixed' ? 'tall or vaulted ceilings' : `${ceilingHeight === 'twelve_plus' ? '12+' : ceilingHeight === 'ten_plus' ? '10' : '9'} ft ceilings`);
   }
 
   const exteriorSurface = extractExteriorSurfaceDetails(text);

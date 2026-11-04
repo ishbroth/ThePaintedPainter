@@ -144,6 +144,85 @@ export const TOPICS: Topic[] = [
   },
 
   // ——————————————————————————————————————————
+  // Multi-unit properties (duplex, apartment building, townhomes...): inside or outside first (project_type, above), then how many units are
+  // being painted (inside) or how many buildings there are (outside). The other inside questions are then about a typical unit, asked once.
+  // ——————————————————————————————————————————
+  {
+    id: 'unit_count',
+    priority: 12,
+    relevant: (c) => c.propertyType === 'multi_unit' && (c.projectType === 'interior' || c.projectType === 'both') && c.unitCount == null,
+    alreadyAnswered: (c) => c.unitCount != null || extDone(c, 'unit_count'),
+    ask: (c) =>
+      c.unitsTotal
+        ? "You mentioned " + c.unitsTotal + " units. Are all " + c.unitsTotal + " being painted, or only some of them? A number is fine, like 'all " + c.unitsTotal + "' or 'just two'."
+        : pick(
+          ["How many units are being painted? A number is fine, like '12', 'all 8' or 'two of the six'.", "How many units are we painting? Just give me a number, like '6' or 'all 10'."],
+          seed(c),
+        ),
+    clarify: () => "I price one typical unit and then work out the rest from how many units there are, since identical units go faster and cost less each than a one-off job.",
+    example: () => "Something like '12', 'all 8', 'a dozen' or 'just two of the six'.",
+  },
+  {
+    id: 'building_count',
+    priority: 12.5,
+    relevant: (c) => c.propertyType === 'multi_unit' && (c.projectType === 'exterior' || c.projectType === 'both') && c.buildingCount == null,
+    alreadyAnswered: (c) => c.buildingCount != null || extDone(c, 'building_count'),
+    ask: () => "How many buildings are being painted? A number is fine.",
+    clarify: () => "Each building needs its own setup and access equipment, so the number of buildings matters as much as their size.",
+    example: () => "Something like '1', '3 buildings' or 'two'.",
+  },
+  {
+    id: 'ceiling_height',
+    priority: 30.2,
+    relevant: (c) =>
+      (c.projectType === 'interior' || c.projectType === 'both') &&
+      c.surfacesAddressed &&
+      (c.interiorWalls !== 'no' || c.interiorCeilings !== 'no' || c.crownMolding === 'yes') &&
+      !c.ceilingHeightKnown,
+    alreadyAnswered: (c) => !!c.ceilingHeightKnown || c.ceilingHeight !== 'standard' || extDone(c, 'ceiling_height'),
+    ask: (c) =>
+      c.propertyType === 'multi_unit' && c.unitCount != null
+        ? "In a typical unit, is it standard ceiling height (around 8 feet)? If not, about how tall are they: 9 ft, 10 ft, 12 ft or more, or vaulted?"
+        : pick(
+          [
+            "Is it standard ceiling height, around 8 feet? If not, about how tall are they (9 ft, 10 ft, 12 ft or more, or vaulted)?",
+            "Are the ceilings standard height (about 8 feet), or higher? If higher, roughly how tall: 9 ft, 10 ft, 12 ft or more, or vaulted?",
+          ],
+          seed(c),
+        ),
+    clarify: () => "Taller ceilings mean more wall area and, above about 9 to 10 feet, ladders or scaffolding and slower work, so the height changes the price.",
+    example: () => "Say 'yes, standard', '9 ft', '10 foot ceilings', '12 ft or more', 'vaulted' or just 'high ceilings'.",
+  },
+  {
+    // Hallways, stairwells, lobbies and laundry rooms are extra scope on a multi-unit job.
+    id: 'common_areas',
+    priority: 31.5,
+    relevant: (c) => c.propertyType === 'multi_unit' && (c.projectType === 'interior' || c.projectType === 'both') && c.unitCount != null,
+    alreadyAnswered: (c) => c.commonAreas !== '' || extDone(c, 'common_areas'),
+    ask: () => "Are the common areas part of the job too, like the hallways, stairwells, lobby or laundry room?",
+    clarify: () => "Hallways, stairwells, lobbies and laundry rooms are painted separately from the units, usually with more protection and access work, so I price them as their own item.",
+    example: () => "Say 'yes, the hallways and stairwells' or 'no, just the units'.",
+  },
+  {
+    id: 'balcony_count',
+    priority: 34.9,
+    relevant: (c) => c.balconies === 'yes' && c.balconyCount == null,
+    alreadyAnswered: (c) => c.balconyCount != null || extDone(c, 'balcony_count'),
+    ask: (c) => (c.propertyType === 'multi_unit' ? "About how many balconies are there in all, across the buildings?" : "About how many balconies are there?"),
+    clarify: () => "Each balcony is priced on its own (floor and railing), so I need a rough count.",
+    example: () => "Something like '12 balconies' or 'about 24'.",
+  },
+  {
+    // Outside on a multi-unit property: the parts that are not the wall.
+    id: 'ext_mu_access',
+    priority: 48.97,
+    relevant: (c) => c.propertyType === 'multi_unit' && isExteriorJob(c) && c.balconies === 'none' && c.railings === 'none',
+    alreadyAnswered: (c) => c.balconies !== 'none' || c.railings !== 'none' || extDone(c, 'ext_mu_access'),
+    ask: () => "Do the buildings have balconies, outside stairwells, railings or breezeways that need painting too?",
+    clarify: () => "On apartment buildings these are often a big part of the job: balcony floors and railings, exterior stairs and landings, and walkways.",
+    example: () => "Say 'yes, balconies and the stairs' or 'no, just the walls'.",
+  },
+  // ——————————————————————————————————————————
   // Room selection
   // ——————————————————————————————————————————
   {
@@ -221,6 +300,9 @@ export const TOPICS: Topic[] = [
       !isNarrowInteriorJob(c),
     alreadyAnswered: (c) => !!c.squareFeet,
     ask: (c) => {
+      if (c.propertyType === 'multi_unit' && c.unitCount != null) {
+        return "About how big is a typical unit, in square feet? If they vary, give me the sizes you know (like 'studios 500, one-bedrooms 700, twos 950', or with how many of each) and I'll work out the average. Or how many bedrooms?";
+      }
       if (isCommercialLike(c)) {
         return pick(
           [
@@ -288,6 +370,7 @@ export const TOPICS: Topic[] = [
       if (c.interiorCeilings === 'no' && c.interiorTrim !== 'no') {
         return "No ceilings, got it. And the trim and doors, are those getting painted too?";
       }
+      if (c.propertyType === 'multi_unit' && c.unitCount != null) return 'In a typical unit, what all is getting painted (walls, ceilings, trim, doors)?';
       const hasKitchen = c.selectedRooms.includes('kitchen');
       if (hasKitchen) {
         return "For the kitchen, what all is getting painted, and are the cabinets included?";
@@ -312,6 +395,8 @@ export const TOPICS: Topic[] = [
     ask: (c) =>
       c.standaloneStructure
         ? `About how big is the ${c.standaloneStructure}, in square feet? Or its length and width.`
+        : c.propertyType === 'multi_unit'
+        ? 'About how big are the buildings, in total square feet of all of them together? Or the number of units and roughly how big each is.'
         : pick(
         [
           'About how big is the house, in square feet?',

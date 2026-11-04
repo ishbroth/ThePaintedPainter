@@ -20,6 +20,7 @@ export function makeInitialContext(): EstimatorContext {
     trimLinearFeet: null, crownLinearFeet: null, accentWallCount: null, stairRailFeet: null, popcornCeilingSqft: null,
     cabinetDoorCount: null, deckSqft: null, overhangSqft: null, pressureWashSqft: null,
     fenceHeightFt: null, chairCount: null, chairRail: 'no', chairRailLinearFeet: null, wainscotSqft: null, interiorShutterCount: null, detailRoomCount: null,
+    unitCount: null, unitsTotal: null, buildingCount: null, commonAreas: '', commonAreaSqft: null,
     exteriorBody: '', excludedRooms: [], excludedItems: [],
     exteriorScope: 'full', sidingType: '', exteriorTrim: 'no', soffitsEaves: 'no',
     exteriorShutters: 'no', exteriorShutterCount: null, garageDoor: 'none', entryDoor: 'no',

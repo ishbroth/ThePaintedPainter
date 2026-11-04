@@ -7,6 +7,7 @@
 // ============================================================================
 
 import type { EstimatorContext } from '../types';
+import { extractCeilingHeight } from './extractors';
 
 const NUMBER_WORDS: Record<string, number> = {
   a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12,
@@ -118,6 +119,60 @@ export const WAINSCOT_RE = /\bwainscot(?:t)?(?:ing)?\b|\bbead\s*board\b|\bboard 
 export const CLOSET_SHELF_RE = /\bclosets?\s+(?:shelves|shelving|shelf|rods?)\b|\b(?:shelves|shelving|shelf)\s+(?:in|inside|of)\s+(?:the\s+|my\s+|our\s+)?closets?\b|\bpantry\s+shelv/i;
 const INTERIOR_WINDOWS_RE = /\bwindows?\s*(?:frames?|trim|sills?|casings?|jambs?)\b|\b(?:paint|painting|include|including|and|plus|with)\s+(?:the\s+|all\s+(?:the\s+)?|all\s+of\s+the\s+)?windows?\b|\bwindows?\s+(?:too|as well|included)\b/i;
 
+// ----------------------------------------------------------------------------------------------------------------------------
+// Multi-unit properties and ceiling height
+// ----------------------------------------------------------------------------------------------------------------------------
+
+/** Words that make a property a multi-unit one: duplex, triplex, fourplex, "12 unit building", apartment building or complex, townhomes, rental units... */
+export const MULTI_UNIT_RE = /\b(?:duplex(?:es)?|triplex(?:es)?|four[\s-]?plex(?:es)?|quad[\s-]?plex(?:es)?|\d[\s-]?plex|multi[\s-]?(?:unit|family)|apartment (?:complex|building|buildings|community|house)|condo(?:minium)?s? (?:complex|building|buildings|community)|town ?homes|town ?houses|rental units|rental properties|units? (?:building|complex)|several units|multiple units|(?:\d{1,3}|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty|a dozen)[\s-]+(?:(?!bed)\w+[\s-]+){0,2}(?:units|apartments|condos|town ?homes|town ?houses)\b)/i;
+
+export function isMultiUnitText(text: string): boolean {
+  return MULTI_UNIT_RE.test(text);
+}
+
+/**
+ * How many units are in the job. "12 unit building" and "a duplex" say how many there are in all (`total`); "all 12", "two of the six" and a plain number in
+ * answer to the units question say how many are being painted (`painted`).
+ */
+export function parseUnits(text: string, answering: boolean, knownTotal: number | null): { painted: number | null; total: number | null } {
+  const t = digitize(text);
+  let painted: number | null = null;
+  let total: number | null = null;
+  const part = t.match(/\b(\d{1,3})\s+(?:\w+\s+)?(?:of|out of)\s+(?:the\s+|my\s+|our\s+)?(\d{1,3})\b/);
+  if (part && parseInt(part[1], 10) <= parseInt(part[2], 10)) {
+    painted = parseInt(part[1], 10);
+    total = parseInt(part[2], 10);
+  }
+  const all = t.match(/\ball\s+(?:of\s+)?(?:the\s+|my\s+|our\s+)?(\d{1,3})\b/);
+  if (painted == null && all) { painted = total = parseInt(all[1], 10); }
+  if (painted == null && answering && /\b(?:all|every|each|whole|entire)\b/.test(t) && knownTotal) painted = knownTotal;
+  if (painted == null && total == null) {
+    const n = t.match(/\b(\d{1,3})[\s-]+(?:\w+[\s-]+){0,2}?(?:units?|apartments?|condos?|town ?homes?|town ?houses?|rental units?)\b/) || t.match(/\b(\d{1,3})[\s-]?plex\b/);
+    if (n && !/\bbed(?:room)?s?\b/.test(n[0])) total = parseInt(n[1], 10);
+    else if (/\bduplex/.test(t)) total = 2;
+    else if (/\btriplex/.test(t)) total = 3;
+    else if (/\b(?:four|quad)[\s-]?plex/.test(t)) total = 4;
+  }
+  if (painted == null && answering && !part) {
+    const c = parseCount(text, 1, 500);
+    if (c) painted = c;
+  }
+  if (painted != null && (painted < 1 || painted > 500)) painted = null;
+  if (total != null && (total < 1 || total > 500)) total = null;
+  return { painted, total };
+}
+
+/** The ceiling height said, or "standard" (8 ft): { height } is the tier for a taller ceiling; { standard: true } when it is the usual height. */
+export function parseCeilingAnswer(text: string, answering: boolean): { height: ReturnType<typeof extractCeilingHeight>; standard: boolean } {
+  const t = text.toLowerCase();
+  const height = extractCeilingHeight(text, answering);
+  const standard =
+    !height &&
+    (/\bstandard\s+(?:ceiling|height)s?\b|\b(?:normal|regular|typical|average)\s+(?:ceiling|height)s?\b|\b(?:8|eight)[\s-]?(?:ft|foot|feet|')\s*(?:tall\s+|high\s+)?ceilings?\b|\bceilings?\b[^.]{0,25}\b(?:standard|normal|regular|(?:8|eight)\s*(?:ft|feet|foot|'))/.test(t) ||
+      (answering && /^\W*(?:yes|yeah|yep|yup|yes it is|standard|normal|regular|typical|average|8|eight|8\s*(?:ft|feet|foot|')|eight (?:feet|foot)|sure|i think so|probably|just standard)\b/.test(t)));
+  return { height, standard };
+}
+
 /** The trim details a message names (they are interior by nature). */
 export function mentionedDetails(text: string): { chairRail: boolean; crown: boolean; wainscot: boolean; closetShelves: boolean } {
   return { chairRail: CHAIR_RAIL_RE.test(text), crown: CROWN_RE.test(text), wainscot: WAINSCOT_RE.test(text), closetShelves: CLOSET_SHELF_RE.test(text) };
@@ -147,6 +202,34 @@ type Patch = Partial<EstimatorContext>;
  * Facts about the small details in a message: crown moulding, chair rail, wainscoting, closet shelves, interior windows; counts of doors, windows and
  * shutters said in passing; and the answer to whichever follow-up question was just asked (`askedId`). Returns what is new, with short acknowledgements.
  */
+
+/**
+ * The size of the typical unit from what the customer says about the units they know: one size ("about 850 sq ft each"), several ("studios 500, one-bedrooms
+ * 700 and twos 950") averaged, or a mix with how many of each ("40 one-bedrooms at 700 and 40 twos at 950") averaged by count. Null if no size is there.
+ */
+export function parseUnitSizes(text: string, bare = false): { average: number; sizes: number; weighted: boolean } | null {
+  const t = digitize(text).replace(/(\d),(\d{3})/g, '$1$2');
+  const unit = '(?:sq\\.?\\s*ft\\.?|sqft|sf|square\\s*f(?:ee|oo)t)';
+  // "40 one-bedrooms at 700", "30 studios, 450 sq ft each": a count, what they are, then the size
+  const withCounts: { n: number; size: number }[] = [];
+  const re = new RegExp('(\\d{1,3})\\s+(?:[a-z0-9-]+\\s+){0,3}?(?:units?|apartments?|apts?|studios?|condos?|townhomes?|flats?|bedrooms?|br|bd)\\b[^\\d.]{0,24}?(\\d{3,4})\\s*(?:' + unit + ')?', 'g');
+  for (const m of t.matchAll(re)) {
+    const n = parseInt(m[1], 10), size = parseInt(m[2], 10);
+    if (n >= 1 && n <= 999 && size >= 250 && size <= 4500) withCounts.push({ n, size });
+  }
+  if (withCounts.length >= 2) {
+    const total = withCounts.reduce((a, b) => a + b.n, 0);
+    return { average: Math.round(withCounts.reduce((a, b) => a + b.n * b.size, 0) / total), sizes: withCounts.length, weighted: true };
+  }
+  // plain sizes: every number with a square-foot unit (or, in answer to the size question, every number that looks like one)
+  const sizes: number[] = [];
+  for (const m of t.matchAll(new RegExp('(\\d{3,4})\\s*(?:' + unit + ')', 'g'))) sizes.push(parseInt(m[1], 10));
+  if (sizes.length === 0 && bare) for (const m of t.matchAll(/\b(\d{3,4})\b/g)) sizes.push(parseInt(m[1], 10));
+  const ok = sizes.filter((n) => n >= 250 && n <= 4500);
+  if (ok.length === 0) return null;
+  return { average: Math.round(ok.reduce((a, b) => a + b, 0) / ok.length), sizes: ok.length, weighted: false };
+}
+
 export function extractDetails(text: string, ctx: EstimatorContext, askedId: string | null): { patch: Patch; acks: string[] } {
   const patch: Patch = {};
   const acks: string[] = [];
@@ -173,6 +256,82 @@ export function extractDetails(text: string, ctx: EstimatorContext, askedId: str
     const inside = text.toLowerCase().replace(/\b(?:garage|front|entry|exterior|outside|screen|patio|storm|back|barn)\s+doors?\b/g, ' ');
     const everything = askedId === 'surfaces' && /\b(everything|all of it|the works|full (?:scope|package)|(?:the )?whole (?:thing|room|place|house|home|apartment|unit))\b/.test(inside);
     if ((/\bdoors?\b/.test(inside) && !negated(/doors?/) && !/\b(?:just|only)\b[^.]{0,30}\b(?:walls?|ceilings?)\b/.test(inside)) || everything) patch.doorsIncluded = true;
+  }
+
+  // a multi-unit property: how many units there are, or are being painted ("12 unit building", "paint all 8 units", "two of the six")
+  if (ctx.propertyType === 'multi_unit' || isMultiUnitText(text)) {
+    const u = parseUnits(text, askedId === 'unit_count', ctx.unitsTotal);
+    if (u.painted != null && (askedId === 'unit_count' || ctx.unitCount == null)) { patch.unitCount = u.painted; acks.push(u.painted + ' unit' + (u.painted === 1 ? '' : 's')); }
+    if (u.total != null && (ctx.unitsTotal == null || askedId === 'unit_count')) patch.unitsTotal = u.total;
+    if (u.painted == null && u.total != null && ctx.unitsTotal == null) acks.push(u.total + '-unit property');
+    if (askedId === 'building_count') {
+      const b = parseCount(text, 1, 100);
+      if (b) { patch.buildingCount = b; acks.push(b + ' building' + (b === 1 ? '' : 's')); }
+    }
+    if (/\b(?:hall(?:way)?s?|corridors?|stair(?:well)?s?|lobb(?:y|ies)|laundry (?:room|area)|common (?:areas?|spaces?)|breezeways?|mail ?rooms?|clubhouse|leasing office)\b/i.test(text) && ctx.commonAreas === '' && !negated(/hall(?:way)?s?|corridors?|stair(?:well)?s?|lobb(?:y|ies)|laundry|common (?:areas?|spaces?)/)) {
+      patch.commonAreas = 'yes';
+      acks.push('common areas');
+    }
+  }
+  // the size of a typical unit: one size, or the sizes they know averaged (weighted by how many of each, when they say)
+  if ((ctx.propertyType === 'multi_unit' || isMultiUnitText(text)) && ctx.projectType !== 'exterior' && !/\?\s*$/.test(text.trim())) {
+    const sizes = parseUnitSizes(text, askedId === 'house_size');
+    if (sizes && (sizes.sizes >= 2 || askedId === 'house_size' || /\b(?:each|per unit|every unit|a unit|typical unit|average)\b/i.test(text))) {
+      patch.squareFeet = sizes.average;
+      if (sizes.sizes >= 2) acks.push('units average about ' + sizes.average.toLocaleString('en-US') + ' sq ft');
+    }
+  }
+  // doors counted across the whole property ("200 pre-primed doors" in 80 units) are per unit for the price: 2.5 each
+  {
+    const unitsHere = patch.unitCount ?? ctx.unitCount ?? ctx.unitsTotal;
+    const dm = t.match(/\b(\d{2,4})\s+(?:[a-z-]+\s+){0,3}?doors?\b/);
+    if ((ctx.propertyType === 'multi_unit' || patch.propertyType === 'multi_unit' || isMultiUnitText(text)) && unitsHere && unitsHere >= 2 && dm && !/\bgarage\s+doors/.test(t)) {
+      const total = parseInt(dm[1], 10);
+      if (total >= unitsHere && total <= unitsHere * 30) {
+        patch.doorCount = Math.round((total / unitsHere) * 2) / 2;
+        if (ctx.interiorDoors === 'none') patch.interiorDoors = 'some';
+        patch.doorsIncluded = true;
+        acks.push(total + ' doors in all, about ' + patch.doorCount + ' a unit');
+      }
+    }
+  }
+  if (askedId === 'common_areas' && !/\?\s*$/.test(text.trim())) {
+    if (/^\W*(?:no|nope|nah|none|just the units|only the units|units only|not (?:the )?common)/i.test(text)) { patch.commonAreas = 'no'; }
+    else if (/^\W*(?:yes|yeah|yep|yup|sure|please|all of them|both)/i.test(text)) { patch.commonAreas = 'yes'; acks.push('common areas'); }
+    const sq = parseArea(text, false);
+    if (sq && patch.commonAreas !== 'no') { patch.commonAreaSqft = sq; patch.commonAreas = 'yes'; }
+  }
+  if (askedId === 'balcony_count' && !/\?\s*$/.test(text.trim())) {
+    const n = parseCount(text, 1, 400);
+    if (n) { patch.balconyCount = n; acks.push(n + ' balconies'); }
+  }
+  if (askedId === 'ext_mu_access') {
+    // balconies, exterior stairwells, railings and breezeways on the buildings
+    if (/\bbalcon/i.test(text) && ctx.balconies === 'none') patch.balconies = 'yes';
+    if (/\b(?:stair|railing|rail|breezeway|walkway|catwalk|landing)/i.test(text) && ctx.railings === 'none') patch.railings = 'yes';
+    if (/^\W*(?:yes|yeah|yep|yup|sure|all of them|both|all)\b/i.test(text)) {
+      if (ctx.balconies === 'none') patch.balconies = 'yes';
+      if (ctx.railings === 'none') patch.railings = 'yes';
+    }
+  }
+
+  // ceiling height: said anywhere ("10 foot ceilings", "standard ceilings"), or in answer to the ceiling question
+  if (ctx.projectType !== 'exterior' && !ctx.ceilingHeightKnown) {
+    const c = parseCeilingAnswer(text, askedId === 'ceiling_height');
+    if (c.height) {
+      if (c.height !== ctx.ceilingHeight) patch.ceilingHeight = c.height;
+      patch.ceilingHeightKnown = true;
+    } else if (c.standard) {
+      patch.ceilingHeightKnown = true;
+      if (askedId === 'ceiling_height') acks.push('standard ceiling height');
+    } else if (askedId === 'ceiling_height' && !/\?\s*$/.test(text.trim())) {
+      if (/\b(?:high|tall|taller|higher|lofty|vaulted|cathedral|soaring)\b/i.test(text) || /^\W*(?:no|nope|nah|not standard|not really)\b/i.test(text)) {
+        // taller than usual, no height given: priced as 10 ft (the dearer reading), editable after the price
+        patch.ceilingHeight = 'ten_plus';
+        patch.ceilingHeightKnown = true;
+        acks.push('taller ceilings');
+      }
+    }
   }
 
   // measurements said along the way
@@ -277,6 +436,7 @@ export function extractDetails(text: string, ctx: EstimatorContext, askedId: str
 
 /** Topic ids of the follow-up questions in this file (their answers are recorded so they are never asked twice). */
 export const DETAIL_TOPIC_IDS = new Set([
+  'unit_count', 'building_count', 'ceiling_height', 'common_areas', 'balcony_count', 'ext_mu_access',
   'door_count', 'window_count', 'chair_count', 'shutter_count', 'closet_count', 'fence_size', 'fence_height', 'deck_size', 'overhang_size', 'railing_length',
   'detail_rooms', 'detail_feet_crown', 'detail_feet_chair_rail', 'detail_feet_trim', 'detail_sqft_wainscot',
 ]);
