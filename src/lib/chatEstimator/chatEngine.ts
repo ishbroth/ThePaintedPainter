@@ -25,6 +25,7 @@ import { getStateFromZip } from '../zipCodeData';
 import { hasScopeLimiter } from './scopeWords';
 import { lookupZipCity } from '../zipLookup';
 import { reviewLocally, reviewWithAI, hasPaintingScope, retryMessage, profanityScan, type ReviewResult } from './conversationReview';
+import { saysItemsOnly } from './items';
 import { isDenial, denialIsAboutScope, topicLabel, recentRecognized, recapSentence } from './clarify';
 import { extractTiming, timelineFromStart } from './dateParsing';
 import { defaultAssumptions, applyAssumptions, type Assumption } from './defaultAssumptions';
@@ -1088,7 +1089,10 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
       // so falling through to the normal topic-advance logic below keeps the
       // conversation moving instead of risking a repeated "sorry" loop if the
       // next message also reads as frustrated.
-      s = { ...s, history: [...s.history, botMessage(metaBank.frustration())] };
+      // Say sorry once, not after every complaint: repeating it each turn reads as a canned loop. When it was just said, the correction in the
+      // message is applied silently and the conversation moves on.
+      const recentBot = s.history.filter((m) => m.role === 'bot').slice(-4);
+      if (!recentBot.some((m) => /^Sorry about that/.test(m.text))) s = { ...s, history: [...s.history, botMessage(metaBank.frustration())] };
     } else if (hasIntent(intent, 'greeting') && s.askedIds.length === 0 && Object.keys(patch).length === 0) {
       // Only treat this as a bare "hi" with nothing else in it. A message like
       // "hi, I need a 3 bedroom house painted" also gets tagged with the
@@ -1118,7 +1122,9 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
     patch.interiorScope !== undefined;
   if (hasIntent(intent, 'negation') && s.lastBotTopic && !isMajorCorrection) {
     const reply = metaBank.negation_after_topic(s.lastBotTopic.id);
-    s = { ...s, history: [...s.history, botMessage(reply)] };
+    // a bare "Got it." after every "no" reads as a stutter: skip it when one of the last bot messages already said it
+    const stutter = reply === 'Got it.' && s.history.filter((m) => m.role === 'bot').slice(-3).some((m) => /^Got it\b/.test(m.text));
+    if (!stutter) s = { ...s, history: [...s.history, botMessage(reply)] };
     // Fall through to topic advance
   }
   // "I already told you" — the user is pointing at a specific repeated
@@ -1225,6 +1231,7 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
       !topic.alreadyAnswered(ctxNext) &&
       !changed &&
       !clarified.includes(topic.id) &&
+      !(ctxNext.itemsOnly && saysItemsOnly(trimmed)) && // "furniture only" repeats the scope, it is not a wrong answer to the pending question
       !s.wrapupAsked &&
       !/\b(run it|price it|go ahead|that'?s (?:all|it)|done)\b/i.test(trimmed) &&
       !trimmed.endsWith('?') &&
@@ -1244,7 +1251,7 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
         history: [
           ...s.history,
           botMessage(
-            `I'm not sure how that answers my question about ${topicLabel(topic.id)}, and I'd rather ask than guess. ${recapSentence(recentRecognized(state.history))} ${q} If something above is wrong, just tell me what to change.`.replace(/\s{2,}/g, ' '),
+            `I'm not sure how that answers my question about ${topicLabel(topic.id, ctxNext.itemsOnly)}, and I'd rather ask than guess. ${recapSentence(recentRecognized(state.history))} ${q} If something above is wrong, just tell me what to change.`.replace(/\s{2,}/g, ' '),
           ),
         ],
       };

@@ -15,6 +15,7 @@
 
 import type { EstimatorContext } from '../types';
 import { isIsolatedDetailJob } from './details';
+import { itemsPhrase } from './items';
 
 export interface Topic {
   id: string;
@@ -82,7 +83,7 @@ function detailLabel(c: EstimatorContext): string {
 
 /** The job is only a few trim details or some furniture, and the customer said so: no "add the ceilings?" suggestions. */
 const skipUpsells = (c: EstimatorContext) =>
-  isIsolatedDetailJob(c) || (c.interiorWalls === 'no' && c.interiorCeilings === 'no' && c.surfacesAddressed && (c.furnitureItems.length > 0 || c.closets !== 'none'));
+  c.itemsOnly || isIsolatedDetailJob(c) || (c.interiorWalls === 'no' && c.interiorCeilings === 'no' && c.surfacesAddressed && (c.furnitureItems.length > 0 || c.closets !== 'none'));
 
 const isCommercialLike = (c: EstimatorContext) => c.propertyType === 'commercial' || c.propertyType === 'multi_unit';
 
@@ -93,7 +94,7 @@ const isCommercialLike = (c: EstimatorContext) => c.propertyType === 'commercial
  * whether the customer lives there, rents or owns it, and whether the home is occupied or empty, don't matter for those.
  */
 export function isStandaloneOnlyJob(c: EstimatorContext): boolean {
-  if (c.standaloneStructure) return true;
+  if (c.standaloneStructure || c.itemsOnly) return true;
   if (c.projectType === 'exterior' && c.exteriorBody === 'no') return true;
   const furnitureOnly = c.furnitureItems.length > 0 && c.selectedRooms.length === 0 && c.interiorScope === '' && !c.squareFeet && !c.bedroomCount;
   return furnitureOnly && (c.projectType === 'interior' || c.projectType === '');
@@ -708,11 +709,43 @@ export const TOPICS: Topic[] = [
   {
     id: 'chair_count',
     priority: 29.94,
-    relevant: (c) => c.furnitureItems.includes('chair') && c.chairCount == null,
-    alreadyAnswered: (c) => c.chairCount != null || extDone(c, 'chair_count'),
-    ask: (c) => pick(["About how many chairs are getting painted?", "How many chairs is that?"], seed(c)),
-    clarify: () => "Each chair is priced on its own (they take a lot of cutting in around the spindles and legs), so I need a rough count.",
-    example: () => "Something like '6 chairs' or 'four'.",
+    relevant: (c) => (c.itemsOnly && c.furnitureItems.length > 0 && !c.furnitureCountKnown) || (c.furnitureItems.includes('chair') && c.chairCount == null && !c.furnitureCountKnown),
+    alreadyAnswered: (c) => c.chairCount != null || c.furnitureCountKnown || extDone(c, 'chair_count'),
+    ask: (c) => {
+      const kinds = [...new Set(c.furnitureItems)];
+      if (kinds.length > 1) return "How many of each piece are we painting? Something like '4 chairs and a table'.";
+      const noun = kinds[0] === 'chair' || kinds.length === 0 ? 'chairs' : itemsPhrase([kinds[0], kinds[0]]).replace(/^2 /, '');
+      return pick([`About how many ${noun} are getting done?`, `How many ${noun} is that?`], seed(c));
+    },
+    clarify: () => "Each piece is priced on its own (chairs take a lot of cutting in around the spindles and legs), so I need a rough count.",
+    example: () => "Something like '6 chairs', 'four', or '2 chairs and a table'.",
+  },
+  {
+    // "furniture" with no piece named
+    id: 'furniture_kind',
+    priority: 29.9,
+    relevant: (c) => c.furnitureUnspecified && c.furnitureItems.length === 0,
+    alreadyAnswered: (c) => c.furnitureItems.length > 0 || extDone(c, 'furniture_kind'),
+    ask: (c) => pick(["What kind of furniture is it, and how many pieces?", "Which pieces are we painting? A dresser, table, chairs, something else?"], seed(c)),
+    clarify: () => "I price each piece on its own (a chair, a dining table, a dresser, a bookcase and so on), so I need to know what they are.",
+    example: () => "Something like '4 dining chairs and a table' or 'one dresser and two nightstands'.",
+  },
+  {
+    // what is being done to the pieces: repaint, refresh the stain, strip and refinish
+    id: 'furniture_finish',
+    priority: 29.96,
+    relevant: (c) => c.itemsOnly && c.furnitureItems.length > 0 && !c.furnitureTreatment,
+    alreadyAnswered: (c) => !!c.furnitureTreatment || extDone(c, 'furniture_finish'),
+    ask: (c) =>
+      pick(
+        [
+          `What are the ${[...new Set(c.furnitureItems)].length > 1 ? 'pieces' : itemsPhrase([c.furnitureItems[0], c.furnitureItems[0]]).replace(/^2 /, '')} like now: painted, stained or bare wood? And do you want them repainted, restained or refinished?`,
+          'Is the finish painted or stained right now, and do you want a new coat of paint, a fresh stain, or stripped back and refinished?',
+        ],
+        seed(c),
+      ),
+    clarify: () => "A fresh coat over sound paint is the quickest. Restaining or stripping back to bare wood takes sanding and more coats, so it costs more per piece.",
+    example: () => "Something like 'painted white, repaint them black', 'stained oak, refresh the stain', or 'strip them down and refinish'.",
   },
   {
     id: 'shutter_count',
@@ -979,11 +1012,20 @@ export const TOPICS: Topic[] = [
     id: 'color_change',
     priority: 35,
     relevant: (c) =>
-      (c.projectType === 'interior' || c.projectType === 'both') &&
-      (c.interiorWalls !== 'no' || c.interiorCeilings === 'yes' || c.interiorTrim === 'yes' || c.cabinets !== 'none'),
+      c.itemsOnly ||
+      ((c.projectType === 'interior' || c.projectType === 'both') &&
+        (c.interiorWalls !== 'no' || c.interiorCeilings === 'yes' || c.interiorTrim === 'yes' || c.cabinets !== 'none')),
     alreadyAnswered: (c) => !!c.interiorColorChange,
     ask: (c) =>
-      pick(
+      c.itemsOnly
+        ? pick(
+            [
+              c.furnitureTreatment === 'restain' ? 'Are we matching the current stain color, or going a different shade?' : 'Are we keeping the current color, or changing it?',
+              'Same color as it is now, or something new?',
+            ],
+            seed(c),
+          )
+        : pick(
         [
           "Is it the same color going back, or a different one?",
           "Are you sticking with the same color, or changing it up?",
@@ -1188,10 +1230,18 @@ export const TOPICS: Topic[] = [
 
 // ===== Topic picker =====
 
+/**
+ * A job that is only movable pieces (chairs, a table, a dresser): these are the only questions that make sense. Every room, wall,
+ * ceiling, trim, door, size-of-house, who-lives-there and paint-grade question is skipped, whatever the list says, and never circled back to.
+ */
+const ITEM_JOB_TOPICS = new Set(['furniture_kind', 'chair_count', 'furniture_finish', 'color_change', 'paint_brand', 'location', 'timeline_and_access']);
+const askableFor = (ctx: EstimatorContext, id: string) => !ctx.itemsOnly || ITEM_JOB_TOPICS.has(id);
+
 export function pickNextTopic(ctx: EstimatorContext, asked: string[]): Topic | null {
   const candidates = TOPICS.filter(
     (t) =>
       !asked.includes(t.id) &&
+      askableFor(ctx, t.id) &&
       t.relevant(ctx) &&
       !t.alreadyAnswered(ctx),
   );
@@ -1212,6 +1262,7 @@ export function pickRetryTopic(ctx: EstimatorContext, asked: string[], retried: 
     (t) =>
       asked.includes(t.id) &&
       !retried.includes(t.id) &&
+      askableFor(ctx, t.id) &&
       t.relevant(ctx) &&
       !t.alreadyAnswered(ctx),
   );

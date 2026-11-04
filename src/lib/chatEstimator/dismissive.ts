@@ -48,6 +48,24 @@ const withExt = (ctx: EstimatorContext, id: string): string[] => [...new Set([..
  * then just moves on). The paint questions are not here: "doesn't matter" about the paint already means the painter chooses.
  */
 export function highestPriceAssumption(topicId: string, ctx: EstimatorContext): Assumption | null {
+  // Movable pieces only: "doesn't matter" never turns them into a house (no whole-inside, walls, ceilings, trim or doors).
+  if (ctx.itemsOnly) {
+    switch (topicId) {
+      case 'furniture_finish':
+        return { patch: { furnitureTreatment: 'strip_refinish', furnitureSanding: true }, say: higher('stripping and refinishing the pieces') };
+      case 'color_change':
+        return { patch: { interiorColorChange: 'different' }, say: higher('a new color') };
+      case 'chair_count':
+      case 'furniture_kind':
+        return { patch: { furnitureCountKnown: true, extAnswered: withExt(ctx, topicId) }, say: "No problem, I'll estimate that from the usual number, and you can change it when you see the price." };
+      case 'location':
+        return { patch: {}, reask: true, say: "I do need a ZIP code. It's how I find painters near you and price it for your area. Nothing else gets saved with it." };
+      case 'paint_brand':
+        return { patch: { extAnswered: withExt(ctx, topicId) }, say: 'No problem, the painter will choose the paint.' };
+      default:
+        return null;
+    }
+  }
   switch (topicId) {
     case 'project_type':
       // never assumed: inside or outside changes the whole job, so it is asked again (any hint in later messages is picked up first)

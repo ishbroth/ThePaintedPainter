@@ -200,7 +200,9 @@ export function classifyIntent(rawText: string): IntentResult {
 
   // Frustration
   if (has(t, /\bthis\s+is\s+(stupid|dumb|ridiculous|pointless|annoying)\b/, /\byou'?re\s+not\s+listening\b/,
-    /\bugh\b/, /\bnevermind\b/, /\bforget\s+it\b/)) {
+    /\bugh\b/, /\bnevermind\b/, /\bforget\s+it\b/,
+    /\boh\s+my\s+(?:god|gosh)\b/, /\bwhat\s+(?:are|r)\s+(?:you|oyu|u)\s+talking\s+about\b/, /\bwhat\s+does\s+(?:this|that|it)\s+have\s+to\s+do\s+with\b/,
+    /\b(?:have|has)\s+nothing\s+to\s+do\s+with\b/, /\b(?:asked|ask)\s+(?:this|that|me)\s+(?:\w+\s+)?(?:\w+\s+)?times\b/)) {
     intents.push('frustration');
   }
 

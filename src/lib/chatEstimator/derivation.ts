@@ -20,6 +20,7 @@
 import type { EstimatorContext } from '../types';
 import { estimateHouseLayout } from '../surfaceAreaEngine';
 import { hasScopeLimiter } from './scopeWords';
+import { saysItemsOnly } from './items';
 import { mentionedDetails, isMultiUnitText } from './details';
 
 export interface Derivation {
@@ -335,7 +336,7 @@ export function derive(ctx: EstimatorContext, transcript: string): Derivation[] 
   };
   // Surfaces the customer ruled out ("no walls, no ceilings", "without the doors", "skip the trim").
   const negated = new Set<string>();
-  const negRe = /\b(?:no|without|skip|excluding|except(?: for)?|not (?:the )?|don'?t (?:paint|do|need)(?: the)?|leave out)\s+((?:(?:walls?|ceilings?|trim|baseboards?|doors?|windows?)\b(?:\s*(?:,|or|and|nor|\/)\s*)?)+)/g;
+  const negRe = /\b(?:no|without|skip|excluding|except(?: for)?|not (?:(?:painting|doing|touching) )?(?:the |any )?|don'?t (?:paint|do|need)(?: the)?|leave out)\s+((?:(?:walls?|ceilings?|trim|baseboards?|doors?|windows?)\b(?:\s*(?:,|or|and|nor|\/)\s*)?)+)/g;
   for (const nm of t.matchAll(negRe)) {
     for (const w of nm[1].split(/[^a-z]+/).filter(Boolean)) negated.add(w.replace(/s$/, ''));
   }
@@ -400,10 +401,23 @@ export function derive(ctx: EstimatorContext, transcript: string): Derivation[] 
   }
 
   // Only chairs to paint ("paint my dining chairs"): a furniture job, not a room.
-  if (ctx.interiorWalls !== 'no' && ctx.furnitureItems.includes('chair') && !mentionsSurfaceWords && !/\b(rooms?|house|home|apartment|condo|walls?|trim|doors?|cabinets?|baseboards?|exterior|outside|patio|outdoor|deck)\b/.test(tNeg)) {
+  // Only movable pieces (chairs, a table, a dresser...): a furniture job, not a room. "Furniture only", "no walls or ceilings",
+  // "nothing in a room" all say so; none of them are room words. Inside or outside doesn't matter for a piece you can carry.
+  const hasItems = ctx.furnitureItems.length > 0 || ctx.furnitureUnspecified;
+  const itemsSaid = saysItemsOnly(t);
+  const tScope = tNeg.replace(/\b(?:nothing|no)\s+(?:in|at all in)\s+(?:a|the|any)\s+rooms?\b|\bno rooms?\b|\bnot (?:in |painting |doing )?(?:a|any|the)\s+rooms?\b|\b(?:doesn'?t|does not|don'?t|do not) (?:matter|apply)\b[^.\n]*|\b(?:inside|outside|indoors?|outdoors?|interior|exterior)(?: or |\s*\/\s*)(?:inside|outside|indoors?|outdoors?|interior|exterior)\b/g, ' ');
+  const roomWords = /\b(rooms?|house|home|apartment|condo|walls?|ceilings?|trim|doors?|baseboards?|bedrooms?|bathrooms?|kitchen|living|hallway|garage|exterior|siding|stucco|fence|deck)\b/.test(tScope);
+  const cabinetRoom = /\bcabinets?\b/.test(tScope) && ctx.furnitureItems.every((i) => i !== 'cabinet') && !itemsSaid;
+  if (hasItems && !ctx.itemsOnly && !roomWords && !mentionsSurfaceWords && !cabinetRoom && (itemsSaid || !/\b(outside|patio|outdoor)\b/.test(tScope))) {
     out.push({
-      patch: { ...interiorOff, projectType: ctx.projectType || 'interior', interiorScope: ctx.interiorScope || 'whole_house' },
-      reason: 'Only chairs → a furniture job, no wall, ceiling, trim or door painting',
+      patch: { ...interiorOff, itemsOnly: true, projectType: ctx.projectType || 'interior', interiorScope: ctx.interiorScope || 'whole_house', interiorColorChange: ctx.interiorColorChange || '' },
+      reason: 'Only movable pieces → a furniture job: no walls, ceilings, trim, doors, rooms or ceiling height',
+    });
+  } else if (ctx.itemsOnly && (roomWords || mentionsSurfaceWords) && !itemsSaid && /\b(?:also|and|plus|too|as well|along with)\b/.test(t) && /\b(?:walls?|ceilings?|bedrooms?|living room|kitchen|whole house|rooms?)\b/.test(tScope)) {
+    // they added a real room to the pieces: back to a normal job
+    out.push({
+      patch: { itemsOnly: false, interiorWalls: 'yes', surfacesAddressed: false, conditionAddressed: false, trimScopeAddressed: false, interiorScope: '' },
+      reason: 'Rooms were added to the furniture → priced as rooms plus the pieces',
     });
   }
 

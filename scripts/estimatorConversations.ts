@@ -472,6 +472,81 @@ async function dismissAt(setup: string[], topicWords: RegExp, dismissal = 'doesn
   check('"yes, standard" is recorded and not asked again', std.state.ctx.ceilingHeightKnown === true && std.state.ctx.ceilingHeight === 'standard' && !/(?:is it|are the ceilings|are they) standard/i.test(std.last), std.last);
 }
 
+// Movable furniture only (a real conversation that went wrong: "i need some chairs painted" got inside/outside, rooms, walls, ceilings, baseboards,
+// doors, ceiling height and "is it a rental" questions, the same ones again at the end, and a $3,545 price for one chair).
+{
+  // questions that only make sense for rooms and houses
+  const ROOM_QUESTION = /inside, (?:the )?outside|interior, exterior|which rooms|what rooms|ceilings?|baseboards?|trim|doors?|walls?\b|ceiling height|how tall|rental|living there|anyone (?:be |living )|occupied|furnished, or empty|room size|how big is the|square feet/i;
+  const asksRoomThings = (turns: string[]) => turns.filter((t) => ROOM_QUESTION.test(t.replace(/\[\[[^\]]*\]\]/g, '').replace(/just [a-z ,]+, no rooms or walls/gi, '')));
+
+  const f = await play([
+    'i need some chairs painted',
+    '1 chair to paint',
+    'the furniture needs sanded',
+    'refreshing the stain',
+    'same stain color',
+    'painters choice',
+    '91941',
+    'whenever',
+    'no',
+  ]);
+  const fc = f.state.ctx;
+  check('chairs: recognised as a furniture-only job on the first message', fc.itemsOnly === true && fc.furnitureItems.includes('chair'), JSON.stringify({ items: fc.furnitureItems, only: fc.itemsOnly }));
+  check('chairs: the first question is how many, not inside or outside', /how many/i.test(f.turns[0]) && !/inside|outside|interior|exterior/i.test(f.turns[0]), f.turns[0]);
+  check('chairs: no room, wall, ceiling, trim, door, height or occupancy question in the whole conversation', asksRoomThings(f.turns).length === 0, asksRoomThings(f.turns).join(' ## '));
+  check('chairs: "1 chair to paint" is read as one chair', fc.chairCount === 1 && fc.furnitureItems.length === 1 && fc.furnitureCountKnown, JSON.stringify({ n: fc.chairCount, items: fc.furnitureItems }));
+  check('chairs: "needs sanded" and "refreshing the stain" are read as a restain with sanding', fc.furnitureTreatment === 'restain' && fc.furnitureSanding, JSON.stringify({ t: fc.furnitureTreatment, s: fc.furnitureSanding }));
+  check('chairs: "same stain color" answers the color question', fc.interiorColorChange === 'same', fc.interiorColorChange);
+  check('chairs: no question is asked twice', new Set(f.turns.map((t) => t.split('||').pop()!.trim())).size === f.turns.length, f.turns.join(' ## '));
+  check('chairs: nothing is "circled back" to', !f.turns.some((t) => /circling back/i.test(t)), f.turns.join(' ## '));
+  const fe = calculateEstimate(fc);
+  check('chairs: one chair is a furniture price (a few hundred dollars), not a house', fe.total > 100 && fe.total < 700 && fe.lineItems.every((l) => /Furniture|Minimum|Scheduling|Mobil/i.test(l.description + l.category)), fe.total + ' ' + JSON.stringify(fe.lineItems.map((l) => l.description)));
+  const plain = calculateEstimate({ ...fc, furnitureTreatment: '', furnitureSanding: false });
+  const strip = calculateEstimate({ ...fc, furnitureTreatment: 'strip_refinish', furnitureItems: Array(6).fill('chair'), chairCount: 6 });
+  const six = calculateEstimate({ ...fc, furnitureTreatment: '', furnitureSanding: false, furnitureItems: Array(6).fill('chair'), chairCount: 6 });
+  check('chairs: restaining and sanding cost at least a plain repaint', fe.total >= plain.total, fe.total + ' vs ' + plain.total);
+  check('chairs: stripping and refinishing six chairs costs more than repainting six', strip.total > six.total, strip.total + ' vs ' + six.total);
+
+  // the same customer, as frustrated as in the real chat: restating "furniture only" and "no walls" must not start a loop of apologies or room questions
+  const g = await play([
+    'i need some chairs painted',
+    'doesnt matter we are talkign about chairs',
+    'moveable chairs only',
+    'nope, nothing in a room at all, only chairs',
+    'furniture only',
+    'no walls or ceilings',
+    'furniture only',
+    'again, no',
+    'oh my god, no',
+    'the furniture needs sanded',
+    'what does this have to do with anything',
+    '1 chair to paint',
+    'refreshing the stain',
+    'same stain color',
+  ]);
+  check('frustrated chairs: still no room, wall, ceiling, trim, door, height or occupancy question', asksRoomThings(g.turns).length === 0, asksRoomThings(g.turns).join(' ## '));
+  const restated = [2, 3, 4, 5, 6]; // "moveable chairs only", "nothing in a room", "furniture only", "no walls or ceilings", "furniture only"
+  check('frustrated chairs: restating the scope is acknowledged, not answered with "I\'m not sure how that answers"', !restated.some((i) => /not sure how that answers/i.test(g.turns[i])), restated.map((i) => g.turns[i]).join(' ## '));
+  check('frustrated chairs: "Sorry about that" is said at most once', g.turns.filter((t) => /Sorry about that/.test(t)).length <= 1, String(g.turns.filter((t) => /Sorry about that/.test(t)).length));
+  check('frustrated chairs: the bare "Got it." filler never repeats back to back', !g.turns.some((t, i) => i > 0 && /^Got it\./.test(t) && /^Got it\./.test(g.turns[i - 1])), g.turns.join(' ## '));
+  check('frustrated chairs: the final price is a furniture price', calculateEstimate(g.state.ctx).total < 700, String(calculateEstimate(g.state.ctx).total));
+
+  // other pieces: recognised, counted, and no room questions
+  const t1 = await play(['I have a dresser and two nightstands that need to be repainted']);
+  check('dresser and nightstands are recognised and counted', t1.state.ctx.itemsOnly && t1.state.ctx.furnitureItems.filter((i) => i === 'dresser').length === 1 && t1.state.ctx.furnitureItems.filter((i) => i === 'nightstand').length === 2, JSON.stringify(t1.state.ctx.furnitureItems));
+  check('dresser job: next question is about the pieces, not rooms', !ROOM_QUESTION.test(t1.last), t1.last);
+  const t2 = await play(['can you paint my dining table and 6 chairs, wood, they are stained and I want them white']);
+  check('table and 6 chairs: counted', t2.state.ctx.furnitureItems.length === 7 && t2.state.ctx.furnitureCountKnown, JSON.stringify(t2.state.ctx.furnitureItems));
+  check('table and 6 chairs: wood, repaint', t2.state.ctx.furnitureMaterial === 'wood', JSON.stringify({ m: t2.state.ctx.furnitureMaterial, t: t2.state.ctx.furnitureTreatment }));
+  const t3 = await play(['I have some furniture I want painted']);
+  check('"some furniture" with no piece named: asks which pieces', t3.state.ctx.itemsOnly && /furniture|pieces/i.test(t3.last) && !ROOM_QUESTION.test(t3.last), t3.last);
+  // rooms are NOT swallowed by the furniture rules
+  const r1 = await play(['I want my living room and the bedroom painted, walls and ceilings']);
+  check('a room job that mentions no furniture is untouched', !r1.state.ctx.itemsOnly && r1.state.ctx.interiorWalls !== 'no', JSON.stringify({ only: r1.state.ctx.itemsOnly, walls: r1.state.ctx.interiorWalls }));
+  const r2 = await play(['I want the walls in my living room painted and the chair rail too, the table stays']);
+  check('a room job that mentions a table or chair rail is still a room job', !r2.state.ctx.itemsOnly, JSON.stringify({ only: r2.state.ctx.itemsOnly, items: r2.state.ctx.furnitureItems }));
+}
+
 setLLMReaderForTests(undefined);
 console.log(failures ? `\n${failures} FAILED` : '\nall conversation checks passed');
 process.exit(failures ? 1 : 0);

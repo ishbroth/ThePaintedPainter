@@ -8,6 +8,7 @@
 
 import type { EstimatorContext } from '../types';
 import { extractCeilingHeight } from './extractors';
+import { detectItems, itemsPhrase, mentionsGenericFurniture, parseFurnitureFinish, saysItemsOnly } from './items';
 
 const NUMBER_WORDS: Record<string, number> = {
   a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12,
@@ -355,14 +356,47 @@ export function extractDetails(text: string, ctx: EstimatorContext, askedId: str
     if (/\binterior\b|\binside\b/.test(t) && ctx.interiorShutterCount == null) patch.interiorShutterCount = shutters;
     else if (ctx.exteriorShutterCount == null && askedId !== 'shutter_count') patch.exteriorShutterCount = shutters;
   }
-  const chairs = t.match(/\b(\d{1,2})\s+(?:\w+\s+){0,2}chairs\b/);
-  if (chairs && ctx.chairCount == null && askedId !== 'chair_count') patch.chairCount = parseInt(chairs[1], 10);
-  // chairs to paint (not the chair rail, and not a patio set, which is counted piece by piece elsewhere)
-  const chairText = t.replace(/chair[\s-]*rails?/g, ' ');
-  if (/\bchairs?\b/.test(chairText) && /\b(?:paint|painting|refinish|repaint|restain|spray)\b/.test(chairText) && !ctx.furnitureItems.includes('chair') && !/\b(?:patio|outdoor|garden|deck)\s*(?:furniture|set|chairs?|table)|\bloungers?\b|\bchaise\b|\bwrought iron\b/.test(chairText)) {
-    patch.furnitureItems = [...ctx.furnitureItems, 'chair'];
+  // movable pieces to paint (chairs, a table, a dresser...): a patio set is counted piece by piece elsewhere, and chair rail is trim, not a chair
+  const itemText = t.replace(/chair[\s-]*rails?/g, ' ');
+  const patioSet = /\b(?:patio|outdoor|garden|deck)\s*(?:furniture|set|chairs?|table)|\bloungers?\b|\bchaise\b|\bwrought iron\b/.test(itemText);
+  const askedItems = askedId === 'chair_count' || askedId === 'furniture_kind' || askedId === 'furniture_finish';
+  const paintVerb = /\b(?:paint(?:ed|ing)?|refinish(?:ed|ing)?|repaint(?:ed|ing)?|restain(?:ed|ing)?|re-stain(?:ed|ing)?|stain(?:ed|ing)?|spray(?:ed|ing)?|sand(?:ed|ing)?|strip(?:ped|ping)?|varnish(?:ed|ing)?)\b/.test(itemText);
+  const bareNoun = itemText.trim().split(/\s+/).length <= 5;
+  const found = detectItems(itemText);
+  if (found.length > 0 && !patioSet && (paintVerb || askedItems || ctx.furnitureItems.length > 0 || ctx.furnitureUnspecified || (bareNoun && !ctx.projectType && ctx.selectedRooms.length === 0))) {
+    const list: string[] = [];
+    let allCounted = true;
+    for (const f of found) {
+      if (f.count == null) allCounted = false;
+      for (let i = 0; i < Math.min(f.count ?? 1, 60); i++) list.push(f.key);
+    }
+    // numbers given with the pieces (or when asked how many) replace the guess; a bare repeat of a piece already counted changes nothing
+    if (!ctx.furnitureCountKnown || (askedId === 'chair_count' && allCounted)) {
+      const kinds = [...new Set([...ctx.furnitureItems, ...list])];
+      const merged = askedId === 'chair_count' || ctx.furnitureItems.length === 0
+        ? list
+        : kinds.flatMap((k) => (list.includes(k) ? list.filter((x) => x === k) : ctx.furnitureItems.filter((x) => x === k)));
+      if (merged.slice().sort().join(',') !== ctx.furnitureItems.slice().sort().join(',') || (allCounted && !ctx.furnitureCountKnown)) {
+        patch.furnitureItems = merged;
+        patch.furnitureUnspecified = false;
+        if (merged.includes('chair') && allCounted) patch.chairCount = merged.filter((x) => x === 'chair').length;
+        if (allCounted) patch.furnitureCountKnown = true;
+        if (!ctx.specialtyServices.includes('furniture')) patch.specialtyServices = [...ctx.specialtyServices, 'furniture'];
+        acks.push(itemsPhrase(merged));
+      }
+    }
+  } else if (!patioSet && ctx.furnitureItems.length === 0 && mentionsGenericFurniture(itemText) && (paintVerb || saysItemsOnly(itemText) || bareNoun)) {
+    if (!ctx.furnitureUnspecified) patch.furnitureUnspecified = true;
     if (!ctx.specialtyServices.includes('furniture')) patch.specialtyServices = [...ctx.specialtyServices, 'furniture'];
-    acks.push('chairs');
+  }
+  if (saysItemsOnly(itemText) && (patch.furnitureItems || ctx.furnitureItems.length > 0 || ctx.furnitureUnspecified)) {
+    acks.push(`just ${itemsPhrase(patch.furnitureItems ?? ctx.furnitureItems).replace(/^the pieces$/, 'the furniture')}, no rooms or walls`);
+  }
+  if (patch.furnitureItems || ctx.furnitureItems.length > 0 || ctx.furnitureUnspecified || patch.furnitureUnspecified) {
+    const fin = parseFurnitureFinish(itemText);
+    if (fin.treatment && (askedId === 'furniture_finish' || !ctx.furnitureTreatment || (fin.treatment === 'strip_refinish' && ctx.furnitureTreatment !== 'strip_refinish'))) patch.furnitureTreatment = fin.treatment;
+    if (fin.material && !ctx.furnitureMaterial) patch.furnitureMaterial = fin.material;
+    if (fin.sanding && !ctx.furnitureSanding) patch.furnitureSanding = true;
   }
   if (ctx.chairRailLinearFeet == null) {
     const m = t.match(/(\d[\d,]*)\s*(?:linear\s*|lin\.?\s*)?(?:feet|foot|ft\.?|lf)\s*(?:of\s*)?(?:the\s*)?chair[\s-]*rail/) || t.match(/chair[\s-]*rails?\b[^.]{0,30}?(\d[\d,]*)\s*(?:linear\s*|lin\.?\s*)?(?:feet|foot|ft\.?|lf)\b/);
@@ -397,7 +431,34 @@ export function extractDetails(text: string, ctx: EstimatorContext, askedId: str
     switch (askedId) {
       case 'door_count': { const n = parseCount(text, 1, 80); if (n) { patch.doorCount = n; acks.push(`${n} doors`); } break; }
       case 'window_count': { const n = parseCount(text, 1, 100); if (n) { patch.windowCount = n; acks.push(`${n} windows`); } break; }
-      case 'chair_count': { const n = parseCount(text, 1, 60); if (n) { patch.chairCount = n; acks.push(`${n} chairs`); } break; }
+      case 'chair_count': {
+        // "3", "a couple", "just the one", or "2 chairs and a table": a lone number counts the one kind of piece
+        if (patch.furnitureItems) break; // the counted pieces were read above
+        const kinds = [...new Set(ctx.furnitureItems)];
+        const n = /\b(?:just|only)?\s*(?:the\s+)?one\b|^\W*(?:a|an)\W*$/i.test(text) ? 1 : parseCount(text, 1, 60);
+        if (n && kinds.length >= 1) {
+          // one number for several kinds means that many of each
+          patch.furnitureItems = kinds.flatMap((k) => Array.from({ length: n }, () => k));
+          patch.furnitureCountKnown = true;
+          if (kinds.includes('chair')) patch.chairCount = n;
+          acks.push(itemsPhrase(patch.furnitureItems));
+        }
+        break;
+      }
+      case 'color_change': {
+        // for the pieces: "same stain color", "keep it", "refresh the stain" (the same) or "a darker shade", "paint them white" (different)
+        if (!(ctx.itemsOnly || patch.furnitureItems)) break;
+        const low = text.toLowerCase();
+        if (/\b(?:same|existing|current|matching|match|keep|keeping|as is|as it is|refresh\w*|touch(?:ing)? up|original|natural)\b/.test(low) && !/\b(?:different|change|changing|new color|new colour|instead)\b/.test(low)) { patch.interiorColorChange = 'same'; acks.push('the same color going back'); }
+        else if (/\b(?:different|change|changing|switch|new|darker|lighter|another|instead|white|black|gr[ae]y|blue|red|green|yellow|navy|cream|espresso|walnut|ebony)\b/.test(low)) { patch.interiorColorChange = 'different'; acks.push('a new color'); }
+        break;
+      }
+      case 'furniture_finish': {
+        const fin = parseFurnitureFinish(text);
+        if (!fin.treatment && !patch.furnitureTreatment && /\b(?:same|existing|current|matching)\b/.test(text.toLowerCase())) patch.furnitureTreatment = ctx.furnitureTreatment || 'restain';
+        if (fin.treatment || fin.material || fin.sanding || patch.furnitureTreatment) acks.push('how the pieces are finished');
+        break;
+      }
       case 'shutter_count': {
         const n = parseCount(text, 1, 60);
         if (n) {
@@ -437,6 +498,6 @@ export function extractDetails(text: string, ctx: EstimatorContext, askedId: str
 /** Topic ids of the follow-up questions in this file (their answers are recorded so they are never asked twice). */
 export const DETAIL_TOPIC_IDS = new Set([
   'unit_count', 'building_count', 'ceiling_height', 'common_areas', 'balcony_count', 'ext_mu_access',
-  'door_count', 'window_count', 'chair_count', 'shutter_count', 'closet_count', 'fence_size', 'fence_height', 'deck_size', 'overhang_size', 'railing_length',
+  'door_count', 'window_count', 'chair_count', 'furniture_kind', 'furniture_finish', 'shutter_count', 'closet_count', 'fence_size', 'fence_height', 'deck_size', 'overhang_size', 'railing_length',
   'detail_rooms', 'detail_feet_crown', 'detail_feet_chair_rail', 'detail_feet_trim', 'detail_sqft_wainscot',
 ]);

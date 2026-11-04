@@ -237,6 +237,18 @@ export interface EstimatorContext {
   epoxyGarageSqft: number | null;
   epoxyType: string; // basic, full_system
   furnitureItems: string[];
+  /** The job is only movable pieces (chairs, a table, a dresser...), no rooms: the room questions are skipped. */
+  itemsOnly: boolean;
+  /** The customer said "furniture" without saying which pieces. */
+  furnitureUnspecified: boolean;
+  /** How many pieces was said (or answered), so it is not asked again. */
+  furnitureCountKnown: boolean;
+  /** What is being done to the pieces: repaint, restain (refresh the stain), strip_refinish. '' = not said. */
+  furnitureTreatment: string;
+  /** wood, metal, other. '' = not said. */
+  furnitureMaterial: string;
+  /** The pieces need sanding before they are finished. */
+  furnitureSanding: boolean;
   brickSqft: number | null;
   brickTreatment: string; // paint, whitewash
 

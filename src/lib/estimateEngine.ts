@@ -507,9 +507,16 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
       const rate = BASE_RATES.specialty[key] || BASE_RATES.specialty.furniture_cabinet;
       furnitureTotal += typeof rate === 'number' ? rate : 175;
     }
+    // What is done to the pieces: refreshing a stain needs sanding, stain and clear coats; stripping back to bare wood is the most work;
+    // sanding on top of a repaint, and metal (rust treatment, bonding primer), each add to it. A plain repaint is the base rate.
+    const treatmentFactor = ctx.furnitureTreatment === 'strip_refinish' ? 1.6 : ctx.furnitureTreatment === 'restain' ? 1.25 : 1;
+    const sandingFactor = ctx.furnitureSanding && ctx.furnitureTreatment !== 'strip_refinish' ? 1.15 : 1;
+    const materialFactor = ctx.furnitureMaterial === 'metal' ? 1.15 : 1;
+    furnitureTotal *= treatmentFactor * sandingFactor * materialFactor;
+    const treatmentLabel = ctx.furnitureTreatment === 'strip_refinish' ? ', stripped and refinished' : ctx.furnitureTreatment === 'restain' ? ', restained' : ctx.furnitureSanding ? ', sanded' : '';
     lineItems.push({
       category: 'Specialty',
-      description: `Furniture Painting (${furnitureList.length} pieces)`,
+      description: `Furniture Painting (${furnitureList.length} piece${furnitureList.length === 1 ? '' : 's'}${treatmentLabel})`,
       amount: furnitureTotal * regionalMult,
       key: 'furniture',
     });

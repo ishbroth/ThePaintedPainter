@@ -49,7 +49,9 @@ const TOPIC_LABEL: Record<string, string> = {
   door_count: 'how many doors',
   window_count: 'how many windows',
   closet_count: 'how many closets',
-  chair_count: 'how many chairs',
+  chair_count: 'how many pieces are being painted',
+  furniture_kind: 'which pieces of furniture',
+  furniture_finish: 'how the pieces are finished now and what you want done',
   shutter_count: 'how many shutters',
   railing_length: 'how long the railing is',
   fence_size: 'how long and how tall the fence is',
@@ -78,7 +80,8 @@ const TOPIC_LABEL: Record<string, string> = {
   timeline_and_access: 'your timing and whether the place is occupied',
 };
 
-export function topicLabel(id: string | null | undefined): string {
+export function topicLabel(id: string | null | undefined, itemsOnly = false): string {
+  if (itemsOnly && id === 'timeline_and_access') return 'your timing';
   return (id && TOPIC_LABEL[id]) || 'that';
 }
 

@@ -43,7 +43,7 @@ export function makeInitialContext(): EstimatorContext {
     exteriorRailingMaterial: 'wood', interiorRailingMaterial: 'wood', additionalDetails: '',
     specialtyServices: [], fireplaceType: '', fireplaceCount: null, beamLinearFeet: null,
     beamLocation: 'standard', builtInCount: null, epoxyGarageSqft: null, epoxyType: 'basic',
-    furnitureItems: [], brickSqft: null, brickTreatment: 'paint',
+    furnitureItems: [], itemsOnly: false, furnitureUnspecified: false, furnitureCountKnown: false, furnitureTreatment: '', furnitureMaterial: '', furnitureSanding: false, brickSqft: null, brickTreatment: 'paint',
     answeredQuestions: 0, responseStyle: 'normal', responseLengths: [],
     specialtyReferrals: [], isHighCostArea: false, stateComplianceNotes: [],
     photoRequests: [], photos: [],
