@@ -16,7 +16,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const fetchProfile = useCallback(async (userId: string) => {
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, role, display_name, avatar_url, phone, zip_code, street_address, city, state, theme_preference, loyalty_points_balance, loyalty_points_lifetime, loyalty_discount_percent, notification_prefs')
+      .select('*') // every column the profile has: the address columns only exist once their migration has been run, so a named list could fail here
       .eq('id', userId)
       .single();
 
