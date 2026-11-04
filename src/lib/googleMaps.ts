@@ -45,6 +45,20 @@ function load() {
   document.head.appendChild(script);
 }
 
+/** Loads Google Maps if it has not been (the address boxes use it too) and says whether it is ready to use. */
+export function ensureGoogleMaps(): Promise<boolean> {
+  return new Promise((resolve) => {
+    load();
+    if (status === 'ready') return resolve(true);
+    if (status === 'no-key' || status === 'error') return resolve(false);
+    const done = () => {
+      if (status === 'ready') { listeners.delete(done); resolve(true); }
+      else if (status === 'no-key' || status === 'error') { listeners.delete(done); resolve(false); }
+    };
+    listeners.add(done);
+  });
+}
+
 /** Starts loading Google Maps the first time it is used and returns where that stands. */
 export function useGoogleMaps(): GoogleMapsStatus {
   const [current, setCurrent] = useState<GoogleMapsStatus>(status);

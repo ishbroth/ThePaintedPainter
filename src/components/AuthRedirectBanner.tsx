@@ -49,6 +49,17 @@ const AuthRedirectBanner = () => {
   const [{ state, message }] = useState(parseAuthRedirect);
   const [email, setEmail] = useState('');
   const [resendStatus, setResendStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
+  // the banner can be closed with its x; the good news ("you're all set", "new email sent") also fades away by itself after ten seconds
+  const [dismissed, setDismissed] = useState(false);
+  const [fading, setFading] = useState(false);
+  const goodNews = state === 'confirmed' || resendStatus === 'sent';
+  useEffect(() => {
+    if (!goodNews) return;
+    setFading(false);
+    const fade = window.setTimeout(() => setFading(true), 9000);
+    const gone = window.setTimeout(() => setDismissed(true), 10000);
+    return () => { window.clearTimeout(fade); window.clearTimeout(gone); };
+  }, [goodNews]);
 
   useEffect(() => {
     // Clean the token/error out of the URL so a refresh doesn't re-trigger it.
@@ -64,19 +75,29 @@ const AuthRedirectBanner = () => {
     setResendStatus(error ? 'error' : 'sent');
   };
 
-  if (state === 'none') return null;
+  if (state === 'none' || dismissed) return null;
 
   return (
     <div
       style={{
         background: state === 'error' ? 'var(--tint-critical-bg)' : 'var(--tint-success-bg)',
         borderBottom: `1px solid ${state === 'error' ? 'var(--tint-critical-border)' : 'var(--tint-success-border)'}`,
-        padding: '10px 20px',
+        padding: '10px 44px 10px 20px',
         textAlign: 'center',
         position: 'relative',
         zIndex: 2,
+        opacity: fading ? 0 : 1,
+        transition: 'opacity 1s ease',
       }}
     >
+      <button
+        type="button"
+        onClick={() => setDismissed(true)}
+        aria-label="Close this message"
+        style={{ position: 'absolute', top: 6, right: 10, width: 28, height: 28, border: 'none', background: 'transparent', color: 'var(--text-secondary)', fontSize: '1.4rem', lineHeight: 1, cursor: 'pointer' }}
+      >
+        ×
+      </button>
       {state === 'confirmed' ? (
         <span style={{ color: 'var(--success)', fontSize: '0.9rem' }}>
           Email confirmed — you're all set!

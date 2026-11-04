@@ -11,6 +11,7 @@ import TimingCalendar from '../components/results/TimingCalendar';
 import { baseFromResult, buildPriceEditor } from '../lib/priceEditing';
 import { buildResponseSummary, timelineLabel } from '../lib/chatEstimator/responseSummary';
 import { supabase } from '../lib/supabase';
+import AddressField from '../components/AddressField';
 import { useAuth } from '../lib/auth';
 import { hapticMedium } from '../lib/haptics';
 import { QUOTE_RESULT_KEY, QUOTE_EXPIRES_KEY, CLAIMED_KEY, PRICE_HOLD_MINUTES, clearEstimatorSession } from '../lib/chatEstimator/persistence';
@@ -478,9 +479,12 @@ const ClaimPriceModal = ({
   const [name, setName] = useState(ctx.contactName || profile?.display_name || '');
   const [email, setEmail] = useState(ctx.contactEmail || user?.email || '');
   const [phone, setPhone] = useState(ctx.contactPhone || profile?.phone || '');
-  const [streetAddress, setStreetAddress] = useState('');
-  const [city, setCity] = useState('');
-  const [state_, setState_] = useState(ctx.state || '');
+  // the address on their profile pre-fills the property's, unless it is in another ZIP than the price was worked out for
+  const homeHere = !!profile?.street_address && (!profile.zip_code || profile.zip_code === ctx.zipCode);
+  const [streetAddress, setStreetAddress] = useState(homeHere ? profile?.street_address ?? '' : '');
+  const [city, setCity] = useState(homeHere ? profile?.city ?? '' : '');
+  const [state_, setState_] = useState((homeHere ? profile?.state : '') || ctx.state || '');
+  const [pickedZip, setPickedZip] = useState('');
   const [preferredDate, setPreferredDate] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -488,11 +492,17 @@ const ClaimPriceModal = ({
   // No approved painter within range yet: a second popup explains what happens
   const [noPainters, setNoPainters] = useState(false);
   // The account loads a moment after the page does: fill the blank fields from it, never over what has been typed or changed
-  const filled = useRef({ name: false, email: false, phone: false });
+  const filled = useRef({ name: false, email: false, phone: false, address: false });
   useEffect(() => {
     if (!filled.current.name && !name && profile?.display_name) { filled.current.name = true; setName(profile.display_name); }
     if (!filled.current.email && !email && user?.email) { filled.current.email = true; setEmail(user.email); }
     if (!filled.current.phone && !phone && profile?.phone) { filled.current.phone = true; setPhone(profile.phone); }
+    if (!filled.current.address && !streetAddress && !city && profile?.street_address && (!profile.zip_code || profile.zip_code === ctx.zipCode)) {
+      filled.current.address = true;
+      setStreetAddress(profile.street_address);
+      setCity(profile.city ?? '');
+      if (profile.state) setState_(profile.state);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile, user]);
 
@@ -615,14 +625,25 @@ const ClaimPriceModal = ({
             </p>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 10, marginTop: 16 }}>
-              <input placeholder="Full name" value={name} onChange={(e) => setName(e.target.value)} style={inputStyle} />
-              <input placeholder="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} style={inputStyle} />
-              <input placeholder="Phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} style={inputStyle} />
-              <input placeholder="Street address" value={streetAddress} onChange={(e) => setStreetAddress(e.target.value)} style={inputStyle} />
+              <div style={{ fontSize: '0.8rem', fontWeight: 700, letterSpacing: 0.4, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Property address (where the painting is)</div>
+              <AddressField
+                value={streetAddress}
+                onChange={(t) => { setStreetAddress(t); setPickedZip(''); }}
+                onPick={(p) => { setCity(p.city); if (p.state) setState_(p.state); setPickedZip(p.zip); }}
+                placeholder="Street address"
+                style={inputStyle}
+              />
               <div style={{ display: 'flex', gap: 10 }}>
-                <input placeholder="City" value={city} onChange={(e) => setCity(e.target.value)} style={{ ...inputStyle, flex: 2 }} />
-                <input placeholder="State" value={state_} onChange={(e) => setState_(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
+                <input placeholder="City" value={city} onChange={(e) => setCity(e.target.value)} style={{ ...inputStyle, flex: 2 }} autoComplete="address-level2" />
+                <input placeholder="State" value={state_} onChange={(e) => setState_(e.target.value)} style={{ ...inputStyle, flex: 1 }} autoComplete="address-level1" />
               </div>
+              {pickedZip && ctx.zipCode && pickedZip.slice(0, 5) !== ctx.zipCode && (
+                <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Your price was worked out for ZIP {ctx.zipCode}. This address is in {pickedZip.slice(0, 5)}, so the painter will confirm it for the new location.</p>
+              )}
+              <div style={{ fontSize: '0.8rem', fontWeight: 700, letterSpacing: 0.4, color: 'var(--text-secondary)', textTransform: 'uppercase', marginTop: 6 }}>Your contact info</div>
+              <input placeholder="Full name" value={name} onChange={(e) => setName(e.target.value)} style={inputStyle} autoComplete="name" />
+              <input placeholder="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} style={inputStyle} autoComplete="email" />
+              <input placeholder="Phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} style={inputStyle} autoComplete="tel" />
               <div>
                 <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
                   Preferred start date (optional — the painter will confirm)

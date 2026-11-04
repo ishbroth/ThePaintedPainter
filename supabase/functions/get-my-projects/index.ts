@@ -62,7 +62,9 @@ serve(async (req: Request) => {
         status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
-    const { id: userId, email: userEmail } = userData.user
+    const { id: userId } = userData.user
+    // projects claimed as a guest are matched by email, which only counts once the email is confirmed (otherwise anyone could sign up with someone else's address)
+    const userEmail = userData.user.email_confirmed_at ? userData.user.email : undefined
 
     const supabase = createClient(supabaseUrl, serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false },

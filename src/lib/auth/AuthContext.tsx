@@ -8,6 +8,9 @@ export interface UserProfile {
   avatar_url: string | null;
   phone: string | null;
   zip_code: string | null;
+  street_address: string | null;
+  city: string | null;
+  state: string | null;
   theme_preference: 'light' | 'dark' | null;
   loyalty_points_balance: number;
   loyalty_points_lifetime: number;

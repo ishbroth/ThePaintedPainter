@@ -1068,8 +1068,19 @@
 }
 
 .chat-estimator-section.keyboard-open .chat-estimator-header p,
-.chat-estimator-section.keyboard-open .chat-input-hint {
+.chat-estimator-section.keyboard-open .chat-input-hint,
+.chat-estimator-section.keyboard-open .chat-estimator-header h2 {
   display: none;
+}
+
+/* with the title gone the header is just a slim bar holding Done */
+.chat-estimator-section.keyboard-open .chat-estimator-header {
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+.chat-estimator-section.keyboard-open .chat-estimator-header-row {
+  justify-content: flex-end;
+  align-items: center;
 }
 
 /* Mute sits at the bottom left, beside the "Getting off track?" line */
