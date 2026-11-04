@@ -1,0 +1,11 @@
+const fs = require('fs');
+const f = 'src/lib/textToSpeech.ts';
+let t = fs.readFileSync(f, 'utf8');
+const BS = String.fromCharCode(92);
+const a = "|en-us-x-(?:iol|iom|tpd)" + BS + "b/;";
+if (!t.includes(a)) throw new Error('nf1');
+t = t.replace(a, () => "/;\n  const ANDROID_MALE = /en-us-x-(?:iol|iom|tpd)/;");
+const b = "(MALE.test(name) ? 200 :";
+if (!t.includes(b)) throw new Error('nf2');
+t = t.replace(b, () => "(MALE.test(name) || ANDROID_MALE.test(name) ? 200 :");
+fs.writeFileSync(f, t);

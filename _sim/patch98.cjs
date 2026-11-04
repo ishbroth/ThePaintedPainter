@@ -1,0 +1,11 @@
+const fs = require('fs');
+const f = 'src/pages/Home.tsx';
+let t = fs.readFileSync(f, 'utf8');
+const crlf = t.includes('\r\n');
+t = t.split('\r\n').join('\n');
+const a = t.indexOf("      {/* Painters Map Section */}");
+const b = t.indexOf("      </section>\n", a) + "      </section>\n".length;
+if (a < 0 || b < a) throw new Error('block');
+t = t.slice(0, a) + "      {/* Painters map: opens right here on the page */}\n      <PaintersMapSection />\n" + t.slice(b);
+t = t.replace("import ChatPanel from '../components/ChatEstimator/ChatPanel';", "import ChatPanel from '../components/ChatEstimator/ChatPanel';\nimport PaintersMapSection from '../components/PaintersMapSection';");
+fs.writeFileSync(f, crlf ? t.split('\n').join('\r\n') : t);

@@ -1,0 +1,28 @@
+import { spawn } from 'node:child_process';
+const chrome = spawn('C:/Program Files/Google/Chrome/Application/chrome.exe', ['--headless=new','--disable-gpu','--remote-debugging-port=9349','--window-size=390,844','--user-data-dir='+process.env.TEMP+'/cdp-prof16','about:blank'],{stdio:'ignore'});
+await new Promise(r=>setTimeout(r,8000));
+const tabs = await (await fetch('http://127.0.0.1:9349/json')).json();
+const ws = new WebSocket(tabs.find(t=>t.type==='page').webSocketDebuggerUrl);
+await new Promise(r=>ws.onopen=r);
+let id=0;const p=new Map();ws.onmessage=m=>{const d=JSON.parse(m.data);if(d.id&&p.has(d.id)){p.get(d.id)(d.result);p.delete(d.id)}};
+const send=(method,params={})=>new Promise(res=>{const i=++id;p.set(i,res);ws.send(JSON.stringify({id:i,method,params}))});
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const ev=async e=>(await send('Runtime.evaluate',{expression:e,returnByValue:true})).result?.value;
+await send('Page.enable');
+await send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:2,mobile:true});
+await send('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:5});
+await send('Page.addScriptToEvaluateOnNewDocument',{source:"window.__spoken=[];const o=SpeechSynthesis.prototype.speak;SpeechSynthesis.prototype.speak=function(u){window.__spoken.push(u.text);return o.call(this,u)};"});
+await send('Page.navigate',{url:'http://localhost:5173/'});await sleep(9000);
+console.log('coarse pointer:', await ev("matchMedia('(pointer: coarse)').matches"), 'fine:', await ev("matchMedia('(hover: hover) and (pointer: fine)').matches"));
+await ev("window.scrollTo({top:700,behavior:'instant'})");await sleep(1500);
+console.log('after scrolling, spoken:', JSON.stringify(await ev("window.__spoken")));
+// a real tap on the typing bubble
+const r = await ev("(()=>{const b=document.querySelector('.chat-composer').getBoundingClientRect();return JSON.stringify({x:b.x+b.width/2,y:b.y+b.height/2})})()");
+const {x,y}=JSON.parse(r);
+await ev("window.scrollTo({top:0,behavior:'instant'})");await sleep(800);
+const r2 = JSON.parse(await ev("(()=>{const b=document.querySelector('.chat-composer').getBoundingClientRect();return JSON.stringify({x:b.x+b.width/2,y:b.y+b.height/2})})()"));
+await send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:r2.x,y:r2.y}]});
+await send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+await sleep(1200);
+console.log('after tap, spoken:', JSON.stringify(await ev("window.__spoken")));
+ws.close();chrome.kill();process.exit(0);

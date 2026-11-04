@@ -1,0 +1,12 @@
+export { makeInitialState, handleUserMessage } from '../src/lib/chatEstimator/chatEngine';
+export { getRegionalMultiplier } from '../src/lib/marketPricingData';
+export { calculateEstimate } from '../src/lib/estimateEngine';
+export { makeInitialContext } from '../src/lib/chatEstimator/defaultContext';
+export { getRate, getRateDetails, RATE_KEYS } from '../src/lib/pricing/referenceLibrary';
+export { extractTiming } from '../src/lib/chatEstimator/dateParsing';
+export { repriceWithEdits } from '../src/lib/chatEstimator/chatEngine';
+export { buildPriceEditor, baseFromResult } from '../src/lib/priceEditing';
+export { extractAll } from '../src/lib/chatEstimator/extractors';
+export { hasScopeLimiter } from '../src/lib/chatEstimator/scopeWords';
+export { extractCeilingHeight } from '../src/lib/chatEstimator/extractors';
+export { makeWorkWithAgainState } from '../src/lib/chatEstimator/chatEngine';

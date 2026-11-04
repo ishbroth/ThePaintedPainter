@@ -1,0 +1,11 @@
+const fs = require('fs');
+const f = 'src/lib/chatEstimator/chatEngine.ts';
+let t = fs.readFileSync(f, 'utf8');
+const crlf = t.includes('\r\n');
+t = t.split('\r\n').join('\n');
+const BS = String.fromCharCode(92);
+const a = "      if (asked === 'ext_garage_count') {";
+if (!t.includes(a)) throw new Error('nf');
+const add = "      if (asked === 'ext_size' && !ctxWithExplicit.squareFeet) {\n        // \"10x12\" or \"10 by 12\" for a shed or a small building: length times width\n        const dims = low.match(/(" + BS + "d{1,3})" + BS + "s*(?:x|by|×)" + BS + "s*(" + BS + "d{1,3})/);\n        if (dims) ctxWithExplicit.squareFeet = parseInt(dims[1], 10) * parseInt(dims[2], 10);\n      }\n";
+t = t.replace(a, () => add + a);
+fs.writeFileSync(f, crlf ? t.split('\n').join('\r\n') : t);

@@ -1,0 +1,15 @@
+const fs = require('fs');
+const f = 'src/lib/chatEstimator/chatEngine.ts';
+let t = fs.readFileSync(f, 'utf8');
+const crlf = t.includes('\r\n');
+t = t.split('\r\n').join('\n');
+const start = t.indexOf("  // \"The whole room\" / \"the whole place\" / \"everything\" as the answer");
+const end = t.indexOf("  const ackLeadIn = fullScopeAnswer");
+if (start < 0 || end < 0) throw new Error('block');
+const block = t.slice(start, end);
+t = t.slice(0, start) + t.slice(end);
+const anchor = "  // Photo-request triggers — a bare keyword match";
+if (!t.includes(anchor)) throw new Error('anchor');
+t = t.replace(anchor, () => block + "  // the full package includes the trim and doors, which the read-back covers: no separate trim question afterwards\n  if (fullScopeAnswer) ctxNext.trimScopeAddressed = true;\n\n" + anchor);
+fs.writeFileSync(f, crlf ? t.split('\n').join('\r\n') : t);
+console.log('ok');

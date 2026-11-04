@@ -1,0 +1,12 @@
+const fs = require('fs');
+const CR = String.fromCharCode(13), LF = String.fromCharCode(10);
+const f = 'src/lib/chatEstimator/dateParsing.ts';
+const raw = fs.readFileSync(f, 'utf8');
+const crlf = raw.includes(CR + LF);
+let t = raw.split(CR + LF).join(LF);
+const start = t.indexOf('  // "before the holidays"');
+const end = t.indexOf('  // A month with no day');
+const block = t.slice(start, end);
+t = t.slice(0, start) + t.slice(end);
+t = t.replace('    if (end >= start) return { ...out, flexible: true, startDate: iso(start), endDate: iso(end) };\n  }\n  return out;', '    if (end >= start) return { ...out, flexible: true, startDate: iso(start), endDate: iso(end) };\n  }\n\n' + block + '  return out;');
+fs.writeFileSync(f, crlf ? t.split(LF).join(CR + LF) : t);

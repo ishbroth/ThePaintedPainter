@@ -1,0 +1,12 @@
+const fs = require('fs');
+const f = 'src/pages/Home.tsx';
+let t = fs.readFileSync(f, 'utf8');
+const crlf = t.includes('\r\n');
+t = t.split('\r\n').join('\n');
+const car = "      {/* Carousel 1 */}\n      <SmoothCarousel triplets={carousel1Triplets} speed={40} />\n\n      <div className=\"divider\"></div>\n\n";
+if (!t.includes(car)) throw new Error('car');
+t = t.replace(car, '');
+const anchor = "      {/* Platform Description */}\n";
+if (!t.includes(anchor)) throw new Error('anchor');
+t = t.replace(anchor, "      {/* Carousel 1, between the estimator and the description */}\n      <SmoothCarousel triplets={carousel1Triplets} speed={40} />\n\n      <div className=\"divider\"></div>\n\n" + anchor);
+fs.writeFileSync(f, crlf ? t.split('\n').join('\r\n') : t);

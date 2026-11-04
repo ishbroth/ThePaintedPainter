@@ -1,0 +1,16 @@
+import { spawn } from 'node:child_process';
+import fs from 'node:fs';
+const chrome = spawn('C:/Program Files/Google/Chrome/Application/chrome.exe', ['--headless=new','--disable-gpu','--remote-debugging-port=9334','--window-size=1300,900','--user-data-dir='+process.env.TEMP+'/cdp-prof2','about:blank'],{stdio:'ignore'});
+await new Promise(r=>setTimeout(r,7000));
+const tabs = await (await fetch('http://127.0.0.1:9334/json')).json();
+const ws = new WebSocket(tabs.find(t=>t.type==='page').webSocketDebuggerUrl);
+await new Promise(r=>ws.onopen=r);
+let id=0;const p=new Map();ws.onmessage=m=>{const d=JSON.parse(m.data);if(d.id&&p.has(d.id)){p.get(d.id)(d.result);p.delete(d.id)}};
+const send=(method,params={})=>new Promise(res=>{const i=++id;p.set(i,res);ws.send(JSON.stringify({id:i,method,params}))});
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const ev=async e=>(await send('Runtime.evaluate',{expression:e,returnByValue:true})).result?.value;
+await send('Page.enable');await send('Page.navigate',{url:'http://localhost:5173/'});await sleep(4000);
+console.log(await ev("JSON.stringify([...document.querySelectorAll('.home-page > *')].map(e=>[e.className.slice(0,40),Math.round(e.getBoundingClientRect().top+scrollY),Math.round(e.getBoundingClientRect().height),getComputedStyle(e).opacity]))"));
+await ev("document.querySelector('.about-text').scrollIntoView({block:'center'})");await sleep(3000);console.log(await ev("JSON.stringify([getComputedStyle(document.querySelector('.about-text h2')).color,getComputedStyle(document.querySelector('.about-text')).opacity,getComputedStyle(document.querySelector('.about-text p')).color])"));
+const r=await send('Page.captureScreenshot',{format:'png'});fs.mkdirSync('_sim/shots',{recursive:true});fs.writeFileSync('_sim/shots/about.png',Buffer.from(r.data,'base64'));
+ws.close();chrome.kill();process.exit(0);

@@ -1,0 +1,10 @@
+import fs from 'node:fs';
+const R = JSON.parse(fs.readFileSync(process.argv[2] || '_sim/results/b2_rules.json'));
+const avg = (a) => a.reduce((x, y) => x + y, 0) / (a.length || 1);
+console.log('n', R.length, 'completed', R.filter(r=>r.completed).length, 'avgTurns', avg(R.map(r=>r.turns)).toFixed(1), 'withLoop', R.filter(r=>r.loops).length, 'loopEvents', R.reduce((a,r)=>a+r.loops,0), 'circling', R.filter(r=>r.genericFallbacks).length, 'anyMiss', R.filter(r=>r.misses.length).length);
+const mc = {}; R.forEach(r => r.misses.forEach(m => { const k = m.replace(/=.*$/, '').replace(/expected.*/, '').replace(/stayed.*/,'').replace(/\(customer.*/,''); mc[k] = (mc[k]||0)+1; }));
+console.log('MISSES', Object.entries(mc).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`${k}:${v}`).join(' | '));
+const lc = {}; R.forEach(r => r.loopEvents.forEach(e => lc[e.topic]=(lc[e.topic]||0)+1)); console.log('LOOPS', JSON.stringify(lc));
+const f = {}; R.forEach(r => f[r.flag]=(f[r.flag]||0)+1); console.log('PRICE FLAGS', f);
+const by = {}; R.forEach(r => (by[r.arch] ||= []).push(r));
+for (const [a, rs] of Object.entries(by)) console.log(a.padEnd(15), rs.map(r => `${r.marketEq??'-'}[${r.flag}]x${r.ratioToTyp}`).join(' '), ' bench~', rs[0].bench.join('/'));

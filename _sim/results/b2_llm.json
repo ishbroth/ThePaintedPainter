@@ -1,0 +1,1079 @@
+[
+ {
+  "fair": true,
+  "n": 1,
+  "arch": "trim300",
+  "archName": "Baseboards only, 300 linear ft",
+  "style": "all-at-once",
+  "zip": "94301",
+  "zipLabel": "Palo Alto CA",
+  "market": "Palo Alto",
+  "mult": 1.4,
+  "when": "ASAP",
+  "fix": null,
+  "turns": 4,
+  "loops": 0,
+  "loopEvents": [],
+  "genericFallbacks": 0,
+  "completed": true,
+  "total": 907,
+  "marketEq": 1008,
+  "bench": [
+   420,
+   1260,
+   2100
+  ],
+  "flag": "ok",
+  "ratioToTyp": 0.8,
+  "misses": [],
+  "log": [
+   {
+    "role": "user",
+    "text": "I only want the baseboards painted, about 300 linear feet of them, in a 1,800 sq ft house. No walls, no ceilings. Zip 94301, ASAP. We live here."
+   },
+   {
+    "role": "bot",
+    "text": "Got it — baseboards only, 300 linear feet, 1,800 sq ft house, occupied, ASAP. Any prep concerns I should know about — holes, wallpaper, popcorn ceilings, water stains, that sort of thing?",
+    "topic": "condition"
+   },
+   {
+    "role": "user",
+    "text": "pretty good shape, a few nail holes and a couple small cracks"
+   },
+   {
+    "role": "bot",
+    "text": "Noted — minor drywall damage, few nail holes. Sticking with the same color, or changing it up? Let me know if it's a big shift like dark to light.",
+    "topic": "color_change"
+   },
+   {
+    "role": "user",
+    "text": "going to a bright white"
+   },
+   {
+    "role": "bot",
+    "text": "I think I've got enough to put a number together. [[photo:property|the property]] A couple of photos of the property help painters respond faster and with more confidence, so feel free to attach some. Anything else I should know — unusual heights, tough access, special colors, timing? Otherwise just say 'run it' and I'll price it out.",
+    "topic": "color_change"
+   },
+   {
+    "role": "user",
+    "text": "run it"
+   },
+   {
+    "role": "bot",
+    "text": "Based on what you told me, I'm at **$680 – $1,179** with **$907** as the guaranteed price.\n\nI added a rush-scheduling premium since you need this done fast — that usually means pulling a crew off another job. I've built in a small allowance for a possible touch-up visit — homes in this market tend to expect a very crisp finish.\n\nPulling up painters in your area now — plus a mystery-painter option if you want to lock in that guaranteed number.",
+    "topic": "color_change"
+   }
+  ],
+  "lineItems": [
+   "Trim & Baseboards (300 lin ft):594",
+   "Touch-Up Callback Allowance (high-end market):120",
+   "Masking & protecting surfaces left unpainted:36"
+  ],
+  "multipliers": [
+   "Rush Schedulingx1.1",
+   "Furnished / Occupiedx1.1"
+  ],
+  "ctx": {
+   "projectType": "interior",
+   "squareFeet": 1800,
+   "scope": "whole_house",
+   "rooms": [],
+   "timeline": "asap",
+   "startDate": "",
+   "endDate": "",
+   "datesFlexible": false,
+   "propertyType": "residential",
+   "occupancy": "occupied",
+   "exteriorBody": "",
+   "stories": null,
+   "zip": "94301"
+  }
+ },
+ {
+  "fair": true,
+  "n": 18,
+  "arch": "pwhouse",
+  "archName": "Pressure wash house exterior only",
+  "style": "all-at-once",
+  "zip": "28202",
+  "zipLabel": "Charlotte NC",
+  "market": "Charlotte",
+  "mult": 1,
+  "when": "by December 18 at the latest",
+  "fix": null,
+  "turns": 2,
+  "loops": 0,
+  "loopEvents": [],
+  "genericFallbacks": 0,
+  "completed": true,
+  "total": 308,
+  "marketEq": 342,
+  "bench": [
+   330,
+   660,
+   1100
+  ],
+  "flag": "ok",
+  "ratioToTyp": 0.52,
+  "misses": [
+   "not captured: pressure wash"
+  ],
+  "log": [
+   {
+    "role": "user",
+    "text": "Just a pressure wash of my 2 story, 2,200 sq ft vinyl-sided house, no painting. Zip 28202, by December 18 at the latest."
+   },
+   {
+    "role": "bot",
+    "text": "Ha — let's stick to your paint job for now. What do you need painted?",
+    "topic": null
+   },
+   {
+    "role": "user",
+    "text": "run it"
+   },
+   {
+    "role": "bot",
+    "text": "Based on what you told me, I'm at **$231 – $400** with **$308** as the guaranteed price.\n\nIncluded automatically: light caulking on previously caulked trim, minor nail-hole fill, two-coat finish (standard).\n\nPulling up painters in your area now — plus a mystery-painter option if you want to lock in that guaranteed number.",
+    "topic": null
+   }
+  ],
+  "lineItems": [
+   "Minimum service charge (small job):308"
+  ],
+  "multipliers": [],
+  "ctx": {
+   "projectType": "exterior",
+   "squareFeet": 2200,
+   "scope": "",
+   "rooms": [],
+   "timeline": "this_month",
+   "startDate": "",
+   "endDate": "2026-12-18",
+   "datesFlexible": true,
+   "propertyType": "",
+   "occupancy": "",
+   "exteriorBody": "no",
+   "stories": 2,
+   "zip": "28202"
+  }
+ },
+ {
+  "fair": true,
+  "n": 35,
+  "arch": "dramatic2br",
+  "archName": "2BR dark navy to white (dramatic change)",
+  "style": "all-at-once",
+  "zip": "99501",
+  "zipLabel": "Anchorage AK",
+  "market": "Anchorage",
+  "mult": 1.4,
+  "when": "the week of November 30",
+  "fix": "timing",
+  "turns": 3,
+  "loops": 0,
+  "loopEvents": [],
+  "genericFallbacks": 0,
+  "completed": true,
+  "total": 8603,
+  "marketEq": 9559,
+  "bench": [
+   7000,
+   11970,
+   16940
+  ],
+  "flag": "ok",
+  "ratioToTyp": 0.8,
+  "misses": [
+   "not captured: dramatic"
+  ],
+  "log": [
+   {
+    "role": "user",
+    "text": "2 bedroom condo 1,000 sq ft, walls are dark navy and need to go to white, walls and ceilings, zip 99501, the week of November 30. I live here."
+   },
+   {
+    "role": "bot",
+    "text": "Got it — 2-bedroom condo, 1,000 sq ft, dark navy to white, walls and ceilings, occupied, November 30 week. How are the walls looking right now — smooth and ready, or any holes, cracks, wallpaper, popcorn ceilings, anything like that?",
+    "topic": "condition"
+   },
+   {
+    "role": "user",
+    "text": "pretty good shape, a few nail holes and a couple small cracks"
+   },
+   {
+    "role": "bot",
+    "text": "I think I've got enough to put a number together. [[photo:property|the property]] A couple of photos of the property help painters respond faster and with more confidence, so feel free to attach some. Anything else I should know — unusual heights, tough access, special colors, timing? Otherwise just say 'run it' and I'll price it out.",
+    "topic": "condition"
+   },
+   {
+    "role": "user",
+    "text": "Actually, change my timing to December 7 through December 11."
+   },
+   {
+    "role": "bot",
+    "text": "Based on what you told me, I'm at **$6,452 – $11,184** with **$8,603** as the guaranteed price.\n\nIncluded automatically: light caulking on previously caulked trim, minor nail-hole fill, two-coat finish (standard).\n\nI've built in a small allowance for a possible touch-up visit — homes in this market tend to expect a very crisp finish.\n\nPulling up painters in your area now — plus a mystery-painter option if you want to lock in that guaranteed number.",
+    "topic": "condition"
+   }
+  ],
+  "lineItems": [
+   "Interior Walls:4600",
+   "Ceilings:1722",
+   "Color Change (extra coat):1380",
+   "Touch-Up Callback Allowance (high-end market):120"
+  ],
+  "multipliers": [
+   "Furnished / Occupiedx1.1"
+  ],
+  "ctx": {
+   "projectType": "interior",
+   "squareFeet": 1000,
+   "scope": "whole_house",
+   "rooms": [],
+   "timeline": "this_month",
+   "startDate": "2026-12-07",
+   "endDate": "2026-12-11",
+   "datesFlexible": false,
+   "propertyType": "residential",
+   "occupancy": "occupied",
+   "exteriorBody": "",
+   "stories": null,
+   "zip": "99501"
+  }
+ },
+ {
+  "fair": true,
+  "n": 52,
+  "arch": "twobathvan",
+  "archName": "Two bathrooms: walls, ceilings, vanities",
+  "style": "all-at-once",
+  "zip": "98101",
+  "zipLabel": "Seattle WA",
+  "market": "Seattle",
+  "mult": 1.4,
+  "when": "between December 1 and December 20, whenever you can fit it",
+  "fix": null,
+  "turns": 4,
+  "loops": 0,
+  "loopEvents": [],
+  "genericFallbacks": 0,
+  "completed": true,
+  "total": 3008,
+  "marketEq": 3342,
+  "bench": [
+   910,
+   1750,
+   2646
+  ],
+  "flag": "HIGH",
+  "ratioToTyp": 1.91,
+  "misses": [],
+  "log": [
+   {
+    "role": "user",
+    "text": "Two bathrooms (one 5x8, one 8x10), walls, ceilings and both vanities, zip 98101, between December 1 and December 20, whenever you can fit it."
+   },
+   {
+    "role": "bot",
+    "text": "Got it — two bathrooms, walls and ceilings, vanities included, zip 98101, December 1-20. Quick one — do you live here, or is it a rental or something you're selling?",
+    "topic": "property_ownership"
+   },
+   {
+    "role": "user",
+    "text": "I own it and live here"
+   },
+   {
+    "role": "bot",
+    "text": "Noted — owner-occupied. Sticking with the same color, or changing it up? Let me know if it's a big shift like dark to light.",
+    "topic": "color_change"
+   },
+   {
+    "role": "user",
+    "text": "going from beige to a light grey, nothing dramatic"
+   },
+   {
+    "role": "bot",
+    "text": "I think I've got enough to put a number together. [[photo:property|the property]] A couple of photos of the property help painters respond faster and with more confidence, so feel free to attach some. Anything else I should know — unusual heights, tough access, special colors, timing? Otherwise just say 'run it' and I'll price it out.",
+    "topic": "color_change"
+   },
+   {
+    "role": "user",
+    "text": "run it"
+   },
+   {
+    "role": "bot",
+    "text": "Based on what you told me, I'm at **$2,256 – $3,910** with **$3,008** as the guaranteed price.\n\nIncluded automatically: light caulking on previously caulked trim, minor nail-hole fill, two-coat finish (standard), cabinet degloss + bond primer.\n\nI've built in a small allowance for a possible touch-up visit — homes in this market tend to expect a very crisp finish.\n\nPulling up painters in your area now — plus a mystery-painter option if you want to lock in that guaranteed number.",
+    "topic": "color_change"
+   }
+  ],
+  "lineItems": [
+   "Interior Walls:1179",
+   "Ceilings:392",
+   "Bathroom Cabinets:690",
+   "Color Change (extra coat):354",
+   "Touch-Up Callback Allowance (high-end market):120"
+  ],
+  "multipliers": [
+   "Furnished / Occupiedx1.1"
+  ],
+  "ctx": {
+   "projectType": "interior",
+   "squareFeet": 138,
+   "scope": "specific_rooms",
+   "rooms": [
+    "bathroom_master",
+    "bathroom_2"
+   ],
+   "timeline": "this_month",
+   "startDate": "2026-12-01",
+   "endDate": "2026-12-20",
+   "datesFlexible": false,
+   "propertyType": "residential",
+   "occupancy": "occupied",
+   "exteriorBody": "",
+   "stories": null,
+   "zip": "98101"
+  }
+ },
+ {
+  "fair": true,
+  "n": 69,
+  "arch": "closets3",
+  "archName": "Three closets only",
+  "style": "rambling-terse",
+  "zip": "05401",
+  "zipLabel": "Burlington VT",
+  "market": "Burlington VT",
+  "mult": 1.05,
+  "when": "November 9 through November 13",
+  "fix": null,
+  "turns": 7,
+  "loops": 0,
+  "loopEvents": [],
+  "genericFallbacks": 0,
+  "completed": true,
+  "total": 2277,
+  "marketEq": 2530,
+  "bench": [
+   551,
+   866,
+   1181
+  ],
+  "flag": "HIGH",
+  "ratioToTyp": 2.92,
+  "misses": [],
+  "log": [
+   {
+    "role": "user",
+    "text": "ok so, long story, we have been meaning to do this forever and my brother-in-law said he would help but he never did lol. anyway. Paint the inside of three closets (two standard, one walk-in) and the closet doors, zip 05401, November 9 through November 13. thanks so much, honestly just want it done right"
+   },
+   {
+    "role": "bot",
+    "text": "Got it — three closets, two standard, one walk-in, closet doors included, November 9-13. What rooms are on the list?",
+    "topic": "which_rooms"
+   },
+   {
+    "role": "user",
+    "text": "closets"
+   },
+   {
+    "role": "bot",
+    "text": "Noted — three closets total. When you say trim, do you mean baseboards only, or should I also price door frames, casings, or built-in shelving?",
+    "topic": "trim_scope"
+   },
+   {
+    "role": "user",
+    "text": "baseboards only"
+   },
+   {
+    "role": "bot",
+    "text": "Makes sense — baseboards only. Are you living here, or renting/selling it?",
+    "topic": "property_ownership"
+   },
+   {
+    "role": "user",
+    "text": "i own it"
+   },
+   {
+    "role": "bot",
+    "text": "Perfect — owner-occupied. Are we matching the existing color or going with something new?",
+    "topic": "color_change"
+   },
+   {
+    "role": "user",
+    "text": "different, light"
+   },
+   {
+    "role": "bot",
+    "text": "Okay — different, light color. Last thing — will the property be occupied, furnished, or completely empty when we work?",
+    "topic": "timeline_and_access"
+   },
+   {
+    "role": "user",
+    "text": "November 9 through November 13, occupied"
+   },
+   {
+    "role": "bot",
+    "text": "I think I've got enough to put a number together. [[photo:property|the property]] A couple of photos of the property help painters respond faster and with more confidence, so feel free to attach some. Anything else I should know — unusual heights, tough access, special colors, timing? Otherwise just say 'run it' and I'll price it out.",
+    "topic": "timeline_and_access"
+   },
+   {
+    "role": "user",
+    "text": "run it"
+   },
+   {
+    "role": "bot",
+    "text": "Based on what you told me, I'm at **$1,935 – $2,619** with **$2,277** as the guaranteed price.\n\nPulling up painters in your area now — plus a mystery-painter option if you want to lock in that guaranteed number.",
+    "topic": "timeline_and_access"
+   }
+  ],
+  "lineItems": [
+   "Trim & Baseboards:665",
+   "Standard Closets (2):525",
+   "Walk-in Closets (2):840",
+   "Masking & protecting surfaces left unpainted:40"
+  ],
+  "multipliers": [
+   "Furnished / Occupiedx1.1"
+  ],
+  "ctx": {
+   "projectType": "interior",
+   "squareFeet": null,
+   "scope": "specific_rooms",
+   "rooms": [],
+   "timeline": "this_month",
+   "startDate": "2026-11-09",
+   "endDate": "2026-11-13",
+   "datesFlexible": false,
+   "propertyType": "residential",
+   "occupancy": "occupied",
+   "exteriorBody": "",
+   "stories": null,
+   "zip": "05401"
+  }
+ },
+ {
+  "fair": true,
+  "n": 86,
+  "arch": "picket80",
+  "archName": "Picket fence 80 ft",
+  "style": "rambling-terse",
+  "zip": "37801",
+  "zipLabel": "Maryville TN",
+  "market": "Knoxville",
+  "mult": 0.85,
+  "when": "late October",
+  "fix": null,
+  "turns": 3,
+  "loops": 0,
+  "loopEvents": [],
+  "genericFallbacks": 0,
+  "completed": true,
+  "total": 408,
+  "marketEq": 453,
+  "bench": [
+   238,
+   476,
+   816
+  ],
+  "flag": "ok",
+  "ratioToTyp": 0.95,
+  "misses": [],
+  "log": [
+   {
+    "role": "user",
+    "text": "ok so, long story, we have been meaning to do this forever and my brother-in-law said he would help but he never did lol. anyway. White picket fence, 4 feet tall, 80 feet long, repaint it, zip 37801, late October. thanks so much, honestly just want it done right"
+   },
+   {
+    "role": "bot",
+    "text": "Got it — white picket fence, 4 feet tall, 80 feet long, repaint, late October. Quick one — do you live here, or is it a rental or something you're selling?",
+    "topic": "property_ownership"
+   },
+   {
+    "role": "user",
+    "text": "i own it"
+   },
+   {
+    "role": "bot",
+    "text": "I think I've got enough to put a number together. [[photo:property|the property]] A couple of photos of the property help painters respond faster and with more confidence, so feel free to attach some. Anything else I should know — unusual heights, tough access, special colors, timing? Otherwise just say 'run it' and I'll price it out.",
+    "topic": "property_ownership"
+   },
+   {
+    "role": "user",
+    "text": "run it"
+   },
+   {
+    "role": "bot",
+    "text": "Based on what you told me, I'm at **$306 – $530** with **$408** as the guaranteed price.\n\nIncluded automatically: light caulking on previously caulked trim, minor nail-hole fill, two-coat finish (standard).\n\nPulling up painters in your area now — plus a mystery-painter option if you want to lock in that guaranteed number.",
+    "topic": "property_ownership"
+   }
+  ],
+  "lineItems": [
+   "Picket Fence (80 ft):408"
+  ],
+  "multipliers": [],
+  "ctx": {
+   "projectType": "exterior",
+   "squareFeet": null,
+   "scope": "",
+   "rooms": [],
+   "timeline": "this_month",
+   "startDate": "2026-10-20",
+   "endDate": "2026-10-31",
+   "datesFlexible": true,
+   "propertyType": "residential",
+   "occupancy": "",
+   "exteriorBody": "no",
+   "stories": null,
+   "zip": "37801"
+  }
+ },
+ {
+  "fair": true,
+  "n": 103,
+  "arch": "fascia180",
+  "archName": "Fascia, soffits and eaves only",
+  "style": "rambling-terse",
+  "zip": "27601",
+  "zipLabel": "Raleigh NC",
+  "market": "Raleigh",
+  "mult": 1,
+  "when": "in about three weeks",
+  "fix": null,
+  "turns": 2,
+  "loops": 0,
+  "loopEvents": [],
+  "genericFallbacks": 0,
+  "completed": true,
+  "total": 1399,
+  "marketEq": 1554,
+  "bench": [
+   1080,
+   1620,
+   2160
+  ],
+  "flag": "ok",
+  "ratioToTyp": 0.96,
+  "misses": [],
+  "log": [
+   {
+    "role": "user",
+    "text": "ok so, long story, we have been meaning to do this forever and my brother-in-law said he would help but he never did lol. anyway. Just the fascia, soffits and eaves on our 1 story 1,500 sq ft brick house (about 180 linear feet of fascia). Zip 27601, in about three weeks. thanks so much, honestly just want it done right"
+   },
+   {
+    "role": "bot",
+    "text": "I think I've got enough to put a number together. [[photo:property|the property]] A couple of photos of the property help painters respond faster and with more confidence, so feel free to attach some. Anything else I should know — unusual heights, tough access, special colors, timing? Otherwise just say 'run it' and I'll price it out.",
+    "topic": null
+   },
+   {
+    "role": "user",
+    "text": "run it"
+   },
+   {
+    "role": "bot",
+    "text": "Based on what you told me, I'm at **$1,049 – $1,819** with **$1,399** as the guaranteed price.\n\nIncluded automatically: light caulking on previously caulked trim, minor nail-hole fill, two-coat finish (standard).\n\nPulling up painters in your area now — plus a mystery-painter option if you want to lock in that guaranteed number.",
+    "topic": null
+   }
+  ],
+  "lineItems": [
+   "Exterior Trim & Fascia:877",
+   "Soffits & Eaves:522"
+  ],
+  "multipliers": [],
+  "ctx": {
+   "projectType": "exterior",
+   "squareFeet": 1500,
+   "scope": "",
+   "rooms": [],
+   "timeline": "this_month",
+   "startDate": "2026-10-28",
+   "endDate": "",
+   "datesFlexible": false,
+   "propertyType": "residential",
+   "occupancy": "",
+   "exteriorBody": "no",
+   "stories": 1,
+   "zip": "27601"
+  }
+ },
+ {
+  "fair": true,
+  "n": 120,
+  "arch": "vic3col",
+  "archName": "Victorian, 3-color, extra trim detail",
+  "style": "rambling-terse",
+  "zip": "25301",
+  "zipLabel": "Charleston WV",
+  "market": "WV (statewide average)",
+  "mult": 0.82,
+  "when": "before the holidays, ideally mid-November",
+  "fix": "timing",
+  "turns": 2,
+  "loops": 0,
+  "loopEvents": [],
+  "genericFallbacks": 0,
+  "completed": true,
+  "total": 10801,
+  "marketEq": 12001,
+  "bench": [
+   6355,
+   10152,
+   13981
+  ],
+  "flag": "ok",
+  "ratioToTyp": 1.18,
+  "misses": [],
+  "log": [
+   {
+    "role": "user",
+    "text": "ok so, long story, we have been meaning to do this forever and my brother-in-law said he would help but he never did lol. anyway. Victorian house, 3 stories, 2,800 sq ft, wood siding, three colors (body, trim, accent) with lots of gingerbread trim. Exterior only. Zip 25301, before the holidays, ideally mid-November. thanks so much, honestly just want it done right"
+   },
+   {
+    "role": "bot",
+    "text": "I think I've got enough to put a number together. While we're at it, I still don't have a picture for this: [[photo:ornate_trim|the trim detail]] [[photo:property|the property]] A couple of photos of the property help painters respond faster and with more confidence, so feel free to attach some. Anything else I should know — unusual heights, tough access, special colors, timing? Otherwise just say 'run it' and I'll price it out.",
+    "topic": null
+   },
+   {
+    "role": "user",
+    "text": "Actually, change my timing to December 7 through December 11."
+   },
+   {
+    "role": "bot",
+    "text": "Based on what you told me, I'm at **$8,101 – $14,041** with **$10,801** as the guaranteed price.\n\nIncluded automatically: light caulking on previously caulked trim, minor nail-hole fill, two-coat finish (standard), power wash prior to paint.\n\nPulling up painters in your area now — plus a mystery-painter option if you want to lock in that guaranteed number.",
+    "topic": null
+   }
+  ],
+  "lineItems": [
+   "Exterior Body / Siding:5980",
+   "Exterior Trim & Fascia:567",
+   "Multi-story Access (3 stories):2990",
+   "Exterior Color Change:598",
+   "Power Washing:666"
+  ],
+  "multipliers": [],
+  "ctx": {
+   "projectType": "exterior",
+   "squareFeet": 2800,
+   "scope": "",
+   "rooms": [],
+   "timeline": "no_rush",
+   "startDate": "2026-12-07",
+   "endDate": "2026-12-11",
+   "datesFlexible": true,
+   "propertyType": "residential",
+   "occupancy": "",
+   "exteriorBody": "",
+   "stories": 3,
+   "zip": "25301"
+  }
+ },
+ {
+  "fair": true,
+  "n": 137,
+  "arch": "restaurant2200",
+  "archName": "Restaurant 2,200 sq ft, after hours",
+  "style": "rambling",
+  "zip": "46204",
+  "zipLabel": "Indianapolis IN",
+  "market": "Minneapolis suburbs",
+  "mult": 1,
+  "when": "whenever, no rush at all",
+  "fix": "zip",
+  "turns": 6,
+  "loops": 1,
+  "loopEvents": [
+   {
+    "topic": "timeline_and_access",
+    "userSaid": "whenever, no rush at all, and the property will be closed",
+    "reg": 0
+   }
+  ],
+  "genericFallbacks": 0,
+  "completed": true,
+  "total": 9950,
+  "marketEq": 11056,
+  "bench": [
+   5060,
+   11000,
+   19800
+  ],
+  "flag": "ok",
+  "ratioToTyp": 1.01,
+  "misses": [],
+  "log": [
+   {
+    "role": "user",
+    "text": "ok so, long story, we have been meaning to do this forever and my brother-in-law said he would help but he never did lol. anyway. Restaurant, 2,200 sq ft: dining room, bar and kitchen walls and ceilings. Must be done overnight or Mondays. Zip 46204, whenever, no rush at all. thanks so much, honestly just want it done right"
+   },
+   {
+    "role": "bot",
+    "text": "Got it — restaurant, 2,200 sq ft, dining room, bar, kitchen, walls and ceilings, overnight/Monday work, 46204. Any prep concerns I should know about — holes, wallpaper, popcorn ceilings, water stains, that sort of thing?",
+    "topic": "condition"
+   },
+   {
+    "role": "user",
+    "text": "pretty good shape, a few nail holes and a couple small cracks"
+   },
+   {
+    "role": "bot",
+    "text": "Noted — few nail holes, small cracks. Are we matching the existing color or going with something new?",
+    "topic": "color_change"
+   },
+   {
+    "role": "user",
+    "text": "going from beige to a light grey, nothing dramatic"
+   },
+   {
+    "role": "bot",
+    "text": "Makes sense — beige to light grey. Last thing — will the space still be open/operating during the work, or empty?",
+    "topic": "timeline_and_access"
+   },
+   {
+    "role": "user",
+    "text": "whenever, no rush at all, and the property will be closed"
+   },
+   {
+    "role": "bot",
+    "text": "Perfect — property closed, no rush. One more thing — last thing — will the space still be open/operating during the work, or empty?",
+    "topic": "timeline_and_access"
+   },
+   {
+    "role": "user",
+    "text": "whenever, no rush at all, and the property will be closed"
+   },
+   {
+    "role": "bot",
+    "text": "I think I've got enough to put a number together. [[photo:property|the property]] A couple of photos of the property help painters respond faster and with more confidence, so feel free to attach some. Anything else I should know — unusual heights, tough access, special colors, timing? Otherwise just say 'run it' and I'll price it out.",
+    "topic": "timeline_and_access"
+   },
+   {
+    "role": "user",
+    "text": "Oh wait, one correction: the zip code is actually 55401."
+   },
+   {
+    "role": "bot",
+    "text": "Based on what you told me, I'm at **$8,458 – $11,443** with **$9,950** as the guaranteed price.\n\nIncluded automatically: light caulking on previously caulked trim, minor nail-hole fill, two-coat finish (standard).\n\nCommercial space runs a bit higher — different insurance and scheduling needs than a residential job. Since this needs to happen after hours or on weekends to avoid disrupting the business, I've included a scheduling premium for that.\n\nPulling up painters in your area now — plus a mystery-painter option if you want to lock in that guaranteed number.",
+    "topic": "timeline_and_access"
+   }
+  ],
+  "lineItems": [
+   "Interior Walls:7241",
+   "Ceilings:2464",
+   "Color Change (extra coat):2172"
+  ],
+  "multipliers": [
+   "Commercial Propertyx1.1",
+   "Open Commercial Layout (fewer rooms, doors and trim)x0.68",
+   "After-Hours/Weekend Schedulingx1.12"
+  ],
+  "ctx": {
+   "projectType": "interior",
+   "squareFeet": 2200,
+   "scope": "whole_house",
+   "rooms": [],
+   "timeline": "no_rush",
+   "startDate": "",
+   "endDate": "",
+   "datesFlexible": false,
+   "propertyType": "commercial",
+   "occupancy": "",
+   "exteriorBody": "",
+   "stories": null,
+   "zip": "55401"
+  }
+ },
+ {
+  "fair": true,
+  "n": 154,
+  "arch": "dental2000",
+  "archName": "Dental office 2,000 sq ft, low-VOC",
+  "style": "rambling",
+  "zip": "80901",
+  "zipLabel": "Colorado Springs CO",
+  "market": "Pueblo",
+  "mult": 0.9,
+  "when": "sometime next month, no firm date",
+  "fix": null,
+  "turns": 6,
+  "loops": 0,
+  "loopEvents": [],
+  "genericFallbacks": 0,
+  "completed": true,
+  "total": 8550,
+  "marketEq": 9500,
+  "bench": [
+   4725,
+   7560,
+   16065
+  ],
+  "flag": "ok",
+  "ratioToTyp": 1.26,
+  "misses": [],
+  "log": [
+   {
+    "role": "user",
+    "text": "ok so, long story, we have been meaning to do this forever and my brother-in-law said he would help but he never did lol. anyway. Dental office, 2,000 sq ft, 7 treatment rooms, antimicrobial low-VOC paint, weekends. Zip 80901, sometime next month, no firm date. thanks so much, honestly just want it done right"
+   },
+   {
+    "role": "bot",
+    "text": "Got it — dental office, 2,000 sq ft, 7 treatment rooms, antimicrobial low-VOC, weekend work, 80901. For those rooms — just walls, or everything (ceilings, trim, doors included)?",
+    "topic": "surfaces"
+   },
+   {
+    "role": "user",
+    "text": "walls and ceilings"
+   },
+   {
+    "role": "bot",
+    "text": "Noted — walls and ceilings. Any prep concerns I should know about — holes, wallpaper, popcorn ceilings, water stains, that sort of thing?",
+    "topic": "condition"
+   },
+   {
+    "role": "user",
+    "text": "pretty good shape, a few nail holes and a couple small cracks"
+   },
+   {
+    "role": "bot",
+    "text": "Makes sense — few nail holes, small cracks. Same color going back, or a different one? And if different — anything dramatic like dark-to-light?",
+    "topic": "color_change"
+   },
+   {
+    "role": "user",
+    "text": "going from beige to a light grey, nothing dramatic"
+   },
+   {
+    "role": "bot",
+    "text": "Perfect — beige to light grey. Last thing — will the space still be open/operating during the work, or empty?",
+    "topic": "timeline_and_access"
+   },
+   {
+    "role": "user",
+    "text": "sometime next month, no firm date, and the property will be closed"
+   },
+   {
+    "role": "bot",
+    "text": "I think I've got enough to put a number together. [[photo:property|the property]] A couple of photos of the property help painters respond faster and with more confidence, so feel free to attach some. Anything else I should know — unusual heights, tough access, special colors, timing? Otherwise just say 'run it' and I'll price it out.",
+    "topic": "timeline_and_access"
+   },
+   {
+    "role": "user",
+    "text": "run it"
+   },
+   {
+    "role": "bot",
+    "text": "Based on what you told me, I'm at **$7,268 – $9,833** with **$8,550** as the guaranteed price.\n\nIncluded automatically: light caulking on previously caulked trim, minor nail-hole fill, two-coat finish (standard).\n\nCommercial space runs a bit higher — different insurance and scheduling needs than a residential job. Since this needs to happen after hours or on weekends to avoid disrupting the business, I've included a scheduling premium for that.\n\nPulling up painters in your area now — plus a mystery-painter option if you want to lock in that guaranteed number.",
+    "topic": "timeline_and_access"
+   }
+  ],
+  "lineItems": [
+   "Interior Walls:5926",
+   "Ceilings:2016",
+   "Color Change (extra coat):1778"
+  ],
+  "multipliers": [
+   "Commercial Propertyx1.1",
+   "Open Commercial Layout (fewer rooms, doors and trim)x0.68",
+   "After-Hours/Weekend Schedulingx1.12",
+   "Low-VOC / Eco-Friendly Paintx1.05"
+  ],
+  "ctx": {
+   "projectType": "interior",
+   "squareFeet": 2000,
+   "scope": "whole_house",
+   "rooms": [],
+   "timeline": "this_month",
+   "startDate": "2026-11-01",
+   "endDate": "",
+   "datesFlexible": false,
+   "propertyType": "commercial",
+   "occupancy": "vacant",
+   "exteriorBody": "",
+   "stories": null,
+   "zip": "80901"
+  }
+ },
+ {
+  "fair": true,
+  "n": 171,
+  "arch": "turn_3br",
+  "archName": "3BR turnover, vacant",
+  "style": "rambling",
+  "zip": "85004",
+  "zipLabel": "Phoenix AZ",
+  "market": "Phoenix",
+  "mult": 1.05,
+  "when": "next Monday if you have an opening",
+  "fix": null,
+  "turns": 4,
+  "loops": 0,
+  "loopEvents": [],
+  "genericFallbacks": 0,
+  "completed": true,
+  "total": 5420,
+  "marketEq": 6022,
+  "bench": [
+   1890,
+   3150,
+   4725
+  ],
+  "flag": "HIGH",
+  "ratioToTyp": 1.91,
+  "misses": [],
+  "log": [
+   {
+    "role": "user",
+    "text": "ok so, long story, we have been meaning to do this forever and my brother-in-law said he would help but he never did lol. anyway. Landlord: 3 bedroom unit, 1,250 sq ft, vacant, full repaint walls ceilings trim, zip 85004, next Monday if you have an opening. thanks so much, honestly just want it done right"
+   },
+   {
+    "role": "bot",
+    "text": "Got it — 3-bedroom unit, 1,250 sq ft, vacant, walls, ceilings, trim, next Monday. When you say trim, do you mean baseboards only, or should I also price door frames, casings, or built-in shelving?",
+    "topic": "trim_scope"
+   },
+   {
+    "role": "user",
+    "text": "baseboards and door casings, no built-ins"
+   },
+   {
+    "role": "bot",
+    "text": "Noted — baseboards and door casings. Same color going back, or a different one? And if different — anything dramatic like dark-to-light?",
+    "topic": "color_change"
+   },
+   {
+    "role": "user",
+    "text": "going from beige to a light grey, nothing dramatic"
+   },
+   {
+    "role": "bot",
+    "text": "I think I've got enough to put a number together. [[photo:property|the property]] A couple of photos of the property help painters respond faster and with more confidence, so feel free to attach some. Anything else I should know — unusual heights, tough access, special colors, timing? Otherwise just say 'run it' and I'll price it out.",
+    "topic": "color_change"
+   },
+   {
+    "role": "user",
+    "text": "run it"
+   },
+   {
+    "role": "bot",
+    "text": "Based on what you told me, I'm at **$4,065 – $7,046** with **$5,420** as the guaranteed price.\n\nIncluded automatically: light caulking on previously caulked trim, minor nail-hole fill, two-coat finish (standard).\n\nSince this is a rental or a pre-sale turnover, I knocked a bit off — that kind of job usually doesn't need the same showroom-perfect finish an owner-occupied home does. I added a rush-scheduling premium since you need this done fast — that usually means pulling a crew off another job.\n\nPulling up painters in your area now — plus a mystery-painter option if you want to lock in that guaranteed number.",
+    "topic": "color_change"
+   }
+  ],
+  "lineItems": [
+   "Interior Walls:4477",
+   "Ceilings:1560",
+   "Trim & Baseboards:566",
+   "Color Change (extra coat):1343"
+  ],
+  "multipliers": [
+   "Standard Turnover Finish (rental/pre-sale)x0.62",
+   "Rush Schedulingx1.1"
+  ],
+  "ctx": {
+   "projectType": "interior",
+   "squareFeet": 1250,
+   "scope": "whole_house",
+   "rooms": [],
+   "timeline": "asap",
+   "startDate": "2026-10-12",
+   "endDate": "",
+   "datesFlexible": false,
+   "propertyType": "rental",
+   "occupancy": "vacant",
+   "exteriorBody": "",
+   "stories": null,
+   "zip": "85004"
+  }
+ },
+ {
+  "fair": true,
+  "n": 188,
+  "arch": "basement1200",
+  "archName": "Basement 1,200 sq ft, exposed ceiling",
+  "style": "rambling",
+  "zip": "90210",
+  "zipLabel": "Beverly Hills CA",
+  "market": "Inglewood/LA",
+  "mult": 1.4,
+  "when": "sometime in early January, no hard date",
+  "fix": null,
+  "turns": 4,
+  "loops": 0,
+  "loopEvents": [],
+  "genericFallbacks": 0,
+  "completed": true,
+  "total": 10490,
+  "marketEq": 11656,
+  "bench": [
+   3780,
+   6510,
+   9240
+  ],
+  "flag": "HIGH",
+  "ratioToTyp": 1.79,
+  "misses": [],
+  "log": [
+   {
+    "role": "user",
+    "text": "ok so, long story, we have been meaning to do this forever and my brother-in-law said he would help but he never did lol. anyway. Basement, 1,200 sq ft, paint walls and spray the exposed ceiling black, zip 90210, sometime in early January, no hard date. Some efflorescence on the block walls. thanks so much, honestly just want it done right"
+   },
+   {
+    "role": "bot",
+    "text": "Got it — basement, 1,200 sq ft, exposed ceiling black, efflorescence on block, early January. Is this your home, or a rental/listing?",
+    "topic": "property_ownership"
+   },
+   {
+    "role": "user",
+    "text": "I own it and live here"
+   },
+   {
+    "role": "bot",
+    "text": "Noted — owner-occupied. Will it be lived-in during the work, furnished but empty, or totally vacant?",
+    "topic": "timeline_and_access"
+   },
+   {
+    "role": "user",
+    "text": "sometime in early January, no hard date, and the property will be furnished and lived-in"
+   },
+   {
+    "role": "bot",
+    "text": "I think I've got enough to put a number together. [[photo:property|the property]] A couple of photos of the property help painters respond faster and with more confidence, so feel free to attach some. Anything else I should know — unusual heights, tough access, special colors, timing? Otherwise just say 'run it' and I'll price it out.",
+    "topic": "timeline_and_access"
+   },
+   {
+    "role": "user",
+    "text": "run it"
+   },
+   {
+    "role": "bot",
+    "text": "Based on what you told me, I'm at **$7,868 – $13,637** with **$10,490** as the guaranteed price.\n\nIncluded automatically: light caulking on previously caulked trim, minor nail-hole fill, two-coat finish (standard).\n\nI've built in a small allowance for a possible touch-up visit — homes in this market tend to expect a very crisp finish.\n\nPulling up painters in your area now — plus a mystery-painter option if you want to lock in that guaranteed number.",
+    "topic": "timeline_and_access"
+   }
+  ],
+  "lineItems": [
+   "Interior Walls:4092",
+   "Ceilings:3950",
+   "Interior Doors (1):147",
+   "Color Change (extra coat):1228",
+   "Touch-Up Callback Allowance (high-end market):120"
+  ],
+  "multipliers": [
+   "Furnished / Occupiedx1.1"
+  ],
+  "ctx": {
+   "projectType": "interior",
+   "squareFeet": 1200,
+   "scope": "specific_rooms",
+   "rooms": [
+    "bonus_room"
+   ],
+   "timeline": "this_month",
+   "startDate": "2027-01-01",
+   "endDate": "2027-01-10",
+   "datesFlexible": true,
+   "propertyType": "residential",
+   "occupancy": "furnished",
+   "exteriorBody": "",
+   "stories": null,
+   "zip": "90210"
+  }
+ }
+]

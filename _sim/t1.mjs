@@ -1,0 +1,1497 @@
+// src/lib/chatEstimator/details.ts
+var MULTI_UNIT_RE = /\b(?:duplex(?:es)?|triplex(?:es)?|four[\s-]?plex(?:es)?|quad[\s-]?plex(?:es)?|\d[\s-]?plex|multi[\s-]?(?:unit|family)|apartment (?:complex|building|buildings|community|house)|condo(?:minium)?s? (?:complex|building|buildings|community)|town ?homes|town ?houses|rental units|rental properties|units? (?:building|complex)|several units|multiple units|(?:\d{1,3}|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty|a dozen)[\s-]+(?:(?!bed)\w+[\s-]+){0,2}(?:units|apartments|condos|town ?homes|town ?houses)\b)/i;
+function isMultiUnitText(text) {
+  return MULTI_UNIT_RE.test(text);
+}
+
+// src/lib/chatEstimator/dateParsing.ts
+var MONTHS = {
+  jan: 0,
+  january: 0,
+  feb: 1,
+  february: 1,
+  mar: 2,
+  march: 2,
+  apr: 3,
+  april: 3,
+  may: 4,
+  jun: 5,
+  june: 5,
+  jul: 6,
+  july: 6,
+  aug: 7,
+  august: 7,
+  sep: 8,
+  sept: 8,
+  september: 8,
+  oct: 9,
+  october: 9,
+  nov: 10,
+  november: 10,
+  dec: 11,
+  december: 11
+};
+var WEEKDAYS = { sunday: 0, monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6 };
+var MONTH_RE = "(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sept?(?:ember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)";
+var ORD = "(?:st|nd|rd|th)?";
+var FLEXIBLE_RE = /\b(?:(?:my |our |the )?dates?(?: are| is)? flexible|flexible (?:on |with |about )?(?:the )?(?:dates?|timing|schedule|timeline)|i'?m flexible|we'?re flexible|totally flexible|very flexible|any ?(?:time|day|date) (?:works|is fine|is good)|open to (?:any|different|other) dates?|whatever dates? work)\b/i;
+var pad = (n) => String(n).padStart(2, "0");
+var iso = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+var startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+var addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+function resolve(month, day, year, today) {
+  if (day < 1 || day > 31 || month < 0 || month > 11) return null;
+  const build = (y) => {
+    const d = new Date(y, month, day);
+    return d.getMonth() === month ? d : null;
+  };
+  if (year) return build(year < 100 ? 2e3 + year : year);
+  const thisYear = build(today.getFullYear());
+  if (thisYear && thisYear >= today) return thisYear;
+  return build(today.getFullYear() + 1);
+}
+function findDates(text, today) {
+  const hits = [];
+  const push = (m, date, hasYear) => {
+    if (date) hits.push({ index: m.index, end: m.index + m[0].length, date, hasYear });
+  };
+  for (const m of text.matchAll(new RegExp(`\\b${MONTH_RE}\\.?\\s+(\\d{1,2})${ORD}(?:,?\\s*(\\d{4}))?\\b`, "gi"))) {
+    push(m, resolve(MONTHS[m[1].toLowerCase()], Number(m[2]), m[3] ? Number(m[3]) : null, today), !!m[3]);
+  }
+  for (const m of text.matchAll(new RegExp(`\\b(\\d{1,2})${ORD}\\s+(?:of\\s+)?${MONTH_RE}\\b(?:,?\\s*(\\d{4}))?`, "gi"))) {
+    push(m, resolve(MONTHS[m[2].toLowerCase()], Number(m[1]), m[3] ? Number(m[3]) : null, today), !!m[3]);
+  }
+  for (const m of text.matchAll(/\b(\d{4})-(\d{2})-(\d{2})\b/g)) {
+    push(m, resolve(Number(m[2]) - 1, Number(m[3]), Number(m[1]), today), true);
+  }
+  for (const m of text.matchAll(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/g)) {
+    const before = text.slice(Math.max(0, m.index - 24), m.index).toLowerCase();
+    if (!m[3] && !/\b(on|by|before|after|starting|start|from|between|to|until|through|around|week of|dates?|date)\s*$/.test(before)) continue;
+    push(m, resolve(Number(m[1]) - 1, Number(m[2]), m[3] ? Number(m[3]) : null, today), !!m[3]);
+  }
+  hits.sort((a, b) => a.index - b.index || b.end - a.end);
+  const kept = [];
+  for (const h of hits) {
+    if (kept.length && h.index < kept[kept.length - 1].end) continue;
+    kept.push(h);
+  }
+  return kept;
+}
+function extractTiming(text, now = /* @__PURE__ */ new Date()) {
+  const today = startOfDay(now);
+  const t = text.toLowerCase();
+  const out = {};
+  if (FLEXIBLE_RE.test(text)) out.flexible = true;
+  const shortRange = new RegExp(`\\b${MONTH_RE}\\.?\\s+(\\d{1,2})${ORD}\\s*(?:to|through|thru|until|till|-|\u2013|\u2014)\\s*(\\d{1,2})${ORD}\\b(?!\\s*(?:am|pm|:|\\/))`, "i").exec(text);
+  if (shortRange) {
+    const month = MONTHS[shortRange[1].toLowerCase()];
+    const start = resolve(month, Number(shortRange[2]), null, today);
+    if (start) {
+      const end = new Date(start.getFullYear(), month, Number(shortRange[3]));
+      if (end >= start && end.getMonth() === month) return { ...out, startDate: iso(start), endDate: iso(end) };
+    }
+  }
+  const hits = findDates(text, today);
+  if (hits.length >= 1) {
+    const first = hits[0];
+    let start = first.date;
+    let end = null;
+    if (/\bweek of\s*$/.test(t.slice(Math.max(0, first.index - 12), first.index))) {
+      end = addDays(start, 4);
+    } else if (hits.length >= 2) {
+      const between = t.slice(first.end, hits[1].index);
+      if (/^\s*(?:,?\s*)?(?:to|through|thru|until|till|and|-|–|—|or)\s*$/.test(between)) {
+        end = hits[1].date;
+        if (end < start && !hits[1].hasYear) end = new Date(end.getFullYear() + 1, end.getMonth(), end.getDate());
+      }
+    }
+    const lead = t.slice(Math.max(0, first.index - 18), first.index);
+    if (!end && /\b(?:by|before|no later than|deadline(?: is)?|done by|finished by|complete by)\s*$/.test(lead)) {
+      return { ...out, flexible: true, endDate: iso(start) };
+    }
+    if (start >= today) {
+      out.startDate = iso(start);
+      if (end && end >= start) out.endDate = iso(end);
+      return out;
+    }
+  }
+  let m;
+  if (m = /\bin (?:about |around )?(\d{1,2}|a|one|two|three|four|five|six) (day|week|month)s?\b/.exec(t)) {
+    const words = { a: 1, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6 };
+    const n = words[m[1]] ?? Number(m[1]);
+    const days = m[2] === "day" ? n : m[2] === "week" ? n * 7 : n * 30;
+    return { ...out, startDate: iso(addDays(today, days)) };
+  }
+  if (/\btomorrow\b/.test(t)) return { ...out, startDate: iso(addDays(today, 1)) };
+  if (m = new RegExp(`\\bnext (${Object.keys(WEEKDAYS).join("|")})\\b`).exec(t)) {
+    const target = WEEKDAYS[m[1]];
+    let diff = (target - today.getDay() + 7) % 7;
+    if (diff === 0) diff = 7;
+    return { ...out, startDate: iso(addDays(today, diff + 0)) };
+  }
+  if (/\bnext month\b/.test(t)) {
+    return { ...out, startDate: iso(new Date(today.getFullYear(), today.getMonth() + 1, 1)) };
+  }
+  if (m = /\b(this|next) weekend\b/.exec(t)) {
+    const diff = (6 - today.getDay() + 7) % 7 || 7;
+    return { ...out, startDate: iso(addDays(today, diff + (m[1] === "next" ? 7 : 0))) };
+  }
+  if (m = new RegExp(`\\b(?:(early|mid|late|end of|beginning of|start of)[\\s-]+|(?:in|during|sometime in|sometime|around|by the end of|by)\\s+(?:the\\s+)?(?:(early|mid|late)[\\s-]+)?)${MONTH_RE}\\b(?!\\.?\\s*\\d)`, "i").exec(t)) {
+    const part = (m[1] || m[2] || "").toLowerCase();
+    const monthIdx = MONTHS[m[3].toLowerCase()];
+    let year = today.getFullYear();
+    if (new Date(year, monthIdx + 1, 0) < today) year += 1;
+    const first = new Date(year, monthIdx, 1);
+    const last = new Date(year, monthIdx + 1, 0);
+    let start = first;
+    let end = last;
+    if (part === "early" || part === "beginning of" || part === "start of") end = new Date(year, monthIdx, 10);
+    else if (part === "mid") {
+      start = new Date(year, monthIdx, 10);
+      end = new Date(year, monthIdx, 20);
+    } else if (part === "late" || part === "end of") start = new Date(year, monthIdx, 20);
+    if (start < today) start = today;
+    if (end >= start) return { ...out, flexible: true, startDate: iso(start), endDate: iso(end) };
+  }
+  if (/\bbefore (?:the )?(?:holidays?|christmas|thanksgiving)\b/.test(t)) {
+    const dec = new Date(today.getFullYear(), /thanksgiving/.test(t) ? 10 : 11, /thanksgiving/.test(t) ? 20 : 20);
+    return { ...out, flexible: true, endDate: iso(dec >= today ? dec : new Date(dec.getFullYear() + 1, dec.getMonth(), dec.getDate())) };
+  }
+  return out;
+}
+function timelineFromStart(startDate, now = /* @__PURE__ */ new Date()) {
+  const today = startOfDay(now).getTime();
+  const days = Math.round(((/* @__PURE__ */ new Date(`${startDate}T00:00:00`)).getTime() - today) / 864e5);
+  if (days <= 7) return "asap";
+  if (days <= 45) return "this_month";
+  return "no_rush";
+}
+
+// src/lib/chatEstimator/scopeWords.ts
+var NOT_A_LIMIT = [
+  "got",
+  "have",
+  "had",
+  "looking",
+  "trying",
+  "hoping",
+  "curious",
+  "checking",
+  "wondering",
+  "be",
+  "get",
+  "did",
+  "do",
+  "really",
+  "so",
+  "ask",
+  "asking",
+  "to",
+  "in case",
+  "because",
+  "thinking",
+  "moved",
+  "bought",
+  "would",
+  "let",
+  "say",
+  "said",
+  "told",
+  "tell",
+  "think",
+  "know",
+  "see",
+  "figure",
+  "a quick",
+  "a question",
+  "a little",
+  "a bit",
+  "one more",
+  "making",
+  "started",
+  "wanted to know"
+];
+var WANT_IT = "(?:want|need|wanted|needed|hope|like|would like)s?\\s+(?:it|this|that|them|things|to|you|me|us|some|a\\s+(?:price|quote|estimate|ballpark)|the\\s+(?:job|work|price))\\b";
+var LEADING = new RegExp(`\\b(?:only|just)\\s+(?!${WANT_IT})(?!(?:${NOT_A_LIMIT.join("|")})\\b)[a-z0-9]`, "i");
+var TRAILING = /(?:[a-z0-9'-]+\s+){1,5}only(?=\s*(?:$|[.,;:!?)]|please\b|thanks\b|thank\b|for\b|no\b|and\b|-|—))/i;
+function hasScopeLimiter(text) {
+  return LEADING.test(text) || TRAILING.test(text) || /\bnothing else\b|\bthat'?s (?:all|it)\b/i.test(text);
+}
+
+// src/lib/chatEstimator/extractors.ts
+var NUMBER_WORDS = {
+  one: 1,
+  two: 2,
+  three: 3,
+  four: 4,
+  five: 5,
+  six: 6,
+  seven: 7,
+  eight: 8,
+  nine: 9,
+  ten: 10,
+  eleven: 11,
+  twelve: 12,
+  dozen: 12,
+  couple: 2,
+  "a couple": 2,
+  several: 3,
+  "a few": 3,
+  few: 3
+};
+function parseIntLoose(s) {
+  const cleaned = s.replace(/,/g, "").trim().toLowerCase();
+  if (/^\d+$/.test(cleaned)) return parseInt(cleaned, 10);
+  if (NUMBER_WORDS[cleaned] !== void 0) return NUMBER_WORDS[cleaned];
+  return null;
+}
+function extractZip(text) {
+  const m = text.match(/\b(\d{5})(?:-\d{4})?\b/);
+  return m ? m[1] : null;
+}
+function extractSquareFeet(text) {
+  const m = text.match(/(\d{1,2}[,.]?\d{3}|\d{2,4})\s*(?:sq\s*ft|square\s*f(?:ee|oo)t|sqft|sf)\b/i);
+  if (!m) return null;
+  const n = parseInt(m[1].replace(/[,.]/g, ""), 10);
+  return isFinite(n) && n > 100 && n < 5e4 ? n : null;
+}
+function extractBedroomCount(text) {
+  const m = text.match(/(\d+|one|two|three|four|five|six|seven)\s*(?:-|\s)?\s*(?:bed(?:room)?s?|br)\b/i);
+  if (!m) return null;
+  return parseIntLoose(m[1]);
+}
+function extractStories(text) {
+  if (/\b(?:single|one)[\s-]?stor(?:y|ey)\b/i.test(text)) return 1;
+  if (/\b(?:two|2)[\s-]?stor(?:y|ey|ies)\b/i.test(text)) return 2;
+  if (/\b(?:three|3)[\s-]?stor(?:y|ey|ies)\b/i.test(text)) return 3;
+  return null;
+}
+function extractProjectType(text) {
+  const t = text.toLowerCase();
+  const hasIn = /\b(interior|inside|indoors?|inside the house|inside the home)\b/.test(t);
+  const hasEx = /\b(exterior|outside|outdoors?|outside the house|siding|stucco)\b/.test(t);
+  if (hasIn && hasEx) return "both";
+  if (/\b(?:inside and out|in and out|inside & out|inside\/outside)\b/.test(t)) return "both";
+  if (/\b(both\s+(?:interior|inside)\s+and\s+(?:exterior|outside))\b/.test(t)) return "both";
+  if (hasEx) return "exterior";
+  if (hasIn) return "interior";
+  if (extractUnitContext(text).impliesInterior && !isMultiUnitText(text)) return "interior";
+  return null;
+}
+function extractProjectCondition(text) {
+  const t = text.toLowerCase();
+  if (/\b(new construction|newly built|just built|new build|new home)\b/.test(t)) return "new_construction";
+  if (/\b(renovat|remodel|just finished|we're redoing|gutted|new drywall|drywall just went up|contractor just)\b/.test(t)) return "renovation";
+  if (/\b(repaint|previously painted|re-?paint|refresh|already painted)\b/.test(t)) return "repaint";
+  return null;
+}
+function stripQuantifiedBedBath(text) {
+  const NUM = "(?:\\d+(?:\\.\\d)?|one|two|three|four|five|six|seven|eight|nine|ten)";
+  const BED = "(?:bed(?:room)?s?|br|bd)";
+  const BATH = "(?:bath(?:room)?s?|ba)";
+  const hasBedCount = new RegExp("\\b" + NUM + "\\s*(?:-|\\s)?\\s*" + BED + "\\b", "i").test(text);
+  const homeWords = /\b(house|home|apartment|condo|townhouse|townhome|unit|place|sq\.?\s?ft|square f)/i.test(text);
+  const keepBaths = !hasBedCount && !homeWords;
+  const oneRoomWithDims = new RegExp("\\b(?:one|1)\\s*(?:-|\\s)?\\s*bed(?:room)?\\s+\\d{1,2}\\s*(?:x|by|\xD7)\\s*\\d{1,2}\\b", "i").test(text) && !homeWords;
+  const parts = [];
+  if (!oneRoomWithDims) parts.push(BED);
+  if (!keepBaths) parts.push(BATH);
+  if (parts.length === 0) return text;
+  return text.replace(new RegExp("\\b" + NUM + "\\s*(?:-|\\s)?\\s*(?:" + parts.join("|") + ")\\b", "gi"), " ");
+}
+function extractRooms(text) {
+  const t = text.toLowerCase();
+  const found = [];
+  const map = [
+    [/\bmaster\s+bed(?:room)?\b/, "master_bedroom"],
+    [/\b(?:second|2nd|guest|kids?)\s+bed(?:room)?\b/, "bedroom_2"],
+    [/\b(?:third|3rd)\s+bed(?:room)?\b/, "bedroom_3"],
+    [/\bliving\s+(?:room|area)\b/, "living_room"],
+    [/\b(?:two|2|both|three|3)\s+(?:full\s+)?bath(?:room)?s\b/, "bathroom_master"],
+    [/\b(?:two|2|both|three|3)\s+(?:full\s+)?bath(?:room)?s\b/, "bathroom_2"],
+    [/\bnursery\b|\bbaby(?:'s)?\s+room\b|\bkid'?s?\s+room\b|\bplay\s*room\b/, "bedroom_3"],
+    [/\bguest\s+room\b/, "bedroom_2"],
+    [/\bsun\s*room\b|\bfour[\s-]season\b|\bscreened[\s-]in\b|\brec(?:reation)?\s+room\b|\bbasement\b|\battic\b|\bloft\b|\bman\s*cave\b|\bgame\s+room\b|\bhome\s+theat(?:er|re)\b/, "bonus_room"],
+    [/\bfamily\s+room\b/, "bonus_room"],
+    [/\bbonus\s+room\b/, "bonus_room"],
+    [/\bdining\s+room\b/, "dining_room"],
+    [/\bkitchen\b/, "kitchen"],
+    [/\bmaster\s+bath(?:room)?\b/, "bathroom_master"],
+    [/\bhalf\s+bath(?:room)?\b|\bpowder\s+room\b/, "bathroom_3"],
+    [/\bbath(?:room)?\b/, "bathroom_2"],
+    [/\boffice\b(?!\s*(?:building|complex|tower|park|space|suite))|\bden\b|\bstudy\b/, "office"],
+    [/\blaundry\b|\bmud(?:room| room)\b/, "laundry"],
+    [/\bhall(?:way)?\b|\bcorridor\b/, "hallway"],
+    [/\bentry(?:way)?\b|\bfoyer\b/, "entryway"],
+    [/\bgarage\b/, "garage"]
+  ];
+  for (const [re, key] of map) {
+    if (re.test(t) && !found.includes(key)) found.push(key);
+  }
+  if (/\bbed(?:room)?s?\b/.test(t) && !found.some((r2) => r2 === "master_bedroom" || r2.startsWith("bedroom"))) {
+    found.push("bedroom_3");
+  }
+  return found;
+}
+function extractCabinetFinish(text, answering) {
+  const whole = text.toLowerCase();
+  const about = answering || /\bcabinet|\bcabinetry|\bvanit(?:y|ies)/.test(whole);
+  if (!about) return null;
+  const parts = whole.split(/[,;.]|\bbut\b|\bwhile\b|\bwhereas\b/);
+  const cabinetWord = /\bcabinet|\bcabinetry|\bvanit(?:y|ies)/;
+  const otherSurface = /\b(?:doors?|trim|base ?boards?|walls?|ceilings?|windows?)\b/;
+  const t = answering ? whole : parts.filter((c, k) => cabinetWord.test(c) || k > 0 && cabinetWord.test(parts[k - 1]) && !otherSurface.test(c)).join(" ");
+  if (/\b(?:laminate|melamine|thermofoil|formica|rta|ikea)\b/.test(t)) return "laminate";
+  if (/\b(?:pre-?primed|already primed|factory[- ]primed|primed already|primed but)\b/.test(t)) return "primed";
+  if (/\b(?:bare|raw|unfinished|unpainted|never (?:been )?(?:painted|finished)|new wood|just the wood)\b/.test(t)) return "bare_wood";
+  if (/\b(?:stained|varnish(?:ed)?|lacquer(?:ed)?|poly(?:urethane)?d?|natural wood|wood grain|honey oak|oak|cherry|maple|mahogany|walnut|hickory|dark wood|wood finish)\b/.test(t)) return "stained";
+  if (/\b(?:previously painted|already (?:been )?painted|painted (?:before|already|white|in the past)|were painted|are painted|painted cabinets|currently painted|repaint(?:ing)? (?:the |my )?(?:cabinets|vanit)|(?:has|have|had) been painted)\b/.test(t)) return "painted";
+  if (answering) {
+    if (/^\s*(?:yes|yeah|yep|yup|they are|they were|painted|it is|it was)\b/.test(t)) return "painted";
+    if (/^\s*(?:no|nope|nah|not painted|not sure|i don'?t know|dont know|unsure|no idea|not really)\b/.test(t)) return "stained";
+  }
+  return null;
+}
+function woodFinishOf(t) {
+  if (/\b(?:pre-?primed|already primed|factory[- ]primed|primed already)\b/.test(t)) return "primed";
+  if (/\b(?:bare|raw|unfinished|unpainted|never (?:been )?(?:painted|finished)|new wood)\b/.test(t)) return "bare_wood";
+  if (/\b(?:stained|varnish(?:ed)?|lacquer(?:ed)?|poly(?:urethane)?d?|natural wood|wood grain|honey oak|oak|cherry|maple|mahogany|walnut|hickory|dark wood|wood finish)\b/.test(t)) return "stained";
+  if (/\b(?:previously painted|already (?:been )?painted|painted (?:before|already|white|in the past)|were painted|are painted|currently painted|(?:has|have|had) been painted|painted)\b/.test(t)) return "painted";
+  return null;
+}
+function extractTrimDoorFinish(text, answering) {
+  const out = { trim: null, door: null };
+  const clauses = text.toLowerCase().split(/[,;.]|\bbut\b|\bwhile\b|\bwhereas\b|\band the\b/);
+  let general = null;
+  for (const c of clauses) {
+    const f = woodFinishOf(c);
+    if (!f) continue;
+    const trim = /\b(?:base ?boards?|trim|molding|moulding|casings?|crown)\b/.test(c);
+    const door = /\bdoors?\b/.test(c);
+    if (trim) out.trim = f;
+    if (door) out.door = f;
+    if (!trim && !door && answering) general = f;
+  }
+  if (answering && !out.trim && !out.door && !general) {
+    const t = text.toLowerCase();
+    if (/^\s*(?:yes|yeah|yep|yup|they are|they were|it is|it was)\b/.test(t)) general = "painted";
+    else if (/^\s*(?:no|nope|nah|not painted|not sure|i don'?t know|dont know|unsure|no idea|not really)\b/.test(t)) general = "stained";
+  }
+  if (general) {
+    out.trim = out.trim ?? general;
+    out.door = out.door ?? general;
+  }
+  return out;
+}
+function extractCabinets(text) {
+  const t = text.toLowerCase();
+  const negated = /\b(?:no|not|without|except|excluding|skip|don'?t (?:paint|do|need)(?: the)?)\s+(?:the\s+|any\s+|our\s+)?(?:\w+\s+)?(?:cabinets?|cabinetry|vanit(?:y|ies))\b/.test(t);
+  const mentioned = /\bcabinet|\bvanit(?:y|ies)/.test(t) && !negated;
+  if (!mentioned) return { yes: false, locations: [] };
+  const locations = [];
+  if (/\bkitchen\b/.test(t)) locations.push("kitchen");
+  if (/\bbath(?:room)?\s+(?:vanit|cabinet)/.test(t) || /\bvanit(?:y|ies)\b/.test(t)) locations.push("bathroom");
+  if (/\blaundry\b.*\bcabinet/.test(t)) locations.push("laundry");
+  if (locations.length === 0) locations.push(/\bbath/.test(t) ? "bathroom" : "kitchen");
+  return { yes: true, locations };
+}
+function extractColorChange(text) {
+  const t = text.toLowerCase();
+  if (/\bceilings?\b[^.;\n]{0,45}?(dark(?:er)?\s+to\s+(?:light|white)|light(?:er)?\s+to\s+dark|dramatic)/.test(t) && /\bwalls?\b[^.;\n]{0,30}?(same\s+(?:\w+\s+)?colou?r|staying|keep|no\s+change)/.test(t)) return "same";
+  if (/\b(dark\s+to\s+light|light\s+to\s+dark|black\s+to\s+white|white\s+to\s+black|dramatic(?:ally)?\s+(?:change|different))\b/.test(t)) return "dramatic";
+  if (/\b(different\s+color|new\s+color|change\s+the\s+color|changing\s+color|different\s+one|something\s+(?:new|different)|a\s+(?:new|different)\s+(?:shade|one|paint)|going\s+(?:from\s+[\w\s-]{2,30}\s+)?to\s+(?:a\s+|an\s+)?(?:\w+\s+)?(?:white|grey|gray|beige|tan|blue|green|navy|black|red|yellow|cream|color|shade|dark|light|darker|lighter|bold|brighter)|changing\s+(?:it\s+)?(?:from\s+[\w\s-]{2,30}\s+)?to|switching\s+to|painting\s+it\s+(?:a\s+)?(?:new|different)|repainting\s+(?:it\s+)?(?:a\s+)?(?:new|different))\b/.test(t)) return "different";
+  if (/\b(same\s+(?:\w+\s+)?colou?r|same\s+(?:white|beige|grey|gray|tan|cream)|match(?:ing)?\s+(?:the\s+)?(?:existing|current)|keep(?:ing)?\s+(?:the\s+)?(?:same|current|existing)|no\s+colou?r\s+change|not\s+changing\s+(?:the\s+)?colou?r|staying\s+(?:the\s+)?same|just\s+(?:a\s+)?(?:fresh coat|refresh|touch[\s-]?up))\b/.test(t)) return "same";
+  return null;
+}
+function colorScopeAckPhrase(ctx) {
+  if (ctx.interiorScope === "specific_rooms") return "for those rooms";
+  if (ctx.propertyType === "rental" || ctx.propertyType === "multi_unit") return "for the whole unit";
+  if (ctx.propertyType === "residential") return "for the whole house";
+  return "for the whole place";
+}
+function extractColorScope(text) {
+  const t = text.toLowerCase();
+  const out = {};
+  const excludeStaying = t.match(
+    /\b(\d+|one|two|three|four|five|six)\s+(?:bed)?rooms?\s+(?:is|are)?\s*(?:staying|stay|keeping|remaining)\s+(?:the\s+)?(?:same|original)/
+  );
+  const excludeExcept = t.match(/\bexcept\s+(\d+|one|two|three|four|five|six)\s+(?:bed)?rooms?\b/);
+  const excludeMatch = excludeStaying ?? excludeExcept;
+  if (excludeMatch) {
+    const n = parseIntLoose(excludeMatch[1]);
+    if (n) {
+      out.excludedRoomCount = n;
+      out.scope = "most_of_house";
+    }
+  }
+  if (/\b(most of the house|most rooms|most of the place|most of the unit)\b/.test(t)) {
+    out.scope = out.scope ?? "most_of_house";
+  }
+  if (/\b(the whole house|entire house|every room|whole place|whole unit|everywhere)\b.{0,25}\b(different|new)\s+colors?\b/.test(t) || /\b(different|new)\s+colors?\b.{0,25}\b(the whole house|entire house|every room|whole place|whole unit|everywhere)\b/.test(t)) {
+    out.scope = "whole_house";
+  }
+  const countedColors = t.match(/\b(\d+|two|three|four|five|six|seven|eight)\s+(?:different\s+)?colors?\b/);
+  if (countedColors) {
+    const n = parseIntLoose(countedColors[1]);
+    if (n) {
+      out.colorCount = n;
+      out.scope = "multiple_colors";
+    }
+  } else if (/\b(several|multiple|a few|many)\s+(?:different\s+)?colors?\b/.test(t)) {
+    out.scope = "multiple_colors";
+    out.needsClarification = "color_count";
+  }
+  if (/\b(one|a|single)\s+main\s+colou?r\b.{0,25}\baccent\s+walls?\b/.test(t) || /\bmain\s+colou?r\b.{0,15}(?:plus|with|and)\b.{0,10}\baccent\s+walls?\b/.test(t)) {
+    out.scope = "accent_only";
+    out.accentWalls = true;
+    if (!/\b(bedroom|living room|kitchen|dining|bathroom|hallway|office|entryway)\b/.test(t)) {
+      out.needsClarification = "color_locations";
+    }
+  }
+  return out;
+}
+function extractSidingType(text, answeringSiding = false) {
+  const t = text.toLowerCase();
+  if (/\bstucco\b/.test(t)) return "stucco";
+  if (/\bhardi(?:e)?\s*board\b|\bhardiplank\b|\bfiber\s+cement\b/.test(t)) return "hardie";
+  if (/\baluminum\s+siding\b/.test(t)) return "aluminum";
+  if (/\bconcrete\s+block\b|\bcinder\s*block\b|\bcmu\b|\bconcrete\s+masonry\b/.test(t)) return "stucco";
+  if (/\bwood\s+siding\b|\bclapboard\b|\bshingle|\bshiplap\b|\bboard\s+and\s+batten\b/.test(t)) return "wood";
+  if (/\bvinyl\s+siding\b/.test(t)) return "vinyl";
+  if (/\bbrick\b/.test(t)) return "brick";
+  if (/\bstone\b/.test(t)) return "stone";
+  if (answeringSiding) {
+    if (/\bwood(?:en)?\b/.test(t)) return "wood";
+    if (/\bvinyl\b/.test(t)) return "vinyl";
+    if (/\b(?:aluminum|aluminium|metal)\b/.test(t)) return "aluminum";
+  }
+  return null;
+}
+function extractCeilingType(text) {
+  const t = text.toLowerCase();
+  if (/\bpopcorn\s+ceiling/.test(t)) return "popcorn";
+  if (/\bvaulted\s+ceiling|\bcathedral\s+ceiling/.test(t)) return "vaulted";
+  if (/\bflat\s+ceiling|\bsmooth\s+ceiling/.test(t)) return "flat";
+  return null;
+}
+function extractDamageSignals(text) {
+  const t = text.toLowerCase();
+  return {
+    wallpaper: /\bwallpaper\b/.test(t),
+    // \s* (not a literal space) so compound phrasing like "nailholes" or
+    // "nailhole" — very common in casual typing — matches just as well as
+    // "nail holes".
+    holes: /\b(holes?|nail\s*holes?|patch|dent)\b/.test(t),
+    rot: /\b(wood rot|dry rot|rotting|rotten)\b/.test(t),
+    // "needs repairs"/"needs fixing"/"needs work" are the most natural way
+    // to answer "what's the condition, does it need repairs?" — none of
+    // these were previously matched anywhere, so that answer silently fell
+    // through and the condition topic kept re-asking.
+    damage: /\b(damage|damaged|cracks?|peeling|chipping|failing paint|repairs?|needs (?:fixing|work)|fixer[\s-]?upper)\b/.test(t),
+    heavyPrep: /\b(needs a lot of prep|extensive prep|tons of prep|lots of repairs?)\b/.test(t),
+    // Distinct from just "popcorn ceiling" (extractCeilingType) existing —
+    // this is specifically about SCRAPING IT OFF, real prep labor with its
+    // own line item (see estimateEngine.ts's prepWork.includes('popcorn_removal')).
+    // Previously nothing ever set this — not this regex path, and not the
+    // LLM schema either (no enum value existed for it) — so "popcorn
+    // ceilings removed" was either silently dropped or, worse, sometimes
+    // mis-tagged by the LLM as the closest-sounding wrong option in its
+    // prepWork enum ("wallpaper_removal"), charging for prep work that was
+    // never requested while never charging for the real removal labor.
+    popcornRemoval: /\bpopcorn\b[^.?!]{0,30}\b(remov(?:e|ed|ing|al)|scrap(?:e|ed|ing))\b|\b(remov(?:e|ed|ing|al)|scrap(?:e|ed|ing))\b[^.?!]{0,30}\bpopcorn\b/.test(t)
+  };
+}
+function extractAccessSignals(text) {
+  const t = text.toLowerCase();
+  return {
+    // Bare "occupied" matters here, not just descriptive phrasing — it's
+    // literally one of this topic's own suggested chip labels ("Vacant" /
+    // "Furnished" / "Occupied"), so a customer just answering with that
+    // exact word must register, not just longer phrases like "we live here".
+    occupied: /\b(occupied|we live|i live|living here|lived[\s-]?in|live in it|we'?re still (?:here|in)|kids at home|pets at home|people living)\b/.test(t),
+    furnished: /\b(furnished|furniture in|moved in|all our stuff)\b/.test(t),
+    vacant: /\b(vacant|empty|no one lives|not moved in|before we move)\b/.test(t),
+    asap: /\b(asap|urgent|as soon as possible|this week|by (?:next )?weekend|rush)\b/.test(t)
+  };
+}
+function extractPropertyType(text) {
+  const t = text.toLowerCase();
+  if (/\b(multi[\s-]?unit|apartment (?:complex|building)|\d+[\s-]?unit building|several units|multiple units|(?:[2-9]|\d{2,3})\s+(?:(?!bed)\w+[\s-]+){0,3}units?\b|property manager)\b/.test(t)) {
+    return "multi_unit";
+  }
+  if (isMultiUnitText(t)) return "multi_unit";
+  if (/\b(restaurant|cafe|coffee shop|bakery|salon|barber ?shop|spa|gym|fitness|church|chapel|clinic|dental|dentist|medical (?:office|practice)|warehouse|retail|storefront|boutique|showroom|brewery|daycare|day care|our business|my business|our store|my store|our shop|my shop|our office|my office suite)\b/.test(t)) {
+    return "commercial";
+  }
+  if (/\b(commercial (?:space|property|building)|office (?:space|building|park|tower|suite|complex)|retail (?:store|space)|warehouse|storefront)\b/.test(t)) {
+    return "commercial";
+  }
+  if (/\b(rental|tenants?|landlord|renting it out|investment propert(?:y|ies)|airbnb|between tenants|turnover unit)\b/.test(t) || // Selling/listing a home means a quick, standard turnover finish for
+  // showings — not a showroom-perfect job for a family that'll live with
+  // it for years — so it prices the same way a rental turnover does. Bare
+  // "selling"/"selling it" (e.g. the chip-list quick reply) counts too,
+  // not just the longer descriptive phrasings.
+  /\b(selling( it)?|putting (?:it |the house |the place )?(?:up )?for sale|listing (?:it|the house|the place)|put(?:ting)? (?:it |the place )?on the market|getting (?:it |the house )?ready to sell|prepping (?:it |the house )?to sell|house is going on the market|flip(?:ping)? (?:it|the house|this house))\b/.test(t)) {
+    return "rental";
+  }
+  if (/\b(my home|our house|my house|my condo|my townhome|my townhouse|my place|we live (?:here|there|in it)|i live (?:here|there|in it)|owner[\s-]?occupied|primary residence|our (?:forever )?home|i own (?:it|the (?:house|home|condo|place))|we own (?:it|the (?:house|home|condo|place)))\b/.test(t)) {
+    return "residential";
+  }
+  return null;
+}
+function extractTimeline(text) {
+  const t = text.toLowerCase();
+  if (/\b(no rush|not (?:in )?a rush|whenever|not urgent|flexible timeline|no hurry|nothing urgent|no deadline|take your time|any ?time)\b/.test(t)) {
+    return "no_rush";
+  }
+  if (/\b(asap|urgent|as soon as possible|this week|next week|(?:this|next) weekend|by (?:next )?weekend|rush|need(?:s|ed)? (?:it |this )?done (?:now|immediately|next week)|right away)\b/.test(t)) {
+    return "asap";
+  }
+  if (/\b(?:a\s+)?(?:few|couple(?: of)?|several)\s+months?\b|\bnext\s+(?:two|three|2|3|few)\s+months\b/.test(t)) {
+    return "no_rush";
+  }
+  if (/\b(this month|within a month|next few weeks|couple weeks|next month|mid[\s-]?(?:month|\w+)|end of the month|before (?:the )?holidays?|before (?:thanksgiving|christmas))\b/.test(t)) {
+    return "this_month";
+  }
+  if (/\b(?:in|during|sometime in|early|late|around)\s+(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sept?(?:ember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b/.test(t)) {
+    return "no_rush";
+  }
+  if (/\b(?:spring|summer|fall|autumn|winter)\b/.test(t)) return "no_rush";
+  return null;
+}
+function extractAfterHoursRequired(text) {
+  const t = text.toLowerCase();
+  if (/\b(after[\s-]?hours|nights?\s+(?:and|or)?\s*weekends?|weekends? only|can'?t (?:be )?disrupt|while (?:we'?re )?closed|outside business hours)\b/.test(t)) {
+    return "yes";
+  }
+  if (/\b(daytime is fine|during the day is fine|normal hours (?:are )?fine|business hours (?:are )?fine)\b/.test(t)) {
+    return "no";
+  }
+  return null;
+}
+var DECADE_MIDPOINTS = {
+  "1940s": 1945,
+  "40s": 1945,
+  "1950s": 1955,
+  "50s": 1955,
+  "1960s": 1965,
+  "60s": 1965,
+  "1970s": 1975,
+  "70s": 1975,
+  "1980s": 1985,
+  "80s": 1985,
+  "1990s": 1995,
+  "90s": 1995
+};
+function extractYearBuilt(text) {
+  const t = text.toLowerCase();
+  const exact = t.match(/\b(?:built|constructed|from)\s+(?:in\s+)?(\d{4})\b/) || t.match(/\bbuilt\s+(\d{4})\b/);
+  if (exact) {
+    const year = parseInt(exact[1], 10);
+    if (year > 1800 && year <= 2030) return year;
+  }
+  const decade = t.match(/\bbuilt\s+in\s+the\s+(\d{4}s|\d0s)\b/) || t.match(/\bfrom\s+the\s+(\d{4}s|\d0s)\b/);
+  if (decade && DECADE_MIDPOINTS[decade[1]]) return DECADE_MIDPOINTS[decade[1]];
+  if (/\b(older home|pre[\s-]?1978|before 1978|historic home|century[\s-]?old|100[\s-]?year[\s-]?old)\b/.test(t)) {
+    return 1965;
+  }
+  return null;
+}
+function extractAccessDifficulty(text) {
+  const t = text.toLowerCase();
+  if (/\b(no ladder access|can'?t get a ladder|no truck access|very (?:difficult|hard) access|steep (?:roof|driveway|hill|slope)|no elevator)\b/.test(t)) {
+    return "significant";
+  }
+  if (/\b(tight (?:side\s?yard|access|space)|limited access|narrow (?:driveway|access)|hard to (?:reach|access)|gated community)\b/.test(t)) {
+    return "some";
+  }
+  return null;
+}
+function extractHOA(text) {
+  return /\bhoa\b|\bhomeowners?\s+association\b|\barchitectural (?:committee|review)\b/.test(text.toLowerCase());
+}
+function extractInteriorSurfaceDetails(text) {
+  const t = text.toLowerCase();
+  const out = {};
+  if (/\b(heavy(?:ly)? textured|thick texture|heavy knockdown)\b/.test(t)) out.wallTexture = "heavy_texture";
+  else if (/\b(textured walls?|orange peel|knockdown texture|light texture)\b/.test(t)) out.wallTexture = "textured";
+  else if (/\b(smooth walls?|flat walls?, no texture)\b/.test(t)) out.wallTexture = "smooth";
+  if (/\b(brand[\s-]?new trim|trim (?:was |is )?just installed|new trim work)\b/.test(t)) out.trimCondition = "new";
+  else if (/\b(trim (?:is |in )?(?:pretty |really |very )?(?:rough|beat[\s-]?up|bad|poor|damaged) shape|trim.{0,15}(?:chipped|damaged|rough))\b/.test(t)) out.trimCondition = "existing_fair";
+  if (/\bcrown molding\b/.test(t)) out.crownMolding = true;
+  if (/\bwainscoting\b|\bbeadboard\b|\bwall paneling\b/.test(t)) out.wainscoting = true;
+  if (/\baccent wall\b|\bfeature wall\b/.test(t)) out.accentWalls = true;
+  if (/\bstained (?:wood|trim|doors?|cabinets?)\b.{0,20}\b(paint|painted|painting)\b|\bpaint(?:ing)? over (?:the )?stained\b/.test(t)) {
+    out.hasStainedWood = true;
+  }
+  if (/\bwalk[\s-]?in closet\b/.test(t)) out.closets = "walkin";
+  else if (/\bcloset (?:interiors?|insides?)\b|\binside (?:the |my )?closets?\b/.test(t)) out.closets = "standard";
+  if (/\bwire shelving\b/.test(t)) out.closetShelving = "wire";
+  else if (/\bbuilt[\s-]?in shelving\b|\bbuilt[\s-]?in shelves\b/.test(t)) out.closetShelving = "built_in";
+  if (/\b(extensive|severe|major|significant) (?:wood )?rot\b/.test(t)) out.woodRotExtent = "major";
+  else if (/\b(some|moderate|a bit of) (?:wood )?rot\b/.test(t)) out.woodRotExtent = "moderate";
+  return out;
+}
+function extractCeilingHeight(text, asked = false) {
+  const t = text.toLowerCase();
+  const WORDS = { nine: 9, ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, eighteen: 18, twenty: 20 };
+  const num = (s) => WORDS[s] ?? parseInt(s, 10);
+  const fromFeet = (n) => n >= 16 && n <= 40 ? "vaulted_mixed" : n >= 12 && n < 16 ? "twelve_plus" : n >= 10 && n < 12 ? "ten_plus" : n === 9 ? "nine_foot" : null;
+  if (/\b(vaulted|cathedral|double[\s-]height|two[\s-]stor(?:y|ey)\s+(?:foyer|entry|entryway|living room|great room|ceiling)|soaring|loft(?:ed)? ceilings?|beamed vaulted)\b/.test(t)) return "vaulted_mixed";
+  const NUM = "(\\d{1,2}|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|eighteen|twenty)";
+  const a = t.match(new RegExp(NUM + "\\s*(?:-|\\s)?(?:f(?:oo|ee)?t|')\\s*(?:tall\\s+|high\\s+)?ceilings?\\b"));
+  const b = t.match(new RegExp("\\bceilings?\\s*(?:are|is|run|go|measure|about|around|at|of|:)?\\s*(?:about\\s+|around\\s+|roughly\\s+)?" + NUM + "\\s*(?:-|\\s)?(?:f(?:oo|ee)?t|')"));
+  const c = t.match(new RegExp("\\bceilings?\\s+height\\s*(?:is|are|of|:)?\\s*(?:about\\s+|around\\s+|roughly\\s+|approximately\\s+)?" + NUM + "\\s*(?:-|\\s)?(?:f(?:oo|ee)?t|')?")) ?? t.match(new RegExp("\\bheight\\s+of\\s+(?:the\\s+|our\\s+)?ceilings?\\s*(?:is|are|:)?\\s*(?:about\\s+|around\\s+|roughly\\s+|approximately\\s+)?" + NUM + "\\s*(?:-|\\s)?(?:f(?:oo|ee)?t|')?"));
+  const d = /\bceilings?\b/.test(t) || asked && !/\b(?:fence|deck|gate|shed|tree|porch|railing|garage|ladder|driveway|yard|pergola)\b/.test(t) ? t.match(new RegExp("(?:^|[^\\d.])" + NUM + "\\s*(?:-|\\s)?(?:f(?:oo|ee)?t|')\\s*(?:tall|high|up)?\\b")) : null;
+  const bare = asked ? t.match(new RegExp("^\\s*(?:about\\s+|around\\s+|roughly\\s+|probably\\s+|like\\s+)?" + NUM + "\\s*(?:-|\\s)?(?:f(?:oo|ee)?t|'|ft\\.?|feet)?\\s*[.!]?\\s*$")) : null;
+  const feet = a ? num(a[1]) : b ? num(b[1]) : c ? num(c[1]) : d ? num(d[1]) : bare ? num(bare[1]) : NaN;
+  if (isFinite(feet)) {
+    const h = fromFeet(feet);
+    if (h) return h;
+  }
+  if (/\b(?:high|tall|extra[\s-]tall|lofty|really high|very high|super high|nine[\s-]foot|9[\s-]foot)\s+ceilings?\b|\bceilings?\s+(?:are|is)\s+(?:really\s+|very\s+|pretty\s+|kind of\s+|fairly\s+|quite\s+)?(?:high|tall)\b|\b(?:tall|high)\s+walls\b|\bhigher than (?:normal|standard|usual)\b/.test(t)) {
+    return /\b(?:9[\s-]foot|nine[\s-]foot)\b/.test(t) ? "nine_foot" : "ten_plus";
+  }
+  if (/\b(10|ten)[\s-]?(?:\+|plus)\s*f(?:oo|ee)?t\b/.test(t)) return "ten_plus";
+  return null;
+}
+function extractExteriorSurfaceDetails(text) {
+  const t = text.toLowerCase();
+  const out = {};
+  if (/\bsame color (?:on the outside|outside|for the exterior)\b|\bexterior.{0,15}same color\b/.test(t)) out.exteriorColorChange = "same";
+  else if (/\bdifferent color (?:on the outside|outside|for the exterior)\b|\bexterior.{0,15}different color\b|\bchanging the exterior color\b/.test(t)) out.exteriorColorChange = "different";
+  if (/\b(exterior|outside|siding).{0,20}\b(peeling|failing paint|really rough|in bad shape|falling apart)\b/.test(t)) out.exteriorCondition = "poor";
+  else if (/\b(exterior|outside|siding).{0,20}\b(some fading|a bit worn|minor (?:issues|wear))\b/.test(t)) out.exteriorCondition = "fair";
+  if (/\bnew stucco\b|\bstucco (?:was |is )?just (?:installed|applied|done)\b/.test(t)) out.stuccoCondition = "new_stucco";
+  else if (/\bstucco (?:needs repair|is cracked|has cracks|needs patching)\b|\bcracked stucco\b/.test(t)) out.stuccoCondition = "needs_repair";
+  if (/\b(fascia|exterior trim)\b/.test(t)) out.exteriorTrim = true;
+  if (/\bmetal railings?\b/.test(t) && /\b(deck|porch|balcony|exterior|outside)\b/.test(t)) out.exteriorRailingMaterial = "metal";
+  else if (/\bcomposite railings?\b/.test(t)) out.exteriorRailingMaterial = "composite";
+  else if (/\bcable railings?\b/.test(t)) out.exteriorRailingMaterial = "cable";
+  return out;
+}
+function extractSpecialtyServices(text) {
+  const t = text.toLowerCase();
+  const out = {};
+  if (/\bfireplace\b|\bmantel\b/.test(t)) {
+    out.fireplace = true;
+    if (/\bwhitewash/.test(t)) out.fireplaceType = "brick_whitewash";
+    else if (/\bstone fireplace\b/.test(t)) out.fireplaceType = "stone";
+    else if (/\bmantel only\b|\bjust the mantel\b/.test(t)) out.fireplaceType = "mantel_only";
+    else if (/\bbrick fireplace\b/.test(t)) out.fireplaceType = "brick_paint";
+  }
+  if (/\bexposed beams?\b|\bwood beams?\b|\bceiling beams?\b/.test(t)) {
+    out.beams = true;
+    if (/\bvaulted\b/.test(t)) out.beamLocation = "vaulted";
+  }
+  if (/\bbuilt[\s-]?ins?\b|\bbuilt[\s-]?in (?:bookshelf|bookshelves|shelving|cabinetry)\b/.test(t) && !/\b(?:no|not|without|except|excluding|skip|don'?t need|not including)\s+(?:the\s+|any\s+|our\s+)?built[\s-]?ins?\b/.test(t)) out.builtIns = true;
+  if (/\bepoxy\b.{0,20}\bgarage\b|\bgarage floor\b.{0,20}\bepoxy\b|\bepoxy (?:the )?(?:garage )?floor\b/.test(t)) out.epoxy = true;
+  if (/\bpaint (?:this|my|the|a) (?:dresser|table|chair|cabinet piece|bookshelf|nightstand|desk)\b/.test(t)) out.furniture = true;
+  if (/\b(?:patio|outdoor|lawn|deck)\s+furniture\b/.test(t)) out.furniture = true;
+  return out;
+}
+function extractMultiTrip(text) {
+  const t = text.toLowerCase();
+  return /\b(before it'?s? installed|before installation|then (?:come back|touch up|return)|touch[\s-]?ups? after|come back (?:and|to) (?:paint|finish|touch)|after (?:the )?install(?:ation)?)\b/.test(t) || /\b(needs? (?:time|a day|\d+ hours?|\d+ days?) to (?:set|cure|dry)|needs? to (?:cure|set) before|has to (?:cure|set|dry) (?:first|before)|window glazing)\b/.test(t) || /\b(prime (?:now|first)[,.]? (?:and )?(?:finish|topcoat|final coat) (?:coat )?after|second (?:trip|visit) (?:to|for) (?:paint|finish)|off[\s-]?site (?:and|then) reinstall)\b/.test(t);
+}
+function extractSpecialEquipment(text) {
+  const t = text.toLowerCase();
+  if (/\b(boom lift|scissor lift|cherry picker|man[\s-]?lift|aerial lift)\b/.test(t)) return "lift";
+  if (/\b(scaffold(?:ing)?|swing stage)\b/.test(t)) return "scaffolding";
+  if (/\b(extension ladder|\d{2}[\s-]?f(?:oo|ee)?t ladder|fall protection|really high (?:peak|roof|gable))\b/.test(t)) return "extended_ladder";
+  return null;
+}
+function extractFixtureRemoval(text) {
+  const t = text.toLowerCase();
+  const mentioned = /\b(towel bar|curtain rod|switch plates?|outlet covers?|vent covers?|register covers?|mirror|light fixtures?|ceiling fan|thermostat|smoke detectors?|blinds|shelf brackets?|house numbers?|mailbox)\b.*\b(remove|removed|removal|take down|taken down|off)\b|\b(remove|removed|removal|take down|taken down)\b.*\b(towel bar|curtain rod|switch plates?|outlet covers?|vent covers?|register covers?|mirror|light fixtures?|ceiling fan|thermostat|smoke detectors?|blinds|shelf brackets?)\b/.test(t);
+  if (!mentioned) return null;
+  if (/\b(all|every|whole house|each room|throughout)\b/.test(t)) return "extensive";
+  return "minor";
+}
+function extractHardwareReplacement(text) {
+  const t = text.toLowerCase();
+  return /\b(replace|swap out|install new|put (?:up|on) new)\b.{0,20}\b(hinges?|knobs?|pulls?|handles?|switch plates?|house numbers?)\b/.test(t);
+}
+function extractLowVOC(text) {
+  const t = text.toLowerCase();
+  return /\b(low[\s-]?voc|zero[\s-]?voc|no[\s-]?voc|low[\s-]?odor|no[\s-]?odor|eco[\s-]?friendly paint|non[\s-]?toxic paint)\b/.test(t) || /\b(allerg(?:y|ies)|asthma|pregnant|sensitive to (?:fumes|smell))\b/.test(t) && /\bpaint\b/.test(t);
+}
+function extractMoldTreatment(text) {
+  return /\b(mold|mildew|musty smell)\b/.test(text.toLowerCase());
+}
+function extractExteriorFeatures(text) {
+  const t = text.toLowerCase();
+  const out = {};
+  if (/\bgarage\s+doors?\b/.test(t)) {
+    if (/\b(two|2|double|two[-\s]?car)\s+(?:garage\s+)?doors?\b|\bdouble\s+garage\b/.test(t)) {
+      out.garageDoor = "double";
+    } else {
+      out.garageDoor = "single";
+    }
+  }
+  if (/\b(front|entry)\s+door\b/.test(t)) out.entryDoor = true;
+  if (/\bdecks?\b/.test(t) && !/\bdeck(?:ed)?\s+out\b/.test(t)) {
+    out.deck = true;
+    if (/\bsmall\s+deck\b/.test(t)) out.deckSize = "small";
+    else if (/\blarge\s+deck\b|\bbig\s+deck\b/.test(t)) out.deckSize = "large";
+    else if (/\bmedium\s+deck\b/.test(t)) out.deckSize = "medium";
+  }
+  if (/\b(outside|outdoor|exterior)\s+(?:stair(?:case|way)?s?|steps)\b/.test(t)) {
+    out.railings = true;
+  }
+  if (/\bfences?\b/.test(t)) {
+    out.fence = true;
+    if (/\bpicket\s+fence\b/.test(t)) out.fenceType = "picket_4ft";
+    else if (/\bprivacy\s+fence\b/.test(t)) out.fenceType = "privacy_6ft";
+    else if (/\bchain[\s-]?link\b/.test(t)) out.fenceType = "chain_link";
+    const fenceIdx = t.search(/\bfences?\b/);
+    if (fenceIdx >= 0) {
+      const window = t.slice(Math.max(0, fenceIdx - 20), fenceIdx + 30);
+      const m = window.match(/\b(\d{2,4})\s*(?:linear\s*)?(?:ft\.?|feet|'|lin\.?\s*ft)\b/);
+      if (m) {
+        const n = parseInt(m[1], 10);
+        if (isFinite(n) && n > 0 && n < 3e3) out.fenceLinearFeet = n;
+      }
+    }
+  }
+  if (/\b(railings?|hand\s*rails?|bannisters?|banisters?|balustrades?)\b/.test(t) && !/\bstair/.test(t)) {
+    out.railings = true;
+    if (/\bspindles?\b/.test(t)) out.railingType = "spindles";
+  }
+  if (/\bbalcon(?:y|ies)\b/.test(t)) out.balconies = true;
+  if (/\bgutters?\b|\bdownspouts?\b/.test(t)) out.gutters = true;
+  if (/\bfoundation\b/.test(t)) out.foundation = true;
+  if (/\boverhangs?\b|\bpatio\s*cover\b|\bporch\s*roof\b|\bpatios?\b(?!\s*(?:furniture|set|table|chairs?|umbrella|cushions?|loungers?))/.test(t)) out.overhangs = true;
+  if (/\bsoffits?\b|\beaves\b/.test(t)) out.soffitsEaves = true;
+  if (/\bshutters?\b/.test(t) && /\bexterior|\boutside|\bwindow shutters|\bhouse\b/.test(t)) {
+    out.exteriorShutters = true;
+  }
+  const insideWords = /\b(inside|interior|indoors?|bedrooms?|bathrooms?|kitchen|living room|dining room|hallway|office|nursery|closets?|basement|apartment|condo)\b/.test(t) && !/\b(exterior|outside|outdoors?|siding|stucco|house exterior)\b/.test(t);
+  if (/\bwindow\s*frames?\b|\bwindow\s*trim\b|\bwindowsills?\b|\bwindow\s+sills?\b/.test(t) && !insideWords) {
+    out.exteriorWindows = true;
+  }
+  return out;
+}
+function extractInteriorDetails(text) {
+  const t = text.toLowerCase();
+  const out = {};
+  if (/\bdoor\s*frames?\b|\bdoor\s*jambs?\b|\bjambs?\b|\bcasings?\b/.test(t)) out.doorFrames = true;
+  if (/\b(inside|interior)\s+(?:of\s+)?(?:the\s+)?cabinets?\b|\bcabinet\s+interiors?\b/.test(t)) {
+    out.cabinetInsides = true;
+  }
+  if (/\bshutters?\b/.test(t) && !/\bexterior|\boutside|\bhouse\b/.test(t)) {
+    out.interiorShutters = true;
+  }
+  if (/\b(staircase|stairway|stairs)\b/.test(t)) {
+    out.stairway = true;
+    if (/\b(railings?|bannisters?|banisters?|balustrades?|hand\s*rails?)\b/.test(t)) {
+      out.stairwayWithRailings = true;
+    }
+  }
+  if (/\bbrick\b/.test(t) && /\bfireplace|\baccent\s+wall|\binterior\b/.test(t)) {
+    out.interiorBrick = true;
+  }
+  if (/\bbaseboards?\b/.test(t)) out.baseboardsMentioned = true;
+  return out;
+}
+function extractFrenchPane(text) {
+  const t = text.toLowerCase();
+  const out = {};
+  if (/\bfrench[\s-]?pane[d]?\s+windows?\b|\bfrench\s+windows?\b/.test(t)) out.window = true;
+  if (/\bfrench[\s-]?pane[d]?\s+doors?\b|\bfrench\s+doors?\b/.test(t)) out.door = true;
+  return out;
+}
+function extractUnitContext(text) {
+  const t = text.toLowerCase();
+  const isUnit = /\b(rental\s+unit|the\s+unit|my\s+unit|apartment|apt\.?|condo(?:minium)?|duplex|studio)\b/.test(t);
+  return { impliesInterior: isUnit, impliesWholeUnit: isUnit };
+}
+function extractSurfaceScope(text) {
+  const t = text.toLowerCase();
+  const out = {};
+  if (/\b(everything|the whole room|whole thing|full (?:scope|package)|all of it|paint it all)\b/.test(t)) {
+    out.everything = true;
+    out.walls = "yes";
+    out.ceilings = "yes";
+    out.trim = "yes";
+    out.doors = "yes";
+    return out;
+  }
+  const justOnly = /(?:^|[.,;]\s*)([\w\s]+?)\s+only\b/i.exec(t) ?? /\b(?:just|only)\s+(?:the\s+)?([\w\s,]+?)(?:$|[.,;])/i.exec(t);
+  if (justOnly) {
+    const limited = justOnly[1];
+    const hasWalls = /\bwalls?\b/.test(limited);
+    const hasCeiling = /\bceiling/.test(limited);
+    const hasTrim = /\btrim\b/.test(limited);
+    const hasDoors = /\bdoors?\b/.test(limited);
+    if (hasWalls || hasCeiling || hasTrim || hasDoors) {
+      if (hasWalls && !hasCeiling && !hasTrim && !hasDoors) {
+        out.walls = "yes";
+        out.ceilings = "no";
+        out.trim = "no";
+        out.doors = "no";
+        return out;
+      }
+      if (hasWalls) out.walls = "yes";
+      if (hasCeiling) out.ceilings = "yes";
+      if (hasTrim) out.trim = "yes";
+      if (hasDoors) out.doors = "yes";
+      if (!hasWalls) out.walls = "no";
+      if (!hasCeiling) out.ceilings = "no";
+      if (!hasTrim) out.trim = "no";
+      if (!hasDoors) out.doors = "no";
+      return out;
+    }
+  }
+  if (/\b(?:no|not|without|skip|except)\s+(?:the\s+)?trim\b/.test(t)) out.trim = "no";
+  if (/\b(?:no|not|without|skip|except)\s+(?:the\s+)?ceiling/.test(t)) out.ceilings = "no";
+  if (/\b(?:no|not|without|skip|except)\s+(?:the\s+)?doors?\b/.test(t)) out.doors = "no";
+  if (/\b(?:no|not|without|skip|except)\s+(?:the\s+)?closet/.test(t)) out.closets = "no";
+  if (/\b(?:include|with|and|plus|paint)\s+(?:the\s+)?trim\b/.test(t)) out.trim = "yes";
+  if (/\b(?:include|with|and|plus|paint)\s+(?:the\s+)?ceiling/.test(t)) out.ceilings = "yes";
+  if (/\b(?:include|with|and|plus|paint)\s+(?:the\s+)?doors?\b/.test(t)) out.doors = "yes";
+  return out;
+}
+function extractRoomSize(text) {
+  const t = text.toLowerCase();
+  const out = {};
+  const dim = t.match(/(\d{1,3})\s*(?:x|×|by)\s*(\d{1,3})/);
+  if (dim) {
+    out.widthFt = parseInt(dim[1], 10);
+    out.lengthFt = parseInt(dim[2], 10);
+    out.sqft = out.widthFt * out.lengthFt;
+    return out;
+  }
+  const sq = extractSquareFeet(text);
+  if (sq) {
+    out.sqft = sq;
+    return out;
+  }
+  if (/\b(?:small|tiny|little|compact)\b/.test(t)) out.size = "small";
+  else if (/\b(?:medium|average|normal|standard)\b/.test(t)) out.size = "medium";
+  else if (/\b(?:large|big|huge|massive|oversized|spacious)\b/.test(t)) out.size = "large";
+  return out;
+}
+function extractSheen(text) {
+  const t = text.toLowerCase();
+  if (/\bflat\b|\bmatte\b/.test(t)) return "flat";
+  if (/\beggshell\b/.test(t)) return "eggshell";
+  if (/\bsatin\b/.test(t)) return "satin";
+  if (/\bsemi[-\s]?gloss\b/.test(t)) return "semi-gloss";
+  if (/\bgloss\b|\bhigh[-\s]?gloss\b/.test(t)) return "gloss";
+  return null;
+}
+function extractMultiPhaseRequest(text) {
+  const t = text.toLowerCase();
+  return /\b(space(?:d)? out|spread out|staggered?|different dates|separate dates|in phases|in stages|different times|not all at once|one (?:room|section|part) at a time)\b/.test(t);
+}
+function extractAll(text, prev, lastBotTopicId = null) {
+  const patch = {};
+  const acks = [];
+  if (extractMultiPhaseRequest(text) && prev.multiPhaseRequested !== "yes") {
+    patch.multiPhaseRequested = "yes";
+    acks.push("spaced out on separate dates");
+  }
+  const zip = extractZip(text);
+  if (zip && !prev.zipCode) {
+    patch.zipCode = zip;
+    acks.push(`ZIP ${zip}`);
+  }
+  const sqft = extractSquareFeet(text);
+  if (sqft && !prev.squareFeet) {
+    patch.squareFeet = sqft;
+    acks.push(`${sqft.toLocaleString()} sqft`);
+  } else if (!prev.squareFeet && (lastBotTopicId === "room_size" || lastBotTopicId === "house_size" || lastBotTopicId === "ext_size")) {
+    const bare = text.trim().match(/^(?:about|around|roughly)?\s*(\d{2,5})\s*$/i);
+    const n = bare ? parseInt(bare[1], 10) : null;
+    if (n && n > 100 && n < 5e4) {
+      patch.squareFeet = n;
+      acks.push(`${n.toLocaleString()} sqft`);
+    }
+  }
+  if (!prev.popcornCeilingRooms && lastBotTopicId === "popcorn_extent") {
+    const bare = text.trim().match(/^(?:about|around|roughly)?\s*(\d{1,2})\s*(?:rooms?)?\s*$/i);
+    const n = bare ? parseInt(bare[1], 10) : null;
+    if (n && n > 0 && n < 30) {
+      patch.popcornCeilingRooms = n;
+      acks.push(`${n} room${n === 1 ? "" : "s"} of popcorn removal`);
+    } else if (/\b(throughout|most(?: of)?(?: the| them| rooms)?|all (?:over|of)|all (?:the )?rooms|everywhere|entire|whole house|every room)\b/i.test(text)) {
+      const bedroomEstimate = patch.bedroomCount ?? prev.bedroomCount;
+      patch.popcornCeilingRooms = (bedroomEstimate ?? 3) + 3;
+      acks.push("most of the house");
+    }
+  }
+  if (lastBotTopicId === "condition" && !prev.conditionAddressed && text.trim().length > 0 && !text.trim().endsWith("?")) {
+    patch.conditionAddressed = true;
+  }
+  if (lastBotTopicId === "trim_scope" && !prev.trimScopeAddressed && text.trim().length > 0 && !text.trim().endsWith("?")) {
+    patch.trimScopeAddressed = true;
+  }
+  if (lastBotTopicId === "stories" && !prev.stories) {
+    const low = text.toLowerCase().trim();
+    const n = /^(?:about |around )?(?:one|1|single|ground level|ranch)\b/.test(low) ? 1 : /^(?:about |around )?(?:two|2|double)\b/.test(low) ? 2 : /^(?:about |around )?(?:three|3|triple)\b/.test(low) ? 3 : null;
+    if (n) {
+      patch.stories = n;
+      acks.push(n + "-story");
+    }
+  }
+  if (lastBotTopicId === "commercial_access" && !prev.afterHoursRequired) {
+    const low = text.toLowerCase();
+    if (/\b(nights?|overnight|evenings?|after[\s-]?hours|weekends?|early (?:morning|mornings)|before (?:we )?open|mondays?|closed (?:on|mondays?)|outside (?:of )?business hours)\b/.test(low)) {
+      patch.afterHoursRequired = "yes";
+      acks.push("after-hours scheduling");
+    } else if (/\b(weekdays?|daytime|during the day|any ?time|anytime|business hours|doesn'?t matter|no preference|we can close|closed (?:for|during)|closed is fine|closed)\b/.test(low)) {
+      patch.afterHoursRequired = "no";
+    }
+  }
+  if (lastBotTopicId === "property_ownership" && !prev.propertyType && !patch.propertyType) {
+    const low = text.toLowerCase();
+    if (/\b(rent|renting|rental|rented|landlord|tenants?)\b/.test(low) && !/\b(live|living)\b/.test(low)) {
+      patch.propertyType = "rental";
+      acks.push("rental property");
+    }
+    if (/\b(commercial|business|company|store|shop|restaurant|office|church|clinic|warehouse|salon|cafe|gym)\b/.test(low)) {
+      patch.propertyType = "commercial";
+      acks.push("commercial");
+    }
+  }
+  const beds = extractBedroomCount(text);
+  if (beds && !prev.bedroomCount) {
+    patch.bedroomCount = beds;
+    acks.push(`${beds}-bedroom`);
+  }
+  const stories = extractStories(text);
+  if (stories && !prev.stories) {
+    patch.stories = stories;
+    acks.push(`${stories}-story`);
+  }
+  const proj = extractProjectType(text);
+  if (proj && !prev.projectType) {
+    patch.projectType = proj;
+    acks.push(proj === "both" ? "interior + exterior" : proj);
+  }
+  const cond = extractProjectCondition(text);
+  if (cond && !prev.projectCondition) {
+    patch.projectCondition = cond;
+    if (cond === "new_construction") acks.push("new construction");
+    else if (cond === "renovation") acks.push("renovation");
+    else acks.push("repaint");
+  }
+  const roomsSourceText = stripQuantifiedBedBath(text);
+  const quantifiedBedBathMention = roomsSourceText !== text;
+  const rooms = extractRooms(roomsSourceText);
+  const describesWholeHome = (quantifiedBedBathMention || !!sqft && /\b(house|home|apartment|condo|townhouse|townhome|unit|whole)\b/i.test(text)) && !hasScopeLimiter(text);
+  if (rooms.length > 0 && describesWholeHome && prev.selectedRooms.length === 0 && !prev.interiorScope && !patch.interiorScope) {
+    patch.interiorScope = "whole_house";
+  } else if (rooms.length > 0 && prev.selectedRooms.length === 0 && prev.interiorScope !== "whole_house") {
+    patch.selectedRooms = rooms;
+    patch.interiorScope = "specific_rooms";
+    acks.push(`${rooms.length} rooms`);
+  } else if (quantifiedBedBathMention && prev.selectedRooms.length === 0 && !prev.interiorScope && !patch.interiorScope) {
+    patch.interiorScope = "whole_house";
+  }
+  if (lastBotTopicId === "which_rooms" && rooms.length === 0 && !prev.interiorScope && !patch.interiorScope && prev.selectedRooms.length === 0 && text.trim().length > 0 && !/\b(whole|entire|all|every(?:thing)?|throughout)\b/i.test(text) && !text.trim().endsWith("?")) {
+    patch.selectedRooms = ["bedroom_2"];
+    patch.interiorScope = "specific_rooms";
+    acks.push("1 room");
+  }
+  const cab = extractCabinets(text);
+  if (cab.yes && prev.cabinets === "none") {
+    patch.cabinets = cab.locations.length > 1 ? "multiple" : cab.locations[0] || "kitchen";
+    patch.cabinetLocations = cab.locations;
+    acks.push("cabinets");
+  }
+  {
+    const wantsTrim = prev.interiorTrim === "yes" || patch.interiorTrim === "yes";
+    const wantsDoors = prev.interiorDoors !== "none" || patch.interiorDoors !== void 0 && patch.interiorDoors !== "none";
+    if (wantsTrim || wantsDoors || lastBotTopicId === "trim_door_finish") {
+      const f = extractTrimDoorFinish(text, lastBotTopicId === "trim_door_finish");
+      if (f.trim && !prev.trimFinish && wantsTrim) {
+        patch.trimFinish = f.trim;
+        acks.push(`${f.trim === "painted" ? "painted" : f.trim === "bare_wood" ? "bare wood" : f.trim === "stained" ? "stained" : "pre-primed"} trim`);
+      }
+      if (f.door && !prev.doorFinish && wantsDoors) {
+        patch.doorFinish = f.door;
+        acks.push(`${f.door === "painted" ? "painted" : f.door === "bare_wood" ? "bare wood" : f.door === "stained" ? "stained" : "pre-primed"} doors`);
+      }
+    }
+  }
+  if (!prev.cabinetFinish && (prev.cabinets !== "none" || patch.cabinets)) {
+    const finish = extractCabinetFinish(text, lastBotTopicId === "cabinet_finish");
+    if (finish) {
+      patch.cabinetFinish = finish;
+      acks.push(finish === "painted" ? "painted cabinets" : finish === "bare_wood" ? "bare wood cabinets" : finish === "stained" ? "stained cabinets" : finish === "primed" ? "pre-primed cabinets" : "laminate cabinets");
+    }
+  }
+  let color = extractColorChange(text);
+  if (!color && lastBotTopicId === "color_change") {
+    const lower = text.toLowerCase();
+    if (/\b(same|keep|keeping|existing|current|match|no change|unchanged|stay)\b/.test(lower)) color = "same";
+    else if (/\b(dark|black|navy|charcoal)\b/.test(lower) && /\b(light|white|cream)\b/.test(lower)) color = "dramatic";
+    else if (/\b(different|new|change|changing|switch|go(?:ing)?|lighter|darker|light|dark|grey|gray|white|blue|green|red|navy|beige|black|bold|bright|color|colour)\b/.test(lower)) color = "different";
+  }
+  if (color && !prev.interiorColorChange) {
+    patch.interiorColorChange = color;
+    if (color === "dramatic") acks.push(`dramatic color change ${colorScopeAckPhrase(prev)}`);
+    else if (color === "different") acks.push(`one different color ${colorScopeAckPhrase(prev)}`);
+  }
+  const colorScope = extractColorScope(text);
+  if (colorScope.scope) {
+    patch.colorChangeScope = colorScope.scope;
+    if (!prev.interiorColorChange && !patch.interiorColorChange && colorScope.scope !== "accent_only") {
+      patch.interiorColorChange = "different";
+      acks.push(`different color ${colorScopeAckPhrase(prev)}`);
+    }
+    if (colorScope.scope === "most_of_house" && colorScope.excludedRoomCount) {
+      acks.push(`${colorScope.excludedRoomCount} room${colorScope.excludedRoomCount === 1 ? "" : "s"} staying original color`);
+    } else if (colorScope.scope === "multiple_colors" && colorScope.colorCount) {
+      acks.push(`${colorScope.colorCount} colors total`);
+    } else if (colorScope.scope === "accent_only") {
+      acks.push("accent wall(s), main color unchanged");
+    }
+  }
+  if (colorScope.excludedRoomCount !== void 0) patch.colorChangeExcludedRoomCount = colorScope.excludedRoomCount;
+  if (colorScope.colorCount !== void 0) patch.colorCount = colorScope.colorCount;
+  if (colorScope.accentWalls) patch.accentWalls = "yes";
+  if (colorScope.needsClarification) {
+    patch.colorClarificationNeeded = colorScope.needsClarification;
+  } else if (prev.colorClarificationNeeded === "color_count") {
+    const bare = text.trim().match(/^(\d+|one|two|three|four|five|six|seven|eight)\b/i);
+    const n = bare ? parseIntLoose(bare[1]) : null;
+    if (n) {
+      patch.colorCount = n;
+      patch.colorChangeScope = "multiple_colors";
+      patch.colorClarificationNeeded = "";
+      acks.push(`${n} colors total`);
+    }
+  } else if (prev.colorClarificationNeeded === "color_locations" && /\b(bedroom|living room|kitchen|dining|bathroom|hallway|office|entryway|closet|wall|walls)\b/.test(text.toLowerCase())) {
+    patch.colorClarificationNeeded = "";
+    acks.push("noted where the color change goes");
+  }
+  const siding = extractSidingType(text, lastBotTopicId === "siding");
+  if (siding && !prev.sidingType) {
+    patch.sidingType = siding;
+    acks.push(siding);
+  }
+  const ceiling = extractCeilingType(text);
+  if (ceiling && !prev.ceilingType) {
+    patch.ceilingType = ceiling;
+    if (ceiling === "popcorn") acks.push("popcorn ceilings");
+    else if (ceiling === "vaulted") acks.push("vaulted ceilings");
+  }
+  const damage = extractDamageSignals(text);
+  if (damage.wallpaper || damage.rot || damage.heavyPrep || damage.holes || damage.damage || damage.popcornRemoval || /\b(good shape|great shape|in good condition|looks good|no (?:damage|issues|problems)|clean|pristine|move[-\s]?in ready)\b/.test(text.toLowerCase())) {
+    patch.conditionAddressed = true;
+  }
+  if (/\b(drywall|contractor|primer|other trades|taped and textured|ready for paint|(?:still|not yet) (?:being )?installed|still in progress|(?:everything|all) (?:installed|finished|done))\b/.test(text.toLowerCase())) {
+    patch.renoStageAddressed = true;
+  }
+  const addPrep = (key) => {
+    const existing = patch.prepWork ?? prev.prepWork ?? [];
+    if (!existing.includes(key)) patch.prepWork = [...existing, key];
+  };
+  if (damage.wallpaper) {
+    addPrep("wallpaper_removal");
+    acks.push("wallpaper removal");
+  }
+  if (damage.popcornRemoval) {
+    addPrep("popcorn_removal");
+    acks.push("popcorn ceiling removal");
+    if (!prev.popcornCeilingRooms) {
+      const wide = /\b(throughout|most of|all (?:over|of)|entire|whole house|every room)\b/i.test(text);
+      if (wide) {
+        const bedroomEstimate = patch.bedroomCount ?? prev.bedroomCount;
+        patch.popcornCeilingRooms = (bedroomEstimate ?? 3) + 3;
+      }
+    }
+  }
+  if (damage.rot) {
+    addPrep("wood_rot");
+    acks.push("wood rot");
+  }
+  if (damage.heavyPrep) {
+    patch.drywallRepairExtent = "major";
+    acks.push("heavy prep");
+  } else if (damage.holes && !damage.heavyPrep) {
+    patch.drywallRepairExtent = patch.drywallRepairExtent || prev.drywallRepairExtent || "minor";
+  }
+  const access = extractAccessSignals(text);
+  if (access.vacant) {
+    patch.occupancy = "vacant";
+  } else if (access.furnished || access.occupied) {
+    patch.occupancy = "furnished";
+  }
+  const propType = extractPropertyType(text);
+  if (propType && !prev.propertyType) {
+    patch.propertyType = propType;
+    if (propType === "rental") acks.push("rental property");
+    else if (propType === "multi_unit") acks.push("multi-unit");
+    else if (propType === "commercial") acks.push("commercial");
+  }
+  const timeline = extractTimeline(text);
+  if (timeline && !prev.timeline) {
+    patch.timeline = timeline;
+    if (timeline === "asap") acks.push("ASAP");
+  }
+  const timing = extractTiming(text);
+  if (timing.flexible && !prev.datesFlexible) {
+    patch.datesFlexible = true;
+    acks.push("flexible dates");
+    if (!prev.timeline && !patch.timeline) patch.timeline = "no_rush";
+  }
+  if (timing.startDate && !prev.startDate) {
+    patch.startDate = timing.startDate;
+    if (timing.endDate) patch.endDate = timing.endDate;
+    acks.push(timing.endDate ? `dates ${timing.startDate} to ${timing.endDate}` : `start around ${timing.startDate}`);
+    if (!prev.timeline && !patch.timeline) patch.timeline = timelineFromStart(timing.startDate);
+  } else if (timing.endDate && !prev.endDate) {
+    patch.endDate = timing.endDate;
+    if (!prev.timeline && !patch.timeline) patch.timeline = "this_month";
+  }
+  const afterHours = extractAfterHoursRequired(text);
+  if (afterHours && !prev.afterHoursRequired) {
+    patch.afterHoursRequired = afterHours;
+    if (afterHours === "yes") acks.push("after-hours scheduling");
+  }
+  const yearBuilt = extractYearBuilt(text);
+  if (yearBuilt && !prev.yearBuilt) {
+    patch.yearBuilt = yearBuilt;
+    if (yearBuilt < 1978) acks.push("pre-1978 construction");
+  }
+  const accessDifficulty = extractAccessDifficulty(text);
+  if (accessDifficulty && prev.accessRestrictions === "none") {
+    patch.accessRestrictions = accessDifficulty;
+    acks.push("tough access");
+  }
+  if (extractHOA(text) && prev.hoa !== "yes") {
+    patch.hoa = "yes";
+    acks.push("HOA");
+  }
+  if (extractMultiTrip(text) && prev.multiTripRequired !== "yes") {
+    patch.multiTripRequired = "yes";
+    acks.push("return trip needed");
+  }
+  const equipment = extractSpecialEquipment(text);
+  if (equipment && prev.specialEquipment === "none") {
+    patch.specialEquipment = equipment;
+    acks.push(equipment === "lift" ? "lift needed" : equipment === "scaffolding" ? "scaffolding needed" : "tall ladder needed");
+  }
+  const fixtureRemoval = extractFixtureRemoval(text);
+  if (fixtureRemoval && prev.fixtureRemoval === "none") {
+    patch.fixtureRemoval = fixtureRemoval;
+    acks.push("fixture removal");
+  }
+  if (extractHardwareReplacement(text) && prev.hardwareReplacement !== "yes") {
+    patch.hardwareReplacement = "yes";
+    acks.push("new hardware");
+  }
+  if (extractLowVOC(text) && prev.lowVocRequested !== "yes") {
+    patch.lowVocRequested = "yes";
+    acks.push("low-VOC paint");
+  }
+  if (extractMoldTreatment(text)) {
+    addPrep("mold_treatment");
+    acks.push("mold treatment");
+  }
+  const interiorSurface = extractInteriorSurfaceDetails(text);
+  if (interiorSurface.wallTexture && !prev.wallTexture) {
+    patch.wallTexture = interiorSurface.wallTexture;
+    acks.push(interiorSurface.wallTexture.replace("_", " "));
+  }
+  if (interiorSurface.trimCondition && prev.trimCondition === "existing_good") {
+    patch.trimCondition = interiorSurface.trimCondition;
+    acks.push(interiorSurface.trimCondition === "new" ? "new trim" : "trim needs work");
+  }
+  if (interiorSurface.crownMolding && prev.crownMolding !== "yes") {
+    patch.crownMolding = "yes";
+    acks.push("crown molding");
+  }
+  if (interiorSurface.wainscoting && prev.wainscoting !== "yes") {
+    patch.wainscoting = "yes";
+    acks.push("wainscoting");
+  }
+  if (interiorSurface.accentWalls && prev.accentWalls !== "yes") {
+    patch.accentWalls = "yes";
+    acks.push("accent wall");
+  }
+  if (interiorSurface.hasStainedWood && prev.hasStainedWood !== "yes") {
+    patch.hasStainedWood = "yes";
+    acks.push("stained wood prep");
+  }
+  if (interiorSurface.closets && prev.closets === "none") {
+    patch.closets = interiorSurface.closets;
+    acks.push(interiorSurface.closets === "walkin" ? "walk-in closet" : "closet interiors");
+  }
+  if (interiorSurface.closetShelving && prev.closetShelving === "none") {
+    patch.closetShelving = interiorSurface.closetShelving;
+  }
+  if (interiorSurface.woodRotExtent && prev.woodRotExtent === "minor") {
+    patch.woodRotExtent = interiorSurface.woodRotExtent;
+    addPrep("wood_rot");
+  }
+  const ceilingHeight = extractCeilingHeight(text);
+  if (ceilingHeight && (!prev.ceilingHeight || prev.ceilingHeight === "standard")) {
+    patch.ceilingHeight = ceilingHeight;
+    acks.push(ceilingHeight === "vaulted_mixed" ? "tall or vaulted ceilings" : `${ceilingHeight === "twelve_plus" ? "12+" : ceilingHeight === "ten_plus" ? "10" : "9"} ft ceilings`);
+  }
+  const exteriorSurface = extractExteriorSurfaceDetails(text);
+  if (exteriorSurface.exteriorColorChange && !prev.exteriorColorChange) {
+    patch.exteriorColorChange = exteriorSurface.exteriorColorChange;
+  }
+  if (exteriorSurface.exteriorCondition && prev.exteriorCondition === "good") {
+    patch.exteriorCondition = exteriorSurface.exteriorCondition;
+    acks.push(`exterior in ${exteriorSurface.exteriorCondition} condition`);
+  }
+  if (exteriorSurface.stuccoCondition && prev.stuccoCondition === "good") {
+    patch.stuccoCondition = exteriorSurface.stuccoCondition;
+    acks.push(exteriorSurface.stuccoCondition === "new_stucco" ? "new stucco" : "stucco repair needed");
+  }
+  if (exteriorSurface.exteriorTrim && prev.exteriorTrim !== "yes") {
+    patch.exteriorTrim = "yes";
+    acks.push("exterior trim/fascia");
+  }
+  if (exteriorSurface.exteriorRailingMaterial && prev.exteriorRailingMaterial === "wood") {
+    patch.exteriorRailingMaterial = exteriorSurface.exteriorRailingMaterial;
+  }
+  const specialty = extractSpecialtyServices(text);
+  const addSpecialty = (key) => {
+    const existing = patch.specialtyServices ?? prev.specialtyServices ?? [];
+    if (!existing.includes(key)) patch.specialtyServices = [...existing, key];
+  };
+  if (specialty.fireplace) {
+    addSpecialty("fireplace");
+    if (specialty.fireplaceType) patch.fireplaceType = specialty.fireplaceType;
+    acks.push("fireplace");
+  }
+  if (specialty.beams) {
+    addSpecialty("beams");
+    if (specialty.beamLocation) patch.beamLocation = specialty.beamLocation;
+    acks.push("exposed beams");
+  }
+  if (specialty.builtIns) {
+    addSpecialty("built_ins");
+    acks.push("built-ins");
+  }
+  if (specialty.epoxy) {
+    addSpecialty("epoxy");
+    acks.push("garage epoxy floor");
+  }
+  if (specialty.furniture) {
+    addSpecialty("furniture");
+    acks.push("furniture piece");
+  }
+  const unitCtx = extractUnitContext(text);
+  if (unitCtx.impliesWholeUnit && !prev.interiorScope && prev.selectedRooms.length === 0) {
+    patch.interiorScope = "whole_house";
+    acks.push("whole unit");
+  }
+  const ext = extractExteriorFeatures(text);
+  if (ext.garageDoor && prev.garageDoor === "none") {
+    patch.garageDoor = ext.garageDoor;
+    acks.push(`${ext.garageDoor} garage door`);
+  }
+  if (ext.entryDoor && prev.entryDoor === "no") {
+    patch.entryDoor = "yes";
+    acks.push("entry door");
+  }
+  if (ext.deck && prev.deck === "none") {
+    patch.deck = "yes";
+    if (ext.deckSize) patch.deckSize = ext.deckSize;
+    acks.push("deck");
+  }
+  if (ext.fence && prev.fence === "none") {
+    patch.fence = "yes";
+    if (ext.fenceType) patch.fenceType = ext.fenceType;
+    if (ext.fenceLinearFeet) patch.fenceLinearFeet = ext.fenceLinearFeet;
+    acks.push(ext.fenceType === "picket_4ft" ? "picket fence" : "fence");
+  }
+  if (ext.railings && prev.railings === "none") {
+    patch.railings = "yes";
+    if (ext.railingType) patch.railingType = ext.railingType;
+    acks.push("railings");
+  }
+  if (ext.balconies && prev.balconies === "none") {
+    patch.balconies = "yes";
+    acks.push("balconies");
+  }
+  if (ext.gutters && prev.gutters === "no") {
+    patch.gutters = "yes";
+    acks.push("gutters");
+  }
+  if (ext.foundation && prev.foundation === "no") {
+    patch.foundation = "yes";
+    acks.push("foundation");
+  }
+  if (ext.overhangs && prev.overhangs === "no") {
+    patch.overhangs = "yes";
+    acks.push("overhangs/patio cover");
+  }
+  if (ext.soffitsEaves && prev.soffitsEaves !== "yes") {
+    patch.soffitsEaves = "yes";
+    acks.push("soffits & eaves");
+  }
+  if (ext.exteriorShutters && prev.exteriorShutters === "no") {
+    patch.exteriorShutters = "yes";
+    acks.push("exterior shutters");
+  }
+  if (ext.exteriorWindows && prev.exteriorWindows === "none") {
+    patch.exteriorWindows = "trim_only";
+    acks.push("exterior window trim");
+  }
+  const interiorDetails = extractInteriorDetails(text);
+  if (interiorDetails.doorFrames && prev.doorFrames === "no") {
+    patch.doorFrames = "yes";
+    acks.push("door frames");
+  }
+  if (interiorDetails.cabinetInsides && prev.cabinetScope !== "inside_too") {
+    patch.cabinetScope = "inside_too";
+    acks.push("cabinet interiors");
+  }
+  if (interiorDetails.interiorShutters && prev.interiorShutters === "no") {
+    patch.interiorShutters = "yes";
+    acks.push("interior shutters");
+  }
+  if (interiorDetails.stairway && prev.stairways === "none") {
+    patch.stairways = "yes";
+    patch.stairwayDetails = interiorDetails.stairwayWithRailings ? "walls_and_railings" : "walls_only";
+    acks.push("staircase");
+  } else if (interiorDetails.stairwayWithRailings && prev.stairways === "yes" && prev.stairwayDetails !== "walls_and_railings") {
+    patch.stairwayDetails = "walls_and_railings";
+    acks.push("bannister/railings");
+  }
+  if (interiorDetails.interiorBrick && !prev.specialtyServices.includes("brick")) {
+    patch.specialtyServices = [...patch.specialtyServices ?? prev.specialtyServices, "brick"];
+    acks.push("interior brick");
+  }
+  if (interiorDetails.baseboardsMentioned && prev.baseboards !== "yes") {
+    patch.baseboards = "yes";
+  }
+  const frenchPane = extractFrenchPane(text);
+  if (frenchPane.window && !prev.windowTypes.includes("french_pane")) {
+    patch.windowTypes = [...patch.windowTypes ?? prev.windowTypes, "french_pane"];
+    acks.push("French-pane windows");
+  }
+  if (frenchPane.door && !prev.doorTypes.includes("french")) {
+    patch.doorTypes = [...patch.doorTypes ?? prev.doorTypes, "french"];
+    acks.push("French doors");
+  }
+  const scopeBlockedBy = ["trim_door_finish", "cabinet_finish", "trim_scope", "condition", "property_ownership", "color_change", "location", "timeline_and_access", "commercial_access", "siding", "stories", "house_size", "room_size", "reno_context", "popcorn_extent"];
+  const surf = lastBotTopicId && (scopeBlockedBy.includes(lastBotTopicId) || lastBotTopicId.startsWith("ext_")) ? {} : extractSurfaceScope(text);
+  const onlySurfaceWords = /^\s*(?:(?:just|only|and|the|with|plus|also|,|&|\+)\s*)*(?:(?:walls?|ceilings?|trim|baseboards?|doors?)\s*(?:,|and|&|\+|\/)?\s*)+[.!]?\s*$/i.test(text);
+  let listParsed = false;
+  if ((lastBotTopicId === "surfaces" || onlySurfaceWords) && !surf.everything) {
+    const low = text.toLowerCase();
+    const partialMode = lastBotTopicId === "surfaces" && !prev.surfacesAddressed && (prev.interiorTrim === "no" || prev.interiorCeilings === "no" || prev.interiorDoors === "none");
+    const negatedPartial = (word) => new RegExp("\\b(?:no|not|without|skip|except|leave|keep)\\s+(?:the\\s+|any\\s+|our\\s+)?" + word + "\\b").test(low) || new RegExp("\\b" + word + "\\s+(?:can\\s+)?(?:stay|stays|remain|as[\\s-]is|untouched|skipped|are\\s+fine|is\\s+fine|not\\s+included)\\b").test(low);
+    if (partialMode) {
+      const pw = /\bceilings?\b/.test(low), pd = /\bdoors?\b/.test(low), ptr = /\b(trim|baseboards?|casings?)\b/.test(low);
+      const refusal = /^\s*(?:no|nope|nah|neither|none|skip (?:them|those|it)|leave (?:them|it|those)|as[\s-]is|not needed|just the walls|walls only)\b/.test(low);
+      if (refusal) {
+        surf.ceilings = "no";
+        surf.doors = "no";
+        surf.trim = "no";
+      } else {
+        if (pw && !negatedPartial("ceilings?")) surf.ceilings = "yes";
+        if (pd && !negatedPartial("doors?")) surf.doors = "yes";
+        if (ptr && !negatedPartial("(?:trim|baseboards?|casings?)")) surf.trim = "yes";
+        if (pw && negatedPartial("ceilings?")) surf.ceilings = "no";
+        if (pd && negatedPartial("doors?")) surf.doors = "no";
+        if (/\b(both|all|everything|yes|yeah|yep|sure)\b/.test(low) && !pw && !pd) {
+          surf.ceilings = "yes";
+          surf.doors = "yes";
+        }
+        if (/\bno\s+(?:the\s+)?ceilings?\b|\bwithout\s+(?:the\s+)?ceilings?\b/.test(low)) surf.ceilings = "no";
+        if (/\bno\s+(?:the\s+)?doors?\b|\bwithout\s+(?:the\s+)?doors?\b/.test(low)) surf.doors = "no";
+      }
+      listParsed = true;
+    } else {
+      const NEG = "(?:no|not|without|skip|except|excluding|don'?t (?:paint|do|need)(?: the)?)\\s+(?:the\\s+|any\\s+|our\\s+)?(?:\\w+\\s+)?";
+      const named = (word) => new RegExp("\\b" + word + "\\b").test(low);
+      const negated = (word) => new RegExp("\\b" + NEG + word + "\\b").test(low) || new RegExp("\\b(?:leave|skip|keep|ignore)\\s+(?:the\\s+|our\\s+)?" + word + "\\b").test(low) || new RegExp("\\b" + word + "\\s+(?:can\\s+)?(?:stay|stays|remain|as[\\s-]is|untouched|skipped|are\\s+fine|is\\s+fine|not\\s+included)\\b").test(low);
+      const mentionW = named("walls?"), mentionC = named("ceilings?"), mentionTr = named("(?:trim|baseboards?|casings?|molding|moulding)"), mentionD = named("doors?");
+      const w = mentionW && !negated("walls?"), c = mentionC && !negated("ceilings?"), tr = mentionTr && !negated("(?:trim|baseboards?|casings?|molding|moulding)"), d = mentionD && !negated("doors?");
+      if (!w && !c && !tr && !d && (mentionW || mentionC || mentionTr || mentionD)) {
+        if (mentionW) surf.walls = "no";
+        if (mentionC) surf.ceilings = "no";
+        if (mentionTr) surf.trim = "no";
+        if (mentionD) surf.doors = "no";
+      }
+      if (/\b(everything|all of it|the works|full (?:package|scope)|(?:the )?whole (?:thing|room|place|apartment|house|home|unit|space)|the usual|standard)\b/.test(low)) {
+        surf.everything = true;
+        surf.walls = "yes";
+        surf.ceilings = "yes";
+        surf.trim = "yes";
+        surf.doors = "yes";
+      } else if (w || c || tr || d) {
+        surf.walls = w ? "yes" : "no";
+        surf.ceilings = c ? "yes" : "no";
+        surf.trim = tr ? "yes" : "no";
+        surf.doors = d ? "yes" : "no";
+        listParsed = true;
+      }
+    }
+  }
+  if (surf.walls !== void 0) patch.interiorWalls = surf.walls;
+  if (surf.ceilings !== void 0) patch.interiorCeilings = surf.ceilings;
+  if (surf.trim !== void 0) patch.interiorTrim = surf.trim;
+  if (surf.doors !== void 0) patch.interiorDoors = surf.doors === "yes" ? "some" : "none";
+  if (surf.closets !== void 0) patch.closets = surf.closets === "yes" ? "standard" : "none";
+  if (surf.everything) {
+    acks.push("whole room");
+    patch.trimScopeAddressed = true;
+  }
+  if (surf.walls === "yes" && surf.trim === "no") {
+    const named = [surf.walls === "yes" ? "walls" : "", surf.ceilings === "yes" ? "ceilings" : "", surf.doors === "yes" ? "doors" : ""].filter(Boolean);
+    acks.push(named.length === 1 ? "walls only" : named.join(" and ") + ", no trim");
+  }
+  const decidedWalls = surf.walls !== void 0 || surf.everything;
+  const partialOnly = !listParsed && !decidedWalls && (surf.ceilings !== void 0 || surf.trim !== void 0 || surf.doors !== void 0);
+  if (listParsed || decidedWalls || surf.ceilings !== void 0 && surf.trim !== void 0) {
+    patch.surfacesAddressed = true;
+  } else if (partialOnly) {
+  } else if (!prev.surfacesAddressed) {
+    const tLower = text.toLowerCase();
+    const mentionCount = [/\bwalls?\b/, /\bceilings?\b/, /\btrim\b/, /\bdoors?\b/].filter((re) => re.test(tLower)).length;
+    if (mentionCount >= 3) patch.surfacesAddressed = true;
+  }
+  const trimNowInScope = (patch.interiorTrim ?? prev.interiorTrim) === "yes";
+  if (trimNowInScope && !prev.trimScopeAddressed) {
+    const tLower = text.toLowerCase();
+    const allWoodwork = /\ball (?:the )?wood\s*work\b|\beverything wood\b|\ball\s+the\s+woodwork\b|\bevery(?:thing)?\b.{0,20}\bwood\b/.test(tLower);
+    if (allWoodwork) {
+      if (prev.doorFrames !== "yes") {
+        patch.doorFrames = "yes";
+        acks.push("door frames");
+      }
+      if (!prev.specialtyServices.includes("built_ins")) addSpecialty("built_ins");
+    }
+    if (interiorDetails.doorFrames || specialty.builtIns || allWoodwork || /\b(just|only)\b.{0,15}\bbaseboards?\b|\bbaseboards?\b.{0,10}\bonly\b/.test(tLower) || /\bnot sure\b|\bno idea\b|\bdon'?t know\b/.test(tLower)) {
+      patch.trimScopeAddressed = true;
+    }
+  }
+  if (!prev.squareFeet) {
+    const rs = extractRoomSize(text);
+    if (rs.sqft) {
+      patch.additionalDetails = `${prev.additionalDetails ? prev.additionalDetails + "; " : ""}room ${rs.widthFt && rs.lengthFt ? `${rs.widthFt}x${rs.lengthFt}` : `${rs.sqft}sqft`}`;
+      acks.push(`${rs.widthFt && rs.lengthFt ? `${rs.widthFt}\xD7${rs.lengthFt}` : `${rs.sqft} sqft`}`);
+    } else if (rs.size) {
+      patch.additionalDetails = `${prev.additionalDetails ? prev.additionalDetails + "; " : ""}${rs.size} room`;
+      acks.push(`${rs.size} room`);
+    }
+  }
+  const sheen = extractSheen(text);
+  if (sheen) {
+    patch.additionalDetails = `${prev.additionalDetails ? prev.additionalDetails + "; " : ""}${sheen} sheen`;
+  }
+  if (/\bretaining wall/.test(text.toLowerCase()) && !prev.additionalDetails.toLowerCase().includes("retaining wall")) {
+    const base = patch.additionalDetails ?? prev.additionalDetails;
+    patch.additionalDetails = `${base ? base + "; " : ""}retaining wall mentioned \u2014 needs manual follow-up`;
+    acks.push("retaining wall (noted)");
+  }
+  return { patch, acknowledgements: acks };
+}
+
+// _sim/t1.ts
+console.log(extractCeilingHeight("the fence is 10 ft and there is a friendly dog", true), extractCeilingHeight("the fence is 10 ft and there is a friendly dog", false));
+var r = extractAll("the fence is 10 ft and there is a friendly dog", {}, null);
+console.log(JSON.stringify(r?.patch?.ceilingHeight ?? r));

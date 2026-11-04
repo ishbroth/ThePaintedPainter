@@ -1,0 +1,10 @@
+import { makeInitialContext, buildPriceEditor } from './out/rules.mjs';
+const ctx = { ...makeInitialContext(), zipCode:'31406', projectType:'both', interiorScope:'whole_house', squareFeet:1200, stories:2, sidingType:'aluminum', propertyType:'rental', occupancy:'furnished', interiorCeilings:'no', interiorTrim:'no', interiorDoors:'none', surfacesAddressed:true, exteriorColorChange:'different', prepWork:['power_washing'] };
+const base = { ctx, transcript: '' };
+const v0 = buildPriceEditor(base, [], []);
+console.log('total', v0.current.estimate.total, v0.current.estimate.lineItems.map(l=>`${l.key||'-'}:${l.description}:${Math.round(l.amount)}`).join(' | '));
+for (const r of v0.rows) console.log(' row', r.key, r.amount, 'change', r.change, '| also:', r.alsoAffects.join(', '), '| fields:', r.fields.map(f=>f.field).join(','));
+const v1 = buildPriceEditor(base, [], ['ext_body']);
+console.log('remove ext_body ->', v1.current.estimate.total, '|', v1.current.estimate.lineItems.map(l=>l.description).join(' | '), '| rows', v1.rows.map(r=>r.key+(r.removed?'(removed)':'')).join(','));
+const v2 = buildPriceEditor(base, [], [], { sidingType: 'wood', stories: 1 });
+console.log('wood 1-story ->', v2.current.estimate.total);

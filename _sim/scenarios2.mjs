@@ -1,0 +1,372 @@
+// Second batch: 50 different archetypes x 4 variants = 200. Each one carries the facts the customer "knows" (so every
+// keyword the estimator should log is checkable) and an item-by-item benchmark (see bench.mjs).
+import { benchmark } from './bench.mjs';
+import { ZIPS as ZIPS1, WHENS as WHENS1 } from './scenarios.mjs';
+
+export const ZIPS = [
+  ...ZIPS1.slice(25),
+  ...ZIPS1.slice(0, 25),
+  ['13501', 'Utica NY'], ['16501', 'Erie PA'], ['37801', 'Maryville TN'], ['62701', 'Springfield IL'], ['76201', 'Denton TX'],
+  ['32501', 'Pensacola FL'], ['25301', 'Charleston WV'], ['99701', 'Fairbanks AK'], ['96701', 'Aiea HI'], ['59801', 'Missoula MT'],
+  ['83001', 'Jackson WY'], ['04401', 'Bangor ME'], ['01201', 'Pittsfield MA'], ['98501', 'Olympia WA'], ['92101', 'San Diego CA'],
+  ['78201', 'San Antonio TX'], ['33101', 'Miami FL'], ['80901', 'Colorado Springs CO'], ['97401', 'Eugene OR'], ['14201', 'Buffalo NY'],
+];
+
+export const WHENS = [
+  ...WHENS1,
+  { text: 'the week of November 30', exp: { startDate: '2026-11-30' } },
+  { text: 'sometime in early January, no hard date', exp: { anyTiming: true } },
+  { text: 'in about three weeks', exp: { anyTiming: true } },
+  { text: 'by December 18 at the latest', exp: { anyTiming: true } },
+  { text: 'next Monday if you have an opening', exp: { anyTiming: true } },
+  { text: 'late October', exp: { anyTiming: true } },
+];
+
+// quantities for whole-home interior jobs, independent of the estimator's own room template
+const house = (f, o = {}) => [
+  ['wallSqft', Math.round(f * 2.5 * (o.walls ?? 1))], ['ceilingSqft', Math.round(f * 1.0 * (o.ceilings ?? 1))],
+  ['trimLF', Math.round(f * 0.3 * (o.trim ?? 1))], ['doorEach', Math.round((f / 130) * (o.doors ?? 1))],
+].filter(([, q]) => q > 0);
+
+const chk = {
+  pt: (v) => (c) => (c.projectType === v ? [] : [`projectType=${c.projectType || '(none)'} expected ${v}`]),
+  sq: (n) => (c) => (c.squareFeet && Math.abs(c.squareFeet - n) / n < 0.15 ? [] : [`squareFeet=${c.squareFeet ?? '(none)'} expected ~${n}`]),
+  has: (label, f) => (c) => (f(c) ? [] : [`not captured: ${label}`]),
+};
+
+const T = (o) => o;
+
+export const ARCHETYPES = [
+  T({ id: 'trim300', name: 'Baseboards only, 300 linear ft', pt: 'interior', prop: 'residential', sqft: 1800,
+    items: [['trimLF', 300]],
+    open: { all: "I only want the baseboards painted, about 300 linear feet of them, in a 1,800 sq ft house. No walls, no ceilings. Zip {zip}, {when}. We live here.", vague: "can you just do my baseboards", mixed: "Painting baseboards only, roughly 300 feet total" },
+    ans: { house_size: ['1800 square feet', '1800', 'average size'], color_change: ['going to a bright white', 'white', 'new'] },
+    check: [chk.pt('interior'), chk.has('trim feet', (c) => c.trimLinearFeet === 300 || c.interiorTrim === 'yes'), chk.has('walls off', (c) => c.interiorWalls === 'no' && c.interiorCeilings !== 'yes')] }),
+  T({ id: 'trimcrown', name: 'Baseboards + crown molding (linear ft)', pt: 'interior', prop: 'residential', sqft: 2400,
+    items: [['trimLF', 220], ['crownLF', 180]],
+    open: { all: "Need 220 linear feet of baseboard and 180 linear feet of crown molding painted white, nothing else. 2 story house, zip {zip}, {when}.", vague: "crown molding and baseboard painting", mixed: "crown molding about 180 ft and baseboards 220 ft" },
+    ans: { house_size: ['2400', '2400', 'big'] },
+    check: [chk.pt('interior'), chk.has('crown feet', (c) => c.crownLinearFeet === 180), chk.has('trim feet', (c) => c.trimLinearFeet === 220)] }),
+  T({ id: 'popremove', name: 'Popcorn ceiling removal only (1,100 sq ft)', pt: 'interior', prop: 'residential', sqft: 1500,
+    items: [['popcornRemoveSqft', 1100]],
+    open: { all: "Popcorn ceiling removal only, about 1,100 sq ft of ceiling across the house, we will paint it ourselves after. Zip {zip}, {when}.", vague: "I want my popcorn ceilings gone", mixed: "scrape popcorn off the ceilings, roughly 1100 sq ft, no painting" },
+    ans: { popcorn_extent: ['all of the main living areas and bedrooms', 'most rooms', 'everywhere'] },
+    check: [chk.pt('interior'), chk.has('popcorn removal', (c) => c.prepWork.includes('popcorn_removal')), chk.has('no wall painting', (c) => c.interiorWalls === 'no'), chk.has('area', (c) => c.popcornCeilingSqft === 1100)] }),
+  T({ id: 'popbed', name: 'Popcorn removal + repaint, 2 bedrooms', pt: 'interior', prop: 'residential', rooms: 2,
+    items: [['popcornRemoveSqft', 300], ['ceilingSqft', 300]],
+    open: { all: "Scrape the popcorn ceiling in two bedrooms (about 150 sq ft each) and repaint the ceilings, walls are fine. Zip {zip}, {when}.", vague: "my bedrooms have popcorn ceilings", mixed: "two bedrooms, remove popcorn and repaint the ceiling" },
+    ans: { room_size: ['150 sq ft each', 'small', 'medium'] },
+    check: [chk.pt('interior'), chk.has('popcorn removal', (c) => c.prepWork.includes('popcorn_removal'))] }),
+  T({ id: 'pwhouse', name: 'Pressure wash house exterior only', pt: 'exterior', prop: 'residential', sqft: 2200,
+    items: [['pressureWashSqft', 2200]],
+    open: { all: "Just a pressure wash of my 2 story, 2,200 sq ft vinyl-sided house, no painting. Zip {zip}, {when}.", vague: "need my house power washed", mixed: "pressure washing the outside of the house only, 2 story vinyl" },
+    ans: { siding: ['vinyl', 'vinyl', 'vinyl'], stories: ['two', '2', 'two'], house_size: ['2200', '2200', 'big'] },
+    check: [chk.pt('exterior'), chk.has('pressure wash', (c) => c.prepWork.includes('power_washing')), chk.has('no body painting', (c) => c.exteriorBody === 'no')] }),
+  T({ id: 'pwdrive', name: 'Pressure wash driveway + walkway', pt: 'exterior', prop: 'residential',
+    items: [['pressureWashSqft', 900]],
+    open: { all: "Pressure wash my driveway and front walkway, about 900 sq ft total, zip {zip}, {when}.", vague: "pressure wash the driveway", mixed: "driveway and walkway power wash, 900 square feet" },
+    ans: { siding: ['no painting', 'n/a', 'n/a'], stories: ['n/a', '1', 'one'] },
+    check: [chk.pt('exterior'), chk.has('pressure wash', (c) => c.prepWork.includes('power_washing')), chk.has('area', (c) => c.pressureWashSqft === 900)] }),
+  T({ id: 'rainbow4br', name: '4BR, every room a different color + accent walls', pt: 'interior', prop: 'residential', sqft: 2300,
+    items: [...house(2300), ['extraColor', 8], ['accentWall', 4]],
+    open: { all: "4 bedroom house, 2,300 sq ft. Every room gets a different color and there will be accent walls in each bedroom. Walls, ceilings white, trim and doors too. Zip {zip}, {when}. We live here with furniture.", vague: "I want every room painted a different color", mixed: "four bedroom house with a different color in each room, accent walls in the bedrooms" },
+    ans: { which_rooms: ['the whole house', 'everything', 'all'], house_size: ['2300', '2300', 'about 2300'], color_scope_clarify: ['about 9 colors, one per room', '9', 'a lot'] },
+    check: [chk.pt('interior'), chk.sq(2300), chk.has('multi color', (c) => c.colorChangeScope === 'multiple_colors'), chk.has('accent walls', (c) => c.accentWalls === 'yes' && (c.accentWallCount || 0) >= 2)] }),
+  T({ id: 'accent2', name: '3BR, two accent walls, rest same color', pt: 'interior', prop: 'residential', sqft: 1600,
+    items: [...house(1600), ['accentWall', 2]],
+    open: { all: "3 bedroom house, 1,600 sq ft, repaint everything the same cream color except two accent walls in navy (living room and master). Zip {zip}, {when}.", vague: "two accent walls", mixed: "two navy accent walls, everything else same color, 3 bed house" },
+    ans: { house_size: ['1600', '1600', 'average'], which_rooms: ['the whole house', 'all', 'all'] },
+    check: [chk.pt('interior'), chk.has('2 accent walls', (c) => c.accentWallCount === 2)] }),
+  T({ id: 'dramatic2br', name: '2BR dark navy to white (dramatic change)', pt: 'interior', prop: 'residential', sqft: 1000,
+    items: [...house(1000), ['wallSqft', 600]],
+    open: { all: "2 bedroom condo 1,000 sq ft, walls are dark navy and need to go to white, walls and ceilings, zip {zip}, {when}. I live here.", vague: "going from dark to light", mixed: "2 bedroom, navy to white, walls and ceilings" },
+    ans: { color_change: ['dark navy to bright white, really dramatic', 'dark to light', 'big change'], house_size: ['1000', '1000', 'smallish'] },
+    check: [chk.pt('interior'), chk.has('dramatic', (c) => c.interiorColorChange === 'dramatic')] }),
+  T({ id: 'cab32', name: 'Kitchen cabinets only, 32 doors and drawers', pt: 'interior', prop: 'residential', rooms: 1,
+    items: [['cabinetFront', 28], ['cabinetSetup', 1]],
+    open: { all: "Paint my kitchen cabinets only, 32 doors and drawer fronts, painted maple, going to white, zip {zip}, {when}.", vague: "cabinets", mixed: "kitchen cabinets, about 32 doors and drawers" },
+    ans: { which_rooms: ['the kitchen', 'kitchen', 'kitchen'] },
+    check: [chk.pt('interior'), chk.has('cabinets', (c) => c.cabinets && c.cabinets !== 'none'), chk.has('door count', (c) => c.cabinetDoorCount === 32), chk.has('walls off', (c) => c.interiorWalls === 'no')] }),
+  T({ id: 'cabisland', name: 'Cabinets + island, inside and out, 40 fronts', pt: 'interior', prop: 'residential', rooms: 1,
+    items: [['cabinetFront', 34], ['cabinetSetup', 1]],
+    open: { all: "Kitchen cabinets plus the island, painting inside and out, 40 doors and drawers all together. Zip {zip}, {when}. House is occupied.", vague: "big kitchen cabinet job", mixed: "kitchen cabinets and island, 40 fronts, insides too" },
+    ans: { which_rooms: ['kitchen', 'kitchen', 'kitchen'] },
+    check: [chk.pt('interior'), chk.has('inside too', (c) => c.cabinetScope === 'inside_too'), chk.has('door count', (c) => c.cabinetDoorCount === 40)] }),
+  T({ id: 'vanity48', name: '48" bathroom vanity only', pt: 'interior', prop: 'residential', rooms: 1,
+    items: [['vanity', 1]],
+    open: { all: "Just painting one 48 inch bathroom vanity, nothing else in the bathroom, zip {zip}, {when}.", vague: "paint a vanity", mixed: "one bathroom vanity" },
+    ans: { which_rooms: ['bathroom', 'bathroom', 'a bathroom'] },
+    check: [chk.pt('interior'), chk.has('vanity', (c) => c.cabinets && c.cabinets !== 'none'), chk.has('walls off', (c) => c.interiorWalls === 'no')] }),
+  T({ id: 'twobathvan', name: 'Two bathrooms: walls, ceilings, vanities', pt: 'interior', prop: 'residential', rooms: 2,
+    items: [['wallSqft', 420], ['ceilingSqft', 110], ['vanity', 2]],
+    open: { all: "Two bathrooms (one 5x8, one 8x10), walls, ceilings and both vanities, zip {zip}, {when}.", vague: "two bathrooms", mixed: "both bathrooms with the vanities too" },
+    ans: { room_size: ['5x8 and 8x10', 'small', 'small'] },
+    check: [chk.pt('interior'), chk.has('2 baths', (c) => c.selectedRooms.length >= 2), chk.has('vanities', (c) => c.cabinets && c.cabinets !== 'none')] }),
+  T({ id: 'rail22', name: 'Stair railing only, 22 ft with spindles', pt: 'interior', prop: 'residential',
+    items: [['stairRailSpindleLF', 22]],
+    open: { all: "Only the stair railing and spindles, about 22 feet of it, going from stained oak to white, zip {zip}, {when}.", vague: "paint my banister", mixed: "stair railing with spindles, 22 ft, that's all" },
+    ans: { which_rooms: ['the staircase railing', 'stair rail', 'the stairs'], surfaces: ['only the railing and spindles', 'just the railing', 'just that'] },
+    check: [chk.pt('interior'), chk.has('railing only', (c) => c.stairwayDetails === 'railings_only'), chk.has('feet', (c) => c.stairRailFeet === 22)] }),
+  T({ id: 'stairwalls', name: 'Stairwell walls (tall) + railing', pt: 'interior', prop: 'residential',
+    items: [['stairWalls', 2], ['stairRailLF', 24]],
+    open: { all: "Two flights of stairs: paint the stairwell walls (they are 18 feet tall) and the railing, zip {zip}, {when}. Need a tall ladder or scaffold.", vague: "my staircase", mixed: "stairwell walls and railing, two flights, very tall" },
+    ans: { which_rooms: ['stairwell', 'the stairs', 'stairs'] },
+    check: [chk.pt('interior'), chk.has('stairs', (c) => c.stairways === 'yes'), chk.has('equipment', (c) => c.specialEquipment !== 'none')] }),
+  T({ id: 'bed1', name: 'One bedroom, walls ceiling trim', pt: 'interior', prop: 'residential', rooms: 1,
+    items: [['wallSqft', 420], ['ceilingSqft', 168], ['trimLF', 50], ['doorEach', 1]],
+    open: { all: "One bedroom 12x14: walls, ceiling, baseboards and the door. Zip {zip}, {when}. It's furnished.", vague: "bedroom", mixed: "a bedroom, 12 by 14, everything" },
+    ans: { room_size: ['12 by 14', 'medium', 'regular'] },
+    check: [chk.pt('interior'), chk.has('1 room', (c) => c.selectedRooms.length === 1)] }),
+  T({ id: 'nursery2', name: 'Nursery, low-VOC, 10x11', pt: 'interior', prop: 'residential', rooms: 1,
+    items: [['wallSqft', 330], ['ceilingSqft', 110]], mods: { lowVoc: true },
+    open: { all: "Baby nursery 10x11, walls and ceiling, zero-VOC paint please, zip {zip}, {when}.", vague: "baby room", mixed: "nursery, low odor paint, walls and ceiling" },
+    ans: { room_size: ['10x11', 'small', 'small'] },
+    check: [chk.pt('interior'), chk.has('low voc', (c) => c.lowVocRequested === 'yes')] }),
+  T({ id: 'closets3', name: 'Three closets only', pt: 'interior', prop: 'residential', rooms: 3,
+    items: [['wallSqft', 300], ['doorEach', 3]],
+    open: { all: "Paint the inside of three closets (two standard, one walk-in) and the closet doors, zip {zip}, {when}.", vague: "closets", mixed: "three closets, inside and doors" },
+    ans: { which_rooms: ['three closets', 'closets', 'closets'] },
+    check: [chk.pt('interior'), chk.has('closets', (c) => c.closets !== 'none')] }),
+  T({ id: 'frontshutters', name: 'Front door + 10 shutters + double garage door', pt: 'exterior', prop: 'residential',
+    items: [['frontDoor', 1], ['shutterEach', 10], ['garageDouble', 1]],
+    open: { all: "Exterior: repaint the front door, 10 shutters and our double garage door only, zip {zip}, {when}.", vague: "front door and shutters", mixed: "front door, shutters (10) and the garage door" },
+    ans: { siding: ['not painting the siding', 'n/a', 'n/a'], stories: ['one', '1', 'one'] },
+    check: [chk.pt('exterior'), chk.has('shutters 10', (c) => c.exteriorShutters === 'yes' && c.exteriorShutterCount === 10), chk.has('garage', (c) => c.garageDoor === 'double'), chk.has('no body', (c) => c.exteriorBody === 'no')] }),
+  T({ id: 'garagesingle', name: 'Single garage door only', pt: 'exterior', prop: 'residential',
+    items: [['garageSingle', 1]],
+    open: { all: "Only one single garage door needs painting, zip {zip}, {when}.", vague: "garage door", mixed: "single garage door only" },
+    ans: { siding: ['n/a', 'n/a', 'n/a'], stories: ['one', '1', 'one'] },
+    check: [chk.pt('exterior'), chk.has('garage', (c) => c.garageDoor === 'single'), chk.has('no body', (c) => c.exteriorBody === 'no')] }),
+  T({ id: 'fence200', name: 'Privacy fence 200 ft', pt: 'exterior', prop: 'residential',
+    items: [['fenceLF', 200]],
+    open: { all: "6 foot wood privacy fence, 200 linear feet, both sides, stain it. Zip {zip}, {when}.", vague: "fence", mixed: "privacy fence about 200 feet" },
+    ans: { siding: ['wood fence', 'wood', 'wood'], stories: ['n/a', '1', 'one'] },
+    check: [chk.pt('exterior'), chk.has('fence', (c) => c.fence === 'yes'), chk.has('feet', (c) => c.fenceLinearFeet === 200), chk.has('no body', (c) => c.exteriorBody === 'no')] }),
+  T({ id: 'picket80', name: 'Picket fence 80 ft', pt: 'exterior', prop: 'residential',
+    items: [['fenceLF', 80]],
+    open: { all: "White picket fence, 4 feet tall, 80 feet long, repaint it, zip {zip}, {when}.", vague: "my picket fence", mixed: "picket fence, 80 ft" },
+    ans: { siding: ['wood', 'wood', 'wood'], stories: ['n/a', '1', 'one'] },
+    check: [chk.pt('exterior'), chk.has('picket', (c) => c.fence === 'yes' && c.fenceType === 'picket_4ft'), chk.has('feet', (c) => c.fenceLinearFeet === 80)] }),
+  T({ id: 'deck240', name: 'Deck stain 12x20', pt: 'exterior', prop: 'residential',
+    items: [['deckStainSqft', 240]],
+    open: { all: "Stain and seal my 12x20 wood deck, it needs a good cleaning first, zip {zip}, {when}.", vague: "deck", mixed: "12x20 deck, stain it" },
+    ans: { siding: ['wood deck only', 'wood', 'wood'], stories: ['ground level', '1', 'one'] },
+    check: [chk.pt('exterior'), chk.has('deck', (c) => c.deck === 'yes'), chk.has('size', (c) => c.deckSqft === 240), chk.has('no body', (c) => c.exteriorBody === 'no')] }),
+  T({ id: 'deckrail', name: 'Deck paint 400 sq ft + 40 ft railing', pt: 'exterior', prop: 'residential',
+    items: [['deckPaintSqft', 400], ['stairRailLF', 40]],
+    open: { all: "Paint a 400 sq ft deck and its 40 foot railing (spindles), nothing on the house itself. Zip {zip}, {when}.", vague: "deck and railing", mixed: "deck painting, 400 sq ft, plus railing" },
+    ans: { siding: ['wood deck', 'wood', 'wood'], stories: ['one', '1', 'one'] },
+    check: [chk.pt('exterior'), chk.has('deck', (c) => c.deck === 'yes'), chk.has('railings', (c) => c.railings === 'yes')] }),
+  T({ id: 'porch2', name: 'Porch: ceiling, railing, floor', pt: 'exterior', prop: 'residential',
+    items: [['ceilingSqft', 200], ['stairRailLF', 36], ['deckPaintSqft', 200]],
+    open: { all: "Front porch only: beadboard ceiling (200 sq ft), railings (36 ft) and the floor, zip {zip}, {when}.", vague: "porch", mixed: "porch ceiling railing and floor" },
+    ans: { siding: ['wood', 'wood', 'wood'], stories: ['one', '1', 'one'] },
+    check: [chk.pt('exterior'), chk.has('railings', (c) => c.railings === 'yes')] }),
+  T({ id: 'fascia180', name: 'Fascia, soffits and eaves only', pt: 'exterior', prop: 'residential', sqft: 1500,
+    items: [['fasciaSoffitLF', 360]],
+    open: { all: "Just the fascia, soffits and eaves on our 1 story 1,500 sq ft brick house (about 180 linear feet of fascia). Zip {zip}, {when}.", vague: "soffits and fascia", mixed: "fascia soffits eaves only, brick house" },
+    ans: { siding: ['brick, not painting it', 'brick', 'brick'], stories: ['one', '1', 'one'], house_size: ['1500', '1500', 'medium'] },
+    check: [chk.pt('exterior'), chk.has('soffits', (c) => c.soffitsEaves === 'yes'), chk.has('no body', (c) => c.exteriorBody === 'no')] }),
+  T({ id: 'gutters150', name: 'Gutters and downspouts, 150 ft', pt: 'exterior', prop: 'residential', sqft: 1900,
+    items: [['gutterLF', 150]],
+    open: { all: "Paint gutters and downspouts only, about 150 linear feet, 2 story house 1,900 sq ft, zip {zip}, {when}.", vague: "gutters", mixed: "gutters and downspouts, 150 ft" },
+    ans: { stories: ['two', '2', 'two'], house_size: ['1900', '1900', 'average'] },
+    check: [chk.pt('exterior'), chk.has('gutters', (c) => c.gutters === 'yes'), chk.has('no body', (c) => c.exteriorBody === 'no')] }),
+  T({ id: 'stucco2story', name: '2-story stucco exterior + trim + garage + 2 doors', pt: 'exterior', prop: 'residential', sqft: 2600,
+    items: [['sidingSqft:stucco', 2000], ['fasciaSoffitLF', 400], ['garageDouble', 1], ['frontDoor', 2]],
+    open: { all: "Whole exterior of our 2 story stucco house, 2,600 sq ft: body, trim, fascia, double garage door and two entry doors. Zip {zip}, {when}.", vague: "paint the outside of my house", mixed: "two story stucco house exterior, 2600 sq ft, with trim and doors" },
+    ans: { siding: ['stucco', 'stucco', 'stucco'], stories: ['two', '2', 'two'], house_size: ['2600', '2600', 'big'] },
+    check: [chk.pt('exterior'), chk.has('stucco', (c) => c.sidingType === 'stucco'), chk.sq(2600)] }),
+  T({ id: 'brick1', name: '1-story brick exterior 1,700', pt: 'exterior', prop: 'residential', sqft: 1700,
+    items: [['sidingSqft:brick', 1500], ['fasciaSoffitLF', 300]],
+    open: { all: "Paint the brick on our 1,700 sq ft one-story house white, plus fascia and soffits. Zip {zip}, {when}.", vague: "painting brick", mixed: "one story brick house exterior, 1700 sq ft" },
+    ans: { siding: ['brick', 'brick', 'brick'], stories: ['one', '1', 'one'], house_size: ['1700', '1700', 'medium'] },
+    check: [chk.pt('exterior'), chk.has('brick', (c) => c.sidingType === 'brick'), chk.sq(1700)] }),
+  T({ id: 'vic3col', name: 'Victorian, 3-color, extra trim detail', pt: 'exterior', prop: 'residential', sqft: 2800,
+    items: [['sidingSqft:wood', 3100], ['extraColor', 2], ['fasciaSoffitLF', 450]],
+    open: { all: "Victorian house, 3 stories, 2,800 sq ft, wood siding, three colors (body, trim, accent) with lots of gingerbread trim. Exterior only. Zip {zip}, {when}.", vague: "old victorian exterior", mixed: "victorian, three stories, three colors, wood siding" },
+    ans: { siding: ['wood', 'wood', 'wood'], stories: ['three', '3', 'three'], house_size: ['2800', '2800', 'big'], color_scope_clarify: ['three colors', '3', 'three'] },
+    check: [chk.pt('exterior'), chk.has('wood', (c) => c.sidingType === 'wood'), chk.has('3 stories', (c) => c.stories === 3), chk.has('colors', (c) => c.colorCount === 3)] }),
+  T({ id: 'hardie2', name: 'Hardie exterior 2-story + 8 shutters', pt: 'exterior', prop: 'residential', sqft: 2000,
+    items: [['sidingSqft:hardie', 1700], ['shutterEach', 8]],
+    open: { all: "Fiber cement (Hardie) siding house, 2 stories, 2,000 sq ft, full repaint plus 8 shutters, zip {zip}, {when}.", vague: "hardie board house", mixed: "hardie siding two story exterior with shutters" },
+    ans: { siding: ['hardie board', 'hardie', 'hardie'], stories: ['two', '2', 'two'], house_size: ['2000', '2000', 'average'] },
+    check: [chk.pt('exterior'), chk.has('hardie', (c) => c.sidingType === 'hardie'), chk.has('shutters', (c) => c.exteriorShutters === 'yes')] }),
+  T({ id: 'patio5', name: 'Patio set: table + 4 chairs', pt: 'exterior', prop: 'residential',
+    items: [['patioPiece', 5]],
+    open: { all: "Refinish my metal patio set: one table and 4 chairs, zip {zip}, {when}.", vague: "patio furniture", mixed: "patio table and four chairs" },
+    ans: { siding: ['n/a', 'n/a', 'n/a'], stories: ['n/a', '1', 'one'] },
+    check: [chk.has('furniture', (c) => c.specialtyServices.includes('furniture') && c.furnitureItems.length >= 4), chk.has('no body', (c) => c.exteriorBody === 'no')] }),
+  T({ id: 'patio13', name: 'Patio: 2 tables, 8 chairs, 2 loungers', pt: 'exterior', prop: 'residential',
+    items: [['patioPiece', 12]],
+    open: { all: "Paint outdoor furniture: two tables, 8 chairs and 2 loungers, all wrought iron. Zip {zip}, {when}.", vague: "lots of outdoor furniture", mixed: "2 tables 8 chairs 2 loungers outdoor" },
+    ans: { siding: ['n/a', 'n/a', 'n/a'], stories: ['n/a', '1', 'one'] },
+    check: [chk.has('furniture count', (c) => c.furnitureItems.length >= 10)] }),
+  T({ id: 'ironrail', name: 'Wrought iron railing, 30 ft', pt: 'exterior', prop: 'residential',
+    items: [['stairRailSpindleLF', 30]],
+    open: { all: "Wrought iron front steps railing, about 30 feet, needs rust treatment and paint, zip {zip}, {when}.", vague: "iron railing", mixed: "metal railing outside, 30 ft" },
+    ans: { siding: ['n/a', 'n/a', 'n/a'], stories: ['one', '1', 'one'] },
+    check: [chk.pt('exterior'), chk.has('railings', (c) => c.railings === 'yes')] }),
+  T({ id: 'restaurant2200', name: 'Restaurant 2,200 sq ft, after hours', pt: 'interior', prop: 'commercial', sqft: 2200,
+    items: [['restaurant', 2200]], mods: { afterHours: true },
+    open: { all: "Restaurant, 2,200 sq ft: dining room, bar and kitchen walls and ceilings. Must be done overnight or Mondays. Zip {zip}, {when}.", vague: "restaurant repaint", mixed: "2200 sq ft restaurant, overnight work only" },
+    ans: { house_size: ['2200', '2200', 'medium'], commercial_access: ['overnight and Mondays only', 'after hours', 'nights'] },
+    check: [chk.pt('interior'), chk.sq(2200), chk.has('commercial', (c) => c.propertyType === 'commercial'), chk.has('after hours', (c) => c.afterHoursRequired === 'yes')] }),
+  T({ id: 'coffee1100', name: 'Coffee shop 1,100 sq ft', pt: 'interior', prop: 'commercial', sqft: 1100,
+    items: [['commercialGeneral', 1100]],
+    open: { all: "Coffee shop, 1,100 sq ft, all interior walls and ceiling, we can close two days. Zip {zip}, {when}.", vague: "coffee shop", mixed: "coffee shop interior 1100 sq ft" },
+    ans: { house_size: ['1100', '1100', 'small'], commercial_access: ['we can close for two days', 'closed', 'closed'] },
+    check: [chk.pt('interior'), chk.sq(1100), chk.has('commercial', (c) => c.propertyType === 'commercial')] }),
+  T({ id: 'retail3500', name: 'Retail store 3,500 sq ft, 14 ft ceilings', pt: 'interior', prop: 'commercial', sqft: 3500,
+    items: [['retail', 3500]],
+    open: { all: "Retail store, 3,500 sq ft with 14 foot ceilings, walls and ceiling, zip {zip}, {when}. Open during the day so evenings.", vague: "store repaint", mixed: "3500 sq ft retail, high ceilings" },
+    ans: { house_size: ['3500', '3500', 'big'], commercial_access: ['evenings only', 'after hours', 'nights'] },
+    check: [chk.pt('interior'), chk.sq(3500), chk.has('commercial', (c) => c.propertyType === 'commercial')] }),
+  T({ id: 'office2400', name: 'Office, 6 offices, 2,400 sq ft, weekends', pt: 'interior', prop: 'commercial', sqft: 2400,
+    items: [['office', 2400]], mods: { afterHours: true },
+    open: { all: "Office suite: 6 offices, conference room and reception, 2,400 sq ft total, weekends only. Zip {zip}, {when}.", vague: "our office", mixed: "2400 sq ft office, weekends only" },
+    ans: { house_size: ['2400', '2400', 'medium'], commercial_access: ['weekends only', 'weekends', 'weekend'] },
+    check: [chk.pt('interior'), chk.sq(2400), chk.has('after hours', (c) => c.afterHoursRequired === 'yes')] }),
+  T({ id: 'dental2000', name: 'Dental office 2,000 sq ft, low-VOC', pt: 'interior', prop: 'commercial', sqft: 2000,
+    items: [['medical', 2000]], mods: { lowVoc: true },
+    open: { all: "Dental office, 2,000 sq ft, 7 treatment rooms, antimicrobial low-VOC paint, weekends. Zip {zip}, {when}.", vague: "dental clinic", mixed: "dental office, low odor paint, weekend work" },
+    ans: { house_size: ['2000', '2000', 'medium'], commercial_access: ['weekends', 'weekends only', 'weekend'] },
+    check: [chk.pt('interior'), chk.has('low voc', (c) => c.lowVocRequested === 'yes'), chk.sq(2000)] }),
+  T({ id: 'gym5000', name: 'Gym 5,000 sq ft, 18 ft ceilings', pt: 'interior', prop: 'commercial', sqft: 5000,
+    items: [['warehouse', 5000]],
+    open: { all: "Gym, 5,000 sq ft with 18 foot ceilings, walls only, need a lift, zip {zip}, {when}.", vague: "gym", mixed: "5000 sq ft gym, tall ceilings, walls" },
+    ans: { house_size: ['5000', '5000', 'big'], commercial_access: ['early mornings before we open', 'before open', 'closed'] },
+    check: [chk.pt('interior'), chk.sq(5000), chk.has('lift', (c) => c.specialEquipment === 'lift' || c.specialEquipment === 'scaffolding')] }),
+  T({ id: 'church6500', name: 'Church sanctuary 6,500 sq ft', pt: 'interior', prop: 'commercial', sqft: 6500,
+    items: [['commercialGeneral', 6500]],
+    open: { all: "Church sanctuary and hall, 6,500 sq ft, 24 foot ceilings, scaffold needed, zip {zip}, {when}.", vague: "church", mixed: "church interior, 6500 sq ft, scaffold" },
+    ans: { house_size: ['6500', '6500', 'very big'], commercial_access: ['weekdays are fine', 'weekdays', 'any'] },
+    check: [chk.pt('interior'), chk.sq(6500), chk.has('equipment', (c) => c.specialEquipment !== 'none')] }),
+  T({ id: 'turn_studio', name: 'Studio turnover, vacant', pt: 'interior', prop: 'rental', sqft: 480,
+    items: [[['turnoverUnit', 'studio'], 1]],
+    open: { all: "Landlord: studio turnover, 480 sq ft, vacant, walls and ceiling, a few scuffs. Zip {zip}, {when}.", vague: "unit turnover", mixed: "studio apartment between tenants" },
+    ans: { house_size: ['480', '480', 'small'] },
+    check: [chk.pt('interior'), chk.sq(480), chk.has('rental', (c) => c.propertyType === 'rental')] }),
+  T({ id: 'turn_3br', name: '3BR turnover, vacant', pt: 'interior', prop: 'rental', sqft: 1250,
+    items: [[['turnoverUnit', 'br3'], 1]],
+    open: { all: "Landlord: 3 bedroom unit, 1,250 sq ft, vacant, full repaint walls ceilings trim, zip {zip}, {when}.", vague: "rental repaint", mixed: "3 bedroom rental, vacant, full repaint" },
+    ans: { house_size: ['1250', '1250', 'medium'] },
+    check: [chk.pt('interior'), chk.sq(1250), chk.has('rental', (c) => c.propertyType === 'rental')] }),
+  T({ id: 'pm10', name: 'Property manager: 10 units x 700 sq ft', pt: 'interior', prop: 'multi_unit', sqft: 7000,
+    items: [[['turnoverUnit', 'br1'], 10]],
+    open: { all: "Property manager: 10 one-bedroom units, 700 sq ft each, repaint walls and ceilings, do them one at a time as tenants leave. Zip {zip}, {when}.", vague: "I manage apartments", mixed: "10 units, 700 each, one at a time" },
+    ans: { house_size: ['700 each, 7000 total', '7000', 'ten small units'], commercial_access: ['vacant when painted', 'vacant', 'vacant'] },
+    check: [chk.pt('interior'), chk.has('multi-phase', (c) => c.multiPhaseRequested === 'yes'), chk.has('multi-unit', (c) => c.propertyType === 'multi_unit')] }),
+  T({ id: 'wallp3', name: 'Wallpaper removal 3 rooms + paint', pt: 'interior', prop: 'residential', rooms: 3,
+    items: [['wallpaperSqft', 900], ['wallSqft', 900]],
+    open: { all: "Strip wallpaper in the dining room, hallway and powder room (3 rooms) and paint them, zip {zip}, {when}.", vague: "old wallpaper everywhere", mixed: "remove wallpaper in three rooms and paint" },
+    ans: { room_size: ['dining 12x14, hall 4x20, powder 5x6', 'medium', 'smallish'] },
+    check: [chk.pt('interior'), chk.has('wallpaper', (c) => c.prepWork.includes('wallpaper_removal')), chk.has('rooms', (c) => c.wallpaperRooms === 3)] }),
+  T({ id: 'newbuild3200', name: 'New construction 3,200 sq ft', pt: 'interior', prop: 'residential', sqft: 3200,
+    items: house(3200),
+    open: { all: "New construction, 3,200 sq ft, drywall hung and primed, need walls, ceilings, trim and doors painted, zip {zip}, {when}. Floors not in yet.", vague: "new house", mixed: "new build, 3200 sq ft, all interior paint" },
+    ans: { house_size: ['3200', '3200', 'big'], reno_context: ['drywall done, floors and cabinets not installed yet', 'drywall done', 'mostly'] },
+    check: [chk.pt('interior'), chk.sq(3200), chk.has('new construction', (c) => c.projectCondition === 'new_construction')] }),
+  T({ id: 'basement1200', name: 'Basement 1,200 sq ft, exposed ceiling', pt: 'interior', prop: 'residential', sqft: 1200,
+    items: [['wallSqft', 1500], ['ceilingSqft', 1200]],
+    open: { all: "Basement, 1,200 sq ft, paint walls and spray the exposed ceiling black, zip {zip}, {when}. Some efflorescence on the block walls.", vague: "basement", mixed: "1200 sq ft basement with exposed ceiling" },
+    ans: { which_rooms: ['basement', 'basement', 'basement'], house_size: ['1200', '1200', 'big'] },
+    check: [chk.pt('interior'), chk.has('basement', (c) => c.selectedRooms.length >= 1 || c.squareFeet === 1200)] }),
+  T({ id: 'garage480', name: 'Garage walls + epoxy floor 480 sq ft', pt: 'interior', prop: 'residential',
+    items: [['wallSqft', 800], ['epoxy', 0]],
+    open: { all: "Two car garage, 480 sq ft: paint the walls and epoxy the floor, zip {zip}, {when}.", vague: "garage", mixed: "garage walls and epoxy floor, two car" },
+    ans: { which_rooms: ['garage', 'garage', 'garage'], room_size: ['480 sq ft', 'large', 'two car'] },
+    check: [chk.has('garage', (c) => c.selectedRooms.includes('garage') || c.specialtyServices.includes('epoxy'))] }),
+  T({ id: 'condo700', name: 'High-rise 1BR condo 700 sq ft', pt: 'interior', prop: 'condo', sqft: 700,
+    items: house(700),
+    open: { all: "1 bedroom high-rise condo, 700 sq ft, walls ceilings and trim, building requires insurance and elevator booking, zip {zip}, {when}. I live here.", vague: "condo", mixed: "700 sq ft one bedroom condo, high rise" },
+    ans: { house_size: ['700', '700', 'small'] },
+    check: [chk.pt('interior'), chk.sq(700), chk.has('condo', (c) => c.propertyType === 'condo' || c.hoa === 'yes')] }),
+];
+
+// expand "sidingSqft:stucco" style keys used above into bench units
+function expandItems(items) {
+  return items
+    .map(([k, q]) => (typeof k === 'string' && k.includes(':') ? [[k.split(':')[0], k.split(':')[1]], q] : [k, q]))
+    .map(([k, q]) => (Array.isArray(k) && k[0] === 'sidingSqft' ? [['sidingSqft', k[1]], q] : [k, q]))
+    .filter(([k]) => k !== 'epoxy');
+}
+
+export function benchFor(arch, regional) {
+  const items = expandItems(arch.items);
+  // epoxy garage floor: $3-8 per sq ft (standard to high-build), 480 sq ft
+  let [lo, typ, hi] = benchmark(items, regional, arch.mods || {});
+  if (arch.id === 'garage480') { lo += 480 * 3 * regional; typ += 480 * 5 * regional; hi += 480 * 8 * regional; }
+  return [lo, typ, hi];
+}
+
+export function buildScenarios2() {
+  const STYLES = [
+    { name: 'all-at-once', open: 'all', reg: 0 },
+    { name: 'all-at-once-terse', open: 'all', reg: 1 },
+    { name: 'vague-then-detailed', open: 'vague', reg: 0 },
+    { name: 'vague-and-terse', open: 'vague', reg: 1 },
+    { name: 'mixed-detail', open: 'mixed', reg: 'mix' },
+    { name: 'minimal-vague', open: 'mixed', reg: 2 },
+    { name: 'rambling', open: 'ramble', reg: 0 },
+    { name: 'rambling-terse', open: 'ramble', reg: 1 },
+  ];
+  const FIXES = [null, null, { type: 'zip' }, null, { type: 'sqft' }, null, { type: 'timing' }, null];
+  const out = [];
+  let n = 0;
+  ARCHETYPES.forEach((arch, ai) => {
+    for (let v = 0; v < 4; v++) {
+      const style = STYLES[(ai * 3 + v * 3 + (ai >> 2)) % STYLES.length];
+      const zi = (ai * 5 + v * 17) % ZIPS.length;
+      const [zip, zipLabel] = ZIPS[zi];
+      const [zip2] = ZIPS[(zi + 9) % ZIPS.length];
+      const when = WHENS[(ai * 2 + v * 5) % WHENS.length];
+      const occ = arch.prop === 'commercial' ? 'closed' : arch.prop === 'rental' ? 'empty' : v % 2 ? 'furnished and lived-in' : 'occupied';
+      const fix = FIXES[(ai + v * 3) % FIXES.length];
+      out.push({ n: ++n, arch, style, zip, zipLabel, zip2, when, occ, fix });
+    }
+  });
+  return out;
+}
+
+// "ramble" opener: the same facts buried in chatter
+export function openerText(arch, style, zip, when) {
+  const base = style.open === 'ramble'
+    ? `ok so, long story, we have been meaning to do this forever and my brother-in-law said he would help but he never did lol. anyway. ${arch.open.all} thanks so much, honestly just want it done right`
+    : arch.open[style.open];
+  return base.replace('{zip}', zip).replace('{when}', when.text);
+}
+
+// Keep the simulated customer consistent with the job they described (a nursery is ONE room, "baseboards only" means
+// no walls...). Without this the persona itself would contradict its own opening message.
+const EXTRA = {
+  trim300: { which_rooms: ['the whole house, but only the baseboards', 'whole house, baseboards only', 'whole house'], surfaces: ['only the baseboards, no walls or ceilings', 'just baseboards', 'just the trim'], trim_scope: ['baseboards only, about 300 feet', 'baseboards only', 'baseboards'] },
+  trimcrown: { which_rooms: ['the whole house, only trim and crown', 'whole house, trim only', 'whole house'], surfaces: ['only baseboards and crown molding', 'just the trim', 'just trim'], trim_scope: ['baseboards and crown molding only', 'baseboards and crown', 'trim'] },
+  popremove: { which_rooms: ['the whole house, ceilings only', 'ceilings only', 'ceilings'], surfaces: ['only the ceiling texture removal, no painting', 'just removal', 'just ceilings'] },
+  popbed: { which_rooms: ['two bedrooms', '2 bedrooms', 'two bedrooms'], surfaces: ['just the ceilings', 'ceilings only', 'ceilings'] },
+  cab32: { which_rooms: ['the kitchen', 'kitchen', 'kitchen'], surfaces: ['only the cabinets', 'cabinets only', 'just cabinets'] },
+  cabisland: { which_rooms: ['the kitchen', 'kitchen', 'kitchen'], surfaces: ['only the cabinets and island', 'cabinets only', 'just cabinets'] },
+  vanity48: { which_rooms: ['one bathroom', 'a bathroom', 'a bathroom'], surfaces: ['only the vanity', 'just the vanity', 'the vanity'] },
+  twobathvan: { which_rooms: ['two bathrooms', 'two bathrooms', 'two baths'], surfaces: ['walls, ceilings and vanities', 'walls ceilings vanities', 'all of it'] },
+  rail22: { which_rooms: ['just the staircase railing', 'stair rail', 'the stairs'], surfaces: ['only the railing and spindles', 'just the railing', 'just that'] },
+  stairwalls: { which_rooms: ['the stairwell', 'stairs', 'the stairs'], surfaces: ['stairwell walls and the railing', 'walls and rail', 'stairs'] },
+  bed1: { which_rooms: ['one bedroom', 'a bedroom', 'a bedroom'], surfaces: ['walls, ceiling, baseboards and the door', 'everything', 'everything'] },
+  nursery2: { which_rooms: ['the nursery, one room', 'nursery', 'nursery'], surfaces: ['walls and ceiling', 'walls and ceiling', 'walls and ceiling'] },
+  closets3: { which_rooms: ['three closets', 'closets', 'closets'], surfaces: ['inside the closets and the closet doors', 'closets only', 'closets'] },
+  wallp3: { which_rooms: ['dining room, hallway and powder room', 'dining, hall, powder', 'three rooms'], surfaces: ['walls', 'walls', 'walls'] },
+  basement1200: { which_rooms: ['the basement', 'basement', 'basement'], surfaces: ['walls and the exposed ceiling', 'walls and ceiling', 'walls and ceiling'] },
+  garage480: { which_rooms: ['the garage', 'garage', 'garage'], surfaces: ['walls', 'walls', 'walls'] },
+  condo700: { which_rooms: ['the whole condo', 'whole condo', 'all'], surfaces: ['walls, ceilings and trim', 'walls ceilings trim', 'the usual'] },
+  turn_studio: { which_rooms: ['the whole studio', 'whole unit', 'all'], surfaces: ['walls and ceiling', 'walls and ceiling', 'walls and ceiling'] },
+  turn_3br: { which_rooms: ['the whole unit', 'whole unit', 'all'], surfaces: ['walls, ceilings and trim', 'walls ceilings trim', 'everything'] },
+  pm10: { which_rooms: ['all ten units', 'ten units', 'all'], surfaces: ['walls and ceilings', 'walls ceilings', 'walls ceilings'] },
+  restaurant2200: { which_rooms: ['the whole restaurant', 'whole space', 'all'], surfaces: ['walls and ceilings', 'walls ceilings', 'walls ceilings'] },
+  coffee1100: { which_rooms: ['the whole shop', 'whole space', 'all'], surfaces: ['walls and ceiling', 'walls ceiling', 'walls ceiling'] },
+  retail3500: { which_rooms: ['the whole store', 'whole space', 'all'], surfaces: ['walls and ceiling', 'walls ceiling', 'walls ceiling'] },
+  office2400: { which_rooms: ['the whole suite', 'whole suite', 'all'], surfaces: ['walls and ceilings', 'walls ceilings', 'walls ceilings'] },
+  dental2000: { which_rooms: ['the whole clinic', 'whole space', 'all'], surfaces: ['walls and ceilings', 'walls ceilings', 'walls ceilings'] },
+  gym5000: { which_rooms: ['the whole gym', 'whole space', 'all'], surfaces: ['walls only', 'walls only', 'walls only'] },
+  church6500: { which_rooms: ['the sanctuary and hall', 'sanctuary and hall', 'all'], surfaces: ['walls and ceiling', 'walls ceiling', 'walls ceiling'] },
+  newbuild3200: { which_rooms: ['the whole house', 'whole house', 'all'], surfaces: ['walls, ceilings, trim and doors', 'everything', 'everything'] },
+};
+for (const a of ARCHETYPES) a.ans = { ...(EXTRA[a.id] || {}), ...(a.ans || {}) };

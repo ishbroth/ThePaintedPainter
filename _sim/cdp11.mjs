@@ -1,0 +1,13 @@
+import { spawn } from 'node:child_process';
+const chrome = spawn('C:/Program Files/Google/Chrome/Application/chrome.exe', ['--headless=new','--disable-gpu','--remote-debugging-port=9345','--window-size=1300,900','--user-data-dir='+process.env.TEMP+'/cdp-prof12','about:blank'],{stdio:'ignore'});
+await new Promise(r=>setTimeout(r,8000));
+const tabs = await (await fetch('http://127.0.0.1:9345/json')).json();
+const ws = new WebSocket(tabs.find(t=>t.type==='page').webSocketDebuggerUrl);
+await new Promise(r=>ws.onopen=r);
+let id=0;const p=new Map();ws.onmessage=m=>{const d=JSON.parse(m.data);if(d.id&&p.has(d.id)){p.get(d.id)(d.result);p.delete(d.id)}};
+const send=(method,params={})=>new Promise(res=>{const i=++id;p.set(i,res);ws.send(JSON.stringify({id:i,method,params}))});
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const ev=async e=>(await send('Runtime.evaluate',{expression:e,returnByValue:true})).result?.value;
+await send('Page.enable');await send('Page.navigate',{url:'http://localhost:5173/'});await sleep(9000);
+console.log(await ev("(()=>{const c=document.querySelector('.chat-estimator-card');const h=c.getBoundingClientRect().height;c.style.minHeight='0';const n=c.getBoundingClientRect().height;c.style.minHeight='';return JSON.stringify({withMin:h,natural:n})})()"));
+ws.close();chrome.kill();process.exit(0);

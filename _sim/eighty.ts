@@ -1,0 +1,14 @@
+import { handleUserMessage, makeInitialState, type ChatState } from '../src/lib/chatEstimator/chatEngine.ts';
+import { setLLMReaderForTests } from '../src/lib/chatEstimator/llmClient.ts';
+import { setSelfReviewEnabled } from '../src/lib/chatEstimator/selfReview.ts';
+import { calculateEstimate } from '../src/lib/estimateEngine.ts';
+setSelfReviewEnabled(false);
+setLLMReaderForTests(null);
+let state: ChatState = makeInitialState();
+const say = async (t: string) => { const before = state.history.length; const r = await handleUserMessage(state, t); state = r.state; console.log('YOU:', t, '\nBOT:', state.history.slice(before + 1).map((m) => m.text).join(' || '), '\n'); };
+const lines = process.argv.slice(2);
+for (const l of lines) await say(l);
+const e = calculateEstimate(state.ctx);
+console.log(JSON.stringify({ sq: state.ctx.squareFeet, units: state.ctx.unitCount, cond: state.ctx.projectCondition, doors: state.ctx.doorCount, zip: state.ctx.zipCode }));
+for (const li of e.lineItems) console.log(li.description.padEnd(70), Math.round(li.amount));
+console.log('multipliers', JSON.stringify(e.multipliers), 'total', Math.round((e as any).total ?? (e as any).totalLow ?? 0), Object.keys(e).join(','));

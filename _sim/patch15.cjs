@@ -1,0 +1,13 @@
+const fs = require('fs');
+const f = 'src/lib/estimateEngine.ts';
+let t = fs.readFileSync(f, 'utf8');
+const crlf = t.includes('\r\n');
+t = t.split('\r\n').join('\n');
+const from = "const extra = base * Math.min(0.12, 0.05 * Math.max(takenOff.length, 1) + (wallsMissing ? 0.03 : 0));";
+if (!t.includes(from)) throw new Error('nf');
+t = t.replace(from, "const extra = base * Math.min(0.09, 0.03 * Math.max(takenOff.length, 1) + (wallsMissing ? 0.03 : 0));");
+fs.writeFileSync(f, crlf ? t.split('\n').join('\r\n') : t);
+const g = 'src/components/results/PriceBreakdown.tsx';
+let u = fs.readFileSync(g, 'utf8');
+u = u.replace("Surcharges and adjustments are recalculated for you, so the price doesn't always drop by the full amount of what you\n          remove: a smaller job can lose the multi-room rate, need extra masking, or reach the minimum service charge.", "Surcharges and adjustments are recalculated for you. The amount shown on each button includes the surcharges that applied to that\n          item, and it can differ from the item's own line: a smaller job can lose the multi-room rate, need extra masking, or reach the\n          minimum service charge.");
+fs.writeFileSync(g, u);

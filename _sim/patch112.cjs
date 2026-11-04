@@ -1,0 +1,10 @@
+const fs = require('fs');
+const f = 'src/index.css';
+let t = fs.readFileSync(f, 'utf8');
+const crlf = t.includes('\r\n');
+t = t.split('\r\n').join('\n');
+const a = t.indexOf("/* Light mode: the picture is washed out");
+const b = t.indexOf("}", t.indexOf("filter: drop-shadow", a)) + 1;
+if (a < 0 || b < a) throw new Error('nf');
+t = t.slice(0, a) + "/* Light mode: the picture is washed out, so the white lettering gets a soft, wide shadow (no hard outline) to stand out. It fades with the lettering. */\n[data-theme=\"light\"] .site-hero-bg--home .site-hero-bg__title {\n  filter: drop-shadow(0 1px 5px rgba(15, 20, 35, 0.5)) drop-shadow(0 3px 12px rgba(15, 20, 35, 0.3));\n}" + t.slice(b);
+fs.writeFileSync(f, crlf ? t.split('\n').join('\r\n') : t);

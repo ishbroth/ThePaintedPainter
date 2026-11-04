@@ -1,0 +1,241 @@
+// Runs scripted conversations through the real estimator engine and checks what it asks and decides. No network: the AI reader is replaced
+// by the plain rules engine, or by readings recorded from the live site (the ones that went wrong), to prove the guards catch them.
+//
+//   npm run check:estimator
+
+import { handleUserMessage, makeInitialState, type ChatState } from '../src/lib/chatEstimator/chatEngine.ts';
+import { setLLMReaderForTests } from '../src/lib/chatEstimator/llmClient.ts';
+import type { Intent } from '../src/lib/chatEstimator/intents.ts';
+import type { EstimatorContext } from '../src/lib/types.ts';
+import { calculateEstimate } from '../src/lib/estimateEngine.ts';
+
+let failures = 0;
+const check = (name: string, ok: boolean, detail = '') => {
+  if (!ok) failures++;
+  console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${ok ? '' : '\n        ' + detail}`);
+};
+
+interface Reading { patch: Partial<EstimatorContext>; intents: Intent[]; acknowledgements: string[] }
+
+/** Plays a conversation; `readings` are what the AI reader said about each message (omitted = rules engine only). Returns what the bot said after each message. */
+async function play(lines: string[], readings: (Reading | null)[] = [], from?: ChatState) {
+  let state: ChatState = from ?? makeInitialState();
+  const turns: string[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const reading = readings[i] ?? null;
+    setLLMReaderForTests(reading ? async () => reading : null);
+    const before = state.history.length;
+    const r = await handleUserMessage(state, lines[i]);
+    state = r.state;
+    turns.push(state.history.slice(before + 1).map((m) => m.text).join(' || '));
+  }
+  return { state, turns, last: turns[turns.length - 1] };
+}
+
+/** Plays the setup, keeps giving neutral answers until the bot asks the topic we want (matched by its words), then answers dismissively. */
+async function dismissAt(setup: string[], topicWords: RegExp, dismissal = 'doesnt matter just want it done') {
+  const a = await play(setup);
+  let state = a.state;
+  let asking = state.history[state.history.length - 1].text;
+  for (let i = 0; i < 30 && !topicWords.test(asking); i++) {
+    const r = await play(['no'], [], state); // a plain "no" is not a brush-off, so only the last message is the test
+    state = r.state;
+    asking = state.history[state.history.length - 1].text;
+  }
+  const reached = topicWords.test(asking);
+  const before = state.ctx;
+  const r = await play([dismissal], [], state);
+  return { reached, asked: asking, before, after: r.state.ctx, reply: r.last, state: r.state };
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------------
+// 1. The conversation from the live site
+// ---------------------------------------------------------------------------------------------------------------------------------
+{
+  // what the AI reader actually returned for "i need a house with trim painted": an inside, whole-house job nobody mentioned
+  const badReading: Reading = {
+    patch: { projectType: 'interior', interiorScope: 'whole_house', interiorWalls: 'yes', interiorTrim: 'yes' },
+    intents: ['provide_info'], acknowledgements: [],
+  };
+  const a = await play(['i need a house with trim painted'], [badReading]);
+  check('"house with trim": the bot asks inside or outside (it used to skip the question)', /inside|interior/i.test(a.last) && /outside|exterior/i.test(a.last), a.last);
+  check('"house with trim": nothing was guessed about the inside', a.state.ctx.projectType === '' && a.state.ctx.interiorScope === '', JSON.stringify({ p: a.state.ctx.projectType, s: a.state.ctx.interiorScope }));
+
+  const exteriorReading: Reading = { patch: { projectType: 'exterior' }, intents: ['provide_info'], acknowledgements: ['exterior'] };
+  const b = await play(['i need a house with trim painted', 'the outside'], [badReading, exteriorReading]);
+  check('after "the outside", the trim they already mentioned is counted (no repeat trim question)', b.state.ctx.projectType === 'exterior' && b.state.ctx.exteriorTrim === 'yes', JSON.stringify({ t: b.state.ctx.projectType, trim: b.state.ctx.exteriorTrim }));
+  check('...and the next question is the owner/rental one', /live here|rental|your home/i.test(b.last), b.last);
+
+  // the reader tags the brush-off as a "deflection", which used to produce the canned "tighter number" line and a repeat of the question
+  const dismissReading: Reading = { patch: {}, intents: ['deflection'], acknowledgements: [] };
+  const c = await play(['i need a house with trim painted', 'the outside', 'doesnt matter just want it done'], [badReading, exteriorReading, dismissReading]);
+  check('"doesn\'t matter, just want it done": no canned ballpark line and no repeat of the question', !/tighter number|ballpark/i.test(c.last) && !/live here|your home, or a rental/i.test(c.last.split(' || ').slice(1).join(' ')), c.last);
+  check('...it takes the higher-priced answer (owner-occupied) and says so', c.state.ctx.propertyType === 'residential' && /higher-priced/i.test(c.last), JSON.stringify({ p: c.state.ctx.propertyType, last: c.last }));
+  check('...and moves on to a different question', c.last.split(' || ').length === 2 && /\?\s*$/.test(c.last), c.last);
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------------
+// 2. The rule for any dismissive answer: highest price
+// ---------------------------------------------------------------------------------------------------------------------------------
+{
+  const a = await play(['i need my house painted', 'doesnt matter', 'whatever']);
+  check('dismissive about inside or outside: never assumed, asked again every time', a.state.ctx.projectType === '' && /inside|interior/i.test(a.last) && /outside|exterior/i.test(a.last), JSON.stringify({ p: a.state.ctx.projectType, last: a.last }));
+  const a2 = await play(['i need my house painted', 'doesnt matter', 'the walls and baseboards and ceilings in the bedrooms']);
+  check('...later hints about walls, ceilings, baseboards mean inside', a2.state.ctx.projectType === 'interior', JSON.stringify(a2.state.ctx.projectType));
+  const a3 = await play(['i need my house painted', 'doesnt matter', 'the siding, soffits and eaves']);
+  check('...later hints about siding, soffits, eaves mean outside', a3.state.ctx.projectType === 'exterior', JSON.stringify(a3.state.ctx.projectType));
+
+  const both1 = await play(['i need my house painted', 'doesnt matter', 'the inside color is gray and the outside color will be white']);
+  check('...inside AND outside named in one message means both', both1.state.ctx.projectType === 'both', JSON.stringify(both1.state.ctx.projectType));
+  const both2 = await play(['i need my house painted', 'doesnt matter', 'the walls and ceilings inside and also the siding and eaves']);
+  check('...walls/ceilings plus siding/eaves across messages means both', both2.state.ctx.projectType === 'both', JSON.stringify(both2.state.ctx.projectType));
+  const both3 = await play(['i need my house painted', 'doesnt matter', 'the bedroom walls', 'and the siding too']);
+  check('...an inside hint, then an outside hint later, becomes both', both3.state.ctx.projectType === 'both', JSON.stringify(both3.state.ctx.projectType));
+  const both4 = await play(['i need my house painted', 'both']);
+  check('answering "both" directly', both4.state.ctx.projectType === 'both', JSON.stringify(both4.state.ctx.projectType));
+
+  const keep = await play(['i need my house painted', 'inside', 'just the bedroom walls, not the siding or eaves']);
+  check('an inside job that says "not the siding or eaves" stays inside only', keep.state.ctx.projectType === 'interior', JSON.stringify(keep.state.ctx.projectType));
+
+  const b = await dismissAt(['exterior of the house', '2000 sq ft'], /material|siding/i);
+  check('dismissive about the siding: the priciest siding in the price table', b.reached && !!b.after.sidingType && b.after.sidingType !== '' && /higher-priced/.test(b.reply), JSON.stringify({ asked: b.asked, siding: b.after.sidingType }));
+
+  const c = await dismissAt(['exterior of the house', '2000 sq ft'], /stor(?:y|ies)|how tall|floors/i);
+  check('dismissive about the stories: the tallest realistic (two for a 2,000 sq ft house)', c.reached && c.after.stories === 2, JSON.stringify({ asked: c.asked, stories: c.after.stories }));
+
+  const d = await dismissAt(['interior of the house', 'the whole house'], /what (?:all|in the room)|paint(?:ing)?\?|surfaces/i, "i don't care");
+  check('dismissive about what gets painted: everything, trim and doors included', d.reached ? d.after.interiorCeilings === 'yes' && d.after.interiorTrim === 'yes' && d.after.interiorDoors !== 'none' : true, JSON.stringify({ asked: d.asked }));
+
+  const e = await dismissAt(['interior of the house', '1500 sq ft'], /ceilings|baseboards|doors|surfaces|painting/i, 'just do it');
+  check('a dismissive answer never loops: the next question is different', e.reply.split(' || ').length >= 2 && e.reply.split(' || ')[1] !== e.asked, e.asked + ' => ' + e.reply);
+
+  const f = await dismissAt(['exterior of the house', '2000 sq ft'], /color/i, 'whatever');
+  check('dismissive about the color: a different color (the pricier answer)', !f.reached || f.after.exteriorColorChange === 'different', JSON.stringify({ asked: f.asked, c: f.after.exteriorColorChange }));
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------------
+// 3. Not everything is "dismissive"
+// ---------------------------------------------------------------------------------------------------------------------------------
+{
+  const a = await play(['exterior of the house', "it's a rental"]);
+  check('a real answer ("it\'s a rental") is taken as said, not replaced by the highest price', a.state.ctx.propertyType === 'rental', JSON.stringify(a.state.ctx.propertyType));
+
+  const b = await play(['exterior of the house', "I'm not sure"]);
+  check('"I\'m not sure" still gets the typical default, not the highest price', !/higher-priced/.test(b.last) && /no worries/i.test(b.last), b.last);
+
+  const c = await play(['i need my house painted', 'inside']);
+  check('answering inside/outside normally still works', c.state.ctx.projectType === 'interior', JSON.stringify(c.state.ctx.projectType));
+
+  const d = await play(['exterior of the house', 'stucco, 2 stories, 2000 sqft, doesnt matter if its occupied']);
+  check('info inside a dismissive message is still used', d.state.ctx.stories === 2 && d.state.ctx.squareFeet === 2000, JSON.stringify({ s: d.state.ctx.stories, q: d.state.ctx.squareFeet }));
+
+  const e = await play(['exterior of the house', "it's our home", 'whatever the painter picks is fine']);
+  check('"whatever the painter picks" about paint still just means the painter chooses, and the brand question is not asked again', e.state.ctx.paintBrand === 'painter_choice' && !/paint brand/i.test(e.last), JSON.stringify({ brand: e.state.ctx.paintBrand, last: e.last }));
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------------
+// 4. A ZIP can't be assumed
+// ---------------------------------------------------------------------------------------------------------------------------------
+{
+  const z = await dismissAt(['exterior of the house', '2000 sq ft'], /zip|city|where is/i, 'who cares');
+  if (z.reached) {
+    check('dismissive about the ZIP: says why it is needed and asks again, no guessing', /zip/i.test(z.reply) && !z.after.zipCode && z.reply.includes('?'), z.reply);
+  } else {
+    console.log('skip  the ZIP question did not come up in this conversation (' + z.asked + ')');
+  }
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------------
+// 5. The wrap-up: "anything else?" is its own question, then photos, then the number; the answer counts
+// ---------------------------------------------------------------------------------------------------------------------------------
+{
+  /** Plays a whole interior job up to (not including) the "anything else?" answer. */
+  const toWrapUp = async () => {
+    let r = await play(['interior of my 600 sq ft one bedroom apartment', 'just the walls, no ceilings, trim or doors']);
+    const answers: [RegExp, string][] = [
+      [/home|rental/i, 'I own it'], [/brand|painter choose/i, 'painter choice'], [/zip/i, '91941'], [/timeline|when|living there|anyone/i, 'next month, nobody lives there'],
+      [/color|changing/i, 'a different color'],
+    ];
+    for (let i = 0; i < 15 && !/anything else/i.test(r.last); i++) {
+      const q = r.last.split('||').pop() ?? '';
+      r = await play([answers.find(([re]) => re.test(q))?.[1] ?? 'no'], [], r.state);
+    }
+    return r;
+  };
+  const w = await toWrapUp();
+  check('the wrap-up asks "anything else?" on its own, with no photo ask in the same message', /anything else/i.test(w.last) && !/photo/i.test(w.last), w.last);
+  check('"no ceilings, trim or doors" is a whole list: baseboards are not suggested back', !/baseboards/i.test(w.turns.join(' ')), w.turns.join(' | ').slice(0, 300));
+  const photos = await play(['no'], [], w.state);
+  check('after "no", the next message is the photo ask and says it has enough to price', /photo/i.test(photos.last) && /run it/i.test(photos.last) && !photos.state.finalEstimate, photos.last);
+  const done = await play(['run it'], [], photos.state);
+  check('"run it" then gives the price', !!done.state.finalEstimate || /guaranteed price/i.test(done.last), done.last);
+
+  const total = (s: ChatState) => calculateEstimate(s.ctx).total;
+  const base = total(photos.state);
+  for (const reply of ['20 feet', 'the ceiling height is 12 ft', '10 foot ceilings', 'about 20 ft tall']) {
+    const a = await play([reply], [], w.state);
+    check(`"${reply}" at "anything else?" is read as a ceiling height and changes the price`, a.state.ctx.ceilingHeight !== 'standard' && total(a.state) > base, JSON.stringify({ h: a.state.ctx.ceilingHeight, t: total(a.state), base }));
+  }
+  const fence = await play(['the fence is 10 ft and there is a friendly dog'], [], w.state);
+  check('a 10 ft fence is not mistaken for the ceiling height, and the note is kept for the painters', fence.state.ctx.ceilingHeight === 'standard' && /friendly dog/.test(fence.state.ctx.additionalDetails), JSON.stringify({ h: fence.state.ctx.ceilingHeight, d: fence.state.ctx.additionalDetails }));
+}
+
+// A whole inside (or a kitchen) with the trim in: the kitchen cabinets get asked about, once; "no" leaves them out for good.
+{
+  const walk = async (opening: string[]) => {
+    let r = await play(opening);
+    const seen: string[] = [r.last];
+    for (let i = 0; i < 14 && !/cabinets/i.test(r.last); i++) {
+      const q = r.last.split('||').pop() ?? '';
+      const reply = /interior|inside|outside|exterior/i.test(q) ? 'inside' : /color|paint|brand|finish|grade/i.test(q) ? 'whatever you recommend' : /how big|square|size/i.test(q) ? '2400 sq ft' : /ceilings/i.test(q) ? 'yes' : /baseboard|trim/i.test(q) ? 'yes' : /door/i.test(q) ? 'yes' : /condition|shape|walls looking/i.test(q) ? 'good shape' : 'no';
+      r = await play([reply], [], r.state);
+      seen.push(r.last);
+    }
+    return { r, seen };
+  };
+  const whole = await walk(['I want the whole inside of my house painted, walls, trim and doors']);
+  check('a whole inside with trim and doors: the kitchen cabinets are asked about', /cabinets/i.test(whole.r.last), whole.seen.join(' | ').slice(0, 500));
+  const yes = await play(['yes'], [], whole.r.state);
+  check('"yes" adds the kitchen cabinets', yes.state.ctx.cabinets !== 'none', JSON.stringify(yes.state.ctx.cabinets));
+  const no = await play(['no'], [], whole.r.state);
+  check('"no" leaves the cabinets out and they are not asked again', no.state.ctx.cabinets === 'none' && !/cabinets/i.test(no.last), no.last);
+  const kitchen = await walk(['I want my kitchen painted, the walls and trim']);
+  check('a kitchen with trim: the cabinets are asked about', /cabinets/i.test(kitchen.r.last), kitchen.seen.join(' | ').slice(0, 500));
+}
+
+// The current finish of cabinets, baseboards/trim and doors: asked, read, and priced (painted is the base; bare wood and stained wood cost more prep; pre-primed less).
+{
+  const priceOf = (st: ChatState) => calculateEstimate(st.ctx).total;
+  const asked = async (opening: string[], pattern: RegExp, answers: [RegExp, string][]) => {
+    let r = await play(opening);
+    for (let i = 0; i < 16 && !pattern.test(r.last); i++) {
+      const q = (r.last.split('||').pop() ?? '').split(/(?<=[.!?])s+/).filter((x) => x.includes('?')).pop() ?? '';
+      r = await play([answers.find(([re]) => re.test(q))?.[1] ?? 'no'], [], r.state);
+    }
+    return r;
+  };
+  const answers: [RegExp, string][] = [[/inside or outside|interior or exterior|inside or out/i, 'inside'], [/how big|square|size/i, '2400 sq ft'], [/what (?:in|all)|which surfaces|getting painted/i, 'walls, ceilings, trim and doors'], [/kitchen cabinets|cabinets part of this/i, 'yes'], [/ceilings/i, 'yes'], [/baseboard|trim/i, 'yes'], [/door/i, 'yes'], [/shape|condition|walls looking/i, 'good shape'], [/color/i, 'same color'], [/brand|grade|finish/i, 'whatever you recommend'], [/zip/i, '92020']];
+  const cab = await asked(['I want the whole inside of my house painted, walls, trim and doors'], /cabinets[^|]*bare/i, answers);
+  check('kitchen cabinets: asked whether they are painted, bare, stained or pre-primed', /cabinets/i.test(cab.last) && /bare/i.test(cab.last), cab.last.slice(0, 300));
+  const finishes: Record<string, number> = {};
+  for (const [name, reply] of [['painted', 'they are painted white'], ['bare', 'bare wood'], ['stained', 'stained oak'], ['primed', 'pre-primed']] as const) {
+    const a2 = await play([reply], [], cab.state);
+    finishes[name] = priceOf(a2.state);
+    check(`cabinets "${reply}" is read (${a2.state.ctx.cabinetFinish})`, a2.state.ctx.cabinetFinish === { painted: 'painted', bare: 'bare_wood', stained: 'stained', primed: 'primed' }[name], JSON.stringify(a2.state.ctx.cabinetFinish));
+  }
+  check('cabinets: bare wood and stained wood cost more than painted, pre-primed costs less', finishes.bare > finishes.painted && finishes.stained > finishes.bare && finishes.primed < finishes.painted, JSON.stringify(finishes));
+  const said = await play(['I want the kitchen cabinets painted, they are stained oak'], []);
+  check('stained oak cabinets said up front are read, not asked about again', said.state.ctx.cabinetFinish === 'stained' && !/cabinets.*bare/i.test(said.last), said.last.slice(0, 200));
+
+  const trim = await asked(['I want the whole inside of my house painted, walls, trim and doors'], /(?:painted|bare|stained|primed).*(?:trim|doors)|(?:trim|doors).*(?:painted|bare|stained|primed)/i, answers.filter(([re]) => !/cabinets/.test(re.source)).concat([[/cabinets/i, 'no']]));
+  check('trim and doors: asked whether they are painted, bare, stained or pre-primed', /doors/i.test(trim.last) && /bare/i.test(trim.last), trim.last.slice(0, 300));
+  const mixed = await play(['stained oak doors, painted baseboards'], [], trim.state);
+  check('"stained oak doors, painted baseboards" is read per item', mixed.state.ctx.doorFinish === 'stained' && mixed.state.ctx.trimFinish === 'painted', JSON.stringify([mixed.state.ctx.trimFinish, mixed.state.ctx.doorFinish]));
+  const allPainted = await play(['all painted white'], [], trim.state);
+  const bare = await play(['all bare wood'], [], trim.state);
+  check('trim and doors: bare wood costs more to prep than painted', priceOf(bare.state) > priceOf(allPainted.state), String([priceOf(bare.state), priceOf(allPainted.state)]));
+}
+
+setLLMReaderForTests(undefined);
+console.log(failures ? `\n${failures} FAILED` : '\nall conversation checks passed');
+process.exit(failures ? 1 : 0);

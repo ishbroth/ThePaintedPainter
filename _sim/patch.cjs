@@ -1,0 +1,11 @@
+const fs=require('fs');
+let t=fs.readFileSync('_sim/run.mjs','utf8');
+const lines=t.split('\n');
+const i=lines.findIndex(l=>l.includes('const asked = {}; const loopEvents'));
+lines[i]=String.raw`  const asked = {}; const firstAnswer = {}; const firstReg = {}; const loopEvents = []; const restated = []; let lastReg = null; let pendingTopic = null; let loops = 0, genericFallbacks = 0, ranIt = false;
+  const stated = { property_ownership: /\b(i live|we live|live here|lived-in|my home|my condo|rental|landlord|tenant|own it|i own)\b/i.test(openText), color_change: /same (white |\w+ )?color|new color|going (from|to)|navy|white to|to a? ?(dark|deep|light)/i.test(openText), condition: /good shape|good condition|nail holes|cracks|stain|peeling|mildew|mold/i.test(openText), house_size: /\d[\d,]*\s*(sq|square)/i.test(openText), location: /\b\d{5}\b/.test(openText), occupancy: /vacant|empty|furnished|occupied|lived-in|we live|i live|closed/i.test(openText), timing: true };`;
+t=lines.join('\n');
+t=t.replace("    log.push({ role: 'user', text: user });\n","    log.push({ role: 'user', text: user });\n    if (pendingTopic && !(pendingTopic in firstAnswer)) { firstAnswer[pendingTopic] = user; firstReg[pendingTopic] = lastReg; }\n");
+t=t.replace("loopEvents.push({ topic: tid, userSaid: lastUser, reg: lastReg })","loopEvents.push({ topic: tid, userSaid: firstAnswer[tid] ?? null, reg: firstReg[tid] ?? null })");
+t=t.replace("lastReg = reg; user = tid ? answerFor(arch, tid, reg, slots) : 'run it'; lastUser = user;","lastReg = reg; pendingTopic = tid; user = tid ? answerFor(arch, tid, reg, slots) : 'run it';");
+fs.writeFileSync('_sim/run.mjs',t);
