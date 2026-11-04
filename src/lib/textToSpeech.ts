@@ -15,6 +15,7 @@
 //      at all — naturalizeForSpeech() drops them entirely rather than
 //      speaking the link text, so only the surrounding sentence is heard.
 
+import { isNativeApp } from './platform';
 import { splitPrompt } from './promptHints';
 import { neuralVoiceAvailable, speakNeural, stopNeural, unlockNeuralAudio, isNeuralBusy, prefetchNeural } from './neuralVoice';
 
@@ -170,10 +171,53 @@ function pickBestVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | n
 
 let selectedVoice: SpeechSynthesisVoice | null | undefined;
 
+// ---- the app's own voice choice (the iPhone / Android app only; the website always uses the automatic pick) ----
+const CHOSEN_VOICE_KEY = 'tpp_chosen_voice';
+const chosenName = (): string | null => {
+  if (!isNativeApp()) return null;
+  try { return localStorage.getItem(CHOSEN_VOICE_KEY); } catch { return null; }
+};
+/** The voice the person picked in the app, if the phone still has it; otherwise the best automatic pick. */
+function chooseVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
+  const wanted = chosenName();
+  const mine = wanted ? voices.find((v) => v.name === wanted) : undefined;
+  return mine ?? pickBestVoice(voices);
+}
+
+export interface VoiceChoice { name: string; lang: string; quality: 'Premium' | 'Enhanced' | 'Standard'; automatic: boolean; chosen: boolean }
+/** The English voices on this phone, best first, for the app's voice picker. */
+export function listEnglishVoices(): VoiceChoice[] {
+  if (!isTTSSupported()) return [];
+  const voices = window.speechSynthesis.getVoices().filter((v) => v.lang?.toLowerCase().replace('_', '-').startsWith('en'));
+  const auto = pickBestVoice(voices);
+  const wanted = chosenName();
+  const rank = (v: SpeechSynthesisVoice) => (/premium/i.test(v.name) ? 0 : /enhanced/i.test(v.name) ? 1 : 2);
+  return voices
+    .map((v) => ({ v, r: rank(v) }))
+    .sort((a, b) => a.r - b.r || (a.v.lang === 'en-US' ? 0 : 1) - (b.v.lang === 'en-US' ? 0 : 1) || a.v.name.localeCompare(b.v.name))
+    .map(({ v, r }) => ({ name: v.name, lang: v.lang, quality: r === 0 ? 'Premium' : r === 1 ? 'Enhanced' : 'Standard', automatic: v === auto, chosen: wanted === v.name }));
+}
+/** Remembers the voice picked in the app (null goes back to the automatic pick). */
+export function chooseAppVoice(name: string | null): void {
+  try { if (name) localStorage.setItem(CHOSEN_VOICE_KEY, name); else localStorage.removeItem(CHOSEN_VOICE_KEY); } catch { /* ignore */ }
+  selectedVoice = undefined;
+}
+/** Says a short sample in one of the phone's voices. */
+export function previewVoice(name: string): void {
+  if (!isTTSSupported()) return;
+  const voice = window.speechSynthesis.getVoices().find((v) => v.name === name);
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance('Hi, I can work out a price for your painting job. Tell me about your project.');
+  u.rate = 0.9975;
+  u.pitch = 1;
+  if (voice) { u.voice = voice; u.lang = voice.lang; }
+  window.speechSynthesis.speak(u);
+}
+
 async function getPreferredVoice(): Promise<SpeechSynthesisVoice | null> {
   if (selectedVoice !== undefined) return selectedVoice;
   const voices = await loadVoices();
-  const best = pickBestVoice(voices);
+  const best = chooseVoice(voices);
   if (best) selectedVoice = best;
   else voicesPromise = null; // none yet (iPhone loads them late): ask again next time instead of settling for the default
   return best;
@@ -253,7 +297,7 @@ function speakWeb(text: string): void {
   // choose the voice now, from what the phone already knows (the list is often there even before the async lookup finishes)
   if (!selectedVoice) {
     const known = synth.getVoices();
-    if (known.length > 0) selectedVoice = pickBestVoice(known) ?? selectedVoice;
+    if (known.length > 0) selectedVoice = chooseVoice(known) ?? selectedVoice;
     if (!selectedVoice) prepareVoice();
   }
   // cancelling something that is playing makes some phones drop whatever is spoken right after, so that start waits a moment

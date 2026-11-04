@@ -17,6 +17,8 @@ import { composerPrompt, GENERIC_PROMPT } from '../../lib/promptHints';
 import { isTTSSupported, speak, stopSpeaking, setupSpeechUnlock, prefetchSpeech, waitForSpeechEnd } from '../../lib/textToSpeech';
 import { uploadQuotePhoto, analyzeQuotePhoto } from '../../lib/chatEstimator/photoUpload';
 import PhotoPopup from './PhotoPopup';
+import VoicePicker from './VoicePicker';
+import { isNativeApp } from '../../lib/platform';
 import { loadAccountChatState, saveAccountChatState, deleteAccountChatState } from '../../lib/chatEstimator/accountPersistence';
 import { useAuth } from '../../lib/auth';
 
@@ -75,6 +77,7 @@ const ChatPanel = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const ttsSupported = isTTSSupported();
+  const [voicePickerOpen, setVoicePickerOpen] = useState(false);
   // First reply: a plain invitation. After that, the core of the question being asked, rephrased short ("Please estimate square feet").
   const lastBotText = [...state.history].reverse().find((m) => m.role === 'bot')?.text ?? '';
   const hasAnswered = state.history.some((m) => m.role === 'user');
@@ -817,11 +820,18 @@ const ChatPanel = () => {
               {readAloud ? '\u{1F50A} Mute' : '\u{1F507} Unmute'}
             </button>
           )}
+          {ttsSupported && isNativeApp() && (
+            <button type="button" className="chat-read-aloud-toggle" onClick={() => setVoicePickerOpen(true)} aria-label="Choose a voice" title="Choose a voice">
+              Voice
+            </button>
+          )}
           <p className="chat-input-hint">
             Getting off track? Try "Back Up" or "Start Over"
           </p>
         </div>
       </div>
+
+      {voicePickerOpen && <VoicePicker onClose={() => setVoicePickerOpen(false)} />}
 
       <input
         ref={photoInputRef}
