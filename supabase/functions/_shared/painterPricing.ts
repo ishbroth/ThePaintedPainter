@@ -248,10 +248,14 @@ function interpolateExteriorPrice(
   // Extras
   if (ctx.fence === 'yes') {
     const fenceFt = ctx.fenceLinearFeet || 100;
-    price += fenceFt * 4.5 * (interiorWallRate / (b.price3BRWalls / REF_SQFT.threeBR));
+    // a taller (or shorter) fence than the usual 6 ft has more (or less) to cover per foot, though not in proportion
+    const heightFactor = ctx.fenceHeightFt ? Math.min(2, Math.max(0.5, 0.4 + 0.6 * (Number(ctx.fenceHeightFt) / (ctx.fenceType === 'picket_4ft' || ctx.fenceType === 'chain_link' ? 4 : 6)))) : 1;
+    price += fenceFt * 4.5 * heightFactor * (interiorWallRate / (b.price3BRWalls / REF_SQFT.threeBR));
   }
   if (ctx.deck === 'yes') {
-    price += 700 * (interiorWallRate / (b.price3BRWalls / REF_SQFT.threeBR));
+    // 700 is a medium deck (250 sq ft); a size the customer gave scales it
+    const deckFactor = ctx.deckSqft ? Math.min(6, Math.max(0.2, Number(ctx.deckSqft) / 250)) : 1;
+    price += 700 * deckFactor * (interiorWallRate / (b.price3BRWalls / REF_SQFT.threeBR));
   }
 
   return price;

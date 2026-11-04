@@ -14,6 +14,7 @@
 // ============================================================================
 
 import type { EstimatorContext } from '../types';
+import { isIsolatedDetailJob } from './details';
 
 export interface Topic {
   id: string;
@@ -71,7 +72,17 @@ const hasTiming = (c: EstimatorContext) => !!(c.timeline || c.startDate || c.end
 const isNarrowInteriorJob = (c: EstimatorContext) =>
   c.interiorWalls === 'no' &&
   c.surfacesAddressed &&
-  (c.stairwayDetails === 'railings_only' || c.cabinets !== 'none' || c.trimLinearFeet != null || c.popcornCeilingSqft != null || c.prepWork.includes('popcorn_removal') || c.interiorTrim === 'yes' || c.interiorCeilings === 'yes');
+  (isIsolatedDetailJob(c) || c.closets !== 'none' || c.furnitureItems.length > 0 || c.stairwayDetails === 'railings_only' || c.cabinets !== 'none' || c.trimLinearFeet != null || c.popcornCeilingSqft != null || c.prepWork.includes('popcorn_removal') || c.interiorTrim === 'yes' || c.interiorCeilings === 'yes');
+
+/** The small trim details a stand-alone detail job is about, in words ("chair rail and crown moulding"). */
+function detailLabel(c: EstimatorContext): string {
+  const parts = [c.chairRail === 'yes' ? 'chair rail' : '', c.crownMolding === 'yes' ? 'crown moulding' : '', c.wainscoting === 'yes' ? 'wainscoting' : '', c.interiorTrim === 'yes' ? 'baseboards' : ''].filter(Boolean);
+  return parts.length > 1 ? parts.slice(0, -1).join(', ') + ' and ' + parts[parts.length - 1] : parts[0] ?? 'trim';
+}
+
+/** The job is only a few trim details or some furniture, and the customer said so: no "add the ceilings?" suggestions. */
+const skipUpsells = (c: EstimatorContext) =>
+  isIsolatedDetailJob(c) || (c.interiorWalls === 'no' && c.interiorCeilings === 'no' && c.surfacesAddressed && (c.furnitureItems.length > 0 || c.closets !== 'none'));
 
 const isCommercialLike = (c: EstimatorContext) => c.propertyType === 'commercial' || c.propertyType === 'multi_unit';
 
@@ -348,7 +359,7 @@ export const TOPICS: Topic[] = [
   {
     id: 'ext_garage_count',
     priority: 48.35,
-    relevant: (c) => isExteriorJob(c) && c.garageDoor === 'single',
+    relevant: (c) => (isExteriorJob(c) || c.exteriorBody === 'no') && c.garageDoor === 'single',
     alreadyAnswered: (c) => c.garageDoor === 'double' || extDone(c, 'ext_garage_count'),
     ask: () => 'Is that one garage door, or two?',
     clarify: () => "A two-car garage often has two single doors or one wide double door; either way I just need to know how many there are.",
@@ -469,7 +480,7 @@ export const TOPICS: Topic[] = [
   {
     id: 'upsell_ceilings',
     priority: 27,
-    relevant: (c) => (c.projectType === 'interior' || c.projectType === 'both') && c.surfacesAddressed && c.interiorCeilings === 'no' && !(c.excludedSurfaces ?? []).includes('ceilings'),
+    relevant: (c) => (c.projectType === 'interior' || c.projectType === 'both') && c.surfacesAddressed && c.interiorCeilings === 'no' && !(c.excludedSurfaces ?? []).includes('ceilings') && !skipUpsells(c),
     alreadyAnswered: (c) => c.interiorCeilings !== 'no',
     ask: (c) =>
       pick(
@@ -485,7 +496,7 @@ export const TOPICS: Topic[] = [
   {
     id: 'upsell_trim',
     priority: 28,
-    relevant: (c) => (c.projectType === 'interior' || c.projectType === 'both') && c.surfacesAddressed && c.interiorTrim === 'no' && !(c.excludedSurfaces ?? []).includes('trim'),
+    relevant: (c) => (c.projectType === 'interior' || c.projectType === 'both') && c.surfacesAddressed && c.interiorTrim === 'no' && !(c.excludedSurfaces ?? []).includes('trim') && !skipUpsells(c),
     alreadyAnswered: (c) => c.interiorTrim !== 'no',
     ask: (c) =>
       pick(
@@ -501,7 +512,7 @@ export const TOPICS: Topic[] = [
   {
     id: 'upsell_doors',
     priority: 29,
-    relevant: (c) => (c.projectType === 'interior' || c.projectType === 'both') && c.surfacesAddressed && c.interiorDoors === 'none' && !(c.excludedSurfaces ?? []).includes('doors') && !(c.excludedSurfaces ?? []).includes('trim'), // turned down the baseboards: nobody paints doors without trim, so don't suggest them (the closing "anything else?" still lets them mention doors)
+    relevant: (c) => (c.projectType === 'interior' || c.projectType === 'both') && c.surfacesAddressed && c.interiorDoors === 'none' && !skipUpsells(c) && !(c.excludedSurfaces ?? []).includes('doors') && !(c.excludedSurfaces ?? []).includes('trim'), // turned down the baseboards: nobody paints doors without trim, so don't suggest them (the closing "anything else?" still lets them mention doors)
     alreadyAnswered: (c) => c.interiorDoors !== 'none',
     ask: (c) =>
       pick(
@@ -574,6 +585,179 @@ export const TOPICS: Topic[] = [
     },
     clarify: () => "The current finish changes the prep. Painted trim and doors just need a clean and a light sanding. Bare wood needs primer first, and stained or varnished wood has to be deglossed and sealed with a stain-blocking primer so it doesn't bleed through.",
     example: () => "E.g., 'all painted white', 'bare wood', 'stained oak doors, painted baseboards', or 'pre-primed'.",
+  },
+
+  // ——————————————————————————————————————————
+  // How many, how long, how big: the counts and sizes behind the items the customer named (doors, windows, chairs, closets, shutters,
+  // fences, decks, overhangs, railings) and the small trim details (crown moulding, chair rail, wainscoting, baseboards). A guess from the
+  // size of the house is the fallback; these make the price match what is actually there. Each is asked once, and only when the item is in.
+  // ——————————————————————————————————————————
+  {
+    id: 'door_count',
+    priority: 29.91,
+    relevant: (c) =>
+      (c.projectType === 'interior' || c.projectType === 'both') && c.interiorDoors !== 'none' && (!!c.doorsIncluded || (c.addedSurfaces ?? []).includes('doors')) && c.doorCount == null,
+    alreadyAnswered: (c) => c.doorCount != null || extDone(c, 'door_count'),
+    ask: (c) => pick(["About how many doors are getting painted? A rough count is fine.", "And roughly how many doors is that?", "How many doors are we talking about, approximately?"], seed(c)),
+    clarify: () => "Each door is priced on its own (both sides and the edges), so a rough count of the interior doors that need paint makes the price much closer.",
+    example: () => "Something like '12 doors' or 'about 8'.",
+  },
+  {
+    id: 'window_count',
+    priority: 29.92,
+    relevant: (c) => (c.projectType === 'interior' || c.projectType === 'both') && c.interiorWindows !== 'none' && c.windowCount == null,
+    alreadyAnswered: (c) => c.windowCount != null || extDone(c, 'window_count'),
+    ask: (c) => pick(["About how many windows are getting painted?", "How many windows would that be, roughly?"], seed(c)),
+    clarify: () => "I price the window frames, sills and trim one window at a time, so a rough count helps.",
+    example: () => "Something like '10 windows' or 'about 15'.",
+  },
+  {
+    id: 'closet_count',
+    priority: 29.93,
+    relevant: (c) => (c.projectType === 'interior' || c.projectType === 'both') && c.closets !== 'none' && c.closetCount == null,
+    alreadyAnswered: (c) => c.closetCount != null || extDone(c, 'closet_count'),
+    ask: (c) => (c.closetShelving !== 'none' ? "How many closets have shelves that need painting?" : "How many closets are getting painted?"),
+    clarify: () => "Closets (and the shelves and rods in them) are priced each, so a rough count is what I need.",
+    example: () => "Something like '3 closets' or 'just one'.",
+  },
+  {
+    id: 'chair_count',
+    priority: 29.94,
+    relevant: (c) => c.furnitureItems.includes('chair') && c.chairCount == null,
+    alreadyAnswered: (c) => c.chairCount != null || extDone(c, 'chair_count'),
+    ask: (c) => pick(["About how many chairs are getting painted?", "How many chairs is that?"], seed(c)),
+    clarify: () => "Each chair is priced on its own (they take a lot of cutting in around the spindles and legs), so I need a rough count.",
+    example: () => "Something like '6 chairs' or 'four'.",
+  },
+  {
+    id: 'shutter_count',
+    priority: 29.95,
+    relevant: (c) => (c.exteriorShutters === 'yes' && c.exteriorShutterCount == null) || (c.interiorShutters === 'yes' && c.interiorShutterCount == null),
+    alreadyAnswered: (c) => ((c.exteriorShutters !== 'yes' || c.exteriorShutterCount != null) && (c.interiorShutters !== 'yes' || c.interiorShutterCount != null)) || extDone(c, 'shutter_count'),
+    ask: (c) => (c.exteriorShutters === 'yes' ? "About how many shutters are getting painted?" : "About how many interior shutters are getting painted?"),
+    clarify: () => "Shutters are priced one at a time (two panels make a pair), so a rough count is what I need.",
+    example: () => "Something like '8 shutters' or '10'.",
+  },
+  {
+    id: 'railing_length',
+    priority: 34.8,
+    relevant: (c) => c.railings === 'yes' && c.stairRailFeet == null && c.stairwayDetails !== 'railings_only',
+    alreadyAnswered: (c) => c.stairRailFeet != null || extDone(c, 'railing_length'),
+    ask: (c) => pick(["About how many linear feet of railing is it in total?", "Roughly how long is the railing, in feet?"], seed(c)),
+    clarify: () => "Railings are priced by the linear foot, and spindles take longer than a plain rail. A rough length is fine, and you can add the spindles in your answer.",
+    example: () => "Something like '30 feet' or '20 feet with spindles'.",
+  },
+  {
+    id: 'fence_size',
+    priority: 34.5,
+    relevant: (c) => c.fence === 'yes' && (c.fenceLinearFeet == null || (c.fenceHeightFt == null && c.fenceType !== 'chain_link')),
+    alreadyAnswered: (c) => (c.fenceLinearFeet != null && (c.fenceHeightFt != null || c.fenceType === 'chain_link')) || extDone(c, 'fence_size'),
+    ask: (c) => {
+      if (c.fenceLinearFeet != null) return "And how tall is the fence, roughly?";
+      if (c.fenceHeightFt != null) return "About how long is the fence in total, in linear feet?";
+      return pick(
+        ["About how long is the fence in linear feet, and how tall is it?", "Roughly how many linear feet of fence is it, and how high does it stand?"],
+        seed(c),
+      );
+    },
+    clarify: () => "Fences are priced by the linear foot, and a taller fence has more surface to cover per foot, so I need the length and the height.",
+    example: () => "Something like '150 feet, 6 feet tall' or '80 feet of 4 foot picket'.",
+  },
+  {
+    id: 'fence_height',
+    priority: 34.51,
+    relevant: (c) => c.fence === 'yes' && c.fenceLinearFeet != null && c.fenceHeightFt == null && c.fenceType !== 'chain_link',
+    alreadyAnswered: (c) => c.fenceHeightFt != null || extDone(c, 'fence_height'),
+    ask: () => "And how tall is the fence, roughly?",
+    clarify: () => "A taller fence has more surface to cover for every foot of length.",
+    example: () => "Something like '6 feet' or '4 foot picket'.",
+  },
+  {
+    id: 'deck_size',
+    priority: 34.6,
+    relevant: (c) => c.deck === 'yes' && c.deckSqft == null && !c.deckSize,
+    alreadyAnswered: (c) => c.deckSqft != null || !!c.deckSize || extDone(c, 'deck_size'),
+    ask: (c) => pick(["About how many square feet is the deck? Or just its length and width.", "Roughly how big is the deck, in square feet or length by width?"], seed(c)),
+    clarify: () => "Decks are priced by the square foot, so the size matters. Length times width is fine, I'll do the math.",
+    example: () => "Something like '400 square feet' or '20 x 20'.",
+  },
+  {
+    id: 'overhang_size',
+    priority: 34.7,
+    relevant: (c) => c.overhangs === 'yes' && c.overhangSqft == null,
+    alreadyAnswered: (c) => c.overhangSqft != null || extDone(c, 'overhang_size'),
+    ask: (c) => pick(["About how many square feet is the overhang or patio cover? Length times width works too.", "Roughly how big is the overhang or patio cover, in square feet or length by width?"], seed(c)),
+    clarify: () => "Overhangs, porch ceilings and patio covers are priced by the square foot of the underside, so the size matters.",
+    example: () => "Something like '200 square feet' or '10 by 20'.",
+  },
+  {
+    // Offered on an outside job, since a fence, a deck or a patio cover is often painted along with the house.
+    id: 'ext_extras',
+    priority: 48.95,
+    relevant: (c) => isExteriorJob(c) && (c.fence === 'none' || c.deck === 'none' || c.overhangs === 'no'),
+    alreadyAnswered: (c) => (c.fence !== 'none' && c.deck !== 'none' && c.overhangs !== 'no') || extDone(c, 'ext_extras'),
+    ask: (c) =>
+      pick(
+        ["Is there a fence, a deck, or a patio cover or overhang that should get painted too?", "Anything else outside to add, like a fence, a deck or a patio cover?"],
+        seed(c),
+      ),
+    clarify: () => "Fences, decks and patio covers are priced separately from the house, so I'd rather include them now than have the price come in short.",
+    example: () => "Say 'yes, the fence and the deck' or 'no, just the house'.",
+  },
+  {
+    id: 'ext_extras_which',
+    priority: 48.96,
+    relevant: (c) => extDone(c, 'ext_extras_yes') && c.fence === 'none' && c.deck === 'none' && c.overhangs === 'no',
+    alreadyAnswered: (c) => c.fence !== 'none' || c.deck !== 'none' || c.overhangs !== 'no' || extDone(c, 'ext_extras_which'),
+    ask: () => "Which one: the fence, the deck, or the patio cover or overhang?",
+    clarify: () => "I'd like to know which of those you have so I can ask how big it is.",
+    example: () => "Say 'the fence' or 'a deck and a patio cover'.",
+  },
+  {
+    // A job that is only crown moulding, chair rail, wainscoting or baseboards ("just the new chair rail"): the number of rooms sizes it.
+    id: 'detail_rooms',
+    priority: 26.1,
+    relevant: (c) => isIsolatedDetailJob(c) && c.detailRoomCount == null && c.selectedRooms.length === 0 && c.squareFeet == null,
+    alreadyAnswered: (c) => c.detailRoomCount != null || c.selectedRooms.length > 0 || c.squareFeet != null || extDone(c, 'detail_rooms'),
+    ask: (c) => `How many rooms is the ${detailLabel(c)} in?`,
+    clarify: () => "With no walls or ceilings in the job, the number of rooms is how I work out roughly how much trim there is, unless you know the length.",
+    example: () => "Something like '3 rooms' or 'just the dining room'.",
+  },
+  {
+    id: 'detail_feet_chair_rail',
+    priority: 26.2,
+    relevant: (c) => (c.projectType === 'interior' || c.projectType === 'both') && c.chairRail === 'yes' && c.chairRailLinearFeet == null,
+    alreadyAnswered: (c) => c.chairRailLinearFeet != null || extDone(c, 'detail_feet_chair_rail'),
+    ask: (c) => (isIsolatedDetailJob(c) ? "About how many linear feet of chair rail is that in total? If you're not sure, say so and I'll work it out from the rooms." : "About how many linear feet of chair rail is there?"),
+    clarify: () => "Chair rail is priced by the linear foot. Measuring along the wall where it runs, or adding up the rooms, gives the number.",
+    example: () => "Something like '60 feet' or 'about 100 linear feet'.",
+  },
+  {
+    id: 'detail_feet_crown',
+    priority: 26.3,
+    relevant: (c) => (c.projectType === 'interior' || c.projectType === 'both') && c.crownMolding === 'yes' && c.crownLinearFeet == null,
+    alreadyAnswered: (c) => c.crownLinearFeet != null || extDone(c, 'detail_feet_crown'),
+    ask: (c) => (isIsolatedDetailJob(c) ? "About how many linear feet of crown moulding is that in total? If you're not sure, say so and I'll work it out from the rooms." : "About how many linear feet of crown moulding is there?"),
+    clarify: () => "Crown moulding is priced by the linear foot along the top of the walls.",
+    example: () => "Something like '80 feet' or 'about 150 linear feet'.",
+  },
+  {
+    id: 'detail_feet_trim',
+    priority: 26.4,
+    relevant: (c) => isIsolatedDetailJob(c) && c.interiorTrim === 'yes' && c.trimLinearFeet == null,
+    alreadyAnswered: (c) => c.trimLinearFeet != null || extDone(c, 'detail_feet_trim'),
+    ask: () => "About how many linear feet of baseboard or trim is that in total? If you're not sure, say so and I'll work it out from the rooms.",
+    clarify: () => "Baseboards and trim are priced by the linear foot.",
+    example: () => "Something like '200 feet'.",
+  },
+  {
+    id: 'detail_sqft_wainscot',
+    priority: 26.5,
+    relevant: (c) => (c.projectType === 'interior' || c.projectType === 'both') && c.wainscoting === 'yes' && c.wainscotSqft == null,
+    alreadyAnswered: (c) => c.wainscotSqft != null || extDone(c, 'detail_sqft_wainscot'),
+    ask: () => "About how many square feet of wainscoting or paneling is that? You can also give the length and height, like '30 x 3'.",
+    clarify: () => "Wainscoting is priced by the square foot of paneling: its length along the wall times its height.",
+    example: () => "Something like '100 square feet' or '30 feet long by 3 feet high'.",
   },
 
   // ——————————————————————————————————————————

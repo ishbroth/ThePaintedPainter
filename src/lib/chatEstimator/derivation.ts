@@ -20,6 +20,7 @@
 import type { EstimatorContext } from '../types';
 import { estimateHouseLayout } from '../surfaceAreaEngine';
 import { hasScopeLimiter } from './scopeWords';
+import { mentionedDetails } from './details';
 
 export interface Derivation {
   /** Fields to merge into the context. */
@@ -50,8 +51,10 @@ export function derive(ctx: EstimatorContext, transcript: string): Derivation[] 
     /\b(room|rooms|bedroom|bathroom|kitchen|living room|dining|hallway|closet|pantry|nursery|den|foyer|mudroom|laundry room|apartment|apt\.?|condo(?:minium)?|duplex|rental unit|the unit|my unit|staircase|stairway|stairs|stairwell|door frames?|door jambs?|cabinets?|cabinet interiors?|vanity|vanities|wainscoting|crown molding|chair rail|baseboards?|fireplace|mantel|built[\s-]?ins?|attic|basement|popcorn ceiling)\b/.test(
       t,
     ) || mentionsHomeOffice;
+  // "bedroom walls and the window frames": the frames are inside, not an outside job
+  const windowFramesIndoors = mentionsIndoorRoom && !/\b(exterior|outside|outdoors?|siding|stucco)\b/.test(t);
   const mentionsExteriorSurface =
-    /\b(siding|stucco|hardie|shiplap|clapboard|concrete block|cinder block|aluminum siding|fascia|soffit|eaves|gutter|exterior|outside|outdoor|deck|fence|picket fence|shed|garage door|driveway|patio|overhang|porch|balcony|balconies|foundation|retaining wall|window frames|window trim|entry door)\b/.test(t);
+    /\b(siding|stucco|hardie|shiplap|clapboard|concrete block|cinder block|aluminum siding|fascia|soffit|eaves|gutter|exterior|outside|outdoor|deck|fence|picket fence|shed|garage door|driveway|patio|overhang|porch|balcony|balconies|foundation|retaining wall|window frames|window trim|entry door)\b/.test(windowFramesIndoors ? t.replace(/window frames|window trim/g, ' ') : t);
 
   if (!ctx.projectType) {
     if (mentionsIndoorRoom && !mentionsExteriorSurface) {
@@ -361,6 +364,26 @@ export function derive(ctx: EstimatorContext, transcript: string): Derivation[] 
       patch: { ...interiorOff, interiorCeilings: repaint ? 'yes' : 'no', projectType: ctx.projectType || 'interior', prepWork: ctx.prepWork.includes('popcorn_removal') ? ctx.prepWork : [...ctx.prepWork, 'popcorn_removal'] },
       reason: 'Popcorn ceiling removal only → no wall, trim or door painting',
     });
+  } else if (
+    // Only the small trim details ("just the new chair rail", "only crown moulding in two rooms", "closet shelves, nothing else"): no walls, ceilings or doors.
+    (mentionedDetails(t).chairRail || mentionedDetails(t).crown || mentionedDetails(t).wainscot || mentionedDetails(t).closetShelves) &&
+    !/\b(walls?|ceilings?|whole|entire|every room|all (?:the )?rooms|throughout|doors?|cabinets?|windows?|exterior|outside|fence|deck)\b/.test(tNeg) &&
+    hasOnly && ctx.interiorWalls !== 'no'
+  ) {
+    const md = mentionedDetails(t);
+    out.push({
+      patch: {
+        ...interiorOff,
+        interiorTrim: /\b(baseboards?|base\s*boards?)\b/.test(tNeg) ? 'yes' : 'no',
+        projectType: ctx.projectType || 'interior',
+        interiorScope: ctx.interiorScope || (ctx.selectedRooms.length > 0 ? 'specific_rooms' : 'whole_house'),
+        ...(md.chairRail ? { chairRail: 'yes' } : {}),
+        ...(md.crown ? { crownMolding: 'yes' } : {}),
+        ...(md.wainscot ? { wainscoting: 'yes' } : {}),
+        ...(md.closetShelves && ctx.closets === 'none' ? { closets: 'standard', closetShelving: ctx.closetShelving === 'none' ? 'built_in' : ctx.closetShelving } : {}),
+      },
+      reason: 'Only trim details (chair rail, crown, wainscoting, closet shelves) → no wall, ceiling or door painting',
+    });
   } else if (/\b(baseboards?|base\s*boards?|trim|casings?|crown)\b/.test(t) && !mentionsSurfaceWords && (ctx.projectType === 'interior' || /\b(interior|inside|baseboards?|casings?|crown)\b/.test(t)) && !/\b(exterior|outside|fascia|soffit)\b/.test(t) && (hasOnly || ctx.trimLinearFeet != null || /\blinear (?:feet|foot)\b/.test(t)) && ctx.interiorWalls !== 'no') {
     out.push({
       patch: { ...interiorOff, interiorTrim: 'yes', projectType: ctx.projectType || 'interior', interiorScope: ctx.interiorScope || 'whole_house' },
@@ -372,6 +395,15 @@ export function derive(ctx: EstimatorContext, transcript: string): Derivation[] 
       reason: 'Cabinets (or a vanity) only → no wall, ceiling or trim painting',
     });
   }
+
+  // Only chairs to paint ("paint my dining chairs"): a furniture job, not a room.
+  if (ctx.interiorWalls !== 'no' && ctx.furnitureItems.includes('chair') && !mentionsSurfaceWords && !/\b(rooms?|house|home|apartment|condo|walls?|trim|doors?|cabinets?|baseboards?|exterior|outside|patio|outdoor|deck)\b/.test(tNeg)) {
+    out.push({
+      patch: { ...interiorOff, projectType: ctx.projectType || 'interior', interiorScope: ctx.interiorScope || 'whole_house' },
+      reason: 'Only chairs → a furniture job, no wall, ceiling, trim or door painting',
+    });
+  }
+
 
   // A business or apartment building isn't priced room by room ("the sanctuary and hall" is not one hallway): it's the whole
   // space, sized by square footage, unless the customer limited it ("just the lobby").

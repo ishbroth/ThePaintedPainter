@@ -34,6 +34,7 @@ const EXCLUDED_KEYS = new Set<keyof EstimatorContext>([
   'extAnswered',
   'excludedSurfaces',
   'addedSurfaces',
+  'doorsIncluded',
   'zipCity',
   // interview bookkeeping, not answers
   'surfacesAddressed',
@@ -66,6 +67,16 @@ const LABEL_OVERRIDES: Partial<Record<keyof EstimatorContext, string>> = {
   popcornCeilingSqft: 'Popcorn ceiling area (sq ft)',
   cabinetDoorCount: 'Cabinet doors and drawer fronts',
   deckSqft: 'Deck area (sq ft)',
+  overhangSqft: 'Overhang or patio cover area (sq ft)',
+  fenceHeightFt: 'Fence height (ft)',
+  chairCount: 'Chairs to paint',
+  chairRail: 'Chair rail',
+  chairRailLinearFeet: 'Chair rail (linear feet)',
+  wainscotSqft: 'Wainscoting area (sq ft)',
+  interiorShutterCount: 'Interior shutters',
+  detailRoomCount: 'Rooms the trim details are in',
+  doorCount: 'Doors to paint',
+  windowCount: 'Windows to paint',
   pressureWashSqft: 'Pressure-wash area (sq ft)',
   exteriorBody: 'House body painted (siding/stucco/brick)',
   soffitsEaves: 'Soffits and eaves',
@@ -120,7 +131,7 @@ export function timelineLabel(timeline: string): string {
 
 /** A detail only means something while the thing it describes is in the job ("fence type" with no fence is just the form's resting answer). */
 const DEPENDS_ON: Record<string, string> = {
-  fenceType: 'fence', fenceLinearFeet: 'fence', deckSize: 'deck', deckSqft: 'deck', railingType: 'railings', exteriorRailingMaterial: 'railings',
+  fenceType: 'fence', fenceLinearFeet: 'fence', fenceHeightFt: 'fence', chairRailLinearFeet: 'chairRail', deckSize: 'deck', deckSqft: 'deck', railingType: 'railings', exteriorRailingMaterial: 'railings',
   balconyCount: 'balconies', exteriorShutterCount: 'exteriorShutters', exteriorWindowCount: 'exteriorWindows', overhangSqft: 'overhangs',
   doorCount: 'interiorDoors', doorTypes: 'interiorDoors', doorFrames: 'interiorDoors', doorMaterial: 'interiorDoors',
   windowCount: 'interiorWindows', windowTypes: 'interiorWindows', cabinetLocations: 'cabinets', cabinetScope: 'cabinets', cabinetFinish: 'cabinets', trimFinish: 'interiorTrim', doorFinish: 'interiorDoors', cabinetDoorCount: 'cabinets',

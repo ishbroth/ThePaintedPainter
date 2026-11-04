@@ -8,6 +8,13 @@ import { setLLMReaderForTests } from '../src/lib/chatEstimator/llmClient.ts';
 import type { Intent } from '../src/lib/chatEstimator/intents.ts';
 import type { EstimatorContext } from '../src/lib/types.ts';
 import { calculateEstimate } from '../src/lib/estimateEngine.ts';
+import { parseArea, parseCount, parseDimensionPair, parseFenceAnswer, parseLinearFeet } from '../src/lib/chatEstimator/details.ts';
+import { botRepeats, collectFriction, detectFriction } from '../src/lib/chatEstimator/selfCheck.ts';
+import { buildReport, scrub, setSelfReviewEnabled } from '../src/lib/chatEstimator/selfReview.ts';
+import { defaultAssumptions } from '../src/lib/chatEstimator/defaultAssumptions.ts';
+import { fieldsForKey } from '../src/lib/priceEditing.ts';
+
+setSelfReviewEnabled(false); // no network from the checks
 
 let failures = 0;
 const check = (name: string, ok: boolean, detail = '') => {
@@ -226,6 +233,201 @@ async function dismissAt(setup: string[], topicWords: RegExp, dismissal = 'doesn
   const allPainted = await play(['all painted white'], [], trim.state);
   const bareAll = await play(['all bare wood'], [], trim.state);
   check('trim and doors: bare wood costs more to prep than painted', priceOf(bareAll.state) > priceOf(allPainted.state), String([priceOf(bareAll.state), priceOf(allPainted.state)]));
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------------
+// How many, how long, how big: counts and sizes behind doors, windows, chairs, fences, decks and overhangs, and the small trim details
+// ---------------------------------------------------------------------------------------------------------------------------------
+{
+  // "20 x 20", "20 by 20", "20x20 ft" are a length and a width: 400 square feet
+  for (const t of ['20 x 20', '20 by 20', '20x20 ft', "20' x 20'", '20 X 20 feet', 'about 20 by 20 feet']) check(`"${t}" is 400 sq ft`, parseArea(t, true) === 400, String(parseArea(t, true)));
+  check('"12.5 by 16" is 200 sq ft', parseArea('12.5 by 16', true) === 200, String(parseArea('12.5 by 16', true)));
+  check('"350 sq ft" is read', parseArea('about 350 sq ft', true) === 350);
+  check('a bare "300" answers an area question', parseArea('300', true) === 300);
+  check('a bare number is not an area unless an area was asked for', parseArea('300', false) === null);
+  check('a dimension pair is not a count', parseCount('3 x 6') === null);
+  check('"a dozen", "two", "about 12" are counts', parseCount('a dozen') === 12 && parseCount('two') === 2 && parseCount('about 12') === 12);
+  check('"150 feet" and "150 linear feet" and "150 lf" are lengths', parseLinearFeet('150 feet') === 150 && parseLinearFeet('150 linear feet') === 150 && parseLinearFeet('150 lf') === 150);
+  const f1 = parseFenceAnswer('about 150 feet, 6 feet tall');
+  const f2 = parseFenceAnswer('80 ft of 4 foot picket fence');
+  const f3 = parseFenceAnswer('150 x 6');
+  const f4 = parseFenceAnswer('six foot tall, 200 feet long');
+  check('fence "150 feet, 6 feet tall" is length 150, height 6', f1.feet === 150 && f1.height === 6, JSON.stringify(f1));
+  check('fence "80 ft of 4 foot picket fence" is length 80, height 4', f2.feet === 80 && f2.height === 4, JSON.stringify(f2));
+  check('fence "150 x 6" is length 150, height 6', f3.feet === 150 && f3.height === 6, JSON.stringify(f3));
+  check('fence "six foot tall, 200 feet long" is length 200, height 6', f4.feet === 200 && f4.height === 6, JSON.stringify(f4));
+  check('a dimension pair is found in "a 20x20 deck"', parseDimensionPair('a 20x20 deck')?.area === 400);
+
+  const priceOf = (st: ChatState) => calculateEstimate(st.ctx).total;
+  const lineOf = (st: ChatState, re: RegExp) => calculateEstimate(st.ctx).lineItems.find((l) => re.test(l.description));
+  /** Keeps answering `answer` until the bot asks something matching `re` (or gives up). */
+  const until = async (from: ChatState, re: RegExp, answer = 'no') => {
+    let state = from;
+    for (let i = 0; i < 25 && !re.test(state.history[state.history.length - 1].text); i++) state = (await play([answer], [], state)).state;
+    return { state, asked: state.history[state.history.length - 1].text, reached: re.test(state.history[state.history.length - 1].text) };
+  };
+
+  // 1. doors: yes to the doors being included -> how many?
+  const start = await play(['I want the whole inside of my house painted, walls, trim and doors', '2400 sq ft', 'walls, ceilings, trim and doors', 'yes']);
+  const doorQ = await until(start.state, /how many doors|doors are we talking about|roughly how many doors/i);
+  check('interior doors included: the bot asks how many doors', doorQ.reached, doorQ.asked);
+  const few = await play(['6 doors'], [], doorQ.state);
+  const many = await play(['about 20'], [], doorQ.state);
+  check('door count "6 doors" is read', few.state.ctx.doorCount === 6, JSON.stringify(few.state.ctx.doorCount));
+  check('door count "about 20" is read', many.state.ctx.doorCount === 20, JSON.stringify(many.state.ctx.doorCount));
+  check('more doors cost more', priceOf(many.state) > priceOf(few.state), String([priceOf(few.state), priceOf(many.state)]));
+  check('the door count is not asked twice', !/how many doors|doors are we talking about|roughly how many doors/i.test(few.last), few.last);
+  check('the price line shows the door count', /\(6\)/.test(lineOf(few.state, /Interior Doors/)?.description ?? ''), JSON.stringify(lineOf(few.state, /Interior Doors/)));
+  check('the doors can be edited in the breakdown', fieldsForKey('doors').some((f) => f.field === 'doorCount'));
+  const noCount = await play(['whatever'], [], doorQ.state);
+  check('an uncounted door list is shown as an estimate in the assumptions', defaultAssumptions(doorQ.state.ctx).some((a) => /doors estimated/i.test(a.label)) && !!noCount.state);
+
+  // 2. windows
+  const win = await play(['I want my bedroom walls and the window frames painted']);
+  check('window frames in a bedroom are inside work, not an outside job', win.state.ctx.projectType === 'interior' && win.state.ctx.interiorWindows !== 'none', JSON.stringify([win.state.ctx.projectType, win.state.ctx.interiorWindows]));
+  const winQ = await until(win.state, /how many windows/i);
+  check('window frames included: the bot asks how many windows', winQ.reached, winQ.asked);
+  const winA = await play(['8 windows'], [], winQ.state);
+  check('window count is read and shown on the price line', winA.state.ctx.windowCount === 8 && /\(8\)/.test(lineOf(winA.state, /Window Frames/)?.description ?? ''), JSON.stringify(lineOf(winA.state, /Window/)));
+
+  // 3. chairs
+  const chairs = await play(['I want to paint my dining chairs']);
+  check('only chairs: no ceilings or baseboards are suggested', !/ceilings|baseboards/i.test(chairs.last), chairs.last);
+  const chairQ = await until(chairs.state, /how many chairs/i);
+  check('chairs mentioned: the bot asks how many', chairQ.reached, chairQ.asked);
+  const six = await play(['6'], [], chairQ.state);
+  const two = await play(['2'], [], chairQ.state);
+  check('chair count "6" is read', six.state.ctx.chairCount === 6, JSON.stringify(six.state.ctx.chairCount));
+  check('six chairs cost more than two', priceOf(six.state) > priceOf(two.state), String([priceOf(two.state), priceOf(six.state)]));
+  check('the chair count can be edited in the breakdown', fieldsForKey('furniture').some((f) => f.field === 'chairCount'));
+
+  // 4. fence: length and height
+  const fence = await play(['I want my fence painted']);
+  check('a fence: the bot asks how long and how tall', /linear feet/i.test(fence.last) && /tall|high/i.test(fence.last), fence.last);
+  const tall = await play(['100 feet, 8 feet tall'], [], fence.state);
+  const short = await play(['100 feet, 4 feet tall'], [], fence.state);
+  check('fence length and height are read', tall.state.ctx.fenceLinearFeet === 100 && tall.state.ctx.fenceHeightFt === 8, JSON.stringify([tall.state.ctx.fenceLinearFeet, tall.state.ctx.fenceHeightFt]));
+  check('a taller fence costs more', priceOf(tall.state) > priceOf(short.state), String([priceOf(short.state), priceOf(tall.state)]));
+  check('the fence line shows the height', /8 ft tall/.test(lineOf(tall.state, /Fence/)?.description ?? ''), JSON.stringify(lineOf(tall.state, /Fence/)));
+  const lengthOnly = await play(['150'], [], fence.state);
+  check('only the length given: the height is asked next', lengthOnly.state.ctx.fenceLinearFeet === 150 && /how tall/i.test(lengthOnly.last), lengthOnly.last);
+  check('the fence height can be edited in the breakdown', fieldsForKey('fence').some((f) => f.field === 'fenceHeightFt'));
+
+  // exterior job: a fence, a deck or a patio cover is offered
+  const house = await play(['I want the outside of my house painted']);
+  const extras = await until(house.state, /fence, a deck|a fence, a deck|fence, deck|a deck or a patio/i, 'yes');
+  check('an outside job: the bot asks about a fence, deck or patio cover', extras.reached, extras.asked);
+  const bareYes = await play(['yes'], [], extras.state);
+  check('a bare yes: the bot asks which one', /which one/i.test(bareYes.last), bareYes.last);
+  const which = await play(['the fence and a deck'], [], bareYes.state);
+  check('"the fence and a deck" adds both', which.state.ctx.fence === 'yes' && which.state.ctx.deck === 'yes', JSON.stringify([which.state.ctx.fence, which.state.ctx.deck]));
+
+  // 5. decks and overhangs: square feet, "20 x 20" included
+  const deck = await play(['I want my deck stained']);
+  check('a deck: the bot asks the size', /square feet|length and width/i.test(deck.last), deck.last);
+  const deck400 = await play(['20 x 20'], [], deck.state);
+  check('deck "20 x 20" is 400 sq ft', deck400.state.ctx.deckSqft === 400, JSON.stringify(deck400.state.ctx.deckSqft));
+  check('...and priced from it', /\(400 sq ft\)/.test(lineOf(deck400.state, /Deck/)?.description ?? ''), JSON.stringify(lineOf(deck400.state, /Deck/)));
+  for (const [text, area] of [['20 by 20', 400], ['20x20 ft', 400], ['500 sq ft', 500], ['300', 300]] as const) {
+    const d = await play([text], [], deck.state);
+    check(`deck "${text}" is ${area} sq ft`, d.state.ctx.deckSqft === area, JSON.stringify(d.state.ctx.deckSqft));
+  }
+  const said = await play(['I need a 16x24 deck stained']);
+  check('a deck size said up front is used and not asked again', said.state.ctx.deckSqft === 384 && !/how many square feet is the deck/i.test(said.last), JSON.stringify([said.state.ctx.deckSqft, said.last]));
+  const cover = await play(['I want the patio cover painted']);
+  check('an overhang or patio cover: the bot asks the size', /square feet|length and width|length times width/i.test(cover.last), cover.last);
+  const cover240 = await play(['12 by 20'], [], cover.state);
+  check('overhang "12 by 20" is 240 sq ft', cover240.state.ctx.overhangSqft === 240, JSON.stringify(cover240.state.ctx.overhangSqft));
+
+  // 6. oddball items, alone: chair rail, crown moulding, closet shelves, wainscoting
+  const rail = await play(['just the new chair rail that was installed painted, nothing else']);
+  check('only a chair rail: no walls, ceilings or doors, and the bot asks how many rooms', rail.state.ctx.interiorWalls === 'no' && rail.state.ctx.chairRail === 'yes' && /how many rooms/i.test(rail.last), JSON.stringify([rail.state.ctx.interiorWalls, rail.state.ctx.chairRail, rail.last]));
+  check('...and does not suggest ceilings or baseboards', !/ceilings|baseboards\?/i.test(rail.last), rail.last);
+  const railRooms = await play(['3'], [], rail.state);
+  check('chair rail: then the approximate linear feet', railRooms.state.ctx.detailRoomCount === 3 && /linear feet/i.test(railRooms.last), railRooms.last);
+  const railFeet = await play(['90 feet'], [], railRooms.state);
+  const railLine = lineOf(railFeet.state, /Chair Rail/);
+  check('chair rail is priced by the foot on its own line', !!railLine && /90 lin ft/.test(railLine.description), JSON.stringify(railLine));
+  check('...and a small job is held up to the minimum service charge', !!lineOf(railFeet.state, /Minimum service charge/), calculateEstimate(railFeet.state.ctx).lineItems.map((l) => l.description).join('; '));
+  const railUnsure = await play(['not sure'], [], railRooms.state);
+  const railMoreRooms = await play(['not sure'], [], (await play(['10'], [], rail.state)).state);
+  check('chair rail with no footage is estimated from the rooms (more rooms, more rail)', priceOf(railMoreRooms.state) > priceOf(railUnsure.state), String([priceOf(railUnsure.state), priceOf(railMoreRooms.state)]));
+  check('the estimate is listed in the assumptions', defaultAssumptions(railUnsure.state.ctx).some((a) => /chair rail length estimated/i.test(a.label)));
+  check('chair rail footage can be edited in the breakdown', fieldsForKey('chair_rail').some((f) => f.field === 'chairRailLinearFeet'));
+
+  const crown = await play(['only crown moulding painted, nothing else']);
+  check('only crown moulding: priced as crown and the bot asks about the rooms or feet', crown.state.ctx.crownMolding === 'yes' && crown.state.ctx.interiorWalls === 'no' && /rooms|linear feet/i.test(crown.last), JSON.stringify([crown.state.ctx.crownMolding, crown.last]));
+  const crownFeet = await play(['2 rooms', '120 feet'], [], crown.state);
+  check('crown moulding footage is read and priced', crownFeet.state.ctx.crownLinearFeet === 120 && /120 lin ft/.test(lineOf(crownFeet.state, /Crown/)?.description ?? ''), JSON.stringify(lineOf(crownFeet.state, /Crown/)));
+  check('crown moulding footage can be edited in the breakdown', fieldsForKey('crown').some((f) => f.field === 'crownLinearFeet'));
+
+  const shelves = await play(['just the closet shelves painted, nothing else']);
+  check('only closet shelves: the bot asks how many closets', /how many closets/i.test(shelves.last), shelves.last);
+  const shelves3 = await play(['3'], [], shelves.state);
+  check('closet count is read and priced', shelves3.state.ctx.closetCount === 3 && /Closets \(3\)/.test(lineOf(shelves3.state, /Closets/)?.description ?? ''), JSON.stringify(lineOf(shelves3.state, /Closets/)));
+
+  const wains = await play(['just wainscoting in the dining room, nothing else']);
+  const wainsQ = await until(wains.state, /square feet of wainscoting/i, 'medium');
+  check('only wainscoting: no walls, and the bot asks how many square feet', wains.state.ctx.wainscoting === 'yes' && wains.state.ctx.interiorWalls === 'no' && wainsQ.reached, wainsQ.asked);
+  const wains2 = await play(['30 x 3'], [], wainsQ.state);
+  check('wainscoting "30 x 3" is 90 sq ft', wains2.state.ctx.wainscotSqft === 90, JSON.stringify(wains2.state.ctx.wainscotSqft));
+
+  // a crown moulding or chair rail inside a bigger job still gets its length asked
+  const bigger = await play(['I want my whole house painted inside, walls, ceilings, trim and crown molding', '2000 sq ft']);
+  const crownAsk = await until(bigger.state, /linear feet of crown/i);
+  check('crown moulding in a bigger job: its length is asked', crownAsk.reached, crownAsk.asked);
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------------
+// The self-trainer: noticing a conversation going badly, correcting course live, and what gets sent for review afterwards
+// ---------------------------------------------------------------------------------------------------------------------------------
+{
+  for (const t of ['I already said that', 'like I said, 14 doors', 'As I said before, it is a rental', 'you already asked me that', 'stop asking', 'I just told you', 'again?', 'I already told you the zip code']) {
+    check(`friction: "${t}" is a repeat complaint`, detectFriction(t) === 'repeat_complaint', String(detectFriction(t)));
+  }
+  for (const t of ["no that's not what I meant", "that's not what I asked", "that's not what I said", 'you misunderstood me', "that doesn't answer my question", "I didn't ask that"]) {
+    check(`friction: "${t}" is a misunderstanding`, detectFriction(t) === 'misunderstood', String(detectFriction(t)));
+  }
+  for (const t of ['6 doors', 'yes', 'about 2000 sq ft', 'the whole house, walls and trim', "that's all", 'I said yes to the cabinets']) {
+    check(`friction: "${t}" is a normal message`, detectFriction(t) === null, String(detectFriction(t)));
+  }
+  const repeated = botRepeats([
+    { role: 'bot', text: 'Hi! How many doors are we talking about, approximately?' },
+    { role: 'user', text: 'eight' },
+    { role: 'bot', text: 'Got it. How many doors are we talking about, approximately?' },
+  ]);
+  check('the same question asked twice is a bot_repeat', repeated.length === 1 && repeated[0].kind === 'bot_repeat', JSON.stringify(repeated));
+
+  // live: the customer already gave the answer, and the notes have it
+  const known = await play(['I want the whole inside of my house painted, walls, trim and doors', '2400 sq ft', 'walls, ceilings, trim and doors', 'yes', 'no', 'all painted']);
+  check('setup: the bot asks how many doors', /doors/i.test(known.last) && /how many|approximately/i.test(known.last), known.last);
+  const noticed = await play(['like I said, 14 doors'], [], known.state);
+  check('"like I said, 14 doors": the bot owns up, uses the answer and does not ask it again', noticed.state.ctx.doorCount === 14 && /you'?re right|sorry/i.test(noticed.last) && !/how many doors/i.test(noticed.last), noticed.last);
+  check('...and what it understood is read back', /14 doors/.test(noticed.last), noticed.last);
+  check('...and the friction is on record', (noticed.state.friction ?? []).some((e) => e.kind === 'repeat_complaint'), JSON.stringify(noticed.state.friction));
+
+  // live: the bot is asking something the notes already hold
+  const asked = await play(['I already told you that'], [], { ...known.state, ctx: { ...known.state.ctx, doorCount: 9 } });
+  check('"I already told you": when the notes already hold it, the bot apologises and moves on without asking again', /sorry|right/i.test(asked.last) && !/how many doors/i.test(asked.last), asked.last);
+
+  // live: not what I meant
+  const confused = await play(["no that's not what I meant"], [], known.state);
+  check('"that\'s not what I meant": a brief apology, what it has so far, and no pushing on with a default', /sorry/i.test(confused.last) && /what i have so far|here's what/i.test(confused.last), confused.last);
+  check('...and it is logged as a misunderstanding', (confused.state.friction ?? []).some((e) => e.kind === 'misunderstood'), JSON.stringify(confused.state.friction));
+
+  // after the quote: what would be sent for the self-review
+  const transcript = [
+    { role: 'bot' as const, text: 'How many doors are we talking about?' },
+    { role: 'user' as const, text: 'call me at (619) 724-2702 or me@example.com, 14 doors' },
+    { role: 'bot' as const, text: 'How many doors are we talking about?' },
+    { role: 'user' as const, text: 'I already said that' },
+  ];
+  const report = buildReport(transcript, []);
+  const sent = JSON.stringify(report);
+  check('the review report has no phone numbers or emails', !/724-2702|example\.com/.test(sent) && /\[phone\]/.test(sent) && /\[email\]/.test(sent), sent);
+  check('the review report lists the friction (a complaint and a repeated question)', report.signals.some((s) => s.kind === 'repeat_complaint') && report.signals.some((s) => s.kind === 'bot_repeat'), JSON.stringify(report.signals));
+  check('a normal conversation reports no friction', collectFriction([{ role: 'bot', text: 'How big is it?' }, { role: 'user', text: '2000 sq ft' }]).length === 0);
+  check('scrub keeps the rest of the text', scrub('14 doors please') === '14 doors please');
 }
 
 setLLMReaderForTests(undefined);

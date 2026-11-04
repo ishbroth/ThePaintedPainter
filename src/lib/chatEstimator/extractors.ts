@@ -906,7 +906,9 @@ export function extractExteriorFeatures(text: string): {
     out.exteriorShutters = true;
   }
 
-  if (/\bwindow\s*frames?\b|\bwindow\s*trim\b|\bwindowsills?\b|\bwindow\s+sills?\b/.test(t)) {
+  // window frames and sills are the outside's unless the message is clearly about a room inside ("bedroom walls and the window frames")
+  const insideWords = /\b(inside|interior|indoors?|bedrooms?|bathrooms?|kitchen|living room|dining room|hallway|office|nursery|closets?|basement|apartment|condo)\b/.test(t) && !/\b(exterior|outside|outdoors?|siding|stucco|house exterior)\b/.test(t);
+  if (/\bwindow\s*frames?\b|\bwindow\s*trim\b|\bwindowsills?\b|\bwindow\s+sills?\b/.test(t) && !insideWords) {
     out.exteriorWindows = true;
   }
 

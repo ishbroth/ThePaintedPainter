@@ -9,6 +9,7 @@ import {
   calculateExteriorSurface,
   estimateHouseLayout,
 } from './surfaceAreaEngine';
+import { isIsolatedDetailJob, TRIM_FEET_PER_ROOM } from './chatEstimator/details';
 
 // ===== Main Estimate Calculation =====
 
@@ -38,6 +39,9 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
   const trimShare = fullLayout.totalTrimLinFt > 0 ? layout.totalTrimLinFt / fullLayout.totalTrimLinFt : 1;
   const roomShare = fullLayout.rooms.length > 0 ? layout.rooms.length / fullLayout.rooms.length : 1;
   const roomGone = (r: string) => ctx.excludedRooms.includes(r);
+  // A job that is only crown moulding, chair rail, wainscoting or baseboards is sized by the rooms it is in, not by the size of the house.
+  const detailOnly = isIsolatedDetailJob(ctx);
+  const detailFeet = detailOnly && ctx.detailRoomCount ? ctx.detailRoomCount * TRIM_FEET_PER_ROOM : null;
   const allBathsGone = fullLayout.rooms.filter((r) => r.startsWith('bathroom')).every(roomGone) && fullLayout.rooms.some((r) => r.startsWith('bathroom'));
 
   // Base labor complexity from project qualifiers
@@ -114,7 +118,7 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
 
     // Trim & Baseboards
     if (ctx.interiorTrim === 'yes' && !off('trim')) {
-      const trimLinFt = ctx.trimLinearFeet ? Math.round(ctx.trimLinearFeet * trimShare) : Math.round(layout.totalTrimLinFt * roomFraction);
+      const trimLinFt = ctx.trimLinearFeet ? Math.round(ctx.trimLinearFeet * trimShare) : detailFeet ?? Math.round(layout.totalTrimLinFt * roomFraction);
       const trimRate = getTrimRate(ctx);
       const trimCond = ctx.trimCondition || (ctx.projectCondition === 'new_construction' ? 'new' : 'existing_good');
       lineItems.push({
@@ -148,7 +152,7 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
     // Crown molding
     if (ctx.crownMolding === 'yes' && !off('crown')) {
       // Crown runs perimeter of rooms, ~80% of baseboard length (unless the customer gave the footage)
-      const crownLinFt = ctx.crownLinearFeet ? Math.round(ctx.crownLinearFeet * trimShare) : Math.round(layout.totalTrimLinFt * roomFraction * 0.8);
+      const crownLinFt = ctx.crownLinearFeet ? Math.round(ctx.crownLinearFeet * trimShare) : detailFeet ?? Math.round(layout.totalTrimLinFt * roomFraction * 0.8);
       lineItems.push({
         category: 'Interior',
         description: ctx.crownLinearFeet ? `Crown Molding (${crownLinFt} lin ft)` : 'Crown Molding',
@@ -157,13 +161,24 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
       });
     }
 
+    // Chair rail: the horizontal moulding about 3 ft up the wall, priced by the linear foot (about 80% of the baseboard run unless the customer gave the footage)
+    if (ctx.chairRail === 'yes' && !off('chair_rail')) {
+      const railFt = ctx.chairRailLinearFeet ? Math.round(ctx.chairRailLinearFeet * trimShare) : detailFeet ?? Math.round(layout.totalTrimLinFt * roomFraction * 0.8);
+      lineItems.push({
+        category: 'Interior',
+        description: ctx.chairRailLinearFeet ? `Chair Rail (${railFt} lin ft)` : 'Chair Rail',
+        amount: railFt * BASE_RATES.trim.chair_rail * regionalMult,
+        key: 'chair_rail',
+      });
+    }
+
     // Wainscoting
     if (ctx.wainscoting === 'yes' && !off('wainscoting')) {
       // Wainscoting: ~30% of wall area, lower 3ft
-      const wainscotSqFt = Math.round(effectiveWallSqFt * 0.15);
+      const wainscotSqFt = ctx.wainscotSqft ? Math.round(ctx.wainscotSqft * trimShare) : detailFeet ? Math.round(detailFeet * 3) : Math.round(effectiveWallSqFt * 0.15); // 3 ft high along the wall when only the rooms are known
       lineItems.push({
         category: 'Interior',
-        description: 'Wainscoting / Paneling',
+        description: ctx.wainscotSqft ? `Wainscoting / Paneling (${wainscotSqFt} sq ft)` : 'Wainscoting / Paneling',
         amount: wainscotSqFt * BASE_RATES.trim.wainscoting_per_sqft * regionalMult,
         key: 'wainscoting',
       });
@@ -334,10 +349,10 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
 
     // Interior shutters
     if (ctx.interiorShutters === 'yes' && !off('interior_shutters')) {
-      const shutterCount = Math.round(layout.totalWindows * roomFraction * 0.5) || 6;
+      const shutterCount = ctx.interiorShutterCount || Math.round(layout.totalWindows * roomFraction * 0.5) || 6;
       lineItems.push({
         category: 'Interior',
-        description: `Interior Shutters (~${shutterCount})`,
+        description: ctx.interiorShutterCount ? `Interior Shutters (${shutterCount})` : `Interior Shutters (~${shutterCount})`,
         amount: shutterCount * BASE_RATES.specialty.shutter_interior * regionalMult,
         key: 'interior_shutters',
       });
@@ -462,16 +477,17 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
   }
 
   // Furniture (indoor pieces, or patio sets on an exterior-only job)
-  if (ctx.specialtyServices.includes('furniture') && ctx.furnitureItems.length > 0 && !off('furniture')) {
+  const furnitureList = ctx.chairCount ? [...ctx.furnitureItems.filter((i) => i !== 'chair'), ...Array.from({ length: ctx.chairCount }, () => 'chair')] : ctx.furnitureItems;
+  if (ctx.specialtyServices.includes('furniture') && furnitureList.length > 0 && !off('furniture')) {
     let furnitureTotal = 0;
-    for (const item of ctx.furnitureItems) {
+    for (const item of furnitureList) {
       const key = `furniture_${item}` as keyof typeof BASE_RATES.specialty;
       const rate = BASE_RATES.specialty[key] || BASE_RATES.specialty.furniture_cabinet;
       furnitureTotal += typeof rate === 'number' ? rate : 175;
     }
     lineItems.push({
       category: 'Specialty',
-      description: `Furniture Painting (${ctx.furnitureItems.length} pieces)`,
+      description: `Furniture Painting (${furnitureList.length} pieces)`,
       amount: furnitureTotal * regionalMult,
       key: 'furniture',
     });
@@ -621,13 +637,16 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
       const fenceRate = ctx.fenceType === 'picket_4ft' ? BASE_RATES.exterior.fence_per_linft_4ft
         : ctx.fenceType === 'chain_link' ? BASE_RATES.exterior.fence_per_linft_chain
         : BASE_RATES.exterior.fence_per_linft_6ft;
+      // the rate is for the usual height of that kind of fence (6 ft privacy, 4 ft picket); a taller fence has more to cover per foot, though not in proportion (setup and cutting in are the same)
+      const usualHeight = ctx.fenceType === 'picket_4ft' || ctx.fenceType === 'chain_link' ? 4 : 6;
+      const heightFactor = ctx.fenceHeightFt ? Math.min(2, Math.max(0.5, 0.4 + 0.6 * (ctx.fenceHeightFt / usualHeight))) : 1;
       const fenceLabel = ctx.fenceType === 'picket_4ft' ? 'Picket Fence'
         : ctx.fenceType === 'chain_link' ? 'Chain Link Fence'
         : 'Fence';
       lineItems.push({
         category: 'Exterior',
-        description: `${fenceLabel} (${fenceFt} ft)`,
-        amount: fenceFt * fenceRate * regionalMult,
+        description: `${fenceLabel} (${fenceFt} ft${ctx.fenceHeightFt ? `, ${ctx.fenceHeightFt} ft tall` : ''})`,
+        amount: fenceFt * fenceRate * heightFactor * regionalMult,
         key: 'fence',
       });
     }

@@ -32,6 +32,8 @@ export interface EstimatorContext {
   addedSurfaces?: string[];
   /** Exterior questions (ext_*) the customer has answered, so each is asked once and never counted as answered when it wasn't. */
   extAnswered?: string[];
+  /** The customer actually said the interior doors are part of the job (interiorDoors alone is also its resting default), so the estimator asks how many. */
+  doorsIncluded?: boolean;
   /** The paint: a brand the customer wants (or 'painter_choice'), how nice it is (economy, standard, premium) and the finish. */
   paintBrand?: string;
   paintGrade?: string;
@@ -94,6 +96,19 @@ export interface EstimatorContext {
   deckSqft: number | null; // deck area, when given
   overhangSqft: number | null; // porch ceiling / patio cover area, when given
   pressureWashSqft: number | null; // area to pressure wash, when it isn't just the house
+  /** Height of the fence in feet, when given (the fence type sets the usual height otherwise). */
+  fenceHeightFt: number | null;
+  /** Chairs to paint (dining, patio...), when the customer said how many. */
+  chairCount: number | null;
+  /** Chair rail (the horizontal moulding halfway up a wall): no, yes. */
+  chairRail: string;
+  chairRailLinearFeet: number | null;
+  /** Wainscoting / paneling area in square feet, when given. */
+  wainscotSqft: number | null;
+  /** Interior shutters, when the customer said how many. */
+  interiorShutterCount: number | null;
+  /** How many rooms the stand-alone trim details (crown, chair rail, wainscoting, baseboards) are in, for a job that is only those. */
+  detailRoomCount: number | null;
   /** Whether the house body itself (siding/stucco/brick) is part of an exterior job. 'no' = only the listed features (fence, deck, shutters, doors, trim, washing...). */
   exteriorBody: string; // '' (not discussed), yes, no
   /** Price editing: rooms and main items the customer took off the price after seeing it. */

@@ -19,6 +19,7 @@
 // ============================================================================
 
 import type { EstimatorContext } from '../types';
+import { isIsolatedDetailJob, TRIM_FEET_PER_ROOM } from './details';
 
 export interface Assumption {
   label: string;
@@ -144,6 +145,34 @@ export function defaultAssumptions(ctx: EstimatorContext): Assumption[] {
           },
         ],
       },
+    });
+  }
+
+  // Sizes and counts the customer did not give: what was assumed, so it can be corrected in the price breakdown.
+  const interior = ctx.projectType === 'interior' || ctx.projectType === 'both';
+  const detailOnly = isIsolatedDetailJob(ctx);
+  const byRooms = detailOnly && ctx.detailRoomCount ? ' from ' + ctx.detailRoomCount + ' room' + (ctx.detailRoomCount === 1 ? '' : 's') + ' (about ' + TRIM_FEET_PER_ROOM + ' ft each)' : ' from the size of the home';
+  const guess = (label: string, reason: string) => out.push({ label, reason: reason + ' Change it in the price breakdown if you know the real number.' });
+  if (interior && ctx.interiorDoors !== 'none' && ctx.doorsIncluded && ctx.doorCount == null) guess('Number of doors estimated', 'You did not give a door count, so the doors are counted' + byRooms + '.');
+  if (interior && ctx.interiorWindows !== 'none' && ctx.windowCount == null) guess('Number of windows estimated', 'You did not give a window count, so the windows are counted' + byRooms + '.');
+  if (interior && ctx.closets !== 'none' && ctx.closetCount == null) guess('Number of closets estimated', 'You did not give a closet count, so the closets are counted' + byRooms + '.');
+  if (ctx.furnitureItems.includes('chair') && ctx.chairCount == null) guess('Number of chairs assumed', 'You did not say how many chairs, so ' + ctx.furnitureItems.filter((i) => i === 'chair').length + ' are priced.');
+  if (interior && ctx.crownMolding === 'yes' && ctx.crownLinearFeet == null) guess('Crown moulding length estimated', 'You did not give the length of crown moulding, so it is estimated' + byRooms + '.');
+  if (interior && ctx.chairRail === 'yes' && ctx.chairRailLinearFeet == null) guess('Chair rail length estimated', 'You did not give the length of chair rail, so it is estimated' + byRooms + '.');
+  if (interior && ctx.wainscoting === 'yes' && ctx.wainscotSqft == null) guess('Wainscoting area estimated', 'You did not give the area of wainscoting, so it is estimated at about 3 ft high along the walls' + byRooms + '.');
+  if (detailOnly && ctx.interiorTrim === 'yes' && ctx.trimLinearFeet == null) guess('Baseboard length estimated', 'You did not give the length of baseboard, so it is estimated' + byRooms + '.');
+  if (ctx.fence === 'yes') {
+    if (ctx.fenceLinearFeet == null) guess('Fence length assumed (100 ft)', 'You did not give the length of the fence.');
+    if (ctx.fenceHeightFt == null && ctx.fenceType !== 'chain_link') guess('Fence height assumed (' + (ctx.fenceType === 'picket_4ft' ? '4' : '6') + ' ft)', 'You did not give the height of the fence, so the usual height for that kind of fence is priced.');
+  }
+  if (ctx.deck === 'yes' && ctx.deckSqft == null) guess('Deck size assumed', 'You did not give the size of the deck, so a ' + (ctx.deckSize || 'medium') + ' deck is priced.');
+  if (ctx.overhangs === 'yes' && ctx.overhangSqft == null) guess('Overhang size estimated', 'You did not give the size of the overhang or patio cover, so it is estimated from the footprint of the house.');
+  if (ctx.railings === 'yes' && ctx.stairRailFeet == null) guess('Railing length estimated', 'You did not give the length of the railing, so it is estimated from the size of the house.');
+  if (ctx.exteriorShutters === 'yes' && ctx.exteriorShutterCount == null) guess('Number of shutters assumed (8)', 'You did not say how many shutters.');
+  if (detailOnly) {
+    out.push({
+      label: 'Small job: minimum service charge applies',
+      reason: 'With only trim details in the job, a painter still has to come, set up and mask, so the price will not go below the minimum service charge.',
     });
   }
 

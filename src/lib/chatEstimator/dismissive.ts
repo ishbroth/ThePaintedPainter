@@ -64,7 +64,7 @@ export function highestPriceAssumption(topicId: string, ctx: EstimatorContext): 
     case 'upsell_trim':
     case 'upsell_doors':
       return {
-        patch: { interiorWalls: 'yes', interiorCeilings: 'yes', interiorTrim: 'yes', interiorDoors: 'all', surfacesAddressed: true, trimScopeAddressed: true },
+        patch: { interiorWalls: 'yes', interiorCeilings: 'yes', interiorTrim: 'yes', interiorDoors: 'all', doorsIncluded: true, surfacesAddressed: true, trimScopeAddressed: true },
         say: higher('everything: walls, ceilings, trim and doors'),
       };
     case 'trim_door_finish':
@@ -131,6 +131,25 @@ export function highestPriceAssumption(topicId: string, ctx: EstimatorContext): 
     case 'paint_finish':
       // "doesn't matter" about paint means "the painter can choose" (standard grade): the paint answers already settle it
       return { patch: { extAnswered: withExt(ctx, topicId) }, say: "No problem, the painter will choose the paint." };
+    case 'door_count':
+    case 'window_count':
+    case 'closet_count':
+    case 'chair_count':
+    case 'shutter_count':
+    case 'railing_length':
+    case 'fence_size':
+    case 'fence_height':
+    case 'deck_size':
+    case 'overhang_size':
+    case 'ext_extras':
+    case 'ext_extras_which':
+    case 'detail_rooms':
+    case 'detail_feet_chair_rail':
+    case 'detail_feet_crown':
+    case 'detail_feet_trim':
+    case 'detail_sqft_wainscot':
+      // no number given: the usual size for the house is used, and the price notes it as an estimate that can be edited
+      return { patch: { extAnswered: withExt(ctx, topicId) }, say: "No problem, I'll estimate that from the usual size, and you can change the number when you see the price." };
     case 'location':
       return {
         patch: {},

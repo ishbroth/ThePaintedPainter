@@ -49,6 +49,12 @@ export function fieldsForKey(key: string): FieldDef[] {
     case 'ceilings': return [{ field: 'ceilingType', label: 'Ceiling type', kind: 'select', options: [{ value: 'flat', label: 'Flat' }, { value: 'popcorn', label: 'Popcorn / textured' }, { value: 'vaulted', label: 'Vaulted' }] }];
     case 'trim': return [{ field: 'trimLinearFeet', label: 'Linear feet of trim', kind: 'number', min: 10, max: 20000 }, { field: 'trimFinish', label: 'Current finish', kind: 'select', options: [{ value: 'painted', label: 'Already painted' }, { value: 'primed', label: 'Pre-primed' }, { value: 'bare_wood', label: 'Bare wood' }, { value: 'stained', label: 'Stained or varnished wood' }] }];
     case 'doors': return [{ field: 'doorCount', label: 'Number of doors', kind: 'number', min: 1, max: 60 }, { field: 'doorFinish', label: 'Current finish', kind: 'select', options: [{ value: 'painted', label: 'Already painted' }, { value: 'primed', label: 'Pre-primed' }, { value: 'bare_wood', label: 'Bare wood' }, { value: 'stained', label: 'Stained or varnished wood' }] }];
+    case 'crown': return [{ field: 'crownLinearFeet', label: 'Linear feet of crown moulding', kind: 'number', min: 5, max: 5000 }];
+    case 'chair_rail': return [{ field: 'chairRailLinearFeet', label: 'Linear feet of chair rail', kind: 'number', min: 5, max: 5000 }];
+    case 'wainscoting': return [{ field: 'wainscotSqft', label: 'Wainscoting area (sq ft)', kind: 'number', min: 10, max: 5000 }];
+    case 'interior_shutters': return [{ field: 'interiorShutterCount', label: 'Number of shutters', kind: 'number', min: 1, max: 60 }];
+    case 'furniture': return [{ field: 'chairCount', label: 'Number of chairs', kind: 'number', min: 1, max: 60 }];
+    case 'overhangs': return [{ field: 'overhangSqft', label: 'Overhang or patio cover (sq ft)', kind: 'number', min: 20, max: 3000 }];
     case 'windows': return [{ field: 'windowCount', label: 'Number of windows', kind: 'number', min: 1, max: 80 }];
     case 'closets': return [{ field: 'closetCount', label: 'Number of closets', kind: 'number', min: 1, max: 30 }];
     case 'stairs': return [{ field: 'stairRailFeet', label: 'Feet of railing', kind: 'number', min: 4, max: 500 }];
@@ -64,7 +70,7 @@ export function fieldsForKey(key: string): FieldDef[] {
     case 'ext_shutters': return [{ field: 'exteriorShutterCount', label: 'Number of shutters', kind: 'number', min: 1, max: 60 }];
     case 'ext_windows': return [{ field: 'exteriorWindowCount', label: 'Windows with trim', kind: 'number', min: 1, max: 80 }];
     case 'deck': return [{ field: 'deckSqft', label: 'Deck size (sq ft)', kind: 'number', min: 20, max: 5000 }];
-    case 'fence': return [{ field: 'fenceLinearFeet', label: 'Feet of fence', kind: 'number', min: 10, max: 3000 }];
+    case 'fence': return [{ field: 'fenceLinearFeet', label: 'Feet of fence', kind: 'number', min: 10, max: 3000 }, { field: 'fenceHeightFt', label: 'Height of the fence (ft)', kind: 'number', min: 2, max: 12 }];
     case 'railings': return [{ field: 'stairRailFeet', label: 'Feet of railing', kind: 'number', min: 4, max: 500 }];
     case 'balconies': return [{ field: 'balconyCount', label: 'Number of balconies', kind: 'number', min: 1, max: 20 }];
     case 'popcorn_removal': return [{ field: 'popcornCeilingSqft', label: 'Ceiling area (sq ft)', kind: 'number', min: 50, max: 30000 }];

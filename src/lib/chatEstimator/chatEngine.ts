@@ -20,7 +20,7 @@
 import type { EstimatorContext, EstimateBreakdown, EstimateLineItem, UserResponseStyle } from '../types';
 import { calculateEstimate } from '../estimateEngine';
 import { supabase } from '../supabase';
-import { extractAll, extractCeilingHeight, extractPhotoTriggers, extractTimeline, extractPropertyType, extractAccessSignals, extractZip, extractSquareFeet } from './extractors';
+import { extractAll, extractExteriorFeatures, extractCeilingHeight, extractPhotoTriggers, extractTimeline, extractPropertyType, extractAccessSignals, extractZip, extractSquareFeet } from './extractors';
 import { getStateFromZip } from '../zipCodeData';
 import { hasScopeLimiter } from './scopeWords';
 import { lookupZipCity } from '../zipLookup';
@@ -40,6 +40,9 @@ import { pickNextTopic, pickRetryTopic, findTopic, metaBank, isStandaloneOnlyJob
 import { extractWithLLM } from './llmClient';
 import { highestPriceAssumption, sanitizeLlmPatch } from './dismissive';
 import { makeInitialContext } from './defaultContext';
+import { extractDetails, DETAIL_TOPIC_IDS } from './details';
+import { detectFriction, type FrictionEvent } from './selfCheck';
+import { reportConversation } from './selfReview';
 
 // ===== Message / state =====
 
@@ -87,6 +90,8 @@ export interface ChatState {
   wrapupAsked: boolean;
   /** Has the bot asked for photos and said it has enough to price it (the last step before the number)? */
   photosAsked?: boolean;
+  /** Signs the conversation went badly ("I already said that", "that's not what I meant"): kept for the live correction and the review after the quote. */
+  friction?: FrictionEvent[];
   finalEstimate: ChatResult | null;
   /** State from immediately before the last processed message, restorable
    * via "back up". Single-level undo only (no redo/multi-step). */
@@ -469,7 +474,21 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
   // 1. Understand the message (LLM first, local rules engine as fallback),
   //    then apply derivations against the full transcript
   const understood = await understand(trimmed, state);
-  const { intent } = understood;
+  // The customer pointing out a mistake ("I already said that", "like I said", "that's not what I asked"): noted, and a repeat complaint is always
+  // handled as "I already answered", whether or not the AI reader tagged it.
+  const frictionKind = detectFriction(trimmed);
+  const intent: IntentResult =
+    frictionKind === 'repeat_complaint' && state.lastBotTopic && !hasIntent(understood.intent, 'already_answered')
+      ? { ...understood.intent, intents: [...understood.intent.intents, 'already_answered'] }
+      : understood.intent;
+  const frictionLog: FrictionEvent[] | undefined = frictionKind
+    ? [...(state.friction ?? []), {
+        kind: frictionKind,
+        turn: state.history.filter((m) => m.role === 'user').length + 1,
+        user: trimmed.slice(0, 200),
+        bot: [...state.history].reverse().find((m) => m.role === 'bot')?.text.slice(0, 200),
+      }].slice(-20)
+    : state.friction;
   const patch = { ...understood.patch };
   // Ceiling height is read by the plain rules as well as the AI reader, so a bare "20 feet" in answer to the ceiling question (or to
   // "anything else?") is never lost.
@@ -504,7 +523,7 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
 
   // The customer is disputing something the bot did ("I never said trim", "I didn't say walls only"): apologise, say what
   // was actually understood, and ask — never fill in a default. Nothing in the message is applied.
-  if (state.askedIds.length > 0 && isDenial(trimmed)) {
+  if (state.askedIds.length > 0 && (isDenial(trimmed) || frictionKind === 'misunderstood')) {
     if (denialIsAboutScope(trimmed) && state.ctx.projectType !== 'exterior') {
       const reset: EstimatorContext = {
         ...state.ctx,
@@ -525,11 +544,29 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
         `Sorry about that, I shouldn't have assumed. ${recap} Let's pin down exactly what's being painted first. ${scopeQuestion}`,
       );
     }
+    // checked against the notes first: when the question on the table is already answered there, it is not asked again
+    if (state.lastBotTopic && state.lastBotTopic.alreadyAnswered(state.ctx)) {
+      return asBot({ friction: frictionLog }, `Sorry about that, I got that wrong. ${recap} Tell me what to change and I'll fix it.`.replace(/\s{2,}/g, ' '));
+    }
     const again = state.lastBotTopic ? state.lastBotTopic.ask(state.ctx) : 'What would you like me to change?';
-    return asBot({}, `Sorry about that, I shouldn't have assumed. ${recap} Tell me what's wrong and I'll fix it, or answer this: ${again.charAt(0).toLowerCase()}${again.slice(1)}`);
+    return asBot({ friction: frictionLog }, `Sorry about that, I shouldn't have assumed. ${recap} Tell me what's wrong and I'll fix it, or answer this: ${again.charAt(0).toLowerCase()}${again.slice(1)}`);
   }
 
   const ctxWithExplicit: EstimatorContext = { ...state.ctx, ...patch };
+
+  // Counts, lengths and areas (how many doors, how long and tall the fence, "20 x 20" for a deck) and the small trim details named in passing
+  // (chair rail, crown moulding, wainscoting, closet shelves): read with plain rules so they count whichever reader handled the rest.
+  {
+    const askedId = state.lastBotTopic?.id ?? null;
+    const det = extractDetails(trimmed, ctxWithExplicit, askedId);
+    Object.assign(ctxWithExplicit, det.patch);
+    for (const a of det.acks) if (!acknowledgements.includes(a)) acknowledgements.push(a);
+    // answered when a number came out of the reply (or it says there is none); anything else leaves the question open to be asked again once
+    const saidNone = /^\W*(?:no|none|nope|nah|skip|n\/a|zero|all of them|every one|everything)\b/i.test(trimmed);
+    if (askedId && DETAIL_TOPIC_IDS.has(askedId) && !trimmed.endsWith('?') && !hasIntent(intent, 'dismissive') && (det.acks.length > 0 || saidNone)) {
+      ctxWithExplicit.extAnswered = [...new Set([...(ctxWithExplicit.extAnswered ?? state.ctx.extAnswered ?? []), askedId])];
+    }
+  }
 
   // A reading of the message that isn't supported by anything the customer actually said gets undone, not priced.
   // Surfaces: a surface can only be switched OFF by a message that names it (or limits the scope: "only", "just", "walls only"),
@@ -706,6 +743,18 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
         const dims = low.match(/(\d{1,3})\s*(?:x|by|×)\s*(\d{1,3})/);
         if (dims) ctxWithExplicit.squareFeet = parseInt(dims[1], 10) * parseInt(dims[2], 10);
       }
+      if (asked === 'ext_extras' || asked === 'ext_extras_which') {
+        // a fence, a deck or a patio cover named in the answer is added; a bare yes only says there is something, so which one is asked next
+        const feat = extractExteriorFeatures(trimmed);
+        if (feat.fence && state.ctx.fence === 'none') { target.fence = 'yes'; if (feat.fenceType) target.fenceType = feat.fenceType; if (feat.fenceLinearFeet) target.fenceLinearFeet = feat.fenceLinearFeet; }
+        if (feat.deck && state.ctx.deck === 'none') { target.deck = 'yes'; if (feat.deckSize) target.deckSize = feat.deckSize; }
+        if (feat.overhangs && state.ctx.overhangs === 'no') target.overhangs = 'yes';
+        if (/\b(?:patio ?cover|porch (?:roof|ceiling)|pergola|carport|awning)\b/.test(low) && state.ctx.overhangs === 'no') target.overhangs = 'yes';
+        const named = target.fence === 'yes' || target.deck === 'yes' || target.overhangs === 'yes';
+        if (asked === 'ext_extras' && yes && !no && !named && !trimmed.endsWith('?')) {
+          ctxWithExplicit.extAnswered = [...new Set([...(ctxWithExplicit.extAnswered ?? state.ctx.extAnswered ?? []), 'ext_extras_yes'])];
+        }
+      }
       if (asked === 'ext_garage_count') {
         if (/\b(?:two|2|double|both|pair|2-car|two-car)\b/.test(low)) ctxWithExplicit.garageDoor = 'double';
       }
@@ -748,7 +797,7 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
       }
       // a question back ("what do you mean?") is not an answer, and neither is a brush-off (the dismissive rule answers it, at the higher price)
       if (!trimmed.endsWith('?') && !hasIntent(intent, 'dismissive')) {
-        ctxWithExplicit.extAnswered = [...new Set([...(state.ctx.extAnswered ?? []), asked])];
+        ctxWithExplicit.extAnswered = [...new Set([...(ctxWithExplicit.extAnswered ?? state.ctx.extAnswered ?? []), asked])];
       }
     }
   }
@@ -936,6 +985,7 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
 
   let s: ChatState = {
     ...state,
+    friction: frictionLog,
     ctx: ctxNext,
     history: [...state.history, userMsg],
     transcript: newTranscript,
@@ -1007,7 +1057,8 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
     };
     }
   } else {
-    if (explicitRunIt && !s.wrapupAsked) {
+    // (on the very first message "nothing else" just describes the job, it is not a request for the price)
+    if (explicitRunIt && !s.wrapupAsked && state.askedIds.length > 0) {
       s = { ...s, history: [...s.history, botMessage("I'll run the numbers as soon as I've asked a few more quick questions.")] };
     }
     // 3. Handle meta questions / clarifications before advancing topics
@@ -1081,7 +1132,20 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
   // stated default rather than repeating the loop.
   if (hasIntent(intent, 'already_answered') && s.lastBotTopic) {
     const topic = s.lastBotTopic;
-    const rescan = extractAll(s.transcript, s.ctx, topic.id);
+    // The notes first: if what the question asks for is already on record, the bot should not have asked. Say so and move on, without asking again.
+    if (topic.alreadyAnswered(s.ctx)) {
+      const recapNow = recapSentence(recentRecognized(s.history));
+      s = {
+        ...s,
+        history: [...s.history, botMessage(`You're right, sorry about that, I already have it. ${recapNow}`.replace(/\s{2,}/g, ' ').trim())],
+      };
+      if (!s.askedIds.includes(topic.id)) s = { ...s, askedIds: [...s.askedIds, topic.id] };
+      if (!s.retriedIds.includes(topic.id)) s = { ...s, retriedIds: [...s.retriedIds, topic.id] };
+      return await advanceAfterUncertainty(s, customerId);
+    }
+    const rescanBase = extractAll(s.transcript, s.ctx, topic.id);
+    const rescanDetails = extractDetails(s.transcript, s.ctx, null);
+    const rescan = { patch: { ...rescanBase.patch, ...rescanDetails.patch }, acknowledgements: [...rescanBase.acknowledgements, ...rescanDetails.acks] };
     const rescannedCtx = { ...s.ctx, ...rescan.patch };
     const resolved = Object.keys(rescan.patch).length > 0 && topic.alreadyAnswered(rescannedCtx);
     if (resolved) {
@@ -1394,6 +1458,8 @@ async function finalizeTurn(state: ChatState, customerId?: string): Promise<Turn
 
   const loyaltyDiscountPercent = customerId ? await fetchLoyaltyDiscountPercent(customerId) : 0;
   const result = finalize(state.ctx, state.transcript, loyaltyDiscountPercent);
+  // After the price is made: the estimator looks back over the conversation for what went wrong (no waiting, never fails the quote)
+  reportConversation(state.history.map((m) => ({ role: m.role, text: m.text })), state.friction ?? []);
   // A price that is just the minimum service charge is fine when what was described is painting (one french-pane window, one
   // door): it is only blocked when nothing paintable was described at all. The AI review decides that; if it couldn't be
   // reached, a job type or some rooms/size on record counts as described.
