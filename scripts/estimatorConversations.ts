@@ -547,6 +547,79 @@ async function dismissAt(setup: string[], topicWords: RegExp, dismissal = 'doesn
   check('a room job that mentions a table or chair rail is still a room job', !r2.state.ctx.itemsOnly, JSON.stringify({ only: r2.state.ctx.itemsOnly, items: r2.state.ctx.furnitureItems }));
 }
 
+// Cabinets as the whole job, and surfaces the customer ruled out. (Two flaws seen in the live chat: "kitchen cabinets" got "Want me to add the
+// ceilings too?", and "the ceilings too, but not the trim" was followed by "Have the trim and doors been painted before?".)
+{
+  const noDoorsAndDrawers = (t: string) => t.replace(/\[\[[^\]]*\]\]/g, '').replace(/doors,? (?:and )?drawer(?: fronts)?|doors and frames|drawer fronts and frames/gi, '');
+  const ROOM_Q = /ceilings?|\bwalls?\b|baseboards?|\btrim\b|\bdoors?\b|ceiling height|how tall|standard ceiling|rental|living (?:here|there)|anyone (?:be |living )|occupied|which rooms|what rooms|how (?:big|large) is (?:that|the)|inside, (?:the )?outside|interior, exterior|painted before|prep concerns|what kind of shape|good shape/i;
+  const roomQs = (turns: string[]) => turns.map(noDoorsAndDrawers).filter((t) => ROOM_Q.test(t));
+
+  // 1. the exact cabinet messages, then the answers to what the bot asks next
+  const cab = await play([
+    'I want my kitchen cabinets painted white',
+    'about 30 cabinet doors and drawers, they are oak',
+    'yes the inside of the boxes too',
+    'sprayed',
+    'keep the hardware',
+    'same color',
+    'painters choice',
+    '91941',
+    'whenever',
+    'no',
+  ]);
+  const cc = cab.state.ctx;
+  check('cabinets: no ceiling, wall, trim, door, height, occupancy or room-size question anywhere', roomQs(cab.turns).length === 0, roomQs(cab.turns).join(' ## '));
+  check('cabinets: "Want me to add the ceilings" is never asked', !cab.turns.some((t) => /add the ceilings|fresh ceilings/i.test(t)), cab.turns.join(' ## '));
+  check('cabinets: the count of doors and drawers is asked first (or read from the first reply)', cab.turns.slice(0, 2).some((t) => /how many (?:cabinet )?doors|doors and drawers/i.test(t)), cab.turns.slice(0, 2).join(' ## '));
+  check('cabinets: the inside of the boxes is read as inside + out', cc.cabinetScope === 'inside_too' && cc.cabinetDoorCount === 30, JSON.stringify({ s: cc.cabinetScope, n: cc.cabinetDoorCount }));
+  check('cabinets: sprayed is read, and hardware is asked about', cc.cabinetMethod === 'sprayed' && cab.turns.some((t) => /hardware|hinges/i.test(t)), cc.cabinetMethod);
+  check('cabinets: walls, ceilings, trim and doors stay off', cc.interiorWalls === 'no' && cc.interiorCeilings === 'no' && cc.interiorTrim === 'no' && cc.interiorDoors === 'none', JSON.stringify({ w: cc.interiorWalls, c: cc.interiorCeilings, t: cc.interiorTrim, d: cc.interiorDoors }));
+  check('cabinets: no question is asked twice and nothing is circled back to', new Set(cab.turns.map((t) => t.split('||').pop()!.trim())).size === cab.turns.length && !cab.turns.some((t) => /circling back/i.test(t)), cab.turns.join(' ## '));
+  const cabE = calculateEstimate(cc);
+  check('cabinets: the price is the cabinets (a few thousand dollars), with no wall, ceiling, trim or door lines', cabE.total > 1500 && cabE.total < 9000 && !cabE.lineItems.some((l) => /Interior Walls|Ceilings|Trim|Interior Doors/.test(l.description)), cabE.total + ' ' + JSON.stringify(cabE.lineItems.map((l) => l.description)));
+  const fronts = calculateEstimate({ ...cc, cabinetScope: 'fronts_only', cabinetMethod: 'brushed' });
+  const sprayedInside = calculateEstimate({ ...cc, cabinetScope: 'inside_too', cabinetMethod: 'sprayed' });
+  check('cabinets: insides and spraying cost more than outsides brushed', sprayedInside.total > fronts.total, sprayedInside.total + ' vs ' + fronts.total);
+  // adding a surface brings it back into scope
+  const cabPlus = await play(['I want my kitchen cabinets painted white', 'and the ceiling too']);
+  check('cabinets: when the customer adds the ceiling it is in the job', cabPlus.state.ctx.interiorCeilings === 'yes', cabPlus.state.ctx.interiorCeilings);
+
+  // 2. the exact exclusion message in a living-room conversation
+  const lr = await play(['I want my living room painted', 'about 15 by 20', 'yes the ceilings too, but not the trim', 'no', 'no', 'no', 'no', '91941', 'whenever', 'no']);
+  const questionsIn = (turns: string[]) => turns.flatMap((t) => t.replace(/\[\[[^\]]*\]\]/g, '').split('||')).flatMap((p) => p.match(/[^.?!]*\?/g) ?? []).map((q) => q.trim());
+  const afterEx = questionsIn(lr.turns.slice(2));
+  check('living room: ceilings are in, the trim is out, the walls stay in', lr.state.ctx.interiorCeilings === 'yes' && lr.state.ctx.interiorTrim === 'no' && lr.state.ctx.interiorWalls === 'yes', JSON.stringify({ c: lr.state.ctx.interiorCeilings, t: lr.state.ctx.interiorTrim, w: lr.state.ctx.interiorWalls }));
+  check('living room: nothing about the trim or baseboards is asked after it was ruled out', !afterEx.some((t) => /\btrim\b|baseboards?/i.test(t)), afterEx.filter((t) => /\btrim\b|baseboards?/i.test(t)).join(' ## '));
+  check('living room: the "painted before / bare / stained / primed" question is only about what is still in scope (the doors)', !lr.turns.some((t) => /painted before|already painted/i.test(t) && /trim|baseboard/i.test(t)), lr.turns.join(' ## '));
+  const lrE = calculateEstimate(lr.state.ctx);
+  check('living room: priced for the walls and ceilings (and doors), no trim line, a sensible total', !lrE.lineItems.some((l) => /Trim/i.test(l.description)) && lrE.total > 900 && lrE.total < 5000, lrE.total + ' ' + JSON.stringify(lrE.lineItems.map((l) => l.description)));
+  // a reader that wrongly leaves the trim on must not win against what the customer said
+  const lrReading = await play(
+    ['I want my living room painted', 'about 15 by 20', 'yes the ceilings too, but not the trim', 'no', 'no'],
+    [null, null, { patch: { interiorCeilings: 'yes', interiorTrim: 'yes', interiorDoors: 'some' }, intents: ['provide_info'], acknowledgements: ['ceilings included'] }],
+  );
+  check('living room (reader kept the trim on): the customer\'s "not the trim" still wins, and trim is never asked about', lrReading.state.ctx.interiorTrim === 'no' && !questionsIn(lrReading.turns.slice(2)).some((t) => /\btrim\b|baseboards?/i.test(t)), JSON.stringify({ t: lrReading.state.ctx.interiorTrim }) + ' ' + lrReading.turns.slice(2).join(' ## '));
+
+  // 3. every kind of exclusion: the surface goes off, and no question about it (or its "painted before?" follow-up) comes afterwards
+  const exclusions: { say: string; field: (c: EstimatorContext) => boolean; asks: RegExp }[] = [
+    { say: 'not the trim', field: (c) => c.interiorTrim === 'no', asks: /\btrim\b|baseboards?/i },
+    { say: 'skip the baseboards', field: (c) => c.interiorTrim === 'no', asks: /baseboards?|\btrim\b/i },
+    { say: 'no doors', field: (c) => c.interiorDoors === 'none', asks: /\bdoors?\b/i },
+    { say: 'no closets', field: (c) => c.closets === 'none', asks: /closets?/i },
+    { say: 'not the ceilings', field: (c) => c.interiorCeilings === 'no', asks: /ceilings?\b(?! height| standard)/i }, // (the height of the walls still matters for the price, so "ceiling height" is not the ceilings)
+    { say: 'no walls', field: (c) => c.interiorWalls === 'no', asks: /how are the walls|walls looking/i },
+  ];
+  for (const ex of exclusions) {
+    const run = await play(['I want my living room, walls, ceilings, trim, doors and closets painted', 'about 15 by 20', ex.say, 'no', 'no', 'no', 'no', 'no', '91941', 'whenever', 'no']);
+    const later = questionsIn(run.turns.slice(2));
+    check(`excluded "${ex.say}": that surface is off`, ex.field(run.state.ctx), JSON.stringify({ w: run.state.ctx.interiorWalls, c: run.state.ctx.interiorCeilings, t: run.state.ctx.interiorTrim, d: run.state.ctx.interiorDoors, cl: run.state.ctx.closets }));
+    check(`excluded "${ex.say}": it is never asked about again`, !later.some((t) => ex.asks.test(t)), later.filter((t) => ex.asks.test(t)).join(' ## '));
+  }
+  // stays excluded through later answers, and comes back only when the customer asks for it
+  const back = await play(['I want my living room painted, walls only', 'about 15 by 20', 'actually, add the ceilings too']);
+  check('a surface ruled out earlier comes back when the customer asks for it', back.state.ctx.interiorCeilings === 'yes' && !(back.state.ctx.excludedSurfaces ?? []).includes('ceilings'), JSON.stringify({ c: back.state.ctx.interiorCeilings, ex: back.state.ctx.excludedSurfaces }));
+}
+
 setLLMReaderForTests(undefined);
 console.log(failures ? `\n${failures} FAILED` : '\nall conversation checks passed');
 process.exit(failures ? 1 : 0);

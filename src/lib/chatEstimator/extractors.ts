@@ -1787,10 +1787,14 @@ export function extractAll(text: string, prev: EstimatorContext, lastBotTopicId:
       surf.everything = true;
       surf.walls = 'yes'; surf.ceilings = 'yes'; surf.trim = 'yes'; surf.doors = 'yes';
     } else if (w || c || tr || d) {
-      surf.walls = w ? 'yes' : 'no';
-      surf.ceilings = c ? 'yes' : 'no';
-      surf.trim = tr ? 'yes' : 'no';
-      surf.doors = d ? 'yes' : 'no';
+      // "yes the ceilings too, but not the trim": "too" adds to what the room already has (the walls), so only what is named or
+      // refused changes; a plain list ("ceilings and trim") still means exactly those.
+      const additive = /\b(?:too|also|as well|plus|in addition|along with)\b/.test(low) && !/\b(?:only|just)\b/.test(low);
+      const decide = (on: boolean, mentioned: boolean): 'yes' | 'no' | undefined => (on ? 'yes' : additive && !mentioned ? undefined : 'no');
+      surf.walls = decide(w, mentionW);
+      surf.ceilings = decide(c, mentionC);
+      surf.trim = decide(tr, mentionTr);
+      surf.doors = decide(d, mentionD);
       listParsed = true;
     }
     }

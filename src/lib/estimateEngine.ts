@@ -288,7 +288,8 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
         lineItems.push({
           category: 'Interior',
           description: desc,
-          amount: rate * scopeMultiplier * regionalMult * cabinetComplexity,
+          // spraying (masking, set-up, a smooth factory-like finish) costs more than brushing and rolling
+          amount: rate * scopeMultiplier * regionalMult * cabinetComplexity * (ctx.cabinetMethod === 'sprayed' ? 1.2 : 1),
           key: `cabinets:${loc}`,
         });
       }

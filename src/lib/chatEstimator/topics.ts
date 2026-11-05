@@ -81,9 +81,25 @@ function detailLabel(c: EstimatorContext): string {
   return parts.length > 1 ? parts.slice(0, -1).join(', ') + ' and ' + parts[parts.length - 1] : parts[0] ?? 'trim';
 }
 
+/**
+ * The job is one fixed item or part of a room, not the room: the cabinets (or vanities), built-in shelving, a mantel, a railing. The walls,
+ * ceilings, trim and doors are off (the customer said so, or it was only that item), so the room questions never apply unless the customer
+ * adds those surfaces (then they are in scope again, and this is '').
+ */
+export function componentKind(c: EstimatorContext): '' | 'cabinets' | 'builtins' | 'mantel' | 'railing' {
+  if (c.itemsOnly) return '';
+  const off = c.interiorWalls === 'no' && c.interiorCeilings !== 'yes' && c.interiorTrim !== 'yes' && c.interiorDoors === 'none' && c.surfacesAddressed;
+  if (!off || (c.projectType !== 'interior' && c.projectType !== 'both')) return '';
+  if (c.cabinets !== 'none') return 'cabinets';
+  if (c.stairwayDetails === 'railings_only') return 'railing';
+  if (c.fireplaceType === 'mantel_only') return 'mantel';
+  if (c.specialtyServices.includes('built_ins') && c.closets === 'none') return 'builtins';
+  return '';
+}
+
 /** The job is only a few trim details or some furniture, and the customer said so: no "add the ceilings?" suggestions. */
 const skipUpsells = (c: EstimatorContext) =>
-  c.itemsOnly || isIsolatedDetailJob(c) || (c.interiorWalls === 'no' && c.interiorCeilings === 'no' && c.surfacesAddressed && (c.furnitureItems.length > 0 || c.closets !== 'none'));
+  c.itemsOnly || componentKind(c) !== '' || isIsolatedDetailJob(c) || (c.interiorWalls === 'no' && c.interiorCeilings === 'no' && c.surfacesAddressed && (c.furnitureItems.length > 0 || c.closets !== 'none'));
 
 const isCommercialLike = (c: EstimatorContext) => c.propertyType === 'commercial' || c.propertyType === 'multi_unit';
 
@@ -94,7 +110,7 @@ const isCommercialLike = (c: EstimatorContext) => c.propertyType === 'commercial
  * whether the customer lives there, rents or owns it, and whether the home is occupied or empty, don't matter for those.
  */
 export function isStandaloneOnlyJob(c: EstimatorContext): boolean {
-  if (c.standaloneStructure || c.itemsOnly) return true;
+  if (c.standaloneStructure || c.itemsOnly || componentKind(c) !== '') return true;
   if (c.projectType === 'exterior' && c.exteriorBody === 'no') return true;
   const furnitureOnly = c.furnitureItems.length > 0 && c.selectedRooms.length === 0 && c.interiorScope === '' && !c.squareFeet && !c.bedroomCount;
   return furnitureOnly && (c.projectType === 'interior' || c.projectType === '');
@@ -652,6 +668,53 @@ export const TOPICS: Topic[] = [
     example: () => "E.g., 'they're painted white now', 'bare wood', 'stained oak', 'pre-primed', or 'laminate'.",
   },
 
+  // Cabinets as the whole job (no walls, ceilings, trim or doors): the questions that are about the cabinets themselves.
+  {
+    id: 'cabinet_count',
+    priority: 29.7,
+    relevant: (c) => componentKind(c) === 'cabinets' && c.cabinetDoorCount == null,
+    alreadyAnswered: (c) => c.cabinetDoorCount != null || extDone(c, 'cabinet_count'),
+    ask: (c) => pick(["About how many cabinet doors and drawer fronts are there? A rough count is fine.", "Roughly how many doors and drawers are we talking about?"], seed(c)),
+    clarify: () => "Cabinets are priced by the door and drawer front, so a rough count (count each door and each drawer face) gets the price close.",
+    example: () => "Something like '30 doors and drawers' or 'about 24'.",
+  },
+  {
+    id: 'cabinet_scope',
+    priority: 29.82,
+    relevant: (c) => componentKind(c) === 'cabinets' && c.cabinetScope !== 'inside_too',
+    alreadyAnswered: (c) => c.cabinetScope === 'inside_too' || extDone(c, 'cabinet_scope'),
+    ask: (c) => pick(["Do you want the inside of the cabinet boxes painted too, or just the doors, drawer fronts and frames?", "Just the outsides (doors, drawer fronts, frames), or the insides of the boxes as well?"], seed(c)),
+    clarify: () => "Painting the insides adds a lot of time (tight spaces, more coats), so it costs more. Most people paint just the outsides.",
+    example: () => "Say 'outsides only' or 'yes, the insides too'.",
+  },
+  {
+    id: 'cabinet_method',
+    priority: 29.84,
+    relevant: (c) => componentKind(c) === 'cabinets' && !c.cabinetMethod,
+    alreadyAnswered: (c) => !!c.cabinetMethod || extDone(c, 'cabinet_method'),
+    ask: (c) => pick(["Sprayed for the smoothest, factory-like finish, or brushed and rolled?", "Do you want them sprayed or brushed and rolled? Spraying looks smoother and costs more."], seed(c)),
+    clarify: () => "Spraying gives a smooth, factory-like finish with no brush marks but takes more masking and set-up, so it costs more. Brushed and rolled is the standard way and still looks good.",
+    example: () => "Say 'sprayed', 'brushed is fine', or 'painter's choice'.",
+  },
+  {
+    id: 'cabinet_hardware',
+    priority: 29.86,
+    relevant: (c) => componentKind(c) === 'cabinets' && c.hardwareReplacement !== 'yes',
+    alreadyAnswered: (c) => c.hardwareReplacement === 'yes' || extDone(c, 'cabinet_hardware'),
+    ask: (c) => pick(["Are the hinges and pulls staying, or are you putting in new hardware?", "What about the hardware: reuse the existing hinges and pulls, or replace them?"], seed(c)),
+    clarify: () => "The painter takes the hardware off and puts it back as part of the job. Installing new hinges or pulls is a separate small charge (the hardware itself is extra).",
+    example: () => "Say 'keep the hardware' or 'new pulls and hinges'.",
+  },
+  {
+    id: 'builtin_count',
+    priority: 29.7,
+    relevant: (c) => componentKind(c) === 'builtins' && c.builtInCount == null,
+    alreadyAnswered: (c) => c.builtInCount != null || extDone(c, 'builtin_count'),
+    ask: (c) => pick(["How many built-in units or sections are there?", "About how many built-ins or shelving sections are we painting?"], seed(c)),
+    clarify: () => "Each built-in or shelving section is priced on its own, so a rough count is what I need.",
+    example: () => "Something like '2 built-in bookcases' or 'one wall of shelves'.",
+  },
+
   {
     // The same question for the baseboards/trim and the doors: bare wood needs primer, stained or varnished wood must be deglossed and sealed, painted needs the least.
     id: 'trim_door_finish',
@@ -1012,7 +1075,7 @@ export const TOPICS: Topic[] = [
     id: 'color_change',
     priority: 35,
     relevant: (c) =>
-      c.itemsOnly ||
+      c.itemsOnly || componentKind(c) !== '' ||
       ((c.projectType === 'interior' || c.projectType === 'both') &&
         (c.interiorWalls !== 'no' || c.interiorCeilings === 'yes' || c.interiorTrim === 'yes' || c.cabinets !== 'none')),
     alreadyAnswered: (c) => !!c.interiorColorChange,
@@ -1235,7 +1298,19 @@ export const TOPICS: Topic[] = [
  * ceiling, trim, door, size-of-house, who-lives-there and paint-grade question is skipped, whatever the list says, and never circled back to.
  */
 const ITEM_JOB_TOPICS = new Set(['furniture_kind', 'chair_count', 'furniture_finish', 'color_change', 'paint_brand', 'location', 'timeline_and_access']);
-const askableFor = (ctx: EstimatorContext, id: string) => !ctx.itemsOnly || ITEM_JOB_TOPICS.has(id);
+const COMPONENT_COMMON = ['color_change', 'paint_brand', 'location', 'timeline_and_access'];
+const COMPONENT_TOPICS: Record<string, string[]> = {
+  cabinets: ['cabinet_count', 'cabinet_finish', 'cabinet_scope', 'cabinet_method', 'cabinet_hardware'],
+  builtins: ['builtin_count'],
+  mantel: [],
+  railing: ['railing_length'],
+};
+/** An item or part-of-a-room job (cabinets, built-ins, a mantel, a railing) only asks about that item, never about the rest of the room. */
+const askableFor = (ctx: EstimatorContext, id: string) => {
+  if (ctx.itemsOnly) return ITEM_JOB_TOPICS.has(id);
+  const kind = componentKind(ctx);
+  return !kind || COMPONENT_COMMON.includes(id) || COMPONENT_TOPICS[kind].includes(id);
+};
 
 export function pickNextTopic(ctx: EstimatorContext, asked: string[]): Topic | null {
   const candidates = TOPICS.filter(

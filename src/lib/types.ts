@@ -216,6 +216,8 @@ export interface EstimatorContext {
   wallTexture: string; // smooth, textured, heavy_texture
   doorMaterial: string; // wood, metal, fiberglass, vinyl, mixed
   cabinetScope: string; // fronts_only, inside_too
+  /** How the cabinets are finished: sprayed (smoothest, costs more), brushed (brushed and rolled). '' = not said. */
+  cabinetMethod: string;
   /** What the cabinets and vanities are finished with now: '' (not known yet), painted, bare_wood, stained (varnished or lacquered too), primed (factory-primed), laminate (laminate, melamine, thermofoil). */
   cabinetFinish: string;
   /** The same for the baseboards/trim and the interior doors: '' (not known yet), painted, bare_wood, stained, primed. */

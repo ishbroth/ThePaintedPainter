@@ -605,15 +605,39 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
     const ruledOut = new Set(state.ctx.excludedSurfaces ?? []);
     const added = new Set(state.ctx.addedSurfaces ?? []);
     // "no ceilings", and the whole list: "no ceilings, trim or doors", "without the trim and doors"
-    const surfaceWord = '(?:the\\s+|any\\s+|our\\s+)?(?:ceilings?|trim|baseboards?|doors?|cabinets?|cabinetry)';
+    const surfaceWord = '(?:the\\s+|any\\s+|our\\s+)?(?:walls?|ceilings?|trim|baseboards?|doors?|closets?|cabinets?|cabinetry)';
     const re = new RegExp("\\b(?:no|not|without|skip|except|excluding|leave out|don'?t (?:paint|do|need|want))\\s+" + surfaceWord + "(?:\\s*(?:,|or|and|&|nor)\\s*" + surfaceWord + ")*", 'g');
     // "just the walls" / "walls only" rules out the rest
     if (/\b(?:just|only)\s+(?:the\s+|our\s+)?(?:\w+\s+)?walls?\b|\bwalls?\s+only\b/.test(low) && !/\b(?:and|plus|also|with)\s+(?:the\s+)?(?:ceilings?|trim|baseboards?|doors?)\b/.test(low)) {
       ruledOut.add('ceilings'); ruledOut.add('trim'); ruledOut.add('doors');
     }
     let m: RegExpExecArray | null;
+    const ruledOutNow = new Set<string>();
     while ((m = re.exec(low))) {
-      for (const w of m[0].match(/ceilings?|trim|baseboards?|doors?|cabinets?|cabinetry/g) ?? []) ruledOut.add(w.startsWith('ceiling') ? 'ceilings' : w.startsWith('door') ? 'doors' : w.startsWith('cabinet') ? 'cabinets' : 'trim');
+      for (const w of m[0].match(/walls?|ceilings?|trim|baseboards?|doors?|closets?|cabinets?|cabinetry/g) ?? []) {
+        const key = w.startsWith('wall') ? 'walls' : w.startsWith('ceiling') ? 'ceilings' : w.startsWith('door') ? 'doors' : w.startsWith('closet') ? 'closets' : w.startsWith('cabinet') ? 'cabinets' : 'trim';
+        ruledOut.add(key);
+        ruledOutNow.add(key);
+      }
+    }
+    // Something ruled out earlier that the customer now asks for ("actually, add the ceilings", "yes the ceilings too") comes back in,
+    // unless this same message rules it out again.
+    const wordFor: Record<string, [RegExp, () => void]> = {
+      walls: [/walls?/, () => { ctxWithExplicit.interiorWalls = 'yes'; }],
+      ceilings: [/ceilings?/, () => { ctxWithExplicit.interiorCeilings = 'yes'; }],
+      trim: [/(?:trim|baseboards?)/, () => { ctxWithExplicit.interiorTrim = 'yes'; }],
+      doors: [/doors?/, () => { ctxWithExplicit.interiorDoors = 'some'; ctxWithExplicit.doorsIncluded = true; }],
+      closets: [/closets?/, () => { ctxWithExplicit.closets = 'standard'; }],
+      cabinets: [/cabinets?/, () => { ctxWithExplicit.cabinets = ctxWithExplicit.cabinets === 'none' ? 'kitchen' : ctxWithExplicit.cabinets; }],
+    };
+    for (const key of [...ruledOut]) {
+      if (ruledOutNow.has(key) || !(state.ctx.excludedSurfaces ?? []).includes(key)) continue;
+      const w = wordFor[key][0].source;
+      if (new RegExp('\\b(?:add|include|including|also|plus|and|yes|do|paint|want)\\b[^.,;!?]{0,25}\\b' + w + '\\b|\\b' + w + '\\s+(?:too|as well)\\b').test(low)) {
+        ruledOut.delete(key);
+        added.add(key);
+        wordFor[key][1]();
+      }
     }
     // the answer to a suggestion ("Want me to add the ceilings too?"): yes adds it, no leaves it out, whatever else was read into the reply
     const offer: Record<string, { field: 'interiorCeilings' | 'interiorTrim' | 'interiorDoors' | 'cabinets'; on: string; word: RegExp; key: string }> = {
@@ -646,7 +670,7 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
         }
       }
     }
-    if (ruledOut.size > 0) ctxWithExplicit.excludedSurfaces = [...ruledOut];
+    if (ruledOut.size > 0 || (state.ctx.excludedSurfaces ?? []).length > 0) ctxWithExplicit.excludedSurfaces = [...ruledOut];
     for (const key of ruledOut) added.delete(key);
     if (added.size > 0) ctxWithExplicit.addedSurfaces = [...added];
   }
@@ -898,6 +922,9 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
     responseStyle: classifyResponseStyle(responseLengths.reduce((sum, n) => sum + n, 0) / responseLengths.length),
     responseLengths,
   };
+  // Whatever the customer ruled out stays out, whatever a reading, a default or a later step put back: the questions that depend on it
+  // (painted before? bare or stained? how many?) then drop out by themselves, because the thing is no longer in the job.
+  Object.assign(ctxNext, enforceExclusions(ctxNext));
 
   // "The whole room" / "the whole place" / "everything" as the answer to what gets painted: read back what that covers, so the
   // customer can correct it, instead of moving on as if only a word had been said.
@@ -1396,6 +1423,20 @@ async function advanceAfterUncertainty(state: ChatState, customerId?: string): P
     },
     done: null,
   };
+}
+
+/** What switching each excluded surface off means on the context. */
+export function enforceExclusions(ctx: EstimatorContext): Partial<EstimatorContext> {
+  const ex = ctx.excludedSurfaces ?? [];
+  const p: Partial<EstimatorContext> = {};
+  if (ex.length === 0) return p;
+  if (ex.includes('walls') && ctx.interiorWalls !== 'no') p.interiorWalls = 'no';
+  if (ex.includes('ceilings') && ctx.interiorCeilings !== 'no') p.interiorCeilings = 'no';
+  if (ex.includes('trim') && ctx.interiorTrim !== 'no') p.interiorTrim = 'no';
+  if (ex.includes('doors') && ctx.interiorDoors !== 'none') { p.interiorDoors = 'none'; p.doorsIncluded = false; }
+  if (ex.includes('closets') && ctx.closets !== 'none') p.closets = 'none';
+  if (ex.includes('cabinets') && ctx.cabinets !== 'none') p.cabinets = 'none';
+  return p;
 }
 
 function readyToQuote(ctx: EstimatorContext): boolean {

@@ -149,6 +149,14 @@ export function highestPriceAssumption(topicId: string, ctx: EstimatorContext): 
     case 'paint_finish':
       // "doesn't matter" about paint means "the painter can choose" (standard grade): the paint answers already settle it
       return { patch: { extAnswered: withExt(ctx, topicId) }, say: "No problem, the painter will choose the paint." };
+    case 'cabinet_scope':
+      return { patch: { cabinetScope: 'inside_too', extAnswered: withExt(ctx, topicId) }, say: higher('painting the insides of the cabinets too') };
+    case 'cabinet_method':
+      return { patch: { cabinetMethod: 'sprayed', extAnswered: withExt(ctx, topicId) }, say: higher('a sprayed finish') };
+    case 'cabinet_hardware':
+      return { patch: { extAnswered: withExt(ctx, topicId) }, say: 'No problem, the existing hardware goes back on.' };
+    case 'cabinet_count':
+    case 'builtin_count':
     case 'door_count':
     case 'window_count':
     case 'closet_count':

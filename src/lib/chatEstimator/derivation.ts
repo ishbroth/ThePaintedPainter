@@ -206,13 +206,15 @@ export function derive(ctx: EstimatorContext, transcript: string): Derivation[] 
   // (The explicit extractor already sets these; this is a safety backstop.)
   // ——————————————————————————————————————————
   if (/\bjust\s+(?:the\s+)?walls?\b|\bonly\s+(?:the\s+)?walls?\b|\bwalls?\s+only\b/.test(t)) {
-    if (ctx.interiorCeilings !== 'no') {
+    // (a surface the customer later asked to add — "actually, add the ceilings too" — is not switched back off by the earlier "just walls")
+    const addedLater = ctx.addedSurfaces ?? [];
+    if (ctx.interiorCeilings !== 'no' && !addedLater.includes('ceilings')) {
       out.push({ patch: { interiorCeilings: 'no' }, reason: '"Just walls" → no ceilings' });
     }
-    if (ctx.interiorTrim !== 'no') {
+    if (ctx.interiorTrim !== 'no' && !addedLater.includes('trim')) {
       out.push({ patch: { interiorTrim: 'no' }, reason: '"Just walls" → no trim' });
     }
-    if (ctx.interiorDoors !== 'none') {
+    if (ctx.interiorDoors !== 'none' && !addedLater.includes('doors')) {
       out.push({ patch: { interiorDoors: 'none' }, reason: '"Just walls" → no doors' });
     }
   }

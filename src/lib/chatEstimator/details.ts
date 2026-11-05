@@ -389,6 +389,11 @@ export function extractDetails(text: string, ctx: EstimatorContext, askedId: str
     if (!ctx.furnitureUnspecified) patch.furnitureUnspecified = true;
     if (!ctx.specialtyServices.includes('furniture')) patch.specialtyServices = [...ctx.specialtyServices, 'furniture'];
   }
+  // sprayed or brushed cabinets, said in passing
+  if (!ctx.cabinetMethod && (ctx.cabinets !== 'none' || /\bcabinet|\bvanit/.test(t))) {
+    if (/\bspray(?:ed|ing)?\b/.test(t)) patch.cabinetMethod = 'sprayed';
+    else if (/\b(?:brushed|brush and roll|brushed and rolled)\b/.test(t)) patch.cabinetMethod = 'brushed';
+  }
   if (saysItemsOnly(itemText) && (patch.furnitureItems || ctx.furnitureItems.length > 0 || ctx.furnitureUnspecified)) {
     acks.push(`just ${itemsPhrase(patch.furnitureItems ?? ctx.furnitureItems).replace(/^the pieces$/, 'the furniture')}, no rooms or walls`);
   }
@@ -445,6 +450,26 @@ export function extractDetails(text: string, ctx: EstimatorContext, askedId: str
         }
         break;
       }
+      case 'cabinet_count': { const n = parseCount(text, 2, 300); if (n) { patch.cabinetDoorCount = n; acks.push(`${n} doors and drawers`); } break; }
+      case 'builtin_count': { const n = parseCount(text, 1, 40); if (n) { patch.builtInCount = n; acks.push(`${n} built-in${n === 1 ? '' : 's'}`); } break; }
+      case 'cabinet_scope': {
+        const low = text.toLowerCase();
+        if (/\b(?:inside|insides|inner|interior|boxes|both|everything|all of it)\b/.test(low) && !/\b(?:no|not|without|don'?t)\b[^.]{0,20}\b(?:inside|insides|boxes)\b/.test(low)) { patch.cabinetScope = 'inside_too'; acks.push('the insides too'); }
+        else if (/^\W*(?:no|nope|nah)\b|\b(?:outsides?|outside only|fronts?|just the doors|only the doors|doors only|exterior)\b/.test(low)) { patch.cabinetScope = 'fronts_only'; acks.push('outsides only'); }
+        break;
+      }
+      case 'cabinet_method': {
+        const low = text.toLowerCase();
+        if (/\bspray/.test(low)) { patch.cabinetMethod = 'sprayed'; acks.push('sprayed'); }
+        else if (/\b(?:brush|brushed|roll|rolled|roller|either|fine|painter'?s? (?:choice|call)|up to (?:you|the painter)|no preference|doesn'?t matter)\b/.test(low)) { patch.cabinetMethod = 'brushed'; acks.push('brushed and rolled'); }
+        break;
+      }
+      case 'cabinet_hardware': {
+        const low = text.toLowerCase();
+        if (/\b(?:replac|new|install|swap|upgrad)/.test(low) && !/\b(?:no|not|don'?t|won'?t)\b[^.]{0,12}\b(?:replac|new)/.test(low)) { patch.hardwareReplacement = 'yes'; acks.push('new hardware'); }
+        else if (/\b(?:keep|reuse|re-use|same|existing|stay|staying|as[\s-]is|no|nope|nah|not replacing)\b/.test(low)) acks.push('keeping the hardware');
+        break;
+      }
       case 'color_change': {
         // for the pieces: "same stain color", "keep it", "refresh the stain" (the same) or "a darker shade", "paint them white" (different)
         if (!(ctx.itemsOnly || patch.furnitureItems)) break;
@@ -498,6 +523,6 @@ export function extractDetails(text: string, ctx: EstimatorContext, askedId: str
 /** Topic ids of the follow-up questions in this file (their answers are recorded so they are never asked twice). */
 export const DETAIL_TOPIC_IDS = new Set([
   'unit_count', 'building_count', 'ceiling_height', 'common_areas', 'balcony_count', 'ext_mu_access',
-  'door_count', 'window_count', 'chair_count', 'furniture_kind', 'furniture_finish', 'shutter_count', 'closet_count', 'fence_size', 'fence_height', 'deck_size', 'overhang_size', 'railing_length',
+  'door_count', 'window_count', 'chair_count', 'furniture_kind', 'furniture_finish', 'cabinet_count', 'cabinet_scope', 'cabinet_method', 'cabinet_hardware', 'builtin_count', 'shutter_count', 'closet_count', 'fence_size', 'fence_height', 'deck_size', 'overhang_size', 'railing_length',
   'detail_rooms', 'detail_feet_crown', 'detail_feet_chair_rail', 'detail_feet_trim', 'detail_sqft_wainscot',
 ]);
