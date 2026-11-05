@@ -12,8 +12,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [profileFailed, setProfileFailed] = useState(false);
 
   const fetchProfile = useCallback(async (userId: string) => {
+    setProfileFailed(false);
     const { data, error } = await supabase
       .from('profiles')
       .select('*') // every column the profile has: the address columns only exist once their migration has been run, so a named list could fail here
@@ -23,6 +25,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     if (error) {
       console.error('Error fetching profile:', error.message);
       setProfile(null);
+      setProfileFailed(true);
       return;
     }
 
@@ -112,6 +115,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       profile,
       session,
       loading,
+      profileFailed,
       signIn,
       signUp,
       signOut,

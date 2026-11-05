@@ -21,7 +21,8 @@ const ThemeToggle = () => {
     <div
       style={{
         background: 'transparent',
-        padding: '3px 20px',
+        // on a phone the page is drawn under the status bar: the toggle starts below it, and the header's own top space is just the usual gap
+        padding: 'max(3px, env(safe-area-inset-top)) 20px 3px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',

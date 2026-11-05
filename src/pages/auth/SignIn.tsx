@@ -11,7 +11,7 @@ import { supabaseAnonKey, supabaseUrl } from '../../lib/supabase';
  * customer one.
  */
 export default function SignIn() {
-  const { signIn, user, profile, loading: authLoading } = useAuth();
+  const { signIn, user, profile, loading: authLoading, profileFailed } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   // Where to go after signing in (e.g. back to a reloaded search). Only same-site paths.
@@ -73,7 +73,8 @@ export default function SignIn() {
     else setResendMsg('We couldn\'t send the email just now. Please try again in a moment.');
   };
 
-  const signedInButNoProfile = !authLoading && user && !profile;
+  // Only once reading the profile has really failed: right after signing in the profile is still on its way for a moment, and that is not an error.
+  const signedInButNoProfile = !authLoading && !!user && !profile && profileFailed;
 
   return (
     <div className="flex items-center justify-center min-h-[70vh] px-4">

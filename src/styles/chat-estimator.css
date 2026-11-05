@@ -14,6 +14,7 @@
   border-radius: 14px;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.35);
   overflow: hidden;
+  position: relative;
   display: flex;
   flex-direction: column;
   /* roomy rather than wide and short: about square, with the extra space as blank room in the open chat window below the typing line
@@ -1052,6 +1053,10 @@
 
 .chat-kbd-done {
   display: none;
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  z-index: 3;
   flex-shrink: 0;
   padding: 2px 12px;
   border-radius: 999px;
@@ -1067,20 +1072,10 @@
   display: inline-flex;
 }
 
-.chat-estimator-section.keyboard-open .chat-estimator-header p,
+/* the title, its line of help and the hint are all gone while the keypad is up, and so is the header bar that held them: the conversation starts right under the status strip (Done floats in its corner) */
 .chat-estimator-section.keyboard-open .chat-input-hint,
-.chat-estimator-section.keyboard-open .chat-estimator-header h2 {
-  display: none;
-}
-
-/* with the title gone the header is just a slim bar holding Done */
 .chat-estimator-section.keyboard-open .chat-estimator-header {
-  padding-top: 6px;
-  padding-bottom: 6px;
-}
-.chat-estimator-section.keyboard-open .chat-estimator-header-row {
-  justify-content: flex-end;
-  align-items: center;
+  display: none;
 }
 
 /* Mute sits at the bottom left, beside the "Getting off track?" line */

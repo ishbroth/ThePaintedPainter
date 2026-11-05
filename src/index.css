@@ -1036,9 +1036,9 @@ html {
   overscroll-behavior: none;
 }
 
-/* Safe area padding for notched phones */
+/* Safe area padding for notched phones: the theme toggle above the header takes the space under the status bar (ThemeToggle.tsx), so the header needs no more than its usual gap */
 .header {
-  padding-top: max(12px, env(safe-area-inset-top));
+  padding-top: 12px;
 }
 
 .footer {

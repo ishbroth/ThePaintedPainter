@@ -13,6 +13,8 @@ const TITLE_BOTTOM = 0.6492;
 const PHONE_WIDTH_OVER_SCREEN = 1.065;
 /** The estimator card starts this many pixels below the lettering. */
 const CARD_GAP = 34;
+/** The lettering starts at least this far below the header (the sign-in button), so a tall header under a phone's status bar pushes the picture down rather than hiding the lettering behind it. */
+const HEADER_CLEARANCE = 8;
 
 /**
  * Superman (the painter with the roller and the brush) as a translucent background.
@@ -50,11 +52,14 @@ const SiteBackground = () => {
         ? Math.round(window.innerWidth * PHONE_WIDTH_OVER_SCREEN)
         : Math.round(Math.min(screenHeight * HEIGHT_OVER_SCREEN * ASPECT, window.innerWidth * MAX_WIDTH_OVER_SCREEN));
       size = Math.round(width / ASPECT); // the picture's height
-      startShift = 0; // its top is at the top of the screen
+      // its top is at the top of the screen, unless (home page) the header is tall enough to reach the lettering: then it starts lower
+      const header = document.querySelector('.header');
+      const headerBottom = header ? Math.round(header.getBoundingClientRect().bottom + window.scrollY) : headerHeight;
+      startShift = isHome ? Math.max(0, headerBottom + HEADER_CLEARANCE - Math.round(size * TITLE_TOP)) : 0;
       root.style.setProperty('--hero-w', `${width}px`);
       root.style.setProperty('--hero-size', `${size}px`);
       // the estimator card starts a little below the lettering (and never so low that none of it shows)
-      const cardTop = Math.min(Math.round(size * TITLE_BOTTOM + CARD_GAP), Math.round(screenHeight * 0.85));
+      const cardTop = Math.min(Math.round(startShift + size * TITLE_BOTTOM + CARD_GAP), Math.round(screenHeight * 0.85));
       // (the card sits 40px below the top of the page content that follows the spacer)
       root.style.setProperty('--hero-spacer', `${Math.max(0, cardTop - headerHeight - 40)}px`);
       place();

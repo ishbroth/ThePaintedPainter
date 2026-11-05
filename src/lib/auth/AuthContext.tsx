@@ -23,6 +23,8 @@ export interface AuthContextType {
   profile: UserProfile | null;
   session: Session | null;
   loading: boolean;
+  /** True only when reading the signed-in user's profile row actually failed (not while it is still on its way). */
+  profileFailed: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, role: 'painter' | 'customer', displayName?: string) => Promise<{ error: Error | null; user: User | null; needsEmailConfirmation: boolean }>;
   signOut: () => Promise<void>;
