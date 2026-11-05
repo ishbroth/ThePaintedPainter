@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../lib/auth';
 import { supabase, supabaseUrl } from '../../lib/supabase';
 import AddToCalendar from '../../components/AddToCalendar';
+import MessageButton from '../../components/messaging/MessageButton';
+import { useUnreadMessages } from '../../lib/jobMessages';
 import { fmtRange } from '../../lib/dates';
 import { WORK_WITH_KEY, clearEstimatorSession } from '../../lib/chatEstimator/persistence';
 import { deleteAccountChatState } from '../../lib/chatEstimator/accountPersistence';
@@ -126,7 +128,7 @@ function RescheduleRequest({ projectId }: { projectId: string }) {
   );
 }
 
-function ProjectCard({ project }: { project: Project }) {
+function ProjectCard({ project, unread = 0, autoOpenMessages = false, onMessagesClosed }: { project: Project; unread?: number; autoOpenMessages?: boolean; onMessagesClosed?: () => void }) {
   const navigate = useNavigate();
   const { user } = useAuth();
 
@@ -259,7 +261,14 @@ function ProjectCard({ project }: { project: Project }) {
               }}
             />
           )}
+          <MessageButton jobId={project.id} role="customer" status={project.status} unread={unread} autoOpen={autoOpenMessages} onClosed={onMessagesClosed} />
           <RescheduleRequest projectId={project.id} />
+        </div>
+      )}
+
+      {project.status === 'painter_accepted' && (
+        <div className="mt-4 pt-4 border-t border-[var(--border)]">
+          <MessageButton jobId={project.id} role="customer" status={project.status} />
         </div>
       )}
 
@@ -323,6 +332,9 @@ function LoyaltyBanner({ balance, discount }: { balance: number; discount: numbe
 
 export default function CustomerProjects() {
   const { session, profile } = useAuth();
+  const { unread, refresh: refreshUnread } = useUnreadMessages(session?.access_token);
+  // a message notification links here with ?messages=<job id>: that project's thread opens
+  const openThreadFor = useSearchParams()[0].get('messages');
   // The profile in auth context is loaded once at login, so a discount that has
   // since lapsed would still show. sync_loyalty_decay applies any due decay and
   // returns the current numbers.
@@ -389,7 +401,7 @@ export default function CustomerProjects() {
           ) : (
             <div className="grid gap-6 mb-10">
               {upcoming.map((project) => (
-                <ProjectCard key={project.id} project={project} />
+                <ProjectCard key={project.id} project={project} unread={unread[project.id] ?? 0} autoOpenMessages={openThreadFor === project.id} onMessagesClosed={refreshUnread} />
               ))}
             </div>
           )}

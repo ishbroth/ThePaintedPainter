@@ -158,6 +158,7 @@ export default function NotificationsList() {
               <div>
                 <p className={`text-[var(--text-primary)] ${n.is_read ? 'font-medium' : 'font-bold'}`}>{n.title}</p>
                 {n.body && <p className="text-sm text-[var(--text-secondary)] mt-1">{n.body}</p>}
+                {n.type === 'message' && <p className="text-xs font-semibold text-[var(--accent)] mt-2">💬 Open the conversation to reply →</p>}
               </div>
               <span className="text-xs text-[var(--text-faint)] whitespace-nowrap">{timeAgo(n.created_at)}</span>
             </div>

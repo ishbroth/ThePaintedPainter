@@ -26,6 +26,7 @@ import { createClient } from '@supabase/supabase-js';
 import { createHash, randomBytes } from 'node:crypto';
 import { fakePainters, type FakePainter } from '../../src/lib/fakePainters.ts';
 import { buildTerms, cleanPainterTerms, type PainterTerms } from '../functions/_shared/contract.ts';
+import { threadLink } from '../functions/_shared/jobMessages.ts';
 
 const url = process.env.SUPABASE_URL;
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -481,6 +482,47 @@ async function seedFlagshipJobs(p: RosterEntry, userId: string, index: number) {
     ...(confirmed ? [{ type: 'deposit_paid', title: 'Deposit received', body: `${confirmed.phase_label} is confirmed`, link: '/painter/dashboard/projects', is_read: true, created_at: timestampDaysAgo(5) }] : []),
   ];
   if (notes.length) must(await supabase.from('notifications').insert(notes.map((n) => ({ user_id: userId, ...n }))).select('id'), 'insert demo notifications');
+  await seedMessages(userId, jobRows);
+}
+
+// ---------------------------------------------------------------------------
+// In-app messages: only confirmed jobs have a conversation (messaging opens once both parties have confirmed). The first confirmed job
+// has a short back-and-forth with the customer's last message still unread; the second has one message waiting; the rest are empty so the
+// empty thread can be tried. (Deleting the jobs above already cleared any earlier messages: job_messages cascades.)
+// ---------------------------------------------------------------------------
+async function seedMessages(painterUserId: string, jobRows: Record<string, unknown>[]) {
+  const confirmed = jobRows.filter((r) => r.status === 'confirmed');
+  const rows: Record<string, unknown>[] = [];
+  const say = (job: Record<string, unknown>, role: 'customer' | 'painter', body: string, hoursAgo: number, read: boolean) =>
+    rows.push({
+      job_id: job.id,
+      sender_user_id: role === 'painter' ? painterUserId : null, // the made-up customers have no login
+      sender_role: role,
+      body,
+      created_at: new Date(Date.now() - hoursAgo * 3600000).toISOString(),
+      read_at: read ? new Date(Date.now() - (hoursAgo - 0.5) * 3600000).toISOString() : null,
+    });
+  if (confirmed[0]) {
+    const first = String(confirmed[0].customer_name ?? 'there').split(' ')[0];
+    say(confirmed[0], 'painter', `Hi ${first}, this is the crew lead. We're all set for your start date. Is there a gate code or a good place to park the van?`, 30, true);
+    say(confirmed[0], 'customer', 'Thanks! Park in the driveway, no code needed. The side gate is unlocked.', 28, true);
+    say(confirmed[0], 'painter', "Perfect. We'll bring drop cloths for the entry and move the furniture ourselves.", 27, true);
+    say(confirmed[0], 'customer', 'Great. One question: can the hallway be done first? We have guests coming that weekend.', 3, false);
+  }
+  if (confirmed[1]) {
+    say(confirmed[1], 'customer', 'Hello! Could you confirm you will be using low-VOC paint? We have a baby in the house.', 5, false);
+  }
+  if (!rows.length) return;
+  must(await supabase.from('job_messages').insert(rows).select('id'), 'insert demo messages');
+  const waiting = rows.filter((r) => r.sender_role === 'customer' && r.read_at === null);
+  if (waiting.length) {
+    must(
+      await supabase.from('notifications').insert(waiting.map((m) => ({
+        user_id: painterUserId, type: 'message', title: 'New message from your client', body: String(m.body).slice(0, 110), link: threadLink('painter', String(m.job_id)), is_read: false, created_at: m.created_at,
+      }))).select('id'),
+      'insert demo message notifications',
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------

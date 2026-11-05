@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../lib/auth';
 import { supabaseUrl } from '../../lib/supabase';
 import AddToCalendar from '../../components/AddToCalendar';
+import MessageButton from '../../components/messaging/MessageButton';
+import { useUnreadMessages } from '../../lib/jobMessages';
 import { fmtRange } from '../../lib/dates';
 
 interface JobPhoto {
@@ -133,7 +135,7 @@ function OfferCard({ offer }: { offer: Offer }) {
   );
 }
 
-function JobCard({ job, onMarkCompleted, onReschedule, marking }: { job: Job; onMarkCompleted?: (id: string) => void; onReschedule?: (id: string, date: string) => Promise<void>; marking: boolean }) {
+function JobCard({ job, onMarkCompleted, onReschedule, marking, unread = 0, autoOpenMessages = false, onMessagesClosed }: { job: Job; onMarkCompleted?: (id: string) => void; onReschedule?: (id: string, date: string) => Promise<void>; marking: boolean; unread?: number; autoOpenMessages?: boolean; onMessagesClosed?: () => void }) {
   const [newDate, setNewDate] = useState('');
   const [rescheduling, setRescheduling] = useState(false);
   return (
@@ -194,6 +196,11 @@ function JobCard({ job, onMarkCompleted, onReschedule, marking }: { job: Job; on
               )}
             </>
           )}
+          {(job.status === 'confirmed' || job.status === 'painter_accepted') && (
+            <div style={{ marginBottom: 10 }}>
+              <MessageButton jobId={job.id} role="painter" status={job.status} unread={unread} autoOpen={autoOpenMessages} onClosed={onMessagesClosed} />
+            </div>
+          )}
           {job.status === 'confirmed' && onMarkCompleted && (
             <button
               onClick={() => onMarkCompleted(job.id)}
@@ -242,6 +249,9 @@ function JobCard({ job, onMarkCompleted, onReschedule, marking }: { job: Job; on
 
 export default function PainterProjects() {
   const { session } = useAuth();
+  const { unread, refresh: refreshUnread } = useUnreadMessages(session?.access_token);
+  // a message notification links here with ?messages=<job id>: that job's thread opens
+  const openThreadFor = useSearchParams()[0].get('messages');
   const [data, setData] = useState<PainterProjectsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -347,7 +357,7 @@ export default function PainterProjects() {
       ) : (
         <div style={{ display: 'grid', gap: 12 }}>
           {data.confirmed.map((j) => (
-            <JobCard key={j.id} job={j} onMarkCompleted={handleMarkCompleted} onReschedule={handleReschedule} marking={markingId === j.id} />
+            <JobCard key={j.id} job={j} onMarkCompleted={handleMarkCompleted} onReschedule={handleReschedule} marking={markingId === j.id} unread={unread[j.id] ?? 0} autoOpenMessages={openThreadFor === j.id} onMessagesClosed={refreshUnread} />
           ))}
         </div>
       )}
