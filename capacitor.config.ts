@@ -21,7 +21,7 @@ const config: CapacitorConfig = {
   },
   plugins: {
     // the launch screen stays until the page is up (src/lib/native.ts hides it)
-    SplashScreen: { launchAutoHide: false, backgroundColor: '#fdf9f2', showSpinner: false },
+    SplashScreen: { launchAutoHide: false, backgroundColor: '#d9e0f3', showSpinner: false },
     StatusBar: { style: 'LIGHT', backgroundColor: '#ffffff' },
   },
 };
