@@ -1,3 +1,4 @@
+import FaceIdSettings from '../../components/FaceIdSettings';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../lib/auth';
@@ -291,6 +292,7 @@ export default function PainterProfile() {
         </ul>
       </Card>
 
+      <FaceIdSettings />
       <button
         type="button"
         onClick={handleSignOut}

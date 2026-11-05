@@ -1,8 +1,10 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../lib/auth/index.ts';
 import { dashboardPathForRole } from '../../lib/auth/roleRoutes.ts';
 import { supabaseAnonKey, supabaseUrl } from '../../lib/supabase';
+import { faceIdName, offerFaceId, savedFaceIds, type SavedAccount } from '../../lib/faceid';
+import { useFaceIdSignIn } from '../../lib/faceidSignIn';
 
 /**
  * One sign-in for everyone. There's no customer/painter choice to make: the
@@ -26,11 +28,25 @@ export default function SignIn() {
   // Credentials that match a painter application still waiting on the emailed verification link.
   const [awaitingVerification, setAwaitingVerification] = useState(false);
   const [resendMsg, setResendMsg] = useState('');
+  // in the app: an account saved behind Face ID can sign in with one tap (a choice, if a customer and a painter account are both saved on this phone)
+  const faceSignIn = useFaceIdSignIn();
+  const [faceName, setFaceName] = useState<string | null>(null);
+  const saved = savedFaceIds();
+  useEffect(() => { void faceIdName().then(setFaceName); }, []);
+  const lastLogin = useRef<{ email: string; password: string } | null>(null);
+  const withFace = async (account: SavedAccount) => {
+    setError(null);
+    setSubmitting(true);
+    const result = await faceSignIn(account);
+    if (!result.ok && !result.cancelled) setError(result.message ?? 'Face ID sign-in did not work.');
+    setSubmitting(false); // on success the effect below sends them to their dashboard
+  };
 
   // Once the session and profile are loaded (right after signing in, or if
   // they were already signed in), send them to the right place.
   useEffect(() => {
     if (!authLoading && user && profile) {
+      if (lastLogin.current) { offerFaceId({ ...lastLogin.current, role: profile.role }); lastLogin.current = null; } // in the app: "Use Face ID next time?"
       navigate(next ?? dashboardPathForRole(profile.role), { replace: true });
     }
   }, [authLoading, user, profile, navigate, next]);
@@ -48,6 +64,7 @@ export default function SignIn() {
         if ((await callPending(false)).pending) setAwaitingVerification(true);
         else setError(signInError.message);
       }
+      if (!signInError) lastLogin.current = { email: email.trim(), password };
       // On success the effect above redirects as soon as the profile loads.
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unexpected error occurred');
@@ -84,6 +101,19 @@ export default function SignIn() {
           {resuming ? 'Sign in to reload your search results. Use the email you used for your request.' : 'Welcome back'}
         </p>
 
+        {faceName && saved.length > 0 && (
+          <div className="mb-5 pb-5 border-b border-[var(--border)] space-y-2">
+            {saved.length > 1 && <p className="text-sm text-[var(--text-secondary)] text-center">Sign in with {faceName}: which account?</p>}
+            {saved.map((a) => (
+              <button
+                key={a.email} type="button" disabled={submitting} onClick={() => void withFace(a)}
+                className="w-full py-2.5 px-4 bg-[var(--accent-blue)] hover:bg-[var(--accent-blue-hover)] disabled:opacity-50 text-[var(--accent-blue-ink)] font-semibold rounded-lg"
+              >
+                {saved.length === 1 ? `Sign in with ${faceName}` : `${a.role === 'painter' ? 'Painter' : a.role === 'customer' ? 'Customer' : 'Admin'} · ${a.email}`}
+              </button>
+            ))}
+          </div>
+        )}
         {error && (
           <div className="bg-[var(--tint-critical-bg)] border border-[var(--tint-critical-border)] text-[var(--danger)] px-4 py-3 rounded mb-4 text-sm">
             {error}

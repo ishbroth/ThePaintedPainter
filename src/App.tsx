@@ -11,6 +11,7 @@ import SiteBackground from './components/SiteBackground';
 import { ThemeAccountSync } from './components/ThemeAccountSync';
 import VoiceCheck from './components/VoiceCheck';
 import AuthRedirectBanner from './components/AuthRedirectBanner';
+import FaceIdPrompt from './components/FaceIdPrompt';
 import Footer from './components/Footer';
 import Home from './pages/Home';
 import QuoteResults from './pages/QuoteResults';
@@ -74,6 +75,7 @@ function App() {
         <AuthProvider>
           <ThemeAccountSync />
           <NativeLinks />
+          <FaceIdPrompt />
           <SiteBackground />
           <VoiceCheck />
           <div className="min-h-screen flex flex-col" style={{ position: 'relative', zIndex: 1 }}>

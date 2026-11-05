@@ -1,3 +1,4 @@
+import FaceIdSettings from '../../components/FaceIdSettings';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../lib/auth/index.ts';
@@ -184,6 +185,7 @@ export default function CustomerDashboard() {
             <AccountSettings />
           </div>
         </details>
+        <FaceIdSettings />
         <button
           type="button"
           onClick={handleSignOut}

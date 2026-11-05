@@ -22,6 +22,8 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Face ID lets you sign in to The Painted Painter without typing your email and password.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Take photos of your project or your finished work to include with your estimate or portfolio.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

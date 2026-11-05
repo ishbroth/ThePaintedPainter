@@ -50,5 +50,6 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Photo uploads (estimate photos, portfolio) can use the camera; the picker works without it. -->
     <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 </manifest>

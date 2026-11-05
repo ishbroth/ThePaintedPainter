@@ -1,3 +1,4 @@
+import { forgetFaceId } from '../../lib/faceid';
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../lib/auth';
@@ -125,6 +126,7 @@ export default function AccountSettings() {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Could not delete your account.');
+      await forgetFaceId(user?.email ?? undefined); // the account is gone, and so is anything saved to sign in to it
       await signOut();
       navigate('/');
     } catch (err) {
