@@ -1,7 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../lib/auth';
-import { Link } from 'react-router-dom';
 import { supabase, supabaseUrl } from '../../lib/supabase';
+import { useUnreadMessages } from '../../lib/jobMessages';
+import AvailabilityCalendar from '../../components/painter/AvailabilityCalendar';
+import { JobCard, OfferCard, type PainterProjectsData } from '../../components/painter/JobCards';
 
 interface NoteRow {
   id: string;
@@ -13,164 +16,148 @@ interface NoteRow {
   created_at: string;
 }
 
-interface DashboardData {
-  companyName: string;
-  offers: { id: string; zip: string | null; offerSentAt: string | null }[];
-  confirmed: { id: string; status: string; phaseLabel: string | null; confirmedAt: string | null; acceptedAt: string | null }[];
-  completed: { id: string; phaseLabel: string | null; completedAt: string | null }[];
-  totalEarnings: number;
-  rating: { avgRating: number; reviewCount: number };
+const COMPLETED_SHOWN = 5;
+
+function Bubble({ value, label, icon, hot = false }: { value: string; label: string; icon?: React.ReactNode; hot?: boolean }) {
+  return (
+    <div
+      className="rounded-xl px-2 py-1.5 text-center min-w-0"
+      style={{ background: 'var(--bg-surface)', border: `1px solid ${hot ? 'var(--danger)' : 'var(--border)'}` }}
+    >
+      <p className="font-bold leading-tight flex items-center justify-center gap-1" style={{ fontSize: '1.05rem', color: hot ? 'var(--danger)' : 'var(--text-primary)' }}>
+        {icon}{value}
+      </p>
+      <p className="uppercase tracking-wide text-[var(--text-faint)] truncate" style={{ fontSize: '0.6rem' }}>{label}</p>
+    </div>
+  );
 }
 
-interface ActivityItem {
-  id: string;
-  text: string;
-  time: string;
-  icon: string;
-  timestamp: number;
+function BubbleIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 9 9 0 0 1-3.6-.8L3 21l1.9-5.1A8.4 8.4 0 0 1 3 11.5 8.5 8.5 0 0 1 12 3a8.5 8.5 0 0 1 9 8.5Z" />
+    </svg>
+  );
 }
 
-const currency = (n: number) =>
-  new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n);
-
-function formatWhen(iso: string): string {
-  return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+function Heading({ children, right }: { children: React.ReactNode; right?: React.ReactNode }) {
+  return (
+    <div className="flex items-baseline justify-between mt-4 mb-1.5">
+      <h2 className="text-sm font-bold text-[var(--text-primary)]">{children}</h2>
+      {right}
+    </div>
+  );
 }
 
-function buildActivity(data: DashboardData, notes: NoteRow[]): ActivityItem[] {
-  const items: ActivityItem[] = [];
-
-  for (const n of notes) {
-    items.push({
-      id: `note-${n.id}`,
-      text: n.title,
-      icon: n.type === 'achievement' ? '\u{1F3C6}' : n.type === 'review_followup' ? '⚠️' : '⭐',
-      time: formatWhen(n.created_at),
-      timestamp: new Date(n.created_at).getTime(),
-    });
-  }
-
-  for (const offer of data.offers) {
-    if (!offer.offerSentAt) continue;
-    items.push({
-      id: `offer-${offer.id}`,
-      text: `New job offer received${offer.zip ? ` in ${offer.zip}` : ''}`,
-      icon: '\u{1F4E9}',
-      time: formatWhen(offer.offerSentAt),
-      timestamp: new Date(offer.offerSentAt).getTime(),
-    });
-  }
-  for (const job of data.confirmed) {
-    const ts = job.confirmedAt ?? job.acceptedAt;
-    if (!ts) continue;
-    items.push({
-      id: `confirmed-${job.id}`,
-      text: job.confirmedAt
-        ? `Deposit received — ${job.phaseLabel || 'job'} confirmed`
-        : `You accepted ${job.phaseLabel || 'a job'}`,
-      icon: '✅',
-      time: formatWhen(ts),
-      timestamp: new Date(ts).getTime(),
-    });
-  }
-  for (const job of data.completed) {
-    if (!job.completedAt) continue;
-    items.push({
-      id: `completed-${job.id}`,
-      text: `${job.phaseLabel || 'Job'} marked as completed`,
-      icon: '\u{1F3C1}',
-      time: formatWhen(job.completedAt),
-      timestamp: new Date(job.completedAt).getTime(),
-    });
-  }
-
-  return items.sort((a, b) => b.timestamp - a.timestamp).slice(0, 6);
+function Empty({ text }: { text: string }) {
+  return <p className="text-xs text-[var(--text-faint)] bg-[var(--bg-surface)] border border-[var(--border)] rounded-lg px-3 py-3 text-center">{text}</p>;
 }
 
+/**
+ * The painter's home: a tight row of numbers, then what needs them (offers, and the jobs they are on with their messages), the calendar with the days
+ * they are booked and blacked out, and the jobs they have finished. It is what the Dashboard and My Projects pages were, as one page.
+ */
 export default function PainterDashboard() {
   const { session } = useAuth();
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [error, setError] = useState('');
+  const { unread, refresh: refreshUnread } = useUnreadMessages(session?.access_token);
+  // a message notification links here with ?messages=<job id>: that job's thread opens
+  const openThreadFor = useSearchParams()[0].get('messages');
+  const [data, setData] = useState<PainterProjectsData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [markingId, setMarkingId] = useState<string | null>(null);
   const [notes, setNotes] = useState<NoteRow[]>([]);
+  const [showAllDone, setShowAllDone] = useState(false);
 
-  // Review / achievement notes for the feed; unread review_followup rows are the pending items.
+  const load = () => {
+    if (!session?.access_token) return;
+    fetch(`${supabaseUrl}/functions/v1/get-painter-projects`, { headers: { Authorization: `Bearer ${session.access_token}` } })
+      .then(async (res) => {
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || 'Failed to load your dashboard');
+        setData(json);
+        setError('');
+      })
+      .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load your dashboard'))
+      .finally(() => setLoading(false));
+  };
+  useEffect(load, [session?.access_token]);
+
+  // review follow-ups that need an answer
   useEffect(() => {
     if (!session?.user?.id) return;
     supabase
       .from('notifications')
       .select('id, type, title, body, link, is_read, created_at')
-      .in('type', ['review_followup', 'new_review', 'achievement'])
+      .eq('type', 'review_followup')
+      .eq('is_read', false)
       .order('created_at', { ascending: false })
-      .limit(30)
+      .limit(10)
       .then(({ data: rows }) => setNotes((rows as NoteRow[]) ?? []));
   }, [session?.user?.id]);
 
   const resolveNote = async (id: string) => {
-    setNotes((prev) => prev.map((n) => (n.id === id ? { ...n, is_read: true } : n)));
+    setNotes((prev) => prev.filter((n) => n.id !== id));
     await supabase.from('notifications').update({ is_read: true }).eq('id', id);
   };
 
-  useEffect(() => {
+  const call = async (fn: string, body: Record<string, unknown>, failed: string) => {
     if (!session?.access_token) return;
-    fetch(`${supabaseUrl}/functions/v1/get-painter-projects`, {
-      headers: { Authorization: `Bearer ${session.access_token}` },
-    })
-      .then(async (res) => {
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.error || 'Failed to load dashboard');
-        setData(json);
-      })
-      .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load dashboard'))
-      .finally(() => setLoading(false));
-  }, [session?.access_token]);
+    const res = await fetch(`${supabaseUrl}/functions/v1/${fn}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || failed);
+  };
 
-  if (loading) return <p className="text-[var(--text-secondary)]">Loading your dashboard…</p>;
-  if (error) return <p className="text-[var(--danger)]">{error}</p>;
+  const handleMarkCompleted = async (jobId: string) => {
+    setMarkingId(jobId);
+    try { await call('mark-job-completed', { jobId }, 'Failed to mark job completed'); load(); }
+    catch (err) { setError(err instanceof Error ? err.message : 'Failed to mark job completed'); }
+    finally { setMarkingId(null); }
+  };
+
+  const handleReschedule = async (jobId: string, newDate: string) => {
+    try { await call('reschedule-job', { jobId, newDate }, 'Failed to change date'); load(); }
+    catch (err) { setError(err instanceof Error ? err.message : 'Failed to change date'); }
+  };
+
+  const unreadTotal = Object.values(unread).reduce((n, c) => n + c, 0);
+  // the days of the jobs that are confirmed, for the calendar
+  const jobSpans = useMemo(
+    () => (data?.confirmed ?? []).filter((j) => j.status === 'confirmed' && j.scheduledDate).map((j) => ({ start: j.scheduledDate as string, end: j.scheduledEndDate })),
+    [data],
+  );
+
+  if (loading) return <p className="p-4 text-sm text-[var(--text-secondary)]">Loading…</p>;
+  if (error && !data) return <p className="p-4 text-sm text-[var(--danger)]">{error}</p>;
   if (!data) return null;
 
-  const activeJobs = data.confirmed.length;
-  const totalJobs = activeJobs + data.completed.length;
-  const activity = buildActivity(data, notes);
-  const pending = notes.filter((n) => n.type === 'review_followup' && !n.is_read);
-
-  const stats = [
-    { label: 'Total Jobs', value: String(totalJobs), icon: '\u{1F3E0}' },
-    { label: 'Active Jobs', value: String(activeJobs), icon: '\u{1F528}' },
-    { label: 'Average Rating', value: data.rating.reviewCount > 0 ? data.rating.avgRating.toFixed(1) : '—', icon: '⭐' },
-    { label: 'Total Reviews', value: String(data.rating.reviewCount), icon: '\u{1F4AC}' },
-  ];
+  const confirmedCount = data.confirmed.filter((j) => j.status === 'confirmed').length;
+  const { avgRating, reviewCount } = data.rating;
+  const done = showAllDone ? data.completed : data.completed.slice(0, COMPLETED_SHOWN);
 
   return (
-    <div className="max-w-6xl mx-auto">
-      <h1 className="text-2xl font-bold text-[var(--text-primary)] mb-1">Welcome back, {data.companyName}</h1>
-      <p className="text-[var(--text-secondary)] mb-8">
-        Here is an overview of your painting business.
-        {data.totalEarnings > 0 && <> You've earned <strong className="text-[var(--accent)]">{currency(data.totalEarnings)}</strong> through The Painted Painter.</>}
-      </p>
+    <div className="max-w-3xl mx-auto px-3 py-3">
+      <p className="text-xs text-[var(--text-secondary)] mb-2 truncate">Hi, <strong className="text-[var(--text-primary)]">{data.companyName}</strong></p>
 
-      {pending.length > 0 && (
-        <div className="mb-8 rounded-xl p-5 border" style={{ borderColor: 'var(--danger)', background: 'var(--bg-surface)' }}>
-          <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-3">Needs your attention</h2>
-          <ul className="space-y-3">
-            {pending.map((n) => (
-              <li key={n.id} className="flex items-start justify-between gap-3 flex-wrap">
+      {error && <p className="text-xs text-[var(--danger)] mb-2">{error}</p>}
+
+      {notes.length > 0 && (
+        <div className="mb-3 rounded-lg p-3 border" style={{ borderColor: 'var(--danger)', background: 'var(--bg-surface)' }}>
+          <p className="text-xs font-semibold text-[var(--text-primary)] mb-1.5">Needs your attention</p>
+          <ul className="space-y-2">
+            {notes.map((n) => (
+              <li key={n.id} className="flex items-start justify-between gap-2 flex-wrap">
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold text-[var(--text-primary)]">{n.title}</p>
-                  {n.body && <p className="text-sm text-[var(--text-secondary)] mt-1">{n.body}</p>}
+                  <p className="text-xs font-semibold text-[var(--text-primary)]">{n.title}</p>
+                  {n.body && <p className="text-xs text-[var(--text-secondary)]">{n.body}</p>}
                 </div>
-                <div className="flex gap-2 shrink-0">
-                  {n.link && (
-                    <Link to={n.link} className="px-3 py-1.5 text-sm font-semibold rounded-lg bg-[var(--accent)] text-[var(--accent-ink)]">
-                      See customers
-                    </Link>
-                  )}
-                  <button
-                    onClick={() => resolveNote(n.id)}
-                    className="px-3 py-1.5 text-sm rounded-lg border border-[var(--border)] text-[var(--text-primary)]"
-                  >
-                    Mark resolved
-                  </button>
+                <div className="flex gap-1.5 shrink-0">
+                  {n.link && <Link to={n.link} className="px-2.5 py-1 text-xs font-semibold rounded-md bg-[var(--accent)] text-[var(--accent-ink)]">See customers</Link>}
+                  <button type="button" onClick={() => resolveNote(n.id)} className="px-2.5 py-1 text-xs rounded-md border border-[var(--border)] text-[var(--text-primary)]">Resolved</button>
                 </div>
               </li>
             ))}
@@ -178,44 +165,51 @@ export default function PainterDashboard() {
         </div>
       )}
 
-      {/* Stats cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        {stats.map((stat) => (
-          <div
-            key={stat.label}
-            className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-xl p-5"
-          >
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-2xl">{stat.icon}</span>
-              <span className="text-sm text-[var(--text-secondary)]">{stat.label}</span>
-            </div>
-            <p className="text-3xl font-bold text-[var(--text-primary)]">{stat.value}</p>
-          </div>
-        ))}
+      <div className="grid grid-cols-3 gap-2">
+        <Bubble value={String(data.offers.length)} label="Offers" />
+        <Bubble value={String(unreadTotal)} label="Messages" icon={<BubbleIcon />} hot={unreadTotal > 0} />
+        <Bubble value={String(confirmedCount)} label="Confirmed" />
+      </div>
+      <div className="grid grid-cols-3 gap-2 mt-2">
+        <Bubble value={String(data.completed.length)} label="Completed" />
+        <Bubble value={reviewCount > 0 ? `${avgRating.toFixed(1)} ★` : '—'} label="Rating" />
+        <Bubble value={String(reviewCount)} label="Reviews" />
       </div>
 
-      {/* Recent activity */}
-      <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-xl p-6">
-        <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Recent Activity</h2>
-        {activity.length === 0 ? (
-          <p className="text-[var(--text-faint)] text-sm">No activity yet — new job offers will show up here.</p>
-        ) : (
-          <ul className="space-y-3">
-            {activity.map((item) => (
-              <li
-                key={item.id}
-                className="flex items-start gap-3 p-3 rounded-lg hover:bg-[var(--bg-surface-hover)] transition-colors"
-              >
-                <span className="text-xl mt-0.5">{item.icon}</span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-[var(--text-primary)]">{item.text}</p>
-                  <p className="text-xs text-[var(--text-faint)] mt-1">{item.time}</p>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+      <Heading>Offers &amp; messages</Heading>
+      {data.offers.length === 0 && data.confirmed.length === 0 ? (
+        <Empty text="No offers or active jobs right now." />
+      ) : (
+        <div className="grid gap-2">
+          {data.offers.map((o) => <OfferCard key={o.id} offer={o} />)}
+          {data.confirmed.map((j) => (
+            <JobCard
+              key={j.id}
+              job={j}
+              onMarkCompleted={handleMarkCompleted}
+              onReschedule={handleReschedule}
+              marking={markingId === j.id}
+              unread={unread[j.id] ?? 0}
+              autoOpenMessages={openThreadFor === j.id}
+              onMessagesClosed={refreshUnread}
+            />
+          ))}
+        </div>
+      )}
+
+      <Heading>Calendar</Heading>
+      <AvailabilityCalendar jobs={jobSpans} />
+
+      <Heading right={data.completed.length > COMPLETED_SHOWN ? (
+        <button type="button" onClick={() => setShowAllDone((v) => !v)} className="text-xs text-[var(--accent-blue)]">{showAllDone ? 'Show fewer' : `Show all ${data.completed.length}`}</button>
+      ) : undefined}>Completed</Heading>
+      {data.completed.length === 0 ? (
+        <Empty text="Finished jobs show up here." />
+      ) : (
+        <div className="grid gap-2">
+          {done.map((j) => <JobCard key={j.id} job={j} marking={false} />)}
+        </div>
+      )}
     </div>
   );
 }

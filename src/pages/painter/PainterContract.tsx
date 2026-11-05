@@ -7,7 +7,7 @@ export default function PainterContract() {
   if (!jobId) return null;
   return (
     <div className="max-w-4xl mx-auto">
-      <Link to="/painter/dashboard/projects" style={{ color: 'var(--accent-blue)', fontSize: '0.9rem' }}>← Back to My Projects</Link>
+      <Link to="/painter/dashboard" style={{ color: 'var(--accent-blue)', fontSize: '0.9rem' }}>← Back to Dashboard</Link>
       <h1 className="text-2xl font-bold text-[var(--text-primary)] mt-2 mb-4">Contract</h1>
       <ContractWorkspace auth={{ kind: 'session', jobId }} />
     </div>

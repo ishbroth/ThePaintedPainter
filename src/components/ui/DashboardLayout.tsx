@@ -1,30 +1,15 @@
-import { Outlet, useNavigate } from 'react-router-dom';
+import { Outlet } from 'react-router-dom';
 import { useAuth } from '../../lib/auth/index.ts';
-import DashboardSidebar from './DashboardSidebar.tsx';
 import ApplicationStatus from '../painter/ApplicationStatus.tsx';
-import type { SidebarItem } from './DashboardSidebar.tsx';
 
-interface DashboardLayoutProps {
-  items: SidebarItem[];
-  title: string;
-}
-
-export default function DashboardLayout({ items, title }: DashboardLayoutProps) {
-  const { signOut, profile } = useAuth();
-  const navigate = useNavigate();
-
-  const handleLogout = async () => {
-    await signOut();
-    navigate('/');
-  };
+/** The signed-in pages (painter and customer): just the page, full width. The header's three links are the only navigation; there is no sidebar or menu. */
+export default function DashboardLayout() {
+  const { profile } = useAuth();
 
   return (
-    <div className="flex min-h-screen">
-      <DashboardSidebar items={items} title={title} onLogout={handleLogout} />
-      <main className="flex-1 min-w-0 p-4 lg:p-8">
-        {profile?.role === 'painter' && <ApplicationStatus />}
-        <Outlet />
-      </main>
-    </div>
+    <main className="min-w-0 w-full max-w-5xl mx-auto px-3 py-4 sm:px-5 lg:px-8">
+      {profile?.role === 'painter' && <ApplicationStatus />}
+      <Outlet />
+    </main>
   );
 }

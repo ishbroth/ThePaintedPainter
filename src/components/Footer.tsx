@@ -10,7 +10,7 @@ const Footer = () => {
     <footer className="footer">
       <div className="footer-links">
         {!unknown && (isPainter ? <Link to="/painter/dashboard">Dashboard</Link> : <Link to="/">Get Your Price</Link>)}
-        {!unknown && (isPainter ? <Link to="/painter/dashboard/projects">My Projects</Link> : isCustomer ? <Link to="/customer/dashboard/projects">My Projects</Link> : <Link to="/painter-signup">For Painters</Link>)}
+        {!unknown && (isPainter ? <Link to="/painter/dashboard/profile">Profile</Link> : isCustomer ? <Link to="/customer/dashboard">Dashboard</Link> : <Link to="/painter-signup">For Painters</Link>)}
         <Link to="/support">Support</Link>
         <Link to="/privacy">Privacy</Link>
       </div>

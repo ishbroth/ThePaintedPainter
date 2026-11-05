@@ -132,7 +132,7 @@ export default function PainterAvailability() {
             {job.status === 'confirmed'
               ? 'This job is confirmed. To change the date, use your dashboard.'
               : 'This job can\'t be scheduled right now.'}{' '}
-            <Link to="/painter/dashboard/projects" style={{ color: 'var(--accent-blue)' }}>Go to your projects</Link>
+            <Link to="/painter/dashboard" style={{ color: 'var(--accent-blue)' }}>Go to your dashboard</Link>
           </p>
         </div>
       )}

@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect } from 'react';
 import { onAppUrl, routeFromUrl } from './lib/native.ts';
 import Privacy from './pages/Privacy.tsx';
@@ -40,7 +40,6 @@ import DashboardLayout from './components/ui/DashboardLayout.tsx';
 import PainterDashboard from './pages/painter/PainterDashboard.tsx';
 import PainterProfile from './pages/painter/PainterProfile.tsx';
 import PainterPortfolio from './pages/painter/PainterPortfolio.tsx';
-import PainterProjects from './pages/painter/PainterProjects.tsx';
 import PainterReviews from './pages/painter/PainterReviews.tsx';
 import PainterSettings from './pages/painter/PainterSettings.tsx';
 import PainterNotifications from './pages/painter/PainterNotifications.tsx';
@@ -49,49 +48,15 @@ import PainterRewards from './pages/painter/PainterRewards.tsx';
 import PainterContract from './pages/painter/PainterContract.tsx';
 import CustomerContract from './pages/customer/CustomerContract.tsx';
 import CustomerDashboard from './pages/customer/CustomerDashboard.tsx';
-import CustomerProfile from './pages/customer/CustomerProfile.tsx';
-import CustomerProjects from './pages/customer/CustomerProjects.tsx';
 import CustomerNotifications from './pages/customer/CustomerNotifications.tsx';
-import type { SidebarItem } from './components/ui/DashboardSidebar.tsx';
 import './index.css';
 
 const queryClient = new QueryClient();
 
-// ---------------------------------------------------------------------------
-// Painter dashboard sidebar items
-// ---------------------------------------------------------------------------
-const painterSidebarItems: SidebarItem[] = [
-  { label: 'Dashboard', icon: '\u{1F3E0}', path: '/painter/dashboard' },
-  { label: 'Profile', icon: '\u{1F464}', path: '/painter/dashboard/profile' },
-  { label: 'Portfolio', icon: '\u{1F5BC}', path: '/painter/dashboard/portfolio' },
-  { label: 'My Projects', icon: '\u{1F4CB}', path: '/painter/dashboard/projects' },
-  { label: 'My Business', icon: '\u{1F4C8}', path: '/painter/dashboard/business' },
-  { label: 'Reviews', icon: '\u2B50', path: '/painter/dashboard/reviews' },
-  { label: 'Rewards', icon: '\u{1F3C6}', path: '/painter/dashboard/rewards' },
-  { label: 'Settings', icon: '\u2699', path: '/painter/dashboard/settings' },
-  { label: 'Notifications', icon: '\u{1F514}', path: '/painter/dashboard/notifications' },
-];
-
-function PainterDashboardLayout() {
-  return (
-    <DashboardLayout items={painterSidebarItems} title="Painter Dashboard" />
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Customer dashboard sidebar items
-// ---------------------------------------------------------------------------
-const customerSidebarItems: SidebarItem[] = [
-  { label: 'Dashboard', icon: '\u{1F3E0}', path: '/customer/dashboard' },
-  { label: 'My Projects', icon: '\u{1F4CB}', path: '/customer/dashboard/projects' },
-  { label: 'Profile', icon: '\u{1F464}', path: '/customer/dashboard/profile' },
-  { label: 'Notifications', icon: '\u{1F514}', path: '/customer/dashboard/notifications' },
-];
-
-function CustomerDashboardLayout() {
-  return (
-    <DashboardLayout items={customerSidebarItems} title="Customer Dashboard" />
-  );
+/** A redirect that keeps the query string and hash, so an old address with ?messages=<job> still opens that thread on the merged dashboard. */
+function RedirectTo({ to }: { to: string }) {
+  const { search, hash } = useLocation();
+  return <Navigate to={{ pathname: to, search, hash }} replace />;
 }
 
 /** In the iOS / Android app, a link that opens the app (an emailed link on the site) goes to the matching page inside it. */
@@ -135,7 +100,7 @@ function App() {
                 <Route path="/confirm-job" element={<ConfirmJob />} />
                 <Route path="/leave-review" element={<LeaveReview />} />
                 <Route path="/painter/availability" element={<PainterAvailability />} />
-                <Route path="/painter/confirm-date" element={<Navigate to="/painter/dashboard/projects" replace />} />
+                <Route path="/painter/confirm-date" element={<RedirectTo to="/painter/dashboard" />} />
                 <Route path="/choose-painter" element={<NotForPainters><ChoosePainter /></NotForPainters>} />
                 <Route path="/cancel-request" element={<CancelRequest />} />
                 <Route path="/cancel-claim" element={<CancelClaim />} />
@@ -144,8 +109,8 @@ function App() {
                 <Route path="/painter/confirm-signup" element={<PainterConfirmSignup />} />
                 <Route path="/painter/accept-job" element={<AcceptJob />} />
                 {/* Short links used in emails and push notifications. */}
-                <Route path="/customer/projects" element={<Navigate to="/customer/dashboard/projects" replace />} />
-                <Route path="/painter/projects" element={<Navigate to="/painter/dashboard/projects" replace />} />
+                <Route path="/customer/projects" element={<RedirectTo to="/customer/dashboard" />} />
+                <Route path="/painter/projects" element={<RedirectTo to="/painter/dashboard" />} />
 
                 {/* Auth routes */}
                 <Route path="/auth/sign-in" element={<SignIn />} />
@@ -162,14 +127,15 @@ function App() {
                   path="/painter/dashboard"
                   element={
                     <ProtectedRoute requiredRole="painter">
-                      <PainterDashboardLayout />
+                      <DashboardLayout />
                     </ProtectedRoute>
                   }
                 >
                   <Route index element={<PainterDashboard />} />
                   <Route path="profile" element={<PainterProfile />} />
                   <Route path="portfolio" element={<PainterPortfolio />} />
-                  <Route path="projects" element={<PainterProjects />} />
+                  {/* My Projects was merged into the Dashboard; the old address (emails, notifications) goes there */}
+                  <Route path="projects" element={<RedirectTo to="/painter/dashboard" />} />
                   <Route path="contract/:jobId" element={<PainterContract />} />
                   <Route path="business" element={<PainterBusiness />} />
                   <Route path="reviews" element={<PainterReviews />} />
@@ -183,13 +149,14 @@ function App() {
                   path="/customer/dashboard"
                   element={
                     <ProtectedRoute requiredRole="customer">
-                      <CustomerDashboardLayout />
+                      <DashboardLayout />
                     </ProtectedRoute>
                   }
                 >
                   <Route index element={<CustomerDashboard />} />
-                  <Route path="profile" element={<CustomerProfile />} />
-                  <Route path="projects" element={<CustomerProjects />} />
+                  {/* Profile and My Projects were merged into the Dashboard; the old addresses go there */}
+                  <Route path="profile" element={<RedirectTo to="/customer/dashboard" />} />
+                  <Route path="projects" element={<RedirectTo to="/customer/dashboard" />} />
                   <Route path="contract/:jobId" element={<CustomerContract />} />
                   <Route path="notifications" element={<CustomerNotifications />} />
                 </Route>

@@ -1,34 +1,58 @@
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useState, type ReactNode } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../lib/auth/index.ts';
-import { supabaseUrl } from '../../lib/supabase';
+import { supabase, supabaseUrl } from '../../lib/supabase';
+import { useUnreadMessages } from '../../lib/jobMessages';
+import AccountSettings from '../../components/account/AccountSettings';
+import MessageButton from '../../components/messaging/MessageButton';
+import ProfileBlock from '../../components/customer/ProfileBlock';
+import ProjectCard, { type Project } from '../../components/customer/ProjectCard';
+import { currency } from '../../components/customer/money';
 
-interface Project {
-  id: string;
-  status: string;
-  price: number | null;
-  phaseLabel: string | null;
-  confirmedAt: string | null;
-  completedAt: string | null;
-  painter: { company_name: string } | null;
+const stat = (n: number) => new Intl.NumberFormat('en-US').format(n);
+
+function Bubble({ label, value, tone }: { label: string; value: string; tone: string }) {
+  return (
+    <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-xl px-2 py-2 text-center">
+      <p className={`text-lg font-bold leading-tight ${tone}`}>{value}</p>
+      <p className="text-[11px] text-[var(--text-secondary)] leading-tight">{label}</p>
+    </div>
+  );
 }
 
-function formatWhen(iso: string): string {
-  return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+function Section({ title, count, children }: { title: string; count?: number; children: ReactNode }) {
+  return (
+    <section className="mt-5">
+      <h2 className="text-[13px] font-bold uppercase tracking-wider text-[var(--text-secondary)] mb-2">
+        {title}{count ? <span className="text-[var(--text-faint)]"> · {count}</span> : null}
+      </h2>
+      {children}
+    </section>
+  );
 }
 
-const currency = (n: number) =>
-  new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n);
+const empty = (text: string) => <p className="text-xs text-[var(--text-faint)] bg-[var(--bg-surface)] border border-dashed border-[var(--border)] rounded-xl px-3 py-3">{text}</p>;
 
+/**
+ * The customer's one page: who they are, a few numbers, what is being arranged and what is said to them, what is scheduled, what is done, then settings.
+ * It replaces the old Dashboard, My Projects and Profile pages (and the sidebar that linked them).
+ */
 export default function CustomerDashboard() {
-  const { profile, session } = useAuth();
-  const displayName = profile?.display_name ?? 'Customer';
+  const { session, profile, signOut } = useAuth();
+  const navigate = useNavigate();
+  const { unread, refresh: refreshUnread } = useUnreadMessages(session?.access_token);
+  // a message notification links here with ?messages=<job id>: that project's thread opens
+  const openThreadFor = useSearchParams()[0].get('messages');
 
+  // The profile in auth context is loaded once at login, so a discount that has since lapsed would still show.
+  // sync_loyalty_decay applies any due decay and returns the current numbers.
+  const [loyalty, setLoyalty] = useState<{ balance: number; discount: number } | null>(null);
   const [projects, setProjects] = useState<Project[] | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // behind ProtectedRoute, so a session is there; if the first render beats it, this runs again once `session` shows up
     if (!session?.access_token) return;
     fetch(`${supabaseUrl}/functions/v1/get-my-projects`, {
       headers: { Authorization: `Bearer ${session.access_token}` },
@@ -42,104 +66,132 @@ export default function CustomerDashboard() {
       .finally(() => setLoading(false));
   }, [session?.access_token]);
 
-  const activeProjects = (projects ?? []).filter((p) => p.status === 'confirmed' || p.status === 'painter_accepted');
-  const completedProjects = (projects ?? []).filter((p) => p.status === 'completed');
-  const totalInvested = (projects ?? []).reduce((sum, p) => sum + (p.price ?? 0), 0);
+  const profileId = profile?.id;
+  useEffect(() => {
+    if (!profileId) return;
+    supabase.rpc('sync_loyalty_decay', { p_customer_id: profileId }).then(({ data, error: rpcError }) => {
+      const row = data?.[0];
+      if (!rpcError && row) setLoyalty({ balance: row.points_balance, discount: row.discount_percent });
+    });
+  }, [profileId]);
 
-  const activity = (projects ?? [])
-    .flatMap((p) => {
-      const items: { id: string; text: string; timestamp: number; time: string }[] = [];
-      if (p.confirmedAt) {
-        items.push({
-          id: `${p.id}-confirmed`,
-          text: `Painter confirmed for ${p.phaseLabel || 'your project'}${p.painter ? ` — ${p.painter.company_name}` : ''}`,
-          timestamp: new Date(p.confirmedAt).getTime(),
-          time: formatWhen(p.confirmedAt),
-        });
-      }
-      if (p.completedAt) {
-        items.push({
-          id: `${p.id}-completed`,
-          text: `${p.phaseLabel || 'Your project'} was marked complete`,
-          timestamp: new Date(p.completedAt).getTime(),
-          time: formatWhen(p.completedAt),
-        });
-      }
-      return items;
-    })
-    .sort((a, b) => b.timestamp - a.timestamp)
-    .slice(0, 6);
+  const all = projects ?? [];
+  const requests = all.filter((p) => p.status !== 'confirmed' && p.status !== 'completed');
+  const scheduled = all.filter((p) => p.status === 'confirmed');
+  const completed = all.filter((p) => p.status === 'completed');
+  const withMessages = scheduled.filter((p) => (unread[p.id] ?? 0) > 0);
+
+  const jobsCompleted = completed.length;
+  const reviewsWritten = completed.filter((p) => p.reviewSubmitted).length;
+  // booked and finished jobs: a confirmed job's deposit is paid, and a finished one is paid for
+  const spent = [...scheduled, ...completed].reduce((sum, p) => sum + (p.price ?? 0), 0);
+
+  const points = loyalty?.balance ?? profile?.loyalty_points_balance ?? 0;
+  const discount = loyalty?.discount ?? profile?.loyalty_discount_percent ?? 0;
+  const toNext = discount >= 5 ? 0 : 20 - (points % 20);
+
+  const dash = (v: string) => (loading ? '—' : v);
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/');
+  };
+
+  const linkBtn = 'px-3 py-1.5 text-xs font-semibold rounded-lg border border-[var(--border-strong)] text-[var(--text-primary)] hover:border-[var(--accent)] transition-colors';
 
   return (
-    <div>
-      <h1 className="text-3xl font-bold text-[var(--text-primary)] mb-2">Welcome back!</h1>
-      <p className="text-[var(--text-secondary)] mb-8">
-        Hi {displayName}, here is an overview of your painting projects.
-      </p>
+    <div className="max-w-3xl mx-auto w-full px-3 py-4 sm:px-4">
+      <ProfileBlock />
 
-      {error && <p className="text-[var(--danger)] mb-6">{error}</p>}
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-10">
-        <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-xl p-6">
-          <p className="text-[var(--text-secondary)] text-sm mb-1">Active Projects</p>
-          <p className="text-3xl font-bold text-[var(--accent)]">
-            {loading ? '—' : activeProjects.length}
-          </p>
-        </div>
-        <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-xl p-6">
-          <p className="text-[var(--text-secondary)] text-sm mb-1">Completed Projects</p>
-          <p className="text-3xl font-bold text-green-400">
-            {loading ? '—' : completedProjects.length}
-          </p>
-        </div>
-        <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-xl p-6">
-          <p className="text-[var(--text-secondary)] text-sm mb-1">Total Invested</p>
-          <p className="text-3xl font-bold text-[var(--accent-blue)]">
-            {loading ? '—' : currency(totalInvested)}
-          </p>
-        </div>
+      {/* a few numbers */}
+      <div className="grid grid-cols-3 gap-2 mt-3">
+        <Bubble label="Jobs completed" value={dash(stat(jobsCompleted))} tone="text-green-400" />
+        <Bubble label="Reviews written" value={dash(stat(reviewsWritten))} tone="text-[var(--accent)]" />
+        <Bubble label="Money spent" value={dash(currency(spent))} tone="text-[var(--accent-blue)]" />
       </div>
+      {profile && (
+        <p className="text-xs text-[var(--text-secondary)] mt-2 px-1">
+          <span className="font-semibold text-[var(--text-primary)]">{points} loyalty pts</span>
+          {discount > 0
+            ? <> · saving <span className="text-[var(--accent-blue)] font-semibold">{discount}%</span> on your next project</>
+            : <> · 1 pt per $100 booked, 20 pts = 1% off</>}
+          {toNext > 0 && discount > 0 ? <span className="text-[var(--text-faint)]"> · {toNext} to next 1%</span> : null}
+        </p>
+      )}
 
-      {/* Quick Actions */}
-      <div className="flex flex-wrap gap-4 mb-10">
-        <Link
-          to="/"
-          className="px-6 py-3 bg-[var(--accent)] text-[var(--accent-ink)] font-semibold rounded-lg hover:bg-[var(--accent-hover)] transition-colors"
-        >
-          Get a New Price
-        </Link>
-        <Link
-          to="/painters-map"
-          className="px-6 py-3 border border-[var(--accent)] text-[var(--accent)] font-semibold rounded-lg hover:bg-[var(--accent)] hover:text-[var(--accent-ink)] transition-colors"
-        >
-          Find Painters
-        </Link>
-      </div>
+      {error && <p className="text-sm text-[var(--danger)] mt-4">{error}</p>}
 
-      {/* Recent Activity */}
-      <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-xl p-6">
-        <h2 className="text-xl font-bold text-[var(--text-primary)] mb-4">Recent Activity</h2>
+      {/* requests being arranged and what your painter has said */}
+      <Section title="Requests & messages" count={requests.length + withMessages.length}>
         {loading ? (
-          <p className="text-[var(--text-secondary)]">Loading…</p>
-        ) : activity.length === 0 ? (
-          <p className="text-[var(--text-faint)]">No activity yet — once a painter accepts and confirms a job, it'll show up here.</p>
+          <p className="text-xs text-[var(--text-secondary)]">Loading…</p>
+        ) : requests.length === 0 && withMessages.length === 0 ? (
+          empty('No open requests or new messages. Get a price and your request shows up here.')
         ) : (
-          <ul className="space-y-4">
-            {activity.map((item) => (
-              <li
-                key={item.id}
-                className="flex items-start justify-between border-b border-[var(--border)] pb-4 last:border-b-0 last:pb-0"
-              >
-                <p className="text-[var(--text-secondary)]">{item.text}</p>
-                <span className="text-[var(--text-faint)] text-sm whitespace-nowrap ml-4">
-                  {item.time}
-                </span>
-              </li>
+          <div className="flex flex-col gap-2.5">
+            {withMessages.map((p) => (
+              <div key={`msg-${p.id}`} className="bg-[var(--bg-surface)] border border-[var(--accent)] rounded-xl px-3 py-2.5 flex items-center justify-between gap-2 flex-wrap">
+                <p className="text-xs text-[var(--text-secondary)]">
+                  <span className="font-semibold text-[var(--text-primary)]">{p.painter?.company_name ?? 'Your painter'}</span> wrote to you about {p.phaseLabel || 'your project'}
+                </p>
+                <MessageButton jobId={p.id} role="customer" status={p.status} unread={unread[p.id] ?? 0} onClosed={refreshUnread} />
+              </div>
             ))}
-          </ul>
+            {requests.map((p) => (
+              <ProjectCard key={p.id} project={p} variant="request" />
+            ))}
+          </div>
         )}
-      </div>
+      </Section>
+
+      {/* confirmed jobs */}
+      <Section title="Scheduled jobs" count={scheduled.length}>
+        {loading ? null : scheduled.length === 0 ? (
+          empty('Nothing scheduled yet. Once a painter accepts and you confirm, the job shows up here with their contact details and date.')
+        ) : (
+          <div className="flex flex-col gap-2.5">
+            {scheduled.map((p) => (
+              <ProjectCard key={p.id} project={p} variant="scheduled" unread={unread[p.id] ?? 0} autoOpenMessages={openThreadFor === p.id} onMessagesClosed={refreshUnread} />
+            ))}
+          </div>
+        )}
+      </Section>
+
+      {/* finished jobs, with the painter who did them */}
+      <Section title="Completed jobs" count={completed.length}>
+        {loading ? null : completed.length === 0 ? (
+          empty('Finished jobs show up here once your painter marks the work done.')
+        ) : (
+          <div className="flex flex-col gap-2.5">
+            {completed.map((p) => (
+              <ProjectCard key={p.id} project={p} variant="completed" />
+            ))}
+          </div>
+        )}
+      </Section>
+
+      {/* settings and the links the old menu had */}
+      <Section title="Settings">
+        <div className="flex flex-wrap gap-2 mb-3">
+          <Link to="/customer/dashboard/notifications" className={linkBtn}>🔔 Notifications</Link>
+          <Link to="/#estimator" className={linkBtn}>Get a new price</Link>
+          <Link to="/painters-map" className={linkBtn}>Find painters</Link>
+          <Link to="/support" className={linkBtn}>Support</Link>
+        </div>
+        <details className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-xl group">
+          <summary className="cursor-pointer select-none px-3.5 py-2.5 text-sm font-semibold text-[var(--text-primary)]">Account — email, password, alerts, delete</summary>
+          <div className="px-3.5 pt-1 [&>*]:!mb-3">
+            <AccountSettings />
+          </div>
+        </details>
+        <button
+          type="button"
+          onClick={handleSignOut}
+          className="mt-4 w-full px-4 py-2.5 text-sm font-semibold rounded-lg border border-[var(--border-strong)] text-[var(--text-secondary)] hover:text-[var(--danger)] hover:border-[var(--danger)] transition-colors"
+        >
+          Sign out
+        </button>
+      </Section>
     </div>
   );
 }
