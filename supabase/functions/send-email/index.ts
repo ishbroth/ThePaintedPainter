@@ -398,8 +398,8 @@ ${body}
       `)
 
     case 'job_offer_available': {
-      // only what belongs to this job (nothing about the fence in an interior job)
-      const qa = cleanScope(data.qa)
+      // only what the customer talked about or is priced in the job
+      const qa = cleanScope(data.qa, { conversation: data.conversation, breakdown: data.breakdown })
       const qaHtml = qa
         .map((item) => `<p style="margin: 4px 0;"><strong>${escapeHtml(item.question)}:</strong> ${escapeHtml(item.answer)}</p>`)
         .join('')
@@ -534,7 +534,7 @@ ${body}
 
     case 'cold_job_invite': {
       // To a local painting company that has never heard from us: a free job near them, with no customer name, address or contact details.
-      const qa = cleanScope(data.qa)
+      const qa = cleanScope(data.qa, { conversation: data.conversation, breakdown: data.breakdown })
       const bd = (Array.isArray(data.breakdown) ? data.breakdown : []) as { description: string; amount: number; removed?: boolean }[]
       const bdHtml = bd.length > 0
         ? `<p style="margin:24px 0 6px;font-size:12px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#6b7280;">What the job includes (your payout for each part)</p>

@@ -144,7 +144,7 @@ serve(async (req: Request) => {
         preferredDate: job.customer_preferred_date,
         timing: describeTiming(job),
         estimatedDays: estimateWorkingDays(Number(job.guaranteed_price) || 0, claimer.crew_size),
-        qa: cleanScope(summary.qa),
+        qa: cleanScope(summary.qa, summary),
         conversation: summary.conversation ?? [],
         breakdown: summary.breakdown ?? [],
         conversationNote: conversationNote(summary.conversation ?? []),

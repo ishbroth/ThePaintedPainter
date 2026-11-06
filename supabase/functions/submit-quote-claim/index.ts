@@ -293,7 +293,7 @@ serve(async (req: Request) => {
         guaranteed_price: guaranteedPrice,
         selected_painter_id: selectionType === 'specific_painter' ? selectedPainterId : null,
         selected_painter_price: guaranteedPrice,
-        project_summary: { qa: cleanScope(qa), timeline, timelineLabel, conversation, breakdown },
+        project_summary: { qa: cleanScope(qa, { conversation, breakdown }), timeline, timelineLabel, conversation, breakdown },
         photos: photos ?? [],
         notified_painters: notifiedPainters.map((p) => p.id),
         status: searching ? 'searching_painter' : 'offer_sent',

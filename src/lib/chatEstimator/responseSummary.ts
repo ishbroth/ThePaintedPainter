@@ -10,7 +10,7 @@
 
 import type { EstimatorContext } from '../types';
 import { makeInitialContext } from './defaultContext';
-import { cleanScope } from './scopeSummary';
+import { cleanScope, type ScopeEvidence } from './scopeSummary';
 
 /** Fields never shown to a painter pre-acceptance — PII or internal bookkeeping. */
 const EXCLUDED_KEYS = new Set<keyof EstimatorContext>([
@@ -155,7 +155,7 @@ const isNegative = (v: unknown): boolean => {
  * interview's resting answer was never answered), and only things that are in the job (an inside job that also mentions a fence lists the fence). "No" and "none"
  * answers are left out, so the list reads as what the job includes.
  */
-export function buildResponseSummary(ctx: EstimatorContext): ResponseQA[] {
+export function buildResponseSummary(ctx: EstimatorContext, evidence?: ScopeEvidence): ResponseQA[] {
   const out: ResponseQA[] = [];
   const resting = makeInitialContext() as unknown as Record<string, unknown>;
   const outside = ctx.projectType === 'exterior';
@@ -193,6 +193,6 @@ export function buildResponseSummary(ctx: EstimatorContext): ResponseQA[] {
     if (ctx.interiorDoors !== 'none') surfaces.push(ctx.interiorDoors === 'all' ? 'all doors' : 'some doors');
     if (surfaces.length > 0) out.unshift({ question: 'Inside surfaces being painted', answer: surfaces.join(', ') });
   }
-  // an inside job never lists the fence or siding, an outside job never lists cabinets; "no" and blank answers never show
-  return cleanScope(out);
+  // specific work (a fence, cabinets, chairs...) is listed only when the customer talked about it or it is priced in the job; "no" and blank answers never show
+  return cleanScope(out, evidence);
 }

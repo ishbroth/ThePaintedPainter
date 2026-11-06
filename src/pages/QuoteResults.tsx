@@ -523,7 +523,7 @@ const ClaimPriceModal = ({
           customer: { name: name.trim(), email: email.trim(), phone: phone.trim(), streetAddress: streetAddress.trim(), city: city.trim(), state: state_.trim() },
           timeline: ctx.timeline,
           timelineLabel: timelineLabel(ctx.timeline),
-          qa: buildResponseSummary(ctx),
+          qa: buildResponseSummary(ctx, { conversation, breakdown }),
           conversation,
           breakdown,
           preferredDate: preferredDate || undefined,

@@ -119,8 +119,8 @@ function priceLines(job: ContractJob): { description: string; amount: number }[]
 export function buildTerms(input: { job: ContractJob; painter: ContractPainter; painterTerms: PainterTerms; documentName?: string | null }): ContractTerms {
   const { job, painter, painterTerms } = input
   const summary = (job.project_summary ?? {}) as { qa?: { question?: string; answer?: string }[]; conversation?: string[] }
-  // only what belongs to this job: nothing about the fence in an apartment's interior, no "no" answers, no greetings
-  const scope = cleanScope(summary.qa)
+  // only what the customer talked about or is priced in the job (inside, outside or both): no stray fence, no "no" answers, no greetings
+  const scope = cleanScope(summary.qa, { conversation: summary.conversation, breakdown: (job.project_summary as { breakdown?: unknown } | null)?.breakdown })
   const customerWords = meaningfulWords(summary.conversation)
 
   const lines = priceLines(job)

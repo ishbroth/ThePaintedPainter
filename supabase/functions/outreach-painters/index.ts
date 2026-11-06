@@ -324,7 +324,7 @@ serve(async (req: Request) => {
     const { data: optouts } = await supabase.from('outreach_optouts').select('email')
     const optedOut = new Set((optouts ?? []).map((o: { email: string }) => String(o.email).toLowerCase()))
 
-    const summary = (job.project_summary ?? {}) as { qa?: { question: string; answer: string }[]; breakdown?: { description: string; amount: number; removed?: boolean }[]; timelineLabel?: string }
+    const summary = (job.project_summary ?? {}) as { qa?: { question: string; answer: string }[]; conversation?: string[]; breakdown?: { description: string; amount: number; removed?: boolean }[]; timelineLabel?: string }
     const invited: string[] = []
     let considered = 0
     const tiers: Record<string, number> = { in_progress: 0, fresh: 0, rotated_out: 0 }
@@ -354,6 +354,7 @@ serve(async (req: Request) => {
             timelineLabel: summary.timelineLabel,
             datesText: describeTiming(job),
             qa: summary.qa ?? [],
+            conversation: summary.conversation ?? [],
             breakdown: summary.breakdown ?? [],
             inviteUrl,
             unsubscribeUrl,
