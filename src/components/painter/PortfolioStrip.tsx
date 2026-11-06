@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../lib/auth';
 import { supabase } from '../../lib/supabase';
+import { fetchPainterDetail } from '../../lib/realPainterMatcher';
 
 interface PortfolioImage {
   id: string;
@@ -14,14 +15,36 @@ const MAX_BYTES = 8 * 1024 * 1024;
 
 const publicUrl = (path: string) => supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
 
+/** Five stars filled to the rating (4.3 fills four and a bit), for the picture. */
+function StarBar({ value }: { value: number }) {
+  return (
+    <span aria-label={`${value.toFixed(1)} out of 5 stars`} className="relative inline-block leading-none text-[15px] tracking-[1px]">
+      <span className="text-white/35">★★★★★</span>
+      <span className="absolute left-0 top-0 overflow-hidden whitespace-nowrap text-amber-400" style={{ width: `${Math.max(0, Math.min(5, value)) / 5 * 100}%` }}>★★★★★</span>
+    </span>
+  );
+}
+
+function CameraPlus() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 8.5A1.5 1.5 0 0 1 4.5 7H7l1.2-2h7.6L17 7h2.5A1.5 1.5 0 0 1 21 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5Z" />
+      <path d="M12 10v6M9 13h6" />
+    </svg>
+  );
+}
+
 /**
- * The painter's portfolio as a carousel at the top of their profile: swipe through it, add photos with the first tile, remove one with its ✕,
- * tap a caption to change it. (What the Portfolio page did, in one row.)
+ * The top of the painter's profile, laid out like a listing on a booking site: their portfolio as one big swipeable picture with the company
+ * name, rating and place over it, dots along the bottom showing how far through the pictures you are (up to 24), and a small camera + at the
+ * bottom left to add photos. A photo can be captioned or removed from the corner buttons.
  */
-export default function PortfolioStrip() {
+export default function PortfolioStrip({ companyName, place }: { companyName: string; place: string }) {
   const { user } = useAuth();
   const [painter, setPainter] = useState<{ id: string; status: string } | null>(null);
   const [images, setImages] = useState<PortfolioImage[] | null>(null);
+  const [rating, setRating] = useState<{ average: number | null; count: number } | null>(null);
+  const [current, setCurrent] = useState(0);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editCaption, setEditCaption] = useState('');
   const [uploading, setUploading] = useState(false);
@@ -50,6 +73,14 @@ export default function PortfolioStrip() {
     })();
     return () => { off = true; };
   }, [user, reload]);
+
+  // the same rating customers see on the listing
+  useEffect(() => {
+    if (!painter?.id) return;
+    let off = false;
+    fetchPainterDetail(painter.id).then((d) => { if (!off && d) setRating(d.rating); });
+    return () => { off = true; };
+  }, [painter?.id]);
 
   const handleFiles = async (files: FileList | null) => {
     if (!files || files.length === 0 || !user || !painter) return;
@@ -92,81 +123,100 @@ export default function PortfolioStrip() {
     setEditingId(null);
   };
 
-  const scrollBy = (dir: number) => rail.current?.scrollBy({ left: dir * (rail.current.clientWidth * 0.7), behavior: 'smooth' });
-  const arrow = 'hidden sm:flex absolute top-1/2 -translate-y-1/2 z-10 w-8 h-8 items-center justify-center rounded-full bg-black/60 text-white text-lg';
+  const count = images?.length ?? 0;
+  const here = images?.[Math.min(current, Math.max(0, count - 1))];
+  const small = 'w-7 h-7 rounded-full bg-black/55 text-white flex items-center justify-center text-xs backdrop-blur-sm';
 
   return (
-    <section aria-label="Portfolio">
-      <div className="flex items-baseline justify-between mb-1.5">
-        <h2 className="text-sm font-semibold text-[var(--text-primary)]">Portfolio</h2>
-        <span className="text-[11px] text-[var(--text-faint)]">
-          {images ? `${images.length} photo${images.length === 1 ? '' : 's'}` : ''}
-          {painter && painter.status !== 'approved' ? ' · shown to customers once approved' : ''}
-        </span>
+    <section aria-label="Your listing" className="relative overflow-hidden rounded-t-xl bg-black" style={{ aspectRatio: '16 / 10', maxHeight: 360, width: '100%' }}>
+      {/* the pictures: swipe or scroll sideways, one at a time */}
+      <div
+        ref={rail}
+        onScroll={(e) => setCurrent(Math.round(e.currentTarget.scrollLeft / Math.max(1, e.currentTarget.clientWidth)))}
+        className="flex h-full overflow-x-auto [&::-webkit-scrollbar]:hidden"
+        style={{ scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}
+      >
+        {images === null && <div className="shrink-0 w-full h-full flex items-center justify-center text-xs text-white/60">Loading…</div>}
+        {images?.length === 0 && (
+          <div className="shrink-0 w-full h-full flex flex-col items-center justify-center gap-1 text-white/45" style={{ background: 'var(--bg-page)' }}>
+            <svg viewBox="0 0 24 24" width="44" height="44" fill="currentColor" aria-hidden="true">
+              <path d="M7 14c-1.66 0-3 1.34-3 3 0 1.31-1.16 2-2 2 .92 1.22 2.49 2 4 2 2.21 0 4-1.79 4-4 0-1.66-1.34-3-3-3zm13.71-9.37l-1.34-1.34a.996.996 0 0 0-1.41 0L9 12.25 11.75 15l8.96-8.96a.996.996 0 0 0 0-1.41z" />
+            </svg>
+            <span className="text-[11px]">Add photos of finished jobs. They show on your public listing.</span>
+          </div>
+        )}
+        {images?.map((img) => (
+          <img key={img.id} src={publicUrl(img.storage_path)} alt={img.caption || 'Portfolio photo'} loading="lazy" className="shrink-0 w-full h-full object-cover" style={{ scrollSnapAlign: 'start' }} />
+        ))}
       </div>
 
-      <div className="relative">
-        <button type="button" className={`${arrow} left-1`} aria-label="Scroll left" onClick={() => scrollBy(-1)}>‹</button>
-        <button type="button" className={`${arrow} right-1`} aria-label="Scroll right" onClick={() => scrollBy(1)}>›</button>
-        <div
-          ref={rail}
-          className="flex gap-2 overflow-x-auto pb-2"
-          style={{ scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch' }}
-        >
-          <button
-            type="button"
-            onClick={() => fileRef.current?.click()}
-            disabled={uploading || !painter}
-            className="shrink-0 w-28 h-36 rounded-xl border-2 border-dashed border-[var(--border-strong)] text-[var(--text-secondary)] flex flex-col items-center justify-center gap-1 disabled:opacity-50"
-            style={{ scrollSnapAlign: 'start' }}
-          >
-            <span className="text-2xl leading-none text-[var(--accent)]">+</span>
-            <span className="text-xs">{uploading ? 'Uploading…' : 'Add photos'}</span>
-          </button>
-          <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => handleFiles(e.target.files)} />
+      {/* name, rating and place over the picture, like a hotel listing */}
+      <div className="absolute inset-x-0 top-0 px-3 pt-2.5 pb-8 pointer-events-none" style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.72), rgba(0,0,0,0))' }}>
+        <h1 className="text-[17px] font-bold leading-tight text-white drop-shadow" style={{ fontFamily: "'Cabin', sans-serif" }}>{companyName}</h1>
+        <div className="flex items-center gap-1.5 mt-0.5 text-[11px] text-white/90">
+          {rating?.average != null ? (
+            <>
+              <StarBar value={rating.average} />
+              <strong>{rating.average.toFixed(1)}</strong>
+              <span className="text-white/70">({rating.count})</span>
+            </>
+          ) : (
+            <span className="text-white/75">{rating ? 'New · no reviews yet' : ' '}</span>
+          )}
+        </div>
+        {place && <p className="text-[11px] text-white/75 leading-tight mt-0.5">{place}</p>}
+        {painter && painter.status !== 'approved' && <p className="text-[10px] text-amber-300 mt-0.5">Shown to customers once approved</p>}
+      </div>
 
-          {images === null && <p className="text-xs text-[var(--text-faint)] self-center px-2">Loading…</p>}
-          {images?.map((img) => (
-            <figure key={img.id} className="shrink-0 w-[62%] sm:w-56 m-0 relative" style={{ scrollSnapAlign: 'start' }}>
-              <img src={publicUrl(img.storage_path)} alt={img.caption || 'Portfolio photo'} loading="lazy" className="w-full h-36 object-cover rounded-xl border border-[var(--border)]" />
-              <button
-                type="button"
-                onClick={() => handleDelete(img)}
-                aria-label="Remove photo"
-                className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/65 text-white text-xs flex items-center justify-center"
-              >
-                {'✕'}
-              </button>
-              {editingId === img.id ? (
-                <div className="flex gap-1 mt-1">
-                  <input
-                    value={editCaption}
-                    maxLength={140}
-                    autoFocus
-                    onChange={(e) => setEditCaption(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') saveCaption(img); if (e.key === 'Escape') setEditingId(null); }}
-                    className="flex-1 min-w-0 px-2 py-1 bg-[var(--bg-page)] border border-[var(--input-border)] rounded text-[var(--text-primary)] text-xs focus:outline-none focus:border-[var(--accent)]"
-                  />
-                  <button type="button" onClick={() => saveCaption(img)} className="px-2 bg-[var(--accent)] text-[var(--accent-ink)] text-xs rounded font-semibold">OK</button>
-                </div>
-              ) : (
-                <figcaption
-                  className="mt-1 text-xs text-[var(--text-secondary)] truncate cursor-pointer"
-                  onClick={() => { setEditingId(img.id); setEditCaption(img.caption); }}
-                  title="Tap to edit caption"
-                >
-                  {img.caption || 'Add a caption…'}
-                </figcaption>
-              )}
-            </figure>
+      {/* this picture's caption and corner buttons */}
+      {here && (
+        <div className="absolute top-2 right-2 flex gap-1.5">
+          <button type="button" aria-label="Edit caption" onClick={() => { setEditingId(here.id); setEditCaption(here.caption); }} className={small}>✎</button>
+          <button type="button" aria-label="Remove photo" onClick={() => handleDelete(here)} className={small}>✕</button>
+        </div>
+      )}
+      {here?.caption && editingId !== here.id && (
+        <p className="absolute inset-x-12 bottom-6 text-center text-[11px] text-white drop-shadow truncate pointer-events-none">{here.caption}</p>
+      )}
+      {here && editingId === here.id && (
+        <div className="absolute inset-x-0 bottom-0 z-20 flex gap-1 p-2 bg-black/75">
+          <input
+            value={editCaption}
+            maxLength={140}
+            autoFocus
+            onChange={(e) => setEditCaption(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') saveCaption(here); if (e.key === 'Escape') setEditingId(null); }}
+            placeholder="Caption"
+            className="flex-1 min-w-0 px-2 py-1 bg-[var(--bg-page)] border border-[var(--input-border)] rounded text-[var(--text-primary)] text-xs focus:outline-none focus:border-[var(--accent)]"
+          />
+          <button type="button" onClick={() => saveCaption(here)} className="px-2 bg-[var(--accent)] text-[var(--accent-ink)] text-xs rounded font-semibold">OK</button>
+        </div>
+      )}
+
+      {/* camera + at the bottom left to add photos */}
+      <button
+        type="button"
+        onClick={() => fileRef.current?.click()}
+        disabled={uploading || !painter}
+        aria-label={uploading ? 'Uploading photos' : 'Add photos'}
+        className="absolute left-2 bottom-2 z-10 w-9 h-9 rounded-full bg-black/60 text-white flex items-center justify-center backdrop-blur-sm disabled:opacity-50"
+      >
+        {uploading ? <span className="text-[10px]">…</span> : <CameraPlus />}
+      </button>
+      <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => handleFiles(e.target.files)} />
+
+      {/* dots: how far through the pictures you are */}
+      {count > 1 && (
+        <div className="absolute inset-x-0 bottom-2.5 flex justify-center gap-1 pointer-events-none" aria-label={`Photo ${Math.min(current, count - 1) + 1} of ${count}`}>
+          {images?.map((img, i) => (
+            <span key={img.id} className={`rounded-full transition-all ${i === Math.min(current, count - 1) ? 'w-2 h-2 bg-white' : 'w-1.5 h-1.5 bg-white/45'}`} style={{ marginTop: i === Math.min(current, count - 1) ? 0 : 1 }} />
           ))}
         </div>
-      </div>
-
-      {images && images.length === 0 && (
-        <p className="text-xs text-[var(--text-faint)]">Add photos of finished jobs. They show on your public listing.</p>
       )}
-      {toast && <p className={`text-xs mt-1 ${toast.kind === 'ok' ? 'text-[var(--success)]' : 'text-[var(--danger)]'}`}>{toast.text}</p>}
+
+      {toast && (
+        <p className={`absolute left-1/2 -translate-x-1/2 bottom-12 px-2.5 py-1 rounded-full text-[11px] bg-black/75 ${toast.kind === 'ok' ? 'text-green-300' : 'text-red-300'}`}>{toast.text}</p>
+      )}
     </section>
   );
 }

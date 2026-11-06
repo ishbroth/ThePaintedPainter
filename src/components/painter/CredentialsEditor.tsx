@@ -44,7 +44,7 @@ const labelClass = 'block text-sm text-[var(--text-secondary)] mb-1';
 
 function Group({ title, enabled, onToggle, toggleLabel, children }: { title: string; enabled: boolean; onToggle: (v: boolean) => void; toggleLabel: string; children: React.ReactNode }) {
   return (
-    <div className="border border-[var(--border)] rounded-lg p-4 space-y-3">
+    <div className="border border-[var(--border)] rounded-lg p-2.5 space-y-2">
       <div className="flex items-center justify-between gap-3">
         <h3 className="text-sm font-semibold text-[var(--text-primary)]">{title}</h3>
         <label className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
@@ -116,9 +116,9 @@ export default function CredentialsEditor({ initial, status, compPauses }: { ini
   };
 
   return (
-    <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-xl p-6 space-y-4">
+    <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-lg p-3 space-y-2.5">
       <div>
-        <h2 className="text-lg font-semibold text-[var(--text-primary)]">Credentials</h2>
+        <h2 className="text-sm font-semibold text-[var(--text-primary)]">Credentials</h2>
         <p className="text-xs text-[var(--text-faint)] mt-1">
           Keep these current — a renewed license number or a new insurance or bond provider goes here and saves right away. Turning off licensed, insured or bonded pauses new leads until we re-verify you (usually 1–3 days){compPauses ? ", and so does turning off workers' comp" : ''}.
         </p>
@@ -145,7 +145,7 @@ export default function CredentialsEditor({ initial, status, compPauses }: { ini
         {text('workers_comp_carrier', 'Carrier')}
       </Group>
 
-      <div className="border border-[var(--border)] rounded-lg p-4 space-y-3">
+      <div className="border border-[var(--border)] rounded-lg p-2.5 space-y-2">
         <h3 className="text-sm font-semibold text-[var(--text-primary)]">Certifications</h3>
         <div className="flex flex-wrap gap-4">
           {CERTIFICATION_OPTIONS.map((cert) => (

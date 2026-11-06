@@ -43,12 +43,12 @@ const COLUMNS =
 const numberOrNull = (v: string): number | null => (v.trim() === '' ? null : Number(v));
 const dash = <span className="text-[var(--text-faint)]">—</span>;
 
-function Card({ title, note, children }: { title: string; note?: ReactNode; children: ReactNode }) {
+function Card({ title, note, children, flush }: { title: string; note?: ReactNode; children: ReactNode; flush?: boolean }) {
   return (
-    <section className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-xl px-3 pt-2.5 pb-1">
-      <h2 className="text-sm font-semibold text-[var(--text-primary)]">{title}</h2>
-      {note && <p className="text-[11px] text-[var(--text-faint)] mt-0.5">{note}</p>}
-      <div className="mt-1">{children}</div>
+    <section className={`bg-[var(--bg-surface)] border border-[var(--border)] px-2.5 pt-1.5 pb-0.5 ${flush ? 'rounded-b-xl border-t-0' : 'rounded-lg'}`}>
+      <h2 className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">{title}</h2>
+      {note && <p className="text-[10px] text-[var(--text-faint)] leading-snug mt-0.5">{note}</p>}
+      <div className="mt-0.5">{children}</div>
     </section>
   );
 }
@@ -149,15 +149,11 @@ export default function PainterProfile() {
   ];
 
   return (
-    <div className="max-w-3xl mx-auto px-3 py-3 space-y-3">
+    <div className="max-w-3xl mx-auto px-2 py-2 space-y-2">
       <div>
-        <h1 className="text-lg font-bold text-[var(--text-primary)] leading-tight">{row.company_name}</h1>
-        <p className="text-xs text-[var(--text-secondary)]">{[row.owner_name, place].filter(Boolean).join(' · ')}</p>
-      </div>
+      <PortfolioStrip companyName={row.company_name} place={place} />
 
-      <PortfolioStrip />
-
-      <Card title="Business details">
+      <Card title="Business details" flush>
         <FieldRow label="Company" field="company_name" row={row} save={save} validate={(v) => (v.trim() ? null : 'Company name is required.')} />
         <FieldRow label="Owner" field="owner_name" row={row} save={save} validate={(v) => (v.trim() ? null : 'Owner name is required.')} />
         <FieldRow label="Phone" field="phone" row={row} save={save} kind="tel" validate={(v) => (v.trim() ? null : 'A phone number is required.')} />
@@ -179,18 +175,19 @@ export default function PainterProfile() {
             return save({ street_address: address.street.trim(), city: address.city.trim(), state: address.state.trim(), zip_code: address.zip.trim() }, { geocode: true });
           }}
         />
-        <FieldRow label="Years in business" field="years_in_business" row={row} save={save} kind="number" />
-        <FieldRow label="Crew size" field="crew_size" row={row} save={save} kind="number" />
         <FieldRow label="About" field="bio" row={row} save={save} kind="textarea" block placeholder="What should customers know about you?" />
       </Card>
+      </div>
 
       <Card title="Services & coverage">
+        <FieldRow label="Years in business" field="years_in_business" row={row} save={save} kind="number" />
+        <FieldRow label="Crew size" field="crew_size" row={row} save={save} kind="number" />
         <EditRow
           label="Services"
           block
           value={(row.service_types ?? []).length ? (
-            <span className="flex flex-wrap gap-1.5">
-              {(row.service_types ?? []).map((s) => <span key={s} className="px-2 py-0.5 rounded-full text-xs bg-[var(--border)] text-[var(--text-primary)]">{s}</span>)}
+            <span className="flex flex-wrap gap-1 justify-end">
+              {(row.service_types ?? []).map((s) => <span key={s} className="px-1.5 py-px rounded-full text-[11px] bg-[var(--border)] text-[var(--text-primary)]">{s}</span>)}
             </span>
           ) : dash}
           onOpen={() => setServices(row.service_types ?? [])}
@@ -200,7 +197,7 @@ export default function PainterProfile() {
                 const on = services.includes(s);
                 return (
                   <button key={s} type="button" onClick={() => setServices(on ? services.filter((x) => x !== s) : [...services, s])}
-                    className={`px-2.5 py-1 rounded-full text-xs border transition-colors ${on ? 'bg-[var(--accent)] text-[var(--accent-ink)] border-[var(--accent)]' : 'border-[var(--input-border)] text-[var(--text-secondary)]'}`}>
+                    className={`px-2 py-0.5 rounded-full text-[11px] border transition-colors ${on ? 'bg-[var(--accent)] text-[var(--accent-ink)] border-[var(--accent)]' : 'border-[var(--input-border)] text-[var(--text-secondary)]'}`}>
                     {s}
                   </button>
                 );
@@ -250,6 +247,21 @@ export default function PainterProfile() {
         />
       </Card>
 
+      <details className="group">
+        <summary className="list-none cursor-pointer bg-[var(--bg-surface)] border border-[var(--border)] rounded-lg px-2.5 py-1.5 flex items-center justify-between">
+          <span>
+            <span className="block text-[13px] font-semibold text-[var(--text-primary)]">License, insurance &amp; credentials</span>
+            <span className="block text-[10px] text-[var(--text-faint)]">Keep these current so customers can trust your listing</span>
+          </span>
+          <span className="text-[var(--text-faint)] transition-transform group-open:rotate-90">›</span>
+        </summary>
+        <div className="mt-1.5">
+          <CredentialsEditor initial={toCredentials(row)} status={row.status} compPauses={(row.crew_size ?? 0) > 1} />
+        </div>
+      </details>
+
+      <BookedPreference />
+
       <Card
         title="Your pricing answers"
         note="Private: only you and our system see these. Customers and other painters never do. They set where you land among nearby painters."
@@ -261,29 +273,14 @@ export default function PainterProfile() {
         ))}
       </Card>
 
-      <details className="group">
-        <summary className="list-none cursor-pointer bg-[var(--bg-surface)] border border-[var(--border)] rounded-xl px-3 py-2.5 flex items-center justify-between">
-          <span>
-            <span className="block text-sm font-semibold text-[var(--text-primary)]">License, insurance &amp; credentials</span>
-            <span className="block text-[11px] text-[var(--text-faint)]">Keep these current so customers can trust your listing</span>
-          </span>
-          <span className="text-[var(--text-faint)] transition-transform group-open:rotate-90">›</span>
-        </summary>
-        <div className="mt-2">
-          <CredentialsEditor initial={toCredentials(row)} status={row.status} compPauses={(row.crew_size ?? 0) > 1} />
-        </div>
-      </details>
-
-      <BookedPreference />
-
       <Card title="More">
         <ul>
           {links.map((l) => (
             <li key={l.to} className="border-b border-[var(--border)] last:border-b-0">
-              <Link to={l.to} className="flex items-center justify-between gap-3 py-2.5">
+              <Link to={l.to} className="flex items-center justify-between gap-3 py-1.5">
                 <span>
-                  <span className="block text-sm text-[var(--text-primary)]">{l.label}</span>
-                  <span className="block text-[11px] text-[var(--text-faint)]">{l.hint}</span>
+                  <span className="block text-[13px] text-[var(--text-primary)]">{l.label}</span>
+                  <span className="block text-[10px] text-[var(--text-faint)]">{l.hint}</span>
                 </span>
                 <span className="text-[var(--text-faint)]">›</span>
               </Link>
@@ -296,7 +293,7 @@ export default function PainterProfile() {
       <button
         type="button"
         onClick={handleSignOut}
-        className="w-full py-2.5 rounded-lg border border-[var(--border-strong)] text-[var(--text-secondary)] text-sm uppercase tracking-wide"
+        className="w-full py-2 rounded-lg border border-[var(--border-strong)] text-[var(--text-secondary)] text-xs uppercase tracking-wide"
       >
         Sign out
       </button>

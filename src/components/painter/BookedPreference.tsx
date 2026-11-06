@@ -42,11 +42,11 @@ export default function BookedPreference() {
   if (on === null) return null;
 
   return (
-    <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-xl p-3">
+    <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-lg px-2.5 py-2">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-sm font-medium text-[var(--text-primary)]">Take jobs even when booked</p>
-          <p className="text-[11px] text-[var(--text-faint)]">
+          <p className="text-[13px] font-medium text-[var(--text-primary)]">Take jobs even when booked</p>
+          <p className="text-[10px] leading-snug text-[var(--text-faint)]">
             If every painter nearby is booked, you can still be offered the job. Crews of 3+ get any job; crews of 1–2 get smaller jobs, after bigger crews.
           </p>
         </div>

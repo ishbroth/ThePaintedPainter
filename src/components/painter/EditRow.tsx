@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
 
 export const editInput =
-  'w-full px-3 py-1.5 bg-[var(--bg-page)] border border-[var(--input-border)] rounded-lg text-[var(--text-primary)] text-sm placeholder-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)] transition-colors';
+  'w-full px-2.5 py-1 bg-[var(--bg-page)] border border-[var(--input-border)] rounded-lg text-[var(--text-primary)] text-[13px] placeholder-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)] transition-colors';
 
 function Pencil() {
   return (
@@ -41,15 +41,15 @@ export default function EditRow({ label, value, editor, onSave, onOpen, block = 
 
   if (open) {
     return (
-      <div className="py-2 border-b border-[var(--border)] last:border-b-0">
-        <p className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1">{label}</p>
+      <div className="py-1.5 border-b border-[var(--border)] last:border-b-0">
+        <p className="text-[10px] uppercase tracking-wide text-[var(--text-faint)] mb-1">{label}</p>
         {editor}
         {error && <p className="text-xs text-[var(--danger)] mt-1">{error}</p>}
         <div className="flex gap-2 mt-2">
-          <button type="button" disabled={busy} onClick={save} className="px-3 py-1 rounded-md bg-[var(--accent)] text-[var(--accent-ink)] text-xs font-semibold disabled:opacity-50">
+          <button type="button" disabled={busy} onClick={save} className="px-2.5 py-0.5 rounded-md bg-[var(--accent)] text-[var(--accent-ink)] text-xs font-semibold disabled:opacity-50">
             {busy ? 'Saving…' : 'Save'}
           </button>
-          <button type="button" disabled={busy} onClick={() => { setOpen(false); setError(''); }} className="px-3 py-1 rounded-md border border-[var(--border)] text-[var(--text-secondary)] text-xs">
+          <button type="button" disabled={busy} onClick={() => { setOpen(false); setError(''); }} className="px-2.5 py-0.5 rounded-md border border-[var(--border)] text-[var(--text-secondary)] text-xs">
             Cancel
           </button>
         </div>
@@ -58,10 +58,10 @@ export default function EditRow({ label, value, editor, onSave, onOpen, block = 
   }
 
   return (
-    <div className={`py-2 border-b border-[var(--border)] last:border-b-0 flex gap-3 min-w-0 ${block ? 'flex-col' : 'items-center justify-between'}`}>
+    <div className={`py-1.5 border-b border-[var(--border)] last:border-b-0 flex gap-3 min-w-0 ${block ? 'flex-col' : 'items-center justify-between'}`}>
       <div className={`flex ${block ? 'items-center justify-between' : 'items-center justify-between w-full'} gap-3 min-w-0`}>
-        <p className={`text-[11px] uppercase tracking-wide text-[var(--text-faint)] min-w-0 ${block ? '' : 'flex-1'}`}>{label}</p>
-        {!block && <div className="text-sm text-[var(--text-primary)] text-right break-words shrink-0 max-w-[60%]">{value}</div>}
+        <p className={`text-[10px] uppercase tracking-wide text-[var(--text-faint)] min-w-0 ${block ? '' : 'flex-1'}`}>{label}</p>
+        {!block && <div className="text-[13px] text-[var(--text-primary)] text-right break-words shrink-0 max-w-[60%]">{value}</div>}
         <button
           type="button"
           onClick={() => { onOpen?.(); setOpen(true); }}
@@ -71,7 +71,7 @@ export default function EditRow({ label, value, editor, onSave, onOpen, block = 
           <Pencil />
         </button>
       </div>
-      {block && <div className="text-sm text-[var(--text-primary)] min-w-0 w-full [overflow-wrap:anywhere]">{value}</div>}
+      {block && <div className="text-[13px] text-[var(--text-primary)] min-w-0 w-full [overflow-wrap:anywhere]">{value}</div>}
     </div>
   );
 }
