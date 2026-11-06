@@ -562,7 +562,7 @@ ${body}
   ${bdHtml}
   <p style="margin:24px 0 6px;font-weight:700;">How to confirm and schedule it</p>
   <p style="margin:0 0 4px;">Create your free painter profile (a few minutes; we check your license and insurance). As soon as you're approved, this job is offered to you automatically: you confirm it and set your dates. The first approved painter to accept gets it.</p>
-  ${button(data.inviteUrl, 'Confirm this job', '#16a34a', true)}
+  ${button(data.inviteUrl, 'Claim this job', '#16a34a', true)}
   <p style="margin:14px 0 0;padding:12px 14px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;font-size:15px;">To say it once more: <strong>the price you see is the price you get</strong>, <strong>it costs you nothing</strong>, and <strong>it's a real job that's already bid</strong>, not a lead. You just confirm it and schedule it.</p>
   <p style="margin:24px 0 6px;font-weight:700;">How working with us goes</p>
   <ul style="margin:0 0 0 20px;padding:0;">

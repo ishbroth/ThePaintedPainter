@@ -139,7 +139,7 @@ export default function CustomerDashboard() {
               </div>
             ))}
             {requests.map((p) => (
-              <ProjectCard key={p.id} project={p} variant="request" />
+              <ProjectCard key={p.id} project={p} variant="request" onCancelled={(id) => setProjects((list) => (list ?? []).filter((x) => x.id !== id))} />
             ))}
           </div>
         )}

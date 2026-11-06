@@ -125,7 +125,71 @@ function RescheduleRequest({ projectId }: { projectId: string }) {
   );
 }
 
-const solidBtn = 'inline-block px-3 py-1.5 bg-[var(--accent)] text-[var(--accent-ink)] text-xs font-semibold rounded-lg hover:bg-[var(--accent-hover)] transition-colors';
+/** "Cancel request" for a request still waiting for a painter. Asks first; the server refuses if a painter accepted in the meantime. */
+function CancelRequest({ projectId, onCancelled }: { projectId: string; onCancelled?: (id: string) => void }) {
+  const { session } = useAuth();
+  const [state, setState] = useState<'idle' | 'confirm' | 'sending'>('idle');
+  const [error, setError] = useState('');
+
+  const cancel = async () => {
+    if (!session?.access_token) return;
+    setState('sending');
+    setError('');
+    try {
+      const res = await fetch(`${supabaseUrl}/functions/v1/cancel-my-request`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobId: projectId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok || data.code === 'already_cancelled') {
+        onCancelled?.(projectId);
+        return;
+      }
+      setError(data.error || "Couldn't cancel. Please try again.");
+    } catch {
+      setError("Couldn't cancel. Please try again.");
+    }
+    setState('idle');
+  };
+
+  return (
+    <div className="mt-2.5">
+      {state === 'idle' ? (
+        <button
+          type="button"
+          onClick={() => setState('confirm')}
+          className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-[var(--border-strong)] text-[var(--text-secondary)] hover:text-[var(--danger)] hover:border-[var(--danger)] transition-colors"
+        >
+          Cancel request
+        </button>
+      ) : (
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs text-[var(--text-secondary)]">Cancel this request? Painters will no longer be able to accept it.</span>
+          <button
+            type="button"
+            onClick={cancel}
+            disabled={state === 'sending'}
+            className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-[var(--danger)] text-[var(--danger)] disabled:opacity-50"
+          >
+            {state === 'sending' ? 'Cancelling…' : 'Yes, cancel it'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setState('idle')}
+            disabled={state === 'sending'}
+            className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-[var(--border-strong)] text-[var(--text-primary)] disabled:opacity-50"
+          >
+            Keep it
+          </button>
+        </div>
+      )}
+      {error && <p className="text-xs text-[var(--danger)] mt-1.5">{error}</p>}
+    </div>
+  );
+}
+
+const solidBtn ='inline-block px-3 py-1.5 bg-[var(--accent)] text-[var(--accent-ink)] text-xs font-semibold rounded-lg hover:bg-[var(--accent-hover)] transition-colors';
 const outlineBtn = 'inline-block px-3 py-1.5 border border-[var(--accent-blue)] text-[var(--accent-blue)] text-xs font-semibold rounded-lg hover:bg-[var(--accent-blue)] hover:text-white transition-colors';
 const rule = 'mt-2.5 pt-2.5 border-t border-[var(--border)]';
 
@@ -133,12 +197,14 @@ const rule = 'mt-2.5 pt-2.5 border-t border-[var(--border)]';
  * One project on the dashboard, compact. `variant` says which section it is in: a request still being arranged, a scheduled (confirmed) job, or a finished job.
  * Everything the old My Projects cards could do is here: dates and deposit, contract, messages, calendar, reschedule, rating, work with again.
  */
-export default function ProjectCard({ project, variant, unread = 0, autoOpenMessages = false, onMessagesClosed }: {
+export default function ProjectCard({ project, variant, unread = 0, autoOpenMessages = false, onMessagesClosed, onCancelled }: {
   project: Project;
   variant: 'request' | 'scheduled' | 'completed';
   unread?: number;
   autoOpenMessages?: boolean;
   onMessagesClosed?: () => void;
+  /** A request waiting for a painter was cancelled from its card. */
+  onCancelled?: (id: string) => void;
 }) {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -212,6 +278,10 @@ export default function ProjectCard({ project, variant, unread = 0, autoOpenMess
         <p className={`${rule} text-xs text-[var(--text-faint)]`}>
           Sent to painters{project.offerSentAt ? ` on ${new Date(project.offerSentAt).toLocaleDateString()}` : ''}. You'll get an email when one accepts.
         </p>
+      )}
+
+      {variant === 'request' && (project.status === 'offer_sent' || project.status === 'searching_painter') && (
+        <CancelRequest projectId={project.id} onCancelled={onCancelled} />
       )}
 
       {project.status === 'needs_new_painter' && (

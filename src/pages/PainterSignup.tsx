@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
+import { supabase, supabaseUrl } from '../lib/supabase';
 import ExternalReviewsFields from '../components/painter/ExternalReviewsFields';
 import { emptyExternalForm, fromExternalForm, validateExternalForm, type ExternalFormValue } from '../lib/externalReviews';
 
@@ -387,6 +387,20 @@ const PainterSignup = () => {
     if (!params.has('invite')) return initialFormData;
     return { ...initialFormData, companyName: (params.get('company') ?? '').slice(0, 120), email: (params.get('email') ?? '').slice(0, 120) };
   });
+  // What became of the job in the invitation: still open, or already claimed by another painter, or cancelled by the customer
+  const [inviteState, setInviteState] = useState<'open' | 'taken' | 'cancelled' | 'closed'>('open');
+  useEffect(() => {
+    const token = new URLSearchParams(window.location.search).get('invite');
+    if (!token) return;
+    fetch(`${supabaseUrl}/functions/v1/invite-status`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+    })
+      .then((res) => res.json())
+      .then((data) => { if (['taken', 'cancelled', 'closed'].includes(data?.state)) setInviteState(data.state); })
+      .catch(() => { /* the form works either way */ });
+  }, []);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [needsEmailConfirmation, setNeedsEmailConfirmation] = useState(false);
@@ -1194,6 +1208,25 @@ const PainterSignup = () => {
           </p>
         </div>
       </section>
+
+      {inviteState !== 'open' && (
+        <section style={{ background: 'var(--bg-chrome)', padding: '24px 20px 0' }}>
+          <div
+            role="status"
+            className="max-w-[700px] mx-auto rounded-xl border border-[var(--border-strong)] bg-[var(--bg-surface)] px-4 py-3 text-sm text-[var(--text-primary)]"
+          >
+            {inviteState === 'taken' && (
+              <>Sorry, this job was already claimed by another painter in the network. But if you join the network now, you'll receive priority for jobs in the future.</>
+            )}
+            {inviteState === 'cancelled' && (
+              <>Sorry, the customer cancelled this request. But if you join the network now, you'll receive priority for jobs in the future.</>
+            )}
+            {inviteState === 'closed' && (
+              <>Sorry, this job is no longer available. But if you join the network now, you'll receive priority for jobs in the future.</>
+            )}
+          </div>
+        </section>
+      )}
 
       {/* Step Indicator */}
       <section style={{ background: 'var(--bg-chrome)', padding: '24px 20px 0' }}>
