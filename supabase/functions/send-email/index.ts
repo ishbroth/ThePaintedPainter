@@ -16,6 +16,7 @@
 //   supabase secrets set RESEND_API_KEY=re_...
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { cleanScope } from '../_shared/scopeSummary.ts'
 
 // ---------------------------------------------------------------------------
 // Email Type Mapping
@@ -64,6 +65,7 @@ const EMAIL_TYPE_MAP: Record<string, string> = {
   painter_bad_review_admin: 'A painter received a low review',
   contract_update: 'Your painter sent a contract update: please review',
   contract_response: 'The customer responded to your contract',
+  customer_cancelled_request: 'An update on your job: the customer is not moving forward at this time',
 }
 
 // The sender address for all outgoing emails
@@ -396,7 +398,8 @@ ${body}
       `)
 
     case 'job_offer_available': {
-      const qa = Array.isArray(data.qa) ? (data.qa as { question: string; answer: string }[]) : []
+      // only what belongs to this job (nothing about the fence in an interior job)
+      const qa = cleanScope(data.qa)
       const qaHtml = qa
         .map((item) => `<p style="margin: 4px 0;"><strong>${escapeHtml(item.question)}:</strong> ${escapeHtml(item.answer)}</p>`)
         .join('')
@@ -531,7 +534,7 @@ ${body}
 
     case 'cold_job_invite': {
       // To a local painting company that has never heard from us: a free job near them, with no customer name, address or contact details.
-      const qa = (Array.isArray(data.qa) ? data.qa : []) as { question: string; answer: string }[]
+      const qa = cleanScope(data.qa)
       const bd = (Array.isArray(data.breakdown) ? data.breakdown : []) as { description: string; amount: number; removed?: boolean }[]
       const bdHtml = bd.length > 0
         ? `<p style="margin:24px 0 6px;font-size:12px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#6b7280;">What the job includes (your payout for each part)</p>
@@ -674,6 +677,15 @@ ${body}
         ${data.link ? button(data.link, 'Open the contract') : ''}
       `)
     }
+
+    case 'customer_cancelled_request':
+      return wrap(`
+        <p style="margin-top:0;">Hi ${data.ownerName || 'there'},</p>
+        <p>We're sorry to tell you that <strong>${data.customerFirstName || 'the customer'}</strong> has decided not to move forward with the <strong>${data.projectLabel || 'painting project'}</strong>${data.zipCode ? ` near ZIP ${data.zipCode}` : ''} at this time. They asked us to pass along their sincere apologies for any inconvenience.</p>
+        <p>Thank you for the time you put into accepting the job and preparing the contract; it was appreciated. Nothing was signed and no deposit was paid, so there is nothing further for you to do. Any dates you were holding for this job are free again.</p>
+        <p>We'll keep sending jobs your way as customers in your area claim prices.</p>
+        ${data.dashboardUrl ? button(data.dashboardUrl, 'Open your dashboard') : ''}
+      `)
 
     case 'painter_bad_review_admin': {
       const rating = Math.max(1, Math.min(5, Math.round(Number(data.rating) || 0)))

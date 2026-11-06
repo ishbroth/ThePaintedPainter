@@ -10,6 +10,7 @@
 // part of the contract and take priority over anything in a painter's own attached document.
 
 import { painterBreakdown } from './priceBreakdown.ts'
+import { cleanScope, meaningfulWords } from './scopeSummary.ts'
 
 /** Bump when the standard wording changes; stored with every version so old contracts stay traceable. */
 export const CONTRACT_TEXT_VERSION = '2026-10-27'
@@ -118,11 +119,9 @@ function priceLines(job: ContractJob): { description: string; amount: number }[]
 export function buildTerms(input: { job: ContractJob; painter: ContractPainter; painterTerms: PainterTerms; documentName?: string | null }): ContractTerms {
   const { job, painter, painterTerms } = input
   const summary = (job.project_summary ?? {}) as { qa?: { question?: string; answer?: string }[]; conversation?: string[] }
-  const scope = (summary.qa ?? [])
-    .filter((q) => q?.question && q?.answer)
-    .slice(0, 40)
-    .map((q) => ({ question: String(q.question).slice(0, 200), answer: String(q.answer).slice(0, 400) }))
-  const customerWords = (summary.conversation ?? []).filter((l) => typeof l === 'string' && l.trim()).slice(0, 15).map((l) => String(l).trim().slice(0, 400))
+  // only what belongs to this job: nothing about the fence in an apartment's interior, no "no" answers, no greetings
+  const scope = cleanScope(summary.qa)
+  const customerWords = meaningfulWords(summary.conversation)
 
   const lines = priceLines(job)
   const base = Math.round(lines.reduce((s, l) => s + l.amount, 0) * 100) / 100
@@ -153,7 +152,7 @@ export function buildTerms(input: { job: ContractJob; painter: ContractPainter; 
   })
 
   const scopeParagraphs = [`The work is the “${label}” project at the Customer's property${job.customer_city ? ` in ${job.customer_city}${job.customer_state ? `, ${job.customer_state}` : ''}` : ''}, as described by the Customer when requesting their price.`]
-  for (const q of scope) scopeParagraphs.push(`${q.question} ${q.answer}`)
+  for (const q of scope) scopeParagraphs.push(`${q.question}: ${q.answer}`)
   if (customerWords.length > 0) scopeParagraphs.push(`In the Customer's own words: ${customerWords.map((w) => `“${w}”`).join(' ')}`)
   if (painterTerms.scopeNotes) scopeParagraphs.push(`Additional scope notes from Painter: ${painterTerms.scopeNotes}`)
   scopeParagraphs.push('Surface preparation, priming, materials, application and cleanup needed to complete that work to a professional standard are included in the price unless this Agreement says otherwise. Anything not described here is not included.')

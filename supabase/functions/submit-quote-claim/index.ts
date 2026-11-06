@@ -25,6 +25,7 @@ import { estimateWorkingDays } from '../_shared/duration.ts'
 import { describeTiming } from '../_shared/offers.ts'
 import { cleanConversation, conversationRejected, conversationNote } from '../_shared/conversationLog.ts'
 import { painterBreakdown } from '../_shared/priceBreakdown.ts'
+import { cleanScope } from '../_shared/scopeSummary.ts'
 import { ADMIN_EMAIL } from '../_shared/adminLink.ts'
 
 const formatUsd = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n)
@@ -292,7 +293,7 @@ serve(async (req: Request) => {
         guaranteed_price: guaranteedPrice,
         selected_painter_id: selectionType === 'specific_painter' ? selectedPainterId : null,
         selected_painter_price: guaranteedPrice,
-        project_summary: { qa, timeline, timelineLabel, conversation, breakdown },
+        project_summary: { qa: cleanScope(qa), timeline, timelineLabel, conversation, breakdown },
         photos: photos ?? [],
         notified_painters: notifiedPainters.map((p) => p.id),
         status: searching ? 'searching_painter' : 'offer_sent',

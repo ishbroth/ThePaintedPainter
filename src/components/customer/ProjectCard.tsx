@@ -126,7 +126,7 @@ function RescheduleRequest({ projectId }: { projectId: string }) {
 }
 
 /** "Cancel request" for a request still waiting for a painter. Asks first; the server refuses if a painter accepted in the meantime. */
-function CancelRequest({ projectId, onCancelled }: { projectId: string; onCancelled?: (id: string) => void }) {
+function CancelRequest({ projectId, onCancelled, painterAccepted = false }: { projectId: string; onCancelled?: (id: string) => void; painterAccepted?: boolean }) {
   const { session } = useAuth();
   const [state, setState] = useState<'idle' | 'confirm' | 'sending'>('idle');
   const [error, setError] = useState('');
@@ -165,7 +165,11 @@ function CancelRequest({ projectId, onCancelled }: { projectId: string; onCancel
         </button>
       ) : (
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-xs text-[var(--text-secondary)]">Cancel this request? Painters will no longer be able to accept it.</span>
+          <span className="text-xs text-[var(--text-secondary)]">
+            {painterAccepted
+              ? "Cancel this request? Nothing has been signed or paid, so you can. We'll let your painter know, with your apologies."
+              : 'Cancel this request? Painters will no longer be able to accept it.'}
+          </span>
           <button
             type="button"
             onClick={cancel}
@@ -320,6 +324,10 @@ export default function ProjectCard({ project, variant, unread = 0, autoOpenMess
           <div className="mt-2">
             <MessageButton jobId={project.id} role="customer" status={project.status} />
           </div>
+          {/* nothing is signed until the contract is accepted: until then the customer can still walk away (once it is accepted, the painter's own cancellation terms apply) */}
+          {variant === 'request' && !project.contract?.accepted && (
+            <CancelRequest projectId={project.id} onCancelled={onCancelled} painterAccepted />
+          )}
         </div>
       )}
 

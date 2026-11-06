@@ -29,6 +29,7 @@ import { ensureDraft } from '../_shared/contractStore.ts'
 import { notify } from '../_shared/notify.ts'
 import { describeTiming } from '../_shared/offers.ts'
 import { estimateWorkingDays } from '../_shared/duration.ts'
+import { cleanScope } from '../_shared/scopeSummary.ts'
 
 function htmlPage(title: string, message: string, tone: 'success' | 'error'): Response {
   const color = tone === 'success' ? '#2563eb' : '#dc2626'
@@ -143,7 +144,7 @@ serve(async (req: Request) => {
         preferredDate: job.customer_preferred_date,
         timing: describeTiming(job),
         estimatedDays: estimateWorkingDays(Number(job.guaranteed_price) || 0, claimer.crew_size),
-        qa: summary.qa ?? [],
+        qa: cleanScope(summary.qa),
         conversation: summary.conversation ?? [],
         breakdown: summary.breakdown ?? [],
         conversationNote: conversationNote(summary.conversation ?? []),
