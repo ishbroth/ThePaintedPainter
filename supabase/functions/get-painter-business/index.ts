@@ -55,7 +55,7 @@ serve(async (req: Request) => {
     // Backfill anything earned before the rewards program existed (no-op once caught up).
     await awardAchievements(supabase, painter).catch((e) => console.error('award backfill failed', e))
 
-    const [jobsRes, reviewsRes, achRes] = await Promise.all([
+    const [jobsRes, reviewsRes, achRes, offersRes] = await Promise.all([
       supabase
         .from('quote_selections')
         .select(`id, status, customer_id, customer_name, customer_email, customer_phone,
@@ -65,8 +65,17 @@ serve(async (req: Request) => {
         .in('status', ['confirmed', 'completed']),
       supabase.from('reviews').select('project_id, rating').eq('painter_id', painter.user_id),
       supabase.from('painter_achievements').select('kind, threshold, earned_at').eq('painter_id', painter.id),
+      // incoming offers not yet accepted by anyone, same match as get-painter-projects: how much is waiting on a decision
+      supabase
+        .from('quote_selections')
+        .select('painter_payout_amount')
+        .eq('status', 'offer_sent')
+        .or(`selected_painter_id.eq.${painter.id},notified_painters.cs.{${painter.id}}`),
     ])
     if (jobsRes.error) throw jobsRes.error
+
+    const offers = (offersRes.data ?? []) as { painter_payout_amount: number | null }[]
+    const pendingOffers = { count: offers.length, amount: offers.reduce((s, o) => s + (Number(o.painter_payout_amount) || 0), 0) }
 
     const ratingByJob = new Map<string, number>()
     let countedReviews = 0
@@ -149,7 +158,7 @@ serve(async (req: Request) => {
       JSON.stringify({
         companyName: painter.company_name,
         income: {
-          totalEarned, thisMonth: thisMonth.earned, yearToDate, pipeline,
+          totalEarned, thisMonth: thisMonth.earned, yearToDate, pipeline, pendingOffers,
           completedJobs: completed.length,
           averageJob: completed.length ? Math.round(totalEarned / completed.length) : 0,
           months,

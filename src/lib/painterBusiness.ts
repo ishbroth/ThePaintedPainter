@@ -22,6 +22,8 @@ export interface BusinessData {
     thisMonth: number;
     yearToDate: number;
     pipeline: number;
+    /** Incoming offers not yet accepted by anyone: how much is waiting on a decision. */
+    pendingOffers: { count: number; amount: number };
     completedJobs: number;
     averageJob: number;
     months: { month: string; earned: number; jobs: number }[];

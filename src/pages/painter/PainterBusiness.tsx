@@ -1,14 +1,14 @@
 import { currency, usePainterBusiness, type BusinessCustomer } from '../../lib/painterBusiness';
-import { fmtDate, fmtRange } from '../../lib/dates';
+import { fmtDate } from '../../lib/dates';
 
 const card = 'bg-[var(--bg-surface)] border border-[var(--border)] rounded-xl';
 
 function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <div className={`${card} p-5`}>
-      <p className="text-sm text-[var(--text-secondary)] mb-1">{label}</p>
-      <p className="text-2xl font-bold text-[var(--text-primary)]">{value}</p>
-      {sub && <p className="text-xs text-[var(--text-faint)] mt-1">{sub}</p>}
+    <div className={`${card} px-3 py-2`}>
+      <p className="text-[11px] text-[var(--text-secondary)] leading-tight">{label}</p>
+      <p className="text-lg font-bold text-[var(--text-primary)] leading-tight">{value}</p>
+      {sub && <p className="text-[10px] text-[var(--text-faint)] leading-snug mt-0.5">{sub}</p>}
     </div>
   );
 }
@@ -88,41 +88,21 @@ export default function PainterBusiness() {
       <h1 className="text-2xl font-bold text-[var(--text-primary)] mb-1">My Business</h1>
       <p className="text-[var(--text-secondary)] mb-6">Your schedule, your customers, and what you've earned through The Painted Painter.</p>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 mb-6">
         <StatCard label="Earned this month" value={currency(income.thisMonth)} />
         <StatCard label="Earned this year" value={currency(income.yearToDate)} />
         <StatCard label="All-time earned" value={currency(income.totalEarned)} sub={`${income.completedJobs} completed job${income.completedJobs === 1 ? '' : 's'}${income.completedJobs ? ` · avg ${currency(income.averageJob)}` : ''}`} />
+        <StatCard
+          label="Waiting in offers"
+          value={income.pendingOffers.count > 0 ? currency(income.pendingOffers.amount) : '—'}
+          sub={income.pendingOffers.count > 0 ? `${income.pendingOffers.count} offer${income.pendingOffers.count === 1 ? '' : 's'} to decide on` : 'No offers waiting'}
+        />
         <StatCard label="Booked, not yet paid out" value={currency(income.pipeline)} sub={`${schedule.length} upcoming job${schedule.length === 1 ? '' : 's'}`} />
       </div>
 
       <section className={`${card} p-6 mb-8`}>
         <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Income, last 12 months</h2>
         <IncomeChart months={income.months} />
-      </section>
-
-      <section className="mb-8">
-        <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-3">Upcoming schedule</h2>
-        {schedule.length === 0 ? (
-          <div className={`${card} p-6 text-center text-[var(--text-faint)]`}>Nothing booked yet. Confirmed jobs appear here in date order.</div>
-        ) : (
-          <ul className="space-y-3">
-            {schedule.map((j) => (
-              <li key={j.id} className={`${card} p-4 flex justify-between gap-3 flex-wrap`}>
-                <div className="min-w-0">
-                  <p className="font-semibold text-[var(--text-primary)]">
-                    {j.scheduledDate ? fmtRange(j.scheduledDate, j.scheduledEndDate) : 'Dates not set yet'}
-                  </p>
-                  <p className="text-sm text-[var(--text-secondary)]">{j.label || 'Painting job'}{j.customerName ? ` — ${j.customerName}` : ''}</p>
-                  <p className="text-xs text-[var(--text-faint)]">
-                    {j.address}
-                    {j.customerPhone && <> · <a href={`tel:${j.customerPhone}`} className="text-[var(--accent-blue)]">{j.customerPhone}</a></>}
-                  </p>
-                </div>
-                <p className="font-bold text-[var(--text-primary)]">{currency(j.amount)}</p>
-              </li>
-            ))}
-          </ul>
-        )}
       </section>
 
       <section>

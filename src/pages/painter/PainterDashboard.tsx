@@ -5,6 +5,8 @@ import { supabase, supabaseUrl } from '../../lib/supabase';
 import { useUnreadMessages } from '../../lib/jobMessages';
 import AvailabilityCalendar from '../../components/painter/AvailabilityCalendar';
 import { JobCard, OfferCard, type PainterProjectsData } from '../../components/painter/JobCards';
+import { currency, usePainterBusiness } from '../../lib/painterBusiness';
+import { fmtRange } from '../../lib/dates';
 
 interface NoteRow {
   id: string;
@@ -60,6 +62,8 @@ function Empty({ text }: { text: string }) {
 export default function PainterDashboard() {
   const { session } = useAuth();
   const { unread, refresh: refreshUnread } = useUnreadMessages(session?.access_token);
+  // just for the upcoming-schedule list under the calendar (confirmed jobs with their dates and amounts)
+  const { data: business } = usePainterBusiness();
   // a message notification links here with ?messages=<job id>: that job's thread opens
   const openThreadFor = useSearchParams()[0].get('messages');
   const [data, setData] = useState<PainterProjectsData | null>(null);
@@ -199,6 +203,29 @@ export default function PainterDashboard() {
 
       <Heading>Calendar</Heading>
       <AvailabilityCalendar jobs={jobSpans} />
+
+      <Heading>Upcoming schedule</Heading>
+      {!business || business.schedule.length === 0 ? (
+        <Empty text="Nothing booked yet. Confirmed jobs appear here in date order." />
+      ) : (
+        <div className="grid gap-2">
+          {business.schedule.map((j) => (
+            <div key={j.id} className="rounded-xl p-3 flex justify-between gap-3 flex-wrap" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-[var(--text-primary)]">
+                  {j.scheduledDate ? fmtRange(j.scheduledDate, j.scheduledEndDate) : 'Dates not set yet'}
+                </p>
+                <p className="text-xs text-[var(--text-secondary)]">{j.label || 'Painting job'}{j.customerName ? ` — ${j.customerName}` : ''}</p>
+                <p className="text-[11px] text-[var(--text-faint)]">
+                  {j.address}
+                  {j.customerPhone && <> · <a href={`tel:${j.customerPhone}`} className="text-[var(--accent-blue)]">{j.customerPhone}</a></>}
+                </p>
+              </div>
+              <p className="text-sm font-bold text-[var(--text-primary)]">{currency(j.amount)}</p>
+            </div>
+          ))}
+        </div>
+      )}
 
       <Heading right={data.completed.length > COMPLETED_SHOWN ? (
         <button type="button" onClick={() => setShowAllDone((v) => !v)} className="text-xs text-[var(--accent-blue)]">{showAllDone ? 'Show fewer' : `Show all ${data.completed.length}`}</button>
