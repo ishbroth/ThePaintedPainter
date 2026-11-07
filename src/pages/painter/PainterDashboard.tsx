@@ -5,8 +5,7 @@ import { supabase, supabaseUrl } from '../../lib/supabase';
 import { useUnreadMessages } from '../../lib/jobMessages';
 import AvailabilityCalendar from '../../components/painter/AvailabilityCalendar';
 import { JobCard, OfferCard, type PainterProjectsData } from '../../components/painter/JobCards';
-import { currency, usePainterBusiness } from '../../lib/painterBusiness';
-import { fmtRange } from '../../lib/dates';
+import MessageButton from '../../components/messaging/MessageButton';
 
 interface NoteRow {
   id: string;
@@ -62,8 +61,6 @@ function Empty({ text }: { text: string }) {
 export default function PainterDashboard() {
   const { session } = useAuth();
   const { unread, refresh: refreshUnread } = useUnreadMessages(session?.access_token);
-  // just for the upcoming-schedule list under the calendar (confirmed jobs with their dates and amounts)
-  const { data: business } = usePainterBusiness();
   // a message notification links here with ?messages=<job id>: that job's thread opens
   const openThreadFor = useSearchParams()[0].get('messages');
   const [data, setData] = useState<PainterProjectsData | null>(null);
@@ -142,6 +139,8 @@ export default function PainterDashboard() {
   const confirmedCount = data.confirmed.filter((j) => j.status === 'confirmed').length;
   const { avgRating, reviewCount } = data.rating;
   const done = showAllDone ? data.completed : data.completed.slice(0, COMPLETED_SHOWN);
+  // messaging opens once a job is confirmed (deposit paid); a job still only "painter_accepted" has no thread yet
+  const messageable = data.confirmed.filter((j) => j.status === 'confirmed');
 
   return (
     <div className="max-w-3xl mx-auto px-3 py-3">
@@ -181,22 +180,26 @@ export default function PainterDashboard() {
       </div>
 
       <Heading>Offers &amp; messages</Heading>
-      {data.offers.length === 0 && data.confirmed.length === 0 ? (
-        <Empty text="No offers or active jobs right now." />
+      {data.offers.length === 0 && messageable.length === 0 ? (
+        <Empty text="No offers or messages right now." />
       ) : (
         <div className="grid gap-2">
           {data.offers.map((o) => <OfferCard key={o.id} offer={o} />)}
-          {data.confirmed.map((j) => (
-            <JobCard
-              key={j.id}
-              job={j}
-              onMarkCompleted={handleMarkCompleted}
-              onReschedule={handleReschedule}
-              marking={markingId === j.id}
-              unread={unread[j.id] ?? 0}
-              autoOpenMessages={openThreadFor === j.id}
-              onMessagesClosed={refreshUnread}
-            />
+          {messageable.map((j) => (
+            <div key={j.id} className="rounded-xl p-3 flex items-center justify-between gap-3 flex-wrap" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-[var(--text-primary)]">{j.customerName || 'Customer'}</p>
+                <p className="text-xs text-[var(--text-faint)]">{j.phaseLabel || 'Painting job'}</p>
+              </div>
+              <MessageButton
+                jobId={j.id}
+                role="painter"
+                status={j.status}
+                unread={unread[j.id] ?? 0}
+                autoOpen={openThreadFor === j.id}
+                onClosed={refreshUnread}
+              />
+            </div>
           ))}
         </div>
       )}
@@ -205,24 +208,19 @@ export default function PainterDashboard() {
       <AvailabilityCalendar jobs={jobSpans} />
 
       <Heading>Upcoming schedule</Heading>
-      {!business || business.schedule.length === 0 ? (
+      {data.confirmed.length === 0 ? (
         <Empty text="Nothing booked yet. Confirmed jobs appear here in date order." />
       ) : (
         <div className="grid gap-2">
-          {business.schedule.map((j) => (
-            <div key={j.id} className="rounded-xl p-3 flex justify-between gap-3 flex-wrap" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-[var(--text-primary)]">
-                  {j.scheduledDate ? fmtRange(j.scheduledDate, j.scheduledEndDate) : 'Dates not set yet'}
-                </p>
-                <p className="text-xs text-[var(--text-secondary)]">{j.label || 'Painting job'}{j.customerName ? ` — ${j.customerName}` : ''}</p>
-                <p className="text-[11px] text-[var(--text-faint)]">
-                  {j.address}
-                  {j.customerPhone && <> · <a href={`tel:${j.customerPhone}`} className="text-[var(--accent-blue)]">{j.customerPhone}</a></>}
-                </p>
-              </div>
-              <p className="text-sm font-bold text-[var(--text-primary)]">{currency(j.amount)}</p>
-            </div>
+          {data.confirmed.map((j) => (
+            <JobCard
+              key={j.id}
+              job={j}
+              onMarkCompleted={handleMarkCompleted}
+              onReschedule={handleReschedule}
+              marking={markingId === j.id}
+              hideMessageButton
+            />
           ))}
         </div>
       )}

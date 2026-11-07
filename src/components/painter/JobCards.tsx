@@ -102,7 +102,7 @@ export function OfferCard({ offer }: { offer: Offer }) {
   );
 }
 
-export function JobCard({ job, onMarkCompleted, onReschedule, marking, unread = 0, autoOpenMessages = false, onMessagesClosed }: {
+export function JobCard({ job, onMarkCompleted, onReschedule, marking, unread = 0, autoOpenMessages = false, onMessagesClosed, hideMessageButton = false }: {
   job: Job;
   onMarkCompleted?: (id: string) => void;
   onReschedule?: (id: string, date: string) => Promise<void>;
@@ -110,6 +110,8 @@ export function JobCard({ job, onMarkCompleted, onReschedule, marking, unread = 
   unread?: number;
   autoOpenMessages?: boolean;
   onMessagesClosed?: () => void;
+  /** Messaging is shown separately (the Offers & messages section), so this card skips its own message button. */
+  hideMessageButton?: boolean;
 }) {
   const [newDate, setNewDate] = useState('');
   const [changing, setChanging] = useState(false);
@@ -198,9 +200,9 @@ export function JobCard({ job, onMarkCompleted, onReschedule, marking, unread = 
         </div>
       )}
 
-      {(job.status === 'confirmed' || job.status === 'painter_accepted') && (
+      {(job.status === 'confirmed' || job.status === 'painter_accepted') && (!hideMessageButton || (job.status === 'confirmed' && onMarkCompleted)) && (
         <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-          <MessageButton jobId={job.id} role="painter" status={job.status} unread={unread} autoOpen={autoOpenMessages} onClosed={onMessagesClosed} />
+          {!hideMessageButton && <MessageButton jobId={job.id} role="painter" status={job.status} unread={unread} autoOpen={autoOpenMessages} onClosed={onMessagesClosed} />}
           {job.status === 'confirmed' && onMarkCompleted && (
             <button
               type="button"
