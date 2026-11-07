@@ -47,7 +47,7 @@ export default function BookedPreference() {
         <div>
           <p className="text-[13px] font-medium text-[var(--text-primary)]">Take jobs even when booked</p>
           <p className="text-[10px] leading-snug text-[var(--text-faint)]">
-            If every painter nearby is booked, you can still be offered the job. Crews of 3+ get any job; crews of 1–2 get smaller jobs, after bigger crews.
+            If every painter nearby is booked, you can still be offered the job.
           </p>
         </div>
         <Toggle
