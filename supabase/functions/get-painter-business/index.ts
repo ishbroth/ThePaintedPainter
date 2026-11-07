@@ -122,24 +122,31 @@ serve(async (req: Request) => {
     const customerMap = new Map<string, {
       name: string | null; email: string | null; phone: string | null; address: string | null
       jobs: number; completedJobs: number; totalPaid: number; lastJobAt: string | null; lowestRating: number | null
+      current: boolean
       projects: { id: string; label: string | null; status: string; amount: number; date: string | null; rating: number | null }[]
     }>()
     for (const j of jobs) {
       const key = j.customer_id ?? (j.customer_email ? String(j.customer_email).toLowerCase() : `name:${j.customer_name ?? j.id}`)
       const c = customerMap.get(key) ?? {
         name: j.customer_name, email: j.customer_email, phone: j.customer_phone, address: address(j),
-        jobs: 0, completedJobs: 0, totalPaid: 0, lastJobAt: null, lowestRating: null, projects: [],
+        jobs: 0, completedJobs: 0, totalPaid: 0, lastJobAt: null, lowestRating: null, current: false, projects: [],
       }
       const when = j.completed_at ?? j.scheduled_date ?? j.confirmed_at ?? null
       const rating = ratingByJob.get(j.id) ?? null
       c.jobs += 1
       if (j.status === 'completed') { c.completedJobs += 1; c.totalPaid += payout(j) }
+      // a job still scheduled (not yet marked done) makes this a current customer, shown ahead of past ones
+      if (j.status === 'confirmed') c.current = true
       if (when && (!c.lastJobAt || when > c.lastJobAt)) c.lastJobAt = when
       if (rating != null && (c.lowestRating == null || rating < c.lowestRating)) c.lowestRating = rating
       c.projects.push({ id: j.id, label: j.phase_label, status: j.status, amount: payout(j), date: when, rating })
       customerMap.set(key, c)
     }
-    const customers = [...customerMap.values()].sort((a, b) => (b.lastJobAt ?? '').localeCompare(a.lastJobAt ?? ''))
+    // current customers (a job still scheduled, not yet marked done) first, then everyone else by their most recent completed job
+    const customers = [...customerMap.values()].sort((a, b) => {
+      if (a.current !== b.current) return a.current ? -1 : 1
+      return (b.lastJobAt ?? '').localeCompare(a.lastJobAt ?? '')
+    })
 
     const schedule = upcoming
       .map((j) => ({

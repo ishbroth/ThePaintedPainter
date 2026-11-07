@@ -82,6 +82,9 @@ export default function PainterBusiness() {
 
   const { income, schedule, customers } = data;
   const repeat = customers.filter((c) => c.jobs > 1).length;
+  // current (a job still scheduled) first, then everyone else, already in that order from the server
+  const currentCustomers = customers.filter((c) => c.current);
+  const pastCustomers = customers.filter((c) => !c.current);
 
   return (
     <div className="max-w-5xl mx-auto">
@@ -113,7 +116,22 @@ export default function PainterBusiness() {
         {customers.length === 0 ? (
           <div className={`${card} p-6 text-center text-[var(--text-faint)]`}>Customers show up here once they've paid their deposit.</div>
         ) : (
-          <ul className="space-y-3">{customers.map((c, i) => <CustomerRow key={`${c.email ?? c.name}-${i}`} c={c} />)}</ul>
+          <>
+            {currentCustomers.length > 0 && (
+              <>
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-faint)] mb-2">Current</h3>
+                <ul className="space-y-3">{currentCustomers.map((c, i) => <CustomerRow key={`${c.email ?? c.name}-${i}`} c={c} />)}</ul>
+              </>
+            )}
+            {pastCustomers.length > 0 && (
+              <>
+                <h3 className={`text-xs font-semibold uppercase tracking-wide text-[var(--text-faint)] mb-2 ${currentCustomers.length > 0 ? 'mt-5' : ''}`}>
+                  {currentCustomers.length > 0 ? 'Previous customers' : 'Customers'}
+                </h3>
+                <ul className="space-y-3">{pastCustomers.map((c, i) => <CustomerRow key={`${c.email ?? c.name}-${i}`} c={c} />)}</ul>
+              </>
+            )}
+          </>
         )}
       </section>
     </div>

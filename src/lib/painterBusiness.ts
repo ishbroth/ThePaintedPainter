@@ -12,6 +12,8 @@ export interface BusinessCustomer {
   totalPaid: number;
   lastJobAt: string | null;
   lowestRating: number | null;
+  /** A job still scheduled (not yet marked done): a current customer, shown ahead of past ones. */
+  current: boolean;
   projects: { id: string; label: string | null; status: string; amount: number; date: string | null; rating: number | null }[];
 }
 
