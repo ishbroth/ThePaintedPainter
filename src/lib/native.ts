@@ -8,7 +8,7 @@ import { StatusBar, Style } from '@capacitor/status-bar';
 import { isNativeApp } from './platform';
 
 /** The custom address that also opens the app (the website's links open it too, once the app's link settings are verified; see docs/mobile-apps.md). */
-export const APP_SCHEME = 'com.thepaintedpainter.app';
+export const APP_SCHEME = 'com.paintedpainter.app';
 const SITE_HOSTS = ['thepaintedpainter.com', 'www.thepaintedpainter.com'];
 
 /**

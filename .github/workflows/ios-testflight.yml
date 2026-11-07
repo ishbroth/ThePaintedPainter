@@ -1,6 +1,6 @@
 name: iOS build to TestFlight
 
-# Builds the iPhone app (com.thepaintedpainter.app) on a GitHub-hosted Mac and uploads it to App Store Connect (TestFlight). Run it by hand:
+# Builds the iPhone app (com.paintedpainter.app) on a GitHub-hosted Mac and uploads it to App Store Connect (TestFlight). Run it by hand:
 # Actions > "iOS build to TestFlight" > Run workflow. Needs these repository secrets:
 #   APPLE_TEAM_ID, ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8 (the App Store Connect API key's .p8 file, base64-encoded; the same key as the WastelandMaps one works),
 #   VITE_GOOGLE_MAPS_API_KEY (the same one the website build uses; for the app it must not be restricted to website addresses)

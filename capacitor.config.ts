@@ -4,7 +4,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 // served from https://localhost, so the app works offline-first and API calls (Supabase) go out over HTTPS.
 // Rebuild + copy into the native projects with:  npm run mobile:sync
 const config: CapacitorConfig = {
-  appId: 'com.thepaintedpainter.app',
+  appId: 'com.paintedpainter.app',
   appName: 'The Painted Painter',
   webDir: 'dist',
   server: {

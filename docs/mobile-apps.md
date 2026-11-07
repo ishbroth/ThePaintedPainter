@@ -5,7 +5,7 @@ The apps are the website wrapped in a native shell with [Capacitor](https://capa
 
 | Thing | Where |
 |---|---|
-| App id (both platforms) | `com.thepaintedpainter.app` (in `capacitor.config.ts`) |
+| App id (both platforms) | `com.paintedpainter.app` (in `capacitor.config.ts`) |
 | Android project | `android/` |
 | iOS project | `ios/` (opens in Xcode, no CocoaPods needed: it uses Swift Package Manager) |
 | Icon + splash sources | `resources/` |
@@ -71,7 +71,7 @@ someone else's trademark, so it's best not to use it as the store icon.
 - **Haptics:** buttons, successes and errors use the phone's haptic engine (`src/lib/haptics.ts`); browsers keep the vibration fallback.
 - **Status bar and launch screen** match the site (light or dark theme); the launch screen goes away once the page is up (`src/lib/native.ts`).
 - **Payments and documents** open in the phone's browser sheet, not inside the app window (`goToCheckout`, `openExternal`). After paying, closing the sheet returns to the app and the booking page refreshes itself.
-- **Links from emails opening the app** (confirm job, choose painter, accept offer, review, sign-in...). The app side is done: Android App Links (intent filters in the manifest), iOS Associated Domains (`ios/App/App/App.entitlements`), the app's own address `com.thepaintedpainter.app://`, and routing of a received link to the right page (`NativeLinks` in `src/App.tsx`). The website side needs two real values in `public/.well-known/`:
+- **Links from emails opening the app** (confirm job, choose painter, accept offer, review, sign-in...). The app side is done: Android App Links (intent filters in the manifest), iOS Associated Domains (`ios/App/App/App.entitlements`), the app's own address `com.paintedpainter.app://`, and routing of a received link to the right page (`NativeLinks` in `src/App.tsx`). The website side needs two real values in `public/.well-known/`:
   - `apple-app-site-association`: replace `REPLACE_WITH_TEAM_ID` with your Apple Team ID (developer.apple.com > Membership).
   - `assetlinks.json`: replace `REPLACE_WITH_SHA256_OF_THE_PLAY_SIGNING_KEY` with the SHA-256 fingerprint of the app signing key (Play Console > Setup > App signing).
 

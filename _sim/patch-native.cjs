@@ -88,7 +88,7 @@ s = rep(s, '                <category android:name="android.intent.category.LAUN
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="com.thepaintedpainter.app" />
+                <data android:scheme="com.paintedpainter.app" />
             </intent-filter>
 `, 'android intent');
 wr(p, s);
@@ -96,7 +96,7 @@ wr(p, s);
 // iOS: the app's own address, Associated Domains (links on the website open the app), and the privacy manifest
 p = 'ios/App/App/Info.plist';
 s = rd(p);
-if (!s.includes('CFBundleURLTypes')) s = rep(s, '\t<key>ITSAppUsesNonExemptEncryption</key>', '\t<key>CFBundleURLTypes</key>\n\t<array>\n\t\t<dict>\n\t\t\t<key>CFBundleURLName</key>\n\t\t\t<string>com.thepaintedpainter.app</string>\n\t\t\t<key>CFBundleURLSchemes</key>\n\t\t\t<array>\n\t\t\t\t<string>com.thepaintedpainter.app</string>\n\t\t\t</array>\n\t\t</dict>\n\t</array>\n\t<key>ITSAppUsesNonExemptEncryption</key>', 'plist');
+if (!s.includes('CFBundleURLTypes')) s = rep(s, '\t<key>ITSAppUsesNonExemptEncryption</key>', '\t<key>CFBundleURLTypes</key>\n\t<array>\n\t\t<dict>\n\t\t\t<key>CFBundleURLName</key>\n\t\t\t<string>com.paintedpainter.app</string>\n\t\t\t<key>CFBundleURLSchemes</key>\n\t\t\t<array>\n\t\t\t\t<string>com.paintedpainter.app</string>\n\t\t\t</array>\n\t\t</dict>\n\t</array>\n\t<key>ITSAppUsesNonExemptEncryption</key>', 'plist');
 wr(p, s);
 fs.writeFileSync('ios/App/App/App.entitlements', `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -141,14 +141,14 @@ if (!s.includes('PrivacyInfo.xcprivacy')) {
   s = rep(s, '\t\t\t\t504EC30E1FED79650016851F /* Assets.xcassets */,\n', '\t\t\t\t504EC30E1FED79650016851F /* Assets.xcassets */,\n\t\t\t\tAA00000000000000000000A2 /* PrivacyInfo.xcprivacy */,\n\t\t\t\tAA00000000000000000000A4 /* App.entitlements */,\n', 'pbx group');
   s = rep(s, '\t\t\t\t504EC30F1FED79650016851F /* Assets.xcassets in Resources */,\n', '\t\t\t\t504EC30F1FED79650016851F /* Assets.xcassets in Resources */,\n\t\t\t\tAA00000000000000000000A1 /* PrivacyInfo.xcprivacy in Resources */,\n', 'pbx resources');
   // both build configurations (Debug, Release) of the App target
-  s = s.split('\t\t\t\tPRODUCT_BUNDLE_IDENTIFIER = com.thepaintedpainter.app;').join('\t\t\t\tCODE_SIGN_ENTITLEMENTS = App/App.entitlements;\n\t\t\t\tPRODUCT_BUNDLE_IDENTIFIER = com.thepaintedpainter.app;');
+  s = s.split('\t\t\t\tPRODUCT_BUNDLE_IDENTIFIER = com.paintedpainter.app;').join('\t\t\t\tCODE_SIGN_ENTITLEMENTS = App/App.entitlements;\n\t\t\t\tPRODUCT_BUNDLE_IDENTIFIER = com.paintedpainter.app;');
   wr(p, s);
 }
 
 // the website's side of "links open the app"
 fs.mkdirSync('public/.well-known', { recursive: true });
 fs.writeFileSync('public/.well-known/apple-app-site-association', JSON.stringify({
-  applinks: { apps: [], details: [{ appIDs: ['REPLACE_WITH_TEAM_ID.com.thepaintedpainter.app'], components: [{ '/': '/confirm-job', '?': { token: '*' } }, { '/': '/choose-painter' }, { '/': '/painter/accept-job' }, { '/': '/leave-review' }, { '/': '/cancel-claim' }, { '/': '/cancel-request' }, { '/': '/resume-search' }, { '/': '/painter/*' }, { '/': '/customer/*' }, { '/': '/auth/*' }] }] },
+  applinks: { apps: [], details: [{ appIDs: ['REPLACE_WITH_TEAM_ID.com.paintedpainter.app'], components: [{ '/': '/confirm-job', '?': { token: '*' } }, { '/': '/choose-painter' }, { '/': '/painter/accept-job' }, { '/': '/leave-review' }, { '/': '/cancel-claim' }, { '/': '/cancel-request' }, { '/': '/resume-search' }, { '/': '/painter/*' }, { '/': '/customer/*' }, { '/': '/auth/*' }] }] },
 }, null, 2) + '\n');
-fs.writeFileSync('public/.well-known/assetlinks.json', JSON.stringify([{ relation: ['delegate_permission/common.handle_all_urls'], target: { namespace: 'android_app', package_name: 'com.thepaintedpainter.app', sha256_cert_fingerprints: ['REPLACE_WITH_SHA256_OF_THE_PLAY_SIGNING_KEY'] } }], null, 2) + '\n');
+fs.writeFileSync('public/.well-known/assetlinks.json', JSON.stringify([{ relation: ['delegate_permission/common.handle_all_urls'], target: { namespace: 'android_app', package_name: 'com.paintedpainter.app', sha256_cert_fingerprints: ['REPLACE_WITH_SHA256_OF_THE_PLAY_SIGNING_KEY'] } }], null, 2) + '\n');
 console.log('ok');

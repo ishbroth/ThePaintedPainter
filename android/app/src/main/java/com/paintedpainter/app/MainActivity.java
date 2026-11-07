@@ -1,4 +1,4 @@
-package com.thepaintedpainter.app;
+package com.paintedpainter.app;
 
 import com.getcapacitor.BridgeActivity;
 
