@@ -16954,10 +16954,10 @@ function extractProjectCondition(text) {
   return null;
 }
 function stripQuantifiedBedBath(text) {
-  const NUM = "(?:\\d+(?:\\.\\d)?|one|two|three|four|five|six|seven|eight|nine|ten)";
+  const NUM2 = "(?:\\d+(?:\\.\\d)?|one|two|three|four|five|six|seven|eight|nine|ten)";
   const BED = "(?:bed(?:room)?s?|br|bd)";
   const BATH = "(?:bath(?:room)?s?|ba)";
-  const hasBedCount = new RegExp("\\b" + NUM + "\\s*(?:-|\\s)?\\s*" + BED + "\\b", "i").test(text);
+  const hasBedCount = new RegExp("\\b" + NUM2 + "\\s*(?:-|\\s)?\\s*" + BED + "\\b", "i").test(text);
   const homeWords = /\b(house|home|apartment|condo|townhouse|townhome|unit|place|sq\.?\s?ft|square f)/i.test(text);
   const keepBaths = !hasBedCount && !homeWords;
   const oneRoomWithDims = new RegExp("\\b(?:one|1)\\s*(?:-|\\s)?\\s*bed(?:room)?\\s+\\d{1,2}\\s*(?:x|by|\xD7)\\s*\\d{1,2}\\b", "i").test(text) && !homeWords;
@@ -16965,7 +16965,7 @@ function stripQuantifiedBedBath(text) {
   if (!oneRoomWithDims) parts.push(BED);
   if (!keepBaths) parts.push(BATH);
   if (parts.length === 0) return text;
-  return text.replace(new RegExp("\\b" + NUM + "\\s*(?:-|\\s)?\\s*(?:" + parts.join("|") + ")\\b", "gi"), " ");
+  return text.replace(new RegExp("\\b" + NUM2 + "\\s*(?:-|\\s)?\\s*(?:" + parts.join("|") + ")\\b", "gi"), " ");
 }
 function extractRooms(text) {
   const t2 = text.toLowerCase();
@@ -17306,12 +17306,12 @@ function extractCeilingHeight(text, asked = false) {
   const num2 = (s) => WORDS[s] ?? parseInt(s, 10);
   const fromFeet = (n) => n >= 16 && n <= 40 ? "vaulted_mixed" : n >= 12 && n < 16 ? "twelve_plus" : n >= 10 && n < 12 ? "ten_plus" : n === 9 ? "nine_foot" : null;
   if (/\b(vaulted|cathedral|double[\s-]height|two[\s-]stor(?:y|ey)\s+(?:foyer|entry|entryway|living room|great room|ceiling)|soaring|loft(?:ed)? ceilings?|beamed vaulted)\b/.test(t2)) return "vaulted_mixed";
-  const NUM = "(\\d{1,2}|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|eighteen|twenty)";
-  const a = t2.match(new RegExp(NUM + "\\s*(?:-|\\s)?(?:f(?:oo|ee)?t|')\\s*(?:tall\\s+|high\\s+)?ceilings?\\b"));
-  const b = t2.match(new RegExp("\\bceilings?\\s*(?:are|is|run|go|measure|about|around|at|of|:)?\\s*(?:about\\s+|around\\s+|roughly\\s+)?" + NUM + "\\s*(?:-|\\s)?(?:f(?:oo|ee)?t|')"));
-  const c2 = t2.match(new RegExp("\\bceilings?\\s+height\\s*(?:is|are|of|:)?\\s*(?:about\\s+|around\\s+|roughly\\s+|approximately\\s+)?" + NUM + "\\s*(?:-|\\s)?(?:f(?:oo|ee)?t|')?")) ?? t2.match(new RegExp("\\bheight\\s+of\\s+(?:the\\s+|our\\s+)?ceilings?\\s*(?:is|are|:)?\\s*(?:about\\s+|around\\s+|roughly\\s+|approximately\\s+)?" + NUM + "\\s*(?:-|\\s)?(?:f(?:oo|ee)?t|')?"));
-  const d2 = /\bceilings?\b/.test(t2) || asked && !/\b(?:fence|deck|gate|shed|tree|porch|railing|garage|ladder|driveway|yard|pergola)\b/.test(t2) ? t2.match(new RegExp("(?:^|[^\\d.])" + NUM + "\\s*(?:-|\\s)?(?:f(?:oo|ee)?t|')\\s*(?:tall|high|up)?\\b")) : null;
-  const bare = asked ? t2.match(new RegExp("^\\s*(?:about\\s+|around\\s+|roughly\\s+|probably\\s+|like\\s+)?" + NUM + "\\s*(?:-|\\s)?(?:f(?:oo|ee)?t|'|ft\\.?|feet)?\\s*[.!]?\\s*$")) : null;
+  const NUM2 = "(\\d{1,2}|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|eighteen|twenty)";
+  const a = t2.match(new RegExp(NUM2 + "\\s*(?:-|\\s)?(?:f(?:oo|ee)?t|')\\s*(?:tall\\s+|high\\s+)?ceilings?\\b"));
+  const b = t2.match(new RegExp("\\bceilings?\\s*(?:are|is|run|go|measure|about|around|at|of|:)?\\s*(?:about\\s+|around\\s+|roughly\\s+)?" + NUM2 + "\\s*(?:-|\\s)?(?:f(?:oo|ee)?t|')"));
+  const c2 = t2.match(new RegExp("\\bceilings?\\s+height\\s*(?:is|are|of|:)?\\s*(?:about\\s+|around\\s+|roughly\\s+|approximately\\s+)?" + NUM2 + "\\s*(?:-|\\s)?(?:f(?:oo|ee)?t|')?")) ?? t2.match(new RegExp("\\bheight\\s+of\\s+(?:the\\s+|our\\s+)?ceilings?\\s*(?:is|are|:)?\\s*(?:about\\s+|around\\s+|roughly\\s+|approximately\\s+)?" + NUM2 + "\\s*(?:-|\\s)?(?:f(?:oo|ee)?t|')?"));
+  const d2 = /\bceilings?\b/.test(t2) || asked && !/\b(?:fence|deck|gate|shed|tree|porch|railing|garage|ladder|driveway|yard|pergola)\b/.test(t2) ? t2.match(new RegExp("(?:^|[^\\d.])" + NUM2 + "\\s*(?:-|\\s)?(?:f(?:oo|ee)?t|')\\s*(?:tall|high|up)?\\b")) : null;
+  const bare = asked ? t2.match(new RegExp("^\\s*(?:about\\s+|around\\s+|roughly\\s+|probably\\s+|like\\s+)?" + NUM2 + "\\s*(?:-|\\s)?(?:f(?:oo|ee)?t|'|ft\\.?|feet)?\\s*[.!]?\\s*$")) : null;
   const feet = a ? num2(a[1]) : b ? num2(b[1]) : c2 ? num2(c2[1]) : d2 ? num2(d2[1]) : bare ? num2(bare[1]) : NaN;
   if (isFinite(feet)) {
     const h = fromFeet(feet);
@@ -18171,10 +18171,12 @@ function extractAll(text, prev, lastBotTopicId = null) {
         surf.trim = "yes";
         surf.doors = "yes";
       } else if (w2 || c2 || tr || d2) {
-        surf.walls = w2 ? "yes" : "no";
-        surf.ceilings = c2 ? "yes" : "no";
-        surf.trim = tr ? "yes" : "no";
-        surf.doors = d2 ? "yes" : "no";
+        const additive = /\b(?:too|also|as well|plus|in addition|along with)\b/.test(low) && !/\b(?:only|just)\b/.test(low);
+        const decide = (on, mentioned) => on ? "yes" : additive && !mentioned ? void 0 : "no";
+        surf.walls = decide(w2, mentionW);
+        surf.ceilings = decide(c2, mentionC);
+        surf.trim = decide(tr, mentionTr);
+        surf.doors = decide(d2, mentionD);
         listParsed = true;
       }
     }
@@ -18237,6 +18239,98 @@ function extractAll(text, prev, lastBotTopicId = null) {
     acks.push("retaining wall (noted)");
   }
   return { patch, acknowledgements: acks };
+}
+
+// src/lib/chatEstimator/items.ts
+init_define_import_meta_env();
+var WORD_NUM = {
+  a: 1,
+  an: 1,
+  one: 1,
+  two: 2,
+  three: 3,
+  four: 4,
+  five: 5,
+  six: 6,
+  seven: 7,
+  eight: 8,
+  nine: 9,
+  ten: 10,
+  eleven: 11,
+  twelve: 12,
+  couple: 2,
+  pair: 2,
+  "a couple": 2,
+  "a pair": 2
+};
+var NUM = "(\\d{1,2}|a couple of|a couple|a pair of|a pair|an?|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)";
+var ITEM_PATTERNS = [
+  { key: "nightstand", re: "night[\\s-]?stands?|bed[\\s-]?side tables?", label: ["nightstand", "nightstands"] },
+  { key: "table_end", re: "(?:end|side|coffee|accent|console|sofa) tables?", label: ["small table", "small tables"] },
+  { key: "table_dining", re: "(?:dining |kitchen |patio |picnic |farm ?house )?tables?", label: ["table", "tables"] },
+  { key: "dresser", re: "dressers?|chests? of drawers|chests?|head[\\s-]?boards?|cribs?|bed ?frames?", label: ["dresser", "dressers"] },
+  { key: "bookcase", re: "book[\\s-]?cases?|book[\\s-]?shel(?:f|ves)|shelving units?|etageres?", label: ["bookcase", "bookcases"] },
+  { key: "desk", re: "desks?", label: ["desk", "desks"] },
+  { key: "bench", re: "benches|bench|ottomans?", label: ["bench", "benches"] },
+  { key: "lounger", re: "loungers?|chaises?(?: lounges?)?|lounge chairs?", label: ["lounger", "loungers"] },
+  { key: "cabinet", re: "(?:china|curio|bar|media|file|storage|display) cabinets?|hutchs?|hutches|buffets?|sideboards?|credenzas?|armoires?|wardrobes?|tv stands?|entertainment centers?", label: ["cabinet", "cabinets"] },
+  { key: "chair", re: "chairs?|stools?|bar ?stools?|rockers?|rocking chairs?|high ?chairs?", label: ["chair", "chairs"] }
+];
+var stripLookalikes = (t2) => t2.replace(/chair[\s-]*rails?/g, " ").replace(/\b(?:kitchen|bathroom|vanity|base|wall|upper|lower) cabinets?\b/g, " ").replace(/\btable ?top\b/g, "table");
+function detectItems(text) {
+  const t2 = stripLookalikes(text.toLowerCase());
+  const out = [];
+  let rest = t2;
+  for (const { key, re } of ITEM_PATTERNS) {
+    const find = new RegExp(`(?:\\b${NUM}\\s+(?:[a-z-]+\\s+){0,2})?\\b(${re})\\b`, "g");
+    let m2;
+    let count = null;
+    let found = false;
+    while ((m2 = find.exec(rest)) !== null) {
+      found = true;
+      const word = m2[2];
+      const plural = /s$|ves$|men$/.test(word) && !/(?:^|\s)(?:glass|bass|chaise lounge)$/.test(word) || /\bbenches\b|\bhutches\b/.test(word);
+      if (m2[1]) {
+        const n = WORD_NUM[m2[1].replace(/ of$/, "")] ?? parseInt(m2[1], 10);
+        count = (count ?? 0) + n;
+      } else if (!plural) {
+        count = (count ?? 0) + 1;
+      }
+      rest = rest.slice(0, m2.index) + " ".repeat(m2[0].length) + rest.slice(m2.index + m2[0].length);
+      find.lastIndex = m2.index + m2[0].length;
+    }
+    if (found) out.push({ key, count });
+  }
+  return out;
+}
+function itemLabel(key, count) {
+  const l = ITEM_PATTERNS.find((p2) => p2.key === key)?.label ?? [key, key + "s"];
+  return count === 1 ? l[0] : l[1];
+}
+function itemsPhrase(items) {
+  const counts = /* @__PURE__ */ new Map();
+  for (const i2 of items) counts.set(i2, (counts.get(i2) ?? 0) + 1);
+  const parts = [...counts.entries()].map(([k, n]) => n === 1 ? `a ${itemLabel(k, 1)}` : `${n} ${itemLabel(k, n)}`);
+  return parts.length > 1 ? parts.slice(0, -1).join(", ") + " and " + parts[parts.length - 1] : parts[0] ?? "the pieces";
+}
+function mentionsGenericFurniture(text) {
+  return /\b(?:furniture|movable|moveable|portable)\b|\bpieces? of (?:furniture|wood)\b|\bantiques?\b|\bheirlooms?\b/i.test(text);
+}
+function saysItemsOnly(text) {
+  const t2 = text.toLowerCase();
+  return /\b(?:furniture|chairs?|tables?|pieces?|items?|dressers?|cabinets?|stools?|moveable|movable)\s+only\b/.test(t2) || /\bonly\s+(?:the\s+|my\s+|some\s+|a\s+|\d+\s+)?(?:furniture|chairs?|tables?|pieces?|items?|dressers?|stools?)\b/.test(t2) || /\b(?:nothing|no)\s+(?:in|at all in)\s+(?:a|the|any)\s+rooms?\b|\bno rooms?\b|\bnot (?:in |painting |doing )?(?:a|any|the)\s+rooms?\b|\bno walls?\b|\bnot (?:painting|doing) (?:any )?(?:walls?|ceilings?)\b/.test(t2) || /\b(?:moveable|movable)\s+(?:chairs?|furniture|tables?|items?|objects?)\b/.test(t2) || /\bnothing to do with (?:the |my )?(?:chairs?|furniture|tables?|pieces?|items?)\b/.test(t2);
+}
+function parseFurnitureFinish(text) {
+  const t2 = text.toLowerCase();
+  const out = {};
+  if (/\b(?:strip(?:ped|ping)?|down to (?:the )?(?:bare )?wood|remove (?:the )?(?:old )?(?:paint|finish|varnish)|sand (?:it |them )?(?:all )?(?:off|down))\b/.test(t2)) out.treatment = "strip_refinish";
+  else if (/\b(?:re-?stain(?:ing|ed)?|refresh\w*(?: the)? (?:stain|finish)|refinish\w*|re-?varnish\w*|(?:same|existing|current|matching|natural|original)\s+(?:stain|varnish|wood)|(?:stain|stained|varnish\w*|lacquer\w*|polyurethane|wood finish)\b)/.test(t2)) out.treatment = "restain";
+  else if (/\b(?:re-?paint(?:ing|ed)?|paint(?:ed|ing)? over|bare|raw|unfinished|new (?:paint|color|colour)|(?:white|black|grey|gray|blue|red|green)\b|chalk paint|(?:currently|already|is|are|they're|its|it's)\s+painted)\b/.test(t2)) out.treatment = "repaint";
+  if (/\b(?:sand|sanded|sanding|sands)\b/.test(t2)) out.sanding = true;
+  if (/\b(?:metal|iron|steel|aluminum|aluminium)\b/.test(t2)) out.material = "metal";
+  else if (/\b(?:wood|wooden|oak|pine|teak|cedar|mahogany|walnut|maple)\b/.test(t2)) out.material = "wood";
+  else if (/\b(?:plastic|resin|wicker|rattan|vinyl|laminate)\b/.test(t2)) out.material = "other";
+  return out;
 }
 
 // src/lib/chatEstimator/details.ts
@@ -18547,13 +18641,47 @@ function extractDetails(text, ctx, askedId) {
     if (/\binterior\b|\binside\b/.test(t2) && ctx.interiorShutterCount == null) patch.interiorShutterCount = shutters;
     else if (ctx.exteriorShutterCount == null && askedId !== "shutter_count") patch.exteriorShutterCount = shutters;
   }
-  const chairs = t2.match(/\b(\d{1,2})\s+(?:\w+\s+){0,2}chairs\b/);
-  if (chairs && ctx.chairCount == null && askedId !== "chair_count") patch.chairCount = parseInt(chairs[1], 10);
-  const chairText = t2.replace(/chair[\s-]*rails?/g, " ");
-  if (/\bchairs?\b/.test(chairText) && /\b(?:paint|painting|refinish|repaint|restain|spray)\b/.test(chairText) && !ctx.furnitureItems.includes("chair") && !/\b(?:patio|outdoor|garden|deck)\s*(?:furniture|set|chairs?|table)|\bloungers?\b|\bchaise\b|\bwrought iron\b/.test(chairText)) {
-    patch.furnitureItems = [...ctx.furnitureItems, "chair"];
+  const itemText = t2.replace(/chair[\s-]*rails?/g, " ");
+  const patioSet = /\b(?:patio|outdoor|garden|deck)\s*(?:furniture|set|chairs?|table)|\bloungers?\b|\bchaise\b|\bwrought iron\b/.test(itemText);
+  const askedItems = askedId === "chair_count" || askedId === "furniture_kind" || askedId === "furniture_finish";
+  const paintVerb = /\b(?:paint(?:ed|ing)?|refinish(?:ed|ing)?|repaint(?:ed|ing)?|restain(?:ed|ing)?|re-stain(?:ed|ing)?|stain(?:ed|ing)?|spray(?:ed|ing)?|sand(?:ed|ing)?|strip(?:ped|ping)?|varnish(?:ed|ing)?)\b/.test(itemText);
+  const bareNoun = itemText.trim().split(/\s+/).length <= 5;
+  const found = detectItems(itemText);
+  if (found.length > 0 && !patioSet && (paintVerb || askedItems || ctx.furnitureItems.length > 0 || ctx.furnitureUnspecified || bareNoun && !ctx.projectType && ctx.selectedRooms.length === 0)) {
+    const list = [];
+    let allCounted = true;
+    for (const f of found) {
+      if (f.count == null) allCounted = false;
+      for (let i2 = 0; i2 < Math.min(f.count ?? 1, 60); i2++) list.push(f.key);
+    }
+    if (!ctx.furnitureCountKnown || askedId === "chair_count" && allCounted) {
+      const kinds = [.../* @__PURE__ */ new Set([...ctx.furnitureItems, ...list])];
+      const merged = askedId === "chair_count" || ctx.furnitureItems.length === 0 ? list : kinds.flatMap((k) => list.includes(k) ? list.filter((x) => x === k) : ctx.furnitureItems.filter((x) => x === k));
+      if (merged.slice().sort().join(",") !== ctx.furnitureItems.slice().sort().join(",") || allCounted && !ctx.furnitureCountKnown) {
+        patch.furnitureItems = merged;
+        patch.furnitureUnspecified = false;
+        if (merged.includes("chair") && allCounted) patch.chairCount = merged.filter((x) => x === "chair").length;
+        if (allCounted) patch.furnitureCountKnown = true;
+        if (!ctx.specialtyServices.includes("furniture")) patch.specialtyServices = [...ctx.specialtyServices, "furniture"];
+        acks.push(itemsPhrase(merged));
+      }
+    }
+  } else if (!patioSet && ctx.furnitureItems.length === 0 && mentionsGenericFurniture(itemText) && (paintVerb || saysItemsOnly(itemText) || bareNoun)) {
+    if (!ctx.furnitureUnspecified) patch.furnitureUnspecified = true;
     if (!ctx.specialtyServices.includes("furniture")) patch.specialtyServices = [...ctx.specialtyServices, "furniture"];
-    acks.push("chairs");
+  }
+  if (!ctx.cabinetMethod && (ctx.cabinets !== "none" || /\bcabinet|\bvanit/.test(t2))) {
+    if (/\bspray(?:ed|ing)?\b/.test(t2)) patch.cabinetMethod = "sprayed";
+    else if (/\b(?:brushed|brush and roll|brushed and rolled)\b/.test(t2)) patch.cabinetMethod = "brushed";
+  }
+  if (saysItemsOnly(itemText) && (patch.furnitureItems || ctx.furnitureItems.length > 0 || ctx.furnitureUnspecified)) {
+    acks.push(`just ${itemsPhrase(patch.furnitureItems ?? ctx.furnitureItems).replace(/^the pieces$/, "the furniture")}, no rooms or walls`);
+  }
+  if (patch.furnitureItems || ctx.furnitureItems.length > 0 || ctx.furnitureUnspecified || patch.furnitureUnspecified) {
+    const fin = parseFurnitureFinish(itemText);
+    if (fin.treatment && (askedId === "furniture_finish" || !ctx.furnitureTreatment || fin.treatment === "strip_refinish" && ctx.furnitureTreatment !== "strip_refinish")) patch.furnitureTreatment = fin.treatment;
+    if (fin.material && !ctx.furnitureMaterial) patch.furnitureMaterial = fin.material;
+    if (fin.sanding && !ctx.furnitureSanding) patch.furnitureSanding = true;
   }
   if (ctx.chairRailLinearFeet == null) {
     const m2 = t2.match(/(\d[\d,]*)\s*(?:linear\s*|lin\.?\s*)?(?:feet|foot|ft\.?|lf)\s*(?:of\s*)?(?:the\s*)?chair[\s-]*rail/) || t2.match(/chair[\s-]*rails?\b[^.]{0,30}?(\d[\d,]*)\s*(?:linear\s*|lin\.?\s*)?(?:feet|foot|ft\.?|lf)\b/);
@@ -18599,11 +18727,79 @@ function extractDetails(text, ctx, askedId) {
         break;
       }
       case "chair_count": {
-        const n = parseCount(text, 1, 60);
-        if (n) {
-          patch.chairCount = n;
-          acks.push(`${n} chairs`);
+        if (patch.furnitureItems) break;
+        const kinds = [...new Set(ctx.furnitureItems)];
+        const n = /\b(?:just|only)?\s*(?:the\s+)?one\b|^\W*(?:a|an)\W*$/i.test(text) ? 1 : parseCount(text, 1, 60);
+        if (n && kinds.length >= 1) {
+          patch.furnitureItems = kinds.flatMap((k) => Array.from({ length: n }, () => k));
+          patch.furnitureCountKnown = true;
+          if (kinds.includes("chair")) patch.chairCount = n;
+          acks.push(itemsPhrase(patch.furnitureItems));
         }
+        break;
+      }
+      case "cabinet_count": {
+        const n = parseCount(text, 2, 300);
+        if (n) {
+          patch.cabinetDoorCount = n;
+          acks.push(`${n} doors and drawers`);
+        }
+        break;
+      }
+      case "builtin_count": {
+        const n = parseCount(text, 1, 40);
+        if (n) {
+          patch.builtInCount = n;
+          acks.push(`${n} built-in${n === 1 ? "" : "s"}`);
+        }
+        break;
+      }
+      case "cabinet_scope": {
+        const low = text.toLowerCase();
+        if (/\b(?:inside|insides|inner|interior|boxes|both|everything|all of it)\b/.test(low) && !/\b(?:no|not|without|don'?t)\b[^.]{0,20}\b(?:inside|insides|boxes)\b/.test(low)) {
+          patch.cabinetScope = "inside_too";
+          acks.push("the insides too");
+        } else if (/^\W*(?:no|nope|nah)\b|\b(?:outsides?|outside only|fronts?|just the doors|only the doors|doors only|exterior)\b/.test(low)) {
+          patch.cabinetScope = "fronts_only";
+          acks.push("outsides only");
+        }
+        break;
+      }
+      case "cabinet_method": {
+        const low = text.toLowerCase();
+        if (/\bspray/.test(low)) {
+          patch.cabinetMethod = "sprayed";
+          acks.push("sprayed");
+        } else if (/\b(?:brush|brushed|roll|rolled|roller|either|fine|painter'?s? (?:choice|call)|up to (?:you|the painter)|no preference|doesn'?t matter)\b/.test(low)) {
+          patch.cabinetMethod = "brushed";
+          acks.push("brushed and rolled");
+        }
+        break;
+      }
+      case "cabinet_hardware": {
+        const low = text.toLowerCase();
+        if (/\b(?:replac|new|install|swap|upgrad)/.test(low) && !/\b(?:no|not|don'?t|won'?t)\b[^.]{0,12}\b(?:replac|new)/.test(low)) {
+          patch.hardwareReplacement = "yes";
+          acks.push("new hardware");
+        } else if (/\b(?:keep|reuse|re-use|same|existing|stay|staying|as[\s-]is|no|nope|nah|not replacing)\b/.test(low)) acks.push("keeping the hardware");
+        break;
+      }
+      case "color_change": {
+        if (!(ctx.itemsOnly || patch.furnitureItems)) break;
+        const low = text.toLowerCase();
+        if (/\b(?:same|existing|current|matching|match|keep|keeping|as is|as it is|refresh\w*|touch(?:ing)? up|original|natural)\b/.test(low) && !/\b(?:different|change|changing|new color|new colour|instead)\b/.test(low)) {
+          patch.interiorColorChange = "same";
+          acks.push("the same color going back");
+        } else if (/\b(?:different|change|changing|switch|new|darker|lighter|another|instead|white|black|gr[ae]y|blue|red|green|yellow|navy|cream|espresso|walnut|ebony)\b/.test(low)) {
+          patch.interiorColorChange = "different";
+          acks.push("a new color");
+        }
+        break;
+      }
+      case "furniture_finish": {
+        const fin = parseFurnitureFinish(text);
+        if (!fin.treatment && !patch.furnitureTreatment && /\b(?:same|existing|current|matching)\b/.test(text.toLowerCase())) patch.furnitureTreatment = ctx.furnitureTreatment || "restain";
+        if (fin.treatment || fin.material || fin.sanding || patch.furnitureTreatment) acks.push("how the pieces are finished");
         break;
       }
       case "shutter_count": {
@@ -18724,6 +18920,13 @@ var DETAIL_TOPIC_IDS = /* @__PURE__ */ new Set([
   "door_count",
   "window_count",
   "chair_count",
+  "furniture_kind",
+  "furniture_finish",
+  "cabinet_count",
+  "cabinet_scope",
+  "cabinet_method",
+  "cabinet_hardware",
+  "builtin_count",
   "shutter_count",
   "closet_count",
   "fence_size",
@@ -18927,7 +19130,8 @@ function calculateEstimate(ctx) {
         lineItems.push({
           category: "Interior",
           description: desc,
-          amount: rate * scopeMultiplier * regionalMult * cabinetComplexity,
+          // spraying (masking, set-up, a smooth factory-like finish) costs more than brushing and rolling
+          amount: rate * scopeMultiplier * regionalMult * cabinetComplexity * (ctx.cabinetMethod === "sprayed" ? 1.2 : 1),
           key: `cabinets:${loc}`
         });
       }
@@ -19093,9 +19297,14 @@ function calculateEstimate(ctx) {
       const rate = RESOLVED_BASE_RATES.specialty[key] || RESOLVED_BASE_RATES.specialty.furniture_cabinet;
       furnitureTotal += typeof rate === "number" ? rate : 175;
     }
+    const treatmentFactor = ctx.furnitureTreatment === "strip_refinish" ? 1.6 : ctx.furnitureTreatment === "restain" ? 1.25 : 1;
+    const sandingFactor = ctx.furnitureSanding && ctx.furnitureTreatment !== "strip_refinish" ? 1.15 : 1;
+    const materialFactor = ctx.furnitureMaterial === "metal" ? 1.15 : 1;
+    furnitureTotal *= treatmentFactor * sandingFactor * materialFactor;
+    const treatmentLabel = ctx.furnitureTreatment === "strip_refinish" ? ", stripped and refinished" : ctx.furnitureTreatment === "restain" ? ", restained" : ctx.furnitureSanding ? ", sanded" : "";
     lineItems.push({
       category: "Specialty",
-      description: `Furniture Painting (${furnitureList.length} pieces)`,
+      description: `Furniture Painting (${furnitureList.length} piece${furnitureList.length === 1 ? "" : "s"}${treatmentLabel})`,
       amount: furnitureTotal * regionalMult,
       key: "furniture"
     });
@@ -19900,7 +20109,14 @@ var TOPIC_LABEL = {
   door_count: "how many doors",
   window_count: "how many windows",
   closet_count: "how many closets",
-  chair_count: "how many chairs",
+  chair_count: "how many pieces are being painted",
+  cabinet_count: "how many cabinet doors and drawers",
+  cabinet_scope: "whether the insides of the cabinets are painted",
+  cabinet_method: "sprayed or brushed",
+  cabinet_hardware: "the cabinet hardware",
+  builtin_count: "how many built-ins",
+  furniture_kind: "which pieces of furniture",
+  furniture_finish: "how the pieces are finished now and what you want done",
   shutter_count: "how many shutters",
   railing_length: "how long the railing is",
   fence_size: "how long and how tall the fence is",
@@ -19928,7 +20144,8 @@ var TOPIC_LABEL = {
   location: "the ZIP code",
   timeline_and_access: "your timing and whether the place is occupied"
 };
-function topicLabel(id) {
+function topicLabel(id, itemsOnly = false) {
+  if (itemsOnly && id === "timeline_and_access") return "your timing";
   return id && TOPIC_LABEL[id] || "that";
 }
 function recentRecognized(history, max = 6) {
@@ -20506,7 +20723,12 @@ function classifyIntent(rawText) {
     /\byou'?re\s+not\s+listening\b/,
     /\bugh\b/,
     /\bnevermind\b/,
-    /\bforget\s+it\b/
+    /\bforget\s+it\b/,
+    /\boh\s+my\s+(?:god|gosh)\b/,
+    /\bwhat\s+(?:are|r)\s+(?:you|oyu|u)\s+talking\s+about\b/,
+    /\bwhat\s+does\s+(?:this|that|it)\s+have\s+to\s+do\s+with\b/,
+    /\b(?:have|has)\s+nothing\s+to\s+do\s+with\b/,
+    /\b(?:asked|ask)\s+(?:this|that|me)\s+(?:\w+\s+)?(?:\w+\s+)?times\b/
   )) {
     intents.push("frustration");
   }
@@ -20653,13 +20875,14 @@ function derive(ctx, transcript) {
     }
   }
   if (/\bjust\s+(?:the\s+)?walls?\b|\bonly\s+(?:the\s+)?walls?\b|\bwalls?\s+only\b/.test(t2)) {
-    if (ctx.interiorCeilings !== "no") {
+    const addedLater = ctx.addedSurfaces ?? [];
+    if (ctx.interiorCeilings !== "no" && !addedLater.includes("ceilings")) {
       out.push({ patch: { interiorCeilings: "no" }, reason: '"Just walls" \u2192 no ceilings' });
     }
-    if (ctx.interiorTrim !== "no") {
+    if (ctx.interiorTrim !== "no" && !addedLater.includes("trim")) {
       out.push({ patch: { interiorTrim: "no" }, reason: '"Just walls" \u2192 no trim' });
     }
-    if (ctx.interiorDoors !== "none") {
+    if (ctx.interiorDoors !== "none" && !addedLater.includes("doors")) {
       out.push({ patch: { interiorDoors: "none" }, reason: '"Just walls" \u2192 no doors' });
     }
   }
@@ -20749,7 +20972,7 @@ function derive(ctx, transcript) {
     conditionAddressed: true
   };
   const negated = /* @__PURE__ */ new Set();
-  const negRe = /\b(?:no|without|skip|excluding|except(?: for)?|not (?:the )?|don'?t (?:paint|do|need)(?: the)?|leave out)\s+((?:(?:walls?|ceilings?|trim|baseboards?|doors?|windows?)\b(?:\s*(?:,|or|and|nor|\/)\s*)?)+)/g;
+  const negRe = /\b(?:no|without|skip|excluding|except(?: for)?|not (?:(?:painting|doing|touching) )?(?:the |any )?|don'?t (?:paint|do|need)(?: the)?|leave out)\s+((?:(?:walls?|ceilings?|trim|baseboards?|doors?|windows?)\b(?:\s*(?:,|or|and|nor|\/)\s*)?)+)/g;
   for (const nm of t2.matchAll(negRe)) {
     for (const w2 of nm[1].split(/[^a-z]+/).filter(Boolean)) negated.add(w2.replace(/s$/, ""));
   }
@@ -20808,10 +21031,20 @@ function derive(ctx, transcript) {
       reason: "Cabinets (or a vanity) only \u2192 no wall, ceiling or trim painting"
     });
   }
-  if (ctx.interiorWalls !== "no" && ctx.furnitureItems.includes("chair") && !mentionsSurfaceWords && !/\b(rooms?|house|home|apartment|condo|walls?|trim|doors?|cabinets?|baseboards?|exterior|outside|patio|outdoor|deck)\b/.test(tNeg)) {
+  const hasItems = ctx.furnitureItems.length > 0 || ctx.furnitureUnspecified;
+  const itemsSaid = saysItemsOnly(t2);
+  const tScope = tNeg.replace(/\b(?:nothing|no)\s+(?:in|at all in)\s+(?:a|the|any)\s+rooms?\b|\bno rooms?\b|\bnot (?:in |painting |doing )?(?:a|any|the)\s+rooms?\b|\b(?:doesn'?t|does not|don'?t|do not) (?:matter|apply)\b[^.\n]*|\b(?:inside|outside|indoors?|outdoors?|interior|exterior)(?: or |\s*\/\s*)(?:inside|outside|indoors?|outdoors?|interior|exterior)\b/g, " ");
+  const roomWords = /\b(rooms?|house|home|apartment|condo|walls?|ceilings?|trim|doors?|baseboards?|bedrooms?|bathrooms?|kitchen|living|hallway|garage|exterior|siding|stucco|fence|deck)\b/.test(tScope);
+  const cabinetRoom = /\bcabinets?\b/.test(tScope) && ctx.furnitureItems.every((i2) => i2 !== "cabinet") && !itemsSaid;
+  if (hasItems && !ctx.itemsOnly && !roomWords && !mentionsSurfaceWords && !cabinetRoom && (itemsSaid || !/\b(outside|patio|outdoor)\b/.test(tScope))) {
     out.push({
-      patch: { ...interiorOff, projectType: ctx.projectType || "interior", interiorScope: ctx.interiorScope || "whole_house" },
-      reason: "Only chairs \u2192 a furniture job, no wall, ceiling, trim or door painting"
+      patch: { ...interiorOff, itemsOnly: true, projectType: ctx.projectType || "interior", interiorScope: ctx.interiorScope || "whole_house", interiorColorChange: ctx.interiorColorChange || "" },
+      reason: "Only movable pieces \u2192 a furniture job: no walls, ceilings, trim, doors, rooms or ceiling height"
+    });
+  } else if (ctx.itemsOnly && (roomWords || mentionsSurfaceWords) && !itemsSaid && /\b(?:also|and|plus|too|as well|along with)\b/.test(t2) && /\b(?:walls?|ceilings?|bedrooms?|living room|kitchen|whole house|rooms?)\b/.test(tScope)) {
+    out.push({
+      patch: { itemsOnly: false, interiorWalls: "yes", surfacesAddressed: false, conditionAddressed: false, trimScopeAddressed: false, interiorScope: "" },
+      reason: "Rooms were added to the furniture \u2192 priced as rooms plus the pieces"
     });
   }
   if ((ctx.propertyType === "commercial" || ctx.propertyType === "multi_unit") && ctx.interiorScope === "specific_rooms" && ctx.stairwayDetails !== "railings_only" && !/\b(?:just|only)\s+(?:the\s+)?(?:lobby|reception|front|dining|kitchen|bar|office|suite|unit|room|hall|bathroom|restroom|entrance)\b/.test(t2)) {
@@ -20983,10 +21216,20 @@ function detailLabel(c2) {
   const parts = [c2.chairRail === "yes" ? "chair rail" : "", c2.crownMolding === "yes" ? "crown moulding" : "", c2.wainscoting === "yes" ? "wainscoting" : "", c2.interiorTrim === "yes" ? "baseboards" : ""].filter(Boolean);
   return parts.length > 1 ? parts.slice(0, -1).join(", ") + " and " + parts[parts.length - 1] : parts[0] ?? "trim";
 }
-var skipUpsells = (c2) => isIsolatedDetailJob(c2) || c2.interiorWalls === "no" && c2.interiorCeilings === "no" && c2.surfacesAddressed && (c2.furnitureItems.length > 0 || c2.closets !== "none");
+function componentKind(c2) {
+  if (c2.itemsOnly) return "";
+  const off = c2.interiorWalls === "no" && c2.interiorCeilings !== "yes" && c2.interiorTrim !== "yes" && c2.interiorDoors === "none" && c2.surfacesAddressed;
+  if (!off || c2.projectType !== "interior" && c2.projectType !== "both") return "";
+  if (c2.cabinets !== "none") return "cabinets";
+  if (c2.stairwayDetails === "railings_only") return "railing";
+  if (c2.fireplaceType === "mantel_only") return "mantel";
+  if (c2.specialtyServices.includes("built_ins") && c2.closets === "none") return "builtins";
+  return "";
+}
+var skipUpsells = (c2) => c2.itemsOnly || componentKind(c2) !== "" || isIsolatedDetailJob(c2) || c2.interiorWalls === "no" && c2.interiorCeilings === "no" && c2.surfacesAddressed && (c2.furnitureItems.length > 0 || c2.closets !== "none");
 var isCommercialLike = (c2) => c2.propertyType === "commercial" || c2.propertyType === "multi_unit";
 function isStandaloneOnlyJob(c2) {
-  if (c2.standaloneStructure) return true;
+  if (c2.standaloneStructure || c2.itemsOnly || componentKind(c2) !== "") return true;
   if (c2.projectType === "exterior" && c2.exteriorBody === "no") return true;
   const furnitureOnly = c2.furnitureItems.length > 0 && c2.selectedRooms.length === 0 && c2.interiorScope === "" && !c2.squareFeet && !c2.bedroomCount;
   return furnitureOnly && (c2.projectType === "interior" || c2.projectType === "");
@@ -21222,7 +21465,7 @@ var TOPICS = [
       if (hasKitchen) {
         return "For the kitchen, what all is getting painted, and are the cabinets included?";
       }
-      return "What in the room are we painting?";
+      return "Which surfaces are we painting?";
     },
     clarify: () => "Some folks just want walls refreshed. Others want the whole package \u2014 walls, ceiling, trim, doors, closets. Either works. You can also mix and match.",
     example: () => "'Just walls' is common. Or 'walls and ceiling, no trim'. Or 'everything except the doors'."
@@ -21476,6 +21719,52 @@ var TOPICS = [
     clarify: () => "The current finish changes the prep. Painted ones just need a good clean and sanding. Bare wood needs primer first, and stained or varnished wood has to be deglossed and sealed with a stain-blocking primer so the stain doesn't bleed through the paint.",
     example: () => "E.g., 'they're painted white now', 'bare wood', 'stained oak', 'pre-primed', or 'laminate'."
   },
+  // Cabinets as the whole job (no walls, ceilings, trim or doors): the questions that are about the cabinets themselves.
+  {
+    id: "cabinet_count",
+    priority: 29.7,
+    relevant: (c2) => componentKind(c2) === "cabinets" && c2.cabinetDoorCount == null,
+    alreadyAnswered: (c2) => c2.cabinetDoorCount != null || extDone(c2, "cabinet_count"),
+    ask: (c2) => pick(["About how many cabinet doors and drawer fronts are there? A rough count is fine.", "Roughly how many doors and drawers are we talking about?"], seed(c2)),
+    clarify: () => "Cabinets are priced by the door and drawer front, so a rough count (count each door and each drawer face) gets the price close.",
+    example: () => "Something like '30 doors and drawers' or 'about 24'."
+  },
+  {
+    id: "cabinet_scope",
+    priority: 29.82,
+    relevant: (c2) => componentKind(c2) === "cabinets" && c2.cabinetScope !== "inside_too",
+    alreadyAnswered: (c2) => c2.cabinetScope === "inside_too" || extDone(c2, "cabinet_scope"),
+    ask: (c2) => pick(["Do you want the inside of the cabinet boxes painted too, or just the doors, drawer fronts and frames?", "Just the outsides (doors, drawer fronts, frames), or the insides of the boxes as well?"], seed(c2)),
+    clarify: () => "Painting the insides adds a lot of time (tight spaces, more coats), so it costs more. Most people paint just the outsides.",
+    example: () => "Say 'outsides only' or 'yes, the insides too'."
+  },
+  {
+    id: "cabinet_method",
+    priority: 29.84,
+    relevant: (c2) => componentKind(c2) === "cabinets" && !c2.cabinetMethod,
+    alreadyAnswered: (c2) => !!c2.cabinetMethod || extDone(c2, "cabinet_method"),
+    ask: (c2) => pick(["Sprayed for the smoothest, factory-like finish, or brushed and rolled?", "Do you want them sprayed or brushed and rolled? Spraying looks smoother and costs more."], seed(c2)),
+    clarify: () => "Spraying gives a smooth, factory-like finish with no brush marks but takes more masking and set-up, so it costs more. Brushed and rolled is the standard way and still looks good.",
+    example: () => "Say 'sprayed', 'brushed is fine', or 'painter's choice'."
+  },
+  {
+    id: "cabinet_hardware",
+    priority: 29.86,
+    relevant: (c2) => componentKind(c2) === "cabinets" && c2.hardwareReplacement !== "yes",
+    alreadyAnswered: (c2) => c2.hardwareReplacement === "yes" || extDone(c2, "cabinet_hardware"),
+    ask: (c2) => pick(["Are the hinges and pulls staying, or are you putting in new hardware?", "What about the hardware: reuse the existing hinges and pulls, or replace them?"], seed(c2)),
+    clarify: () => "The painter takes the hardware off and puts it back as part of the job. Installing new hinges or pulls is a separate small charge (the hardware itself is extra).",
+    example: () => "Say 'keep the hardware' or 'new pulls and hinges'."
+  },
+  {
+    id: "builtin_count",
+    priority: 29.7,
+    relevant: (c2) => componentKind(c2) === "builtins" && c2.builtInCount == null,
+    alreadyAnswered: (c2) => c2.builtInCount != null || extDone(c2, "builtin_count"),
+    ask: (c2) => pick(["How many built-in units or sections are there?", "About how many built-ins or shelving sections are we painting?"], seed(c2)),
+    clarify: () => "Each built-in or shelving section is priced on its own, so a rough count is what I need.",
+    example: () => "Something like '2 built-in bookcases' or 'one wall of shelves'."
+  },
   {
     // The same question for the baseboards/trim and the doors: bare wood needs primer, stained or varnished wood must be deglossed and sealed, painted needs the least.
     id: "trim_door_finish",
@@ -21531,11 +21820,42 @@ var TOPICS = [
   {
     id: "chair_count",
     priority: 29.94,
-    relevant: (c2) => c2.furnitureItems.includes("chair") && c2.chairCount == null,
-    alreadyAnswered: (c2) => c2.chairCount != null || extDone(c2, "chair_count"),
-    ask: (c2) => pick(["About how many chairs are getting painted?", "How many chairs is that?"], seed(c2)),
-    clarify: () => "Each chair is priced on its own (they take a lot of cutting in around the spindles and legs), so I need a rough count.",
-    example: () => "Something like '6 chairs' or 'four'."
+    relevant: (c2) => c2.itemsOnly && c2.furnitureItems.length > 0 && !c2.furnitureCountKnown || c2.furnitureItems.includes("chair") && c2.chairCount == null && !c2.furnitureCountKnown,
+    alreadyAnswered: (c2) => c2.chairCount != null || c2.furnitureCountKnown || extDone(c2, "chair_count"),
+    ask: (c2) => {
+      const kinds = [...new Set(c2.furnitureItems)];
+      if (kinds.length > 1) return "How many of each piece are we painting? Something like '4 chairs and a table'.";
+      const noun = kinds[0] === "chair" || kinds.length === 0 ? "chairs" : itemsPhrase([kinds[0], kinds[0]]).replace(/^2 /, "");
+      return pick([`About how many ${noun} are getting done?`, `How many ${noun} is that?`], seed(c2));
+    },
+    clarify: () => "Each piece is priced on its own (chairs take a lot of cutting in around the spindles and legs), so I need a rough count.",
+    example: () => "Something like '6 chairs', 'four', or '2 chairs and a table'."
+  },
+  {
+    // "furniture" with no piece named
+    id: "furniture_kind",
+    priority: 29.9,
+    relevant: (c2) => c2.furnitureUnspecified && c2.furnitureItems.length === 0,
+    alreadyAnswered: (c2) => c2.furnitureItems.length > 0 || extDone(c2, "furniture_kind"),
+    ask: (c2) => pick(["What kind of furniture is it, and how many pieces?", "Which pieces are we painting? A dresser, table, chairs, something else?"], seed(c2)),
+    clarify: () => "I price each piece on its own (a chair, a dining table, a dresser, a bookcase and so on), so I need to know what they are.",
+    example: () => "Something like '4 dining chairs and a table' or 'one dresser and two nightstands'."
+  },
+  {
+    // what is being done to the pieces: repaint, refresh the stain, strip and refinish
+    id: "furniture_finish",
+    priority: 29.96,
+    relevant: (c2) => c2.itemsOnly && c2.furnitureItems.length > 0 && !c2.furnitureTreatment,
+    alreadyAnswered: (c2) => !!c2.furnitureTreatment || extDone(c2, "furniture_finish"),
+    ask: (c2) => pick(
+      [
+        `What are the ${[...new Set(c2.furnitureItems)].length > 1 ? "pieces" : itemsPhrase([c2.furnitureItems[0], c2.furnitureItems[0]]).replace(/^2 /, "")} like now: painted, stained or bare wood? And do you want them repainted, restained or refinished?`,
+        "Is the finish painted or stained right now, and do you want a new coat of paint, a fresh stain, or stripped back and refinished?"
+      ],
+      seed(c2)
+    ),
+    clarify: () => "A fresh coat over sound paint is the quickest. Restaining or stripping back to bare wood takes sanding and more coats, so it costs more per piece.",
+    example: () => "Something like 'painted white, repaint them black', 'stained oak, refresh the stain', or 'strip them down and refinish'."
   },
   {
     id: "shutter_count",
@@ -21771,9 +22091,15 @@ var TOPICS = [
   {
     id: "color_change",
     priority: 35,
-    relevant: (c2) => (c2.projectType === "interior" || c2.projectType === "both") && (c2.interiorWalls !== "no" || c2.interiorCeilings === "yes" || c2.interiorTrim === "yes" || c2.cabinets !== "none"),
+    relevant: (c2) => c2.itemsOnly || componentKind(c2) !== "" || (c2.projectType === "interior" || c2.projectType === "both") && (c2.interiorWalls !== "no" || c2.interiorCeilings === "yes" || c2.interiorTrim === "yes" || c2.cabinets !== "none"),
     alreadyAnswered: (c2) => !!c2.interiorColorChange,
-    ask: (c2) => pick(
+    ask: (c2) => c2.itemsOnly ? pick(
+      [
+        c2.furnitureTreatment === "restain" ? "Are we matching the current stain color, or going a different shade?" : "Are we keeping the current color, or changing it?",
+        "Same color as it is now, or something new?"
+      ],
+      seed(c2)
+    ) : pick(
       [
         "Is it the same color going back, or a different one?",
         "Are you sticking with the same color, or changing it up?",
@@ -21944,16 +22270,29 @@ var TOPICS = [
     }
   }
 ];
+var ITEM_JOB_TOPICS = /* @__PURE__ */ new Set(["furniture_kind", "chair_count", "furniture_finish", "color_change", "paint_brand", "location", "timeline_and_access"]);
+var COMPONENT_COMMON = ["color_change", "paint_brand", "location", "timeline_and_access"];
+var COMPONENT_TOPICS = {
+  cabinets: ["cabinet_count", "cabinet_finish", "cabinet_scope", "cabinet_method", "cabinet_hardware"],
+  builtins: ["builtin_count"],
+  mantel: [],
+  railing: ["railing_length"]
+};
+var askableFor = (ctx, id) => {
+  if (ctx.itemsOnly) return ITEM_JOB_TOPICS.has(id);
+  const kind = componentKind(ctx);
+  return !kind || COMPONENT_COMMON.includes(id) || COMPONENT_TOPICS[kind].includes(id);
+};
 function pickNextTopic(ctx, asked) {
   const candidates = TOPICS.filter(
-    (t2) => !asked.includes(t2.id) && t2.relevant(ctx) && !t2.alreadyAnswered(ctx)
+    (t2) => !asked.includes(t2.id) && askableFor(ctx, t2.id) && t2.relevant(ctx) && !t2.alreadyAnswered(ctx)
   );
   candidates.sort((a, b) => a.priority - b.priority);
   return candidates[0] ?? null;
 }
 function pickRetryTopic(ctx, asked, retried) {
   const candidates = TOPICS.filter(
-    (t2) => asked.includes(t2.id) && !retried.includes(t2.id) && t2.relevant(ctx) && !t2.alreadyAnswered(ctx)
+    (t2) => asked.includes(t2.id) && !retried.includes(t2.id) && askableFor(ctx, t2.id) && t2.relevant(ctx) && !t2.alreadyAnswered(ctx)
   );
   candidates.sort((a, b) => a.priority - b.priority);
   return candidates[0] ?? null;
@@ -22151,6 +22490,7 @@ function makeInitialContext() {
     wallTexture: "smooth",
     doorMaterial: "wood",
     cabinetScope: "fronts_only",
+    cabinetMethod: "",
     cabinetFinish: "",
     trimFinish: "",
     doorFinish: "",
@@ -22168,6 +22508,12 @@ function makeInitialContext() {
     epoxyGarageSqft: null,
     epoxyType: "basic",
     furnitureItems: [],
+    itemsOnly: false,
+    furnitureUnspecified: false,
+    furnitureCountKnown: false,
+    furnitureTreatment: "",
+    furnitureMaterial: "",
+    furnitureSanding: false,
     brickSqft: null,
     brickTreatment: "paint",
     answeredQuestions: 0,
@@ -22465,6 +22811,23 @@ var tallest = (ctx) => (ctx.squareFeet ?? 0) >= 3e3 ? 3 : 2;
 var higher = (what) => `No problem, I'll go with ${what}, the higher-priced option, so the price won't come in short. A painter can adjust it once they see the place.`;
 var withExt = (ctx, id) => [.../* @__PURE__ */ new Set([...ctx.extAnswered ?? [], id])];
 function highestPriceAssumption(topicId, ctx) {
+  if (ctx.itemsOnly) {
+    switch (topicId) {
+      case "furniture_finish":
+        return { patch: { furnitureTreatment: "strip_refinish", furnitureSanding: true }, say: higher("stripping and refinishing the pieces") };
+      case "color_change":
+        return { patch: { interiorColorChange: "different" }, say: higher("a new color") };
+      case "chair_count":
+      case "furniture_kind":
+        return { patch: { furnitureCountKnown: true, extAnswered: withExt(ctx, topicId) }, say: "No problem, I'll estimate that from the usual number, and you can change it when you see the price." };
+      case "location":
+        return { patch: {}, reask: true, say: "I do need a ZIP code. It's how I find painters near you and price it for your area. Nothing else gets saved with it." };
+      case "paint_brand":
+        return { patch: { extAnswered: withExt(ctx, topicId) }, say: "No problem, the painter will choose the paint." };
+      default:
+        return null;
+    }
+  }
   switch (topicId) {
     case "project_type":
       return { patch: {}, reask: true, say: "I do need to know which one, since inside and outside are priced very differently.", askUntilClear: true };
@@ -22543,6 +22906,14 @@ function highestPriceAssumption(topicId, ctx) {
     case "paint_grade":
     case "paint_finish":
       return { patch: { extAnswered: withExt(ctx, topicId) }, say: "No problem, the painter will choose the paint." };
+    case "cabinet_scope":
+      return { patch: { cabinetScope: "inside_too", extAnswered: withExt(ctx, topicId) }, say: higher("painting the insides of the cabinets too") };
+    case "cabinet_method":
+      return { patch: { cabinetMethod: "sprayed", extAnswered: withExt(ctx, topicId) }, say: higher("a sprayed finish") };
+    case "cabinet_hardware":
+      return { patch: { extAnswered: withExt(ctx, topicId) }, say: "No problem, the existing hardware goes back on." };
+    case "cabinet_count":
+    case "builtin_count":
     case "door_count":
     case "window_count":
     case "closet_count":
@@ -22935,7 +23306,7 @@ async function processMessage(state, trimmed, customerId) {
     const low = trimmed.toLowerCase();
     const ruledOut = new Set(state.ctx.excludedSurfaces ?? []);
     const added = new Set(state.ctx.addedSurfaces ?? []);
-    const surfaceWord = "(?:the\\s+|any\\s+|our\\s+)?(?:ceilings?|trim|baseboards?|doors?|cabinets?|cabinetry)";
+    const surfaceWord = "(?:the\\s+|any\\s+|our\\s+)?(?:walls?|ceilings?|trim|baseboards?|doors?|closets?|cabinets?|cabinetry)";
     const re = new RegExp("\\b(?:no|not|without|skip|except|excluding|leave out|don'?t (?:paint|do|need|want))\\s+" + surfaceWord + "(?:\\s*(?:,|or|and|&|nor)\\s*" + surfaceWord + ")*", "g");
     if (/\b(?:just|only)\s+(?:the\s+|our\s+)?(?:\w+\s+)?walls?\b|\bwalls?\s+only\b/.test(low) && !/\b(?:and|plus|also|with)\s+(?:the\s+)?(?:ceilings?|trim|baseboards?|doors?)\b/.test(low)) {
       ruledOut.add("ceilings");
@@ -22943,8 +23314,43 @@ async function processMessage(state, trimmed, customerId) {
       ruledOut.add("doors");
     }
     let m2;
+    const ruledOutNow = /* @__PURE__ */ new Set();
     while (m2 = re.exec(low)) {
-      for (const w2 of m2[0].match(/ceilings?|trim|baseboards?|doors?|cabinets?|cabinetry/g) ?? []) ruledOut.add(w2.startsWith("ceiling") ? "ceilings" : w2.startsWith("door") ? "doors" : w2.startsWith("cabinet") ? "cabinets" : "trim");
+      for (const w2 of m2[0].match(/walls?|ceilings?|trim|baseboards?|doors?|closets?|cabinets?|cabinetry/g) ?? []) {
+        const key = w2.startsWith("wall") ? "walls" : w2.startsWith("ceiling") ? "ceilings" : w2.startsWith("door") ? "doors" : w2.startsWith("closet") ? "closets" : w2.startsWith("cabinet") ? "cabinets" : "trim";
+        ruledOut.add(key);
+        ruledOutNow.add(key);
+      }
+    }
+    const wordFor = {
+      walls: [/walls?/, () => {
+        ctxWithExplicit.interiorWalls = "yes";
+      }],
+      ceilings: [/ceilings?/, () => {
+        ctxWithExplicit.interiorCeilings = "yes";
+      }],
+      trim: [/(?:trim|baseboards?)/, () => {
+        ctxWithExplicit.interiorTrim = "yes";
+      }],
+      doors: [/doors?/, () => {
+        ctxWithExplicit.interiorDoors = "some";
+        ctxWithExplicit.doorsIncluded = true;
+      }],
+      closets: [/closets?/, () => {
+        ctxWithExplicit.closets = "standard";
+      }],
+      cabinets: [/cabinets?/, () => {
+        ctxWithExplicit.cabinets = ctxWithExplicit.cabinets === "none" ? "kitchen" : ctxWithExplicit.cabinets;
+      }]
+    };
+    for (const key of [...ruledOut]) {
+      if (ruledOutNow.has(key) || !(state.ctx.excludedSurfaces ?? []).includes(key)) continue;
+      const w2 = wordFor[key][0].source;
+      if (new RegExp("\\b(?:add|include|including|also|plus|and|yes|do|paint|want)\\b[^.,;!?]{0,25}\\b" + w2 + "\\b|\\b" + w2 + "\\s+(?:too|as well)\\b").test(low)) {
+        ruledOut.delete(key);
+        added.add(key);
+        wordFor[key][1]();
+      }
     }
     const offer = {
       upsell_ceilings: { field: "interiorCeilings", on: "yes", word: /\bceilings?\b/, key: "ceilings" },
@@ -22975,7 +23381,7 @@ async function processMessage(state, trimmed, customerId) {
         }
       }
     }
-    if (ruledOut.size > 0) ctxWithExplicit.excludedSurfaces = [...ruledOut];
+    if (ruledOut.size > 0 || (state.ctx.excludedSurfaces ?? []).length > 0) ctxWithExplicit.excludedSurfaces = [...ruledOut];
     for (const key of ruledOut) added.delete(key);
     if (added.size > 0) ctxWithExplicit.addedSurfaces = [...added];
   }
@@ -23206,6 +23612,7 @@ ${trimmed}`.trim();
     responseStyle: classifyResponseStyle(responseLengths.reduce((sum, n) => sum + n, 0) / responseLengths.length),
     responseLengths
   };
+  Object.assign(ctxNext, enforceExclusions(ctxNext));
   const fullScopeAnswer = state.lastBotTopic?.id === "surfaces" && /\b(everything|all of it|the works|full (?:package|scope)|(?:the )?whole (?:thing|room|place|apartment|house|home|unit|space))\b/i.test(trimmed) && ctxNext.surfacesAddressed && ctxNext.interiorWalls !== "no" && ctxNext.interiorCeilings !== "no" && ctxNext.interiorTrim !== "no" && ctxNext.interiorDoors !== "none";
   if (fullScopeAnswer) ctxNext.trimScopeAddressed = true;
   if (ctxNext.zipCode && (ctxNext.zipCode !== state.ctx.zipCode || !ctxNext.zipCity)) {
@@ -23321,7 +23728,8 @@ ${trimmed}`.trim();
       return { state: s, done: null };
     }
     if (hasIntent(intent, "frustration") && !hasIntent(intent, "already_answered")) {
-      s = { ...s, history: [...s.history, botMessage(metaBank.frustration())] };
+      const recentBot = s.history.filter((m2) => m2.role === "bot").slice(-4);
+      if (!recentBot.some((m2) => /^Sorry about that/.test(m2.text))) s = { ...s, history: [...s.history, botMessage(metaBank.frustration())] };
     } else if (hasIntent(intent, "greeting") && s.askedIds.length === 0 && Object.keys(patch).length === 0) {
       s = { ...s, history: [...s.history, botMessage(metaBank.greeting())] };
       return { state: s, done: null };
@@ -23333,7 +23741,8 @@ ${trimmed}`.trim();
   const isMajorCorrection = patch.projectType !== void 0 || patch.propertyType !== void 0 || patch.interiorScope !== void 0;
   if (hasIntent(intent, "negation") && s.lastBotTopic && !isMajorCorrection) {
     const reply = metaBank.negation_after_topic(s.lastBotTopic.id);
-    s = { ...s, history: [...s.history, botMessage(reply)] };
+    const stutter = reply === "Got it." && s.history.filter((m2) => m2.role === "bot").slice(-3).some((m2) => /^Got it\b/.test(m2.text));
+    if (!stutter) s = { ...s, history: [...s.history, botMessage(reply)] };
   }
   if (hasIntent(intent, "already_answered") && s.lastBotTopic) {
     const topic = s.lastBotTopic;
@@ -23407,7 +23816,8 @@ ${trimmed}`.trim();
       (k) => !ignoredKeys.has(k) && JSON.stringify(ctxNext[k]) !== JSON.stringify(state.ctx[k])
     );
     const plainReply = /^(yes|yeah|yep|yup|no|nope|nah|ok|okay|sure|fine|maybe|idk|not sure|skip)\b[.!]?$/i.test(trimmed);
-    if (topic && !topic.alreadyAnswered(ctxNext) && !changed && !clarified.includes(topic.id) && !s.wrapupAsked && !/\b(run it|price it|go ahead|that'?s (?:all|it)|done)\b/i.test(trimmed) && !trimmed.endsWith("?") && !plainReply && trimmed.split(/\s+/).length >= 2 && !hasIntent(intent, "ready_to_finish") && !hasIntent(intent, "express_uncertainty") && !hasIntent(intent, "negation") && !hasIntent(intent, "ask_clarification") && !hasIntent(intent, "ask_example") && !hasIntent(intent, "greeting")) {
+    if (topic && !topic.alreadyAnswered(ctxNext) && !changed && !clarified.includes(topic.id) && !(ctxNext.itemsOnly && saysItemsOnly(trimmed)) && // "furniture only" repeats the scope, it is not a wrong answer to the pending question
+    !s.wrapupAsked && !/\b(run it|price it|go ahead|that'?s (?:all|it)|done)\b/i.test(trimmed) && !trimmed.endsWith("?") && !plainReply && trimmed.split(/\s+/).length >= 2 && !hasIntent(intent, "ready_to_finish") && !hasIntent(intent, "express_uncertainty") && !hasIntent(intent, "negation") && !hasIntent(intent, "ask_clarification") && !hasIntent(intent, "ask_example") && !hasIntent(intent, "greeting")) {
       const q = topic.ask(ctxNext);
       s = {
         ...s,
@@ -23415,7 +23825,7 @@ ${trimmed}`.trim();
         history: [
           ...s.history,
           botMessage(
-            `I'm not sure how that answers my question about ${topicLabel(topic.id)}, and I'd rather ask than guess. ${recapSentence(recentRecognized(state.history))} ${q} If something above is wrong, just tell me what to change.`.replace(/\s{2,}/g, " ")
+            `I'm not sure how that answers my question about ${topicLabel(topic.id, ctxNext.itemsOnly)}, and I'd rather ask than guess. ${recapSentence(recentRecognized(state.history))} ${q} If something above is wrong, just tell me what to change.`.replace(/\s{2,}/g, " ")
           )
         ]
       };
@@ -23509,6 +23919,21 @@ async function advanceAfterUncertainty(state, customerId) {
     },
     done: null
   };
+}
+function enforceExclusions(ctx) {
+  const ex = ctx.excludedSurfaces ?? [];
+  const p2 = {};
+  if (ex.length === 0) return p2;
+  if (ex.includes("walls") && ctx.interiorWalls !== "no") p2.interiorWalls = "no";
+  if (ex.includes("ceilings") && ctx.interiorCeilings !== "no") p2.interiorCeilings = "no";
+  if (ex.includes("trim") && ctx.interiorTrim !== "no") p2.interiorTrim = "no";
+  if (ex.includes("doors") && ctx.interiorDoors !== "none") {
+    p2.interiorDoors = "none";
+    p2.doorsIncluded = false;
+  }
+  if (ex.includes("closets") && ctx.closets !== "none") p2.closets = "none";
+  if (ex.includes("cabinets") && ctx.cabinets !== "none") p2.cabinets = "none";
+  return p2;
 }
 function readyToQuote(ctx) {
   if (!ctx.projectType) return false;
@@ -24110,6 +24535,133 @@ async function dismissAt(setup, topicWords, dismissal = "doesnt matter just want
   check('"anything else?" does not mention ceiling height', !/ceiling height|how tall/i.test(wrapText), wrapText);
   const std = await play(["yes, standard"], [], st2);
   check('"yes, standard" is recorded and not asked again', std.state.ctx.ceilingHeightKnown === true && std.state.ctx.ceilingHeight === "standard" && !/(?:is it|are the ceilings|are they) standard/i.test(std.last), std.last);
+}
+{
+  const ROOM_QUESTION = /inside, (?:the )?outside|interior, exterior|which rooms|what rooms|ceilings?|baseboards?|trim|doors?|walls?\b|ceiling height|how tall|rental|living there|anyone (?:be |living )|occupied|furnished, or empty|room size|how big is the|square feet/i;
+  const asksRoomThings = (turns) => turns.filter((t4) => ROOM_QUESTION.test(t4.replace(/\[\[[^\]]*\]\]/g, "").replace(/just [a-z ,]+, no rooms or walls/gi, "")));
+  const f = await play([
+    "i need some chairs painted",
+    "1 chair to paint",
+    "the furniture needs sanded",
+    "refreshing the stain",
+    "same stain color",
+    "painters choice",
+    "91941",
+    "whenever",
+    "no"
+  ]);
+  const fc = f.state.ctx;
+  check("chairs: recognised as a furniture-only job on the first message", fc.itemsOnly === true && fc.furnitureItems.includes("chair"), JSON.stringify({ items: fc.furnitureItems, only: fc.itemsOnly }));
+  check("chairs: the first question is how many, not inside or outside", /how many/i.test(f.turns[0]) && !/inside|outside|interior|exterior/i.test(f.turns[0]), f.turns[0]);
+  check("chairs: no room, wall, ceiling, trim, door, height or occupancy question in the whole conversation", asksRoomThings(f.turns).length === 0, asksRoomThings(f.turns).join(" ## "));
+  check('chairs: "1 chair to paint" is read as one chair', fc.chairCount === 1 && fc.furnitureItems.length === 1 && fc.furnitureCountKnown, JSON.stringify({ n: fc.chairCount, items: fc.furnitureItems }));
+  check('chairs: "needs sanded" and "refreshing the stain" are read as a restain with sanding', fc.furnitureTreatment === "restain" && fc.furnitureSanding, JSON.stringify({ t: fc.furnitureTreatment, s: fc.furnitureSanding }));
+  check('chairs: "same stain color" answers the color question', fc.interiorColorChange === "same", fc.interiorColorChange);
+  check("chairs: no question is asked twice", new Set(f.turns.map((t4) => t4.split("||").pop().trim())).size === f.turns.length, f.turns.join(" ## "));
+  check('chairs: nothing is "circled back" to', !f.turns.some((t4) => /circling back/i.test(t4)), f.turns.join(" ## "));
+  const fe = calculateEstimate(fc);
+  check("chairs: one chair is a furniture price (a few hundred dollars), not a house", fe.total > 100 && fe.total < 700 && fe.lineItems.every((l) => /Furniture|Minimum|Scheduling|Mobil/i.test(l.description + l.category)), fe.total + " " + JSON.stringify(fe.lineItems.map((l) => l.description)));
+  const plain = calculateEstimate({ ...fc, furnitureTreatment: "", furnitureSanding: false });
+  const strip = calculateEstimate({ ...fc, furnitureTreatment: "strip_refinish", furnitureItems: Array(6).fill("chair"), chairCount: 6 });
+  const six = calculateEstimate({ ...fc, furnitureTreatment: "", furnitureSanding: false, furnitureItems: Array(6).fill("chair"), chairCount: 6 });
+  check("chairs: restaining and sanding cost at least a plain repaint", fe.total >= plain.total, fe.total + " vs " + plain.total);
+  check("chairs: stripping and refinishing six chairs costs more than repainting six", strip.total > six.total, strip.total + " vs " + six.total);
+  const g = await play([
+    "i need some chairs painted",
+    "doesnt matter we are talkign about chairs",
+    "moveable chairs only",
+    "nope, nothing in a room at all, only chairs",
+    "furniture only",
+    "no walls or ceilings",
+    "furniture only",
+    "again, no",
+    "oh my god, no",
+    "the furniture needs sanded",
+    "what does this have to do with anything",
+    "1 chair to paint",
+    "refreshing the stain",
+    "same stain color"
+  ]);
+  check("frustrated chairs: still no room, wall, ceiling, trim, door, height or occupancy question", asksRoomThings(g.turns).length === 0, asksRoomThings(g.turns).join(" ## "));
+  const restated = [2, 3, 4, 5, 6];
+  check(`frustrated chairs: restating the scope is acknowledged, not answered with "I'm not sure how that answers"`, !restated.some((i2) => /not sure how that answers/i.test(g.turns[i2])), restated.map((i2) => g.turns[i2]).join(" ## "));
+  check('frustrated chairs: "Sorry about that" is said at most once', g.turns.filter((t4) => /Sorry about that/.test(t4)).length <= 1, String(g.turns.filter((t4) => /Sorry about that/.test(t4)).length));
+  check('frustrated chairs: the bare "Got it." filler never repeats back to back', !g.turns.some((t4, i2) => i2 > 0 && /^Got it\./.test(t4) && /^Got it\./.test(g.turns[i2 - 1])), g.turns.join(" ## "));
+  check("frustrated chairs: the final price is a furniture price", calculateEstimate(g.state.ctx).total < 700, String(calculateEstimate(g.state.ctx).total));
+  const t1 = await play(["I have a dresser and two nightstands that need to be repainted"]);
+  check("dresser and nightstands are recognised and counted", t1.state.ctx.itemsOnly && t1.state.ctx.furnitureItems.filter((i2) => i2 === "dresser").length === 1 && t1.state.ctx.furnitureItems.filter((i2) => i2 === "nightstand").length === 2, JSON.stringify(t1.state.ctx.furnitureItems));
+  check("dresser job: next question is about the pieces, not rooms", !ROOM_QUESTION.test(t1.last), t1.last);
+  const t2 = await play(["can you paint my dining table and 6 chairs, wood, they are stained and I want them white"]);
+  check("table and 6 chairs: counted", t2.state.ctx.furnitureItems.length === 7 && t2.state.ctx.furnitureCountKnown, JSON.stringify(t2.state.ctx.furnitureItems));
+  check("table and 6 chairs: wood, repaint", t2.state.ctx.furnitureMaterial === "wood", JSON.stringify({ m: t2.state.ctx.furnitureMaterial, t: t2.state.ctx.furnitureTreatment }));
+  const t3 = await play(["I have some furniture I want painted"]);
+  check('"some furniture" with no piece named: asks which pieces', t3.state.ctx.itemsOnly && /furniture|pieces/i.test(t3.last) && !ROOM_QUESTION.test(t3.last), t3.last);
+  const r1 = await play(["I want my living room and the bedroom painted, walls and ceilings"]);
+  check("a room job that mentions no furniture is untouched", !r1.state.ctx.itemsOnly && r1.state.ctx.interiorWalls !== "no", JSON.stringify({ only: r1.state.ctx.itemsOnly, walls: r1.state.ctx.interiorWalls }));
+  const r2 = await play(["I want the walls in my living room painted and the chair rail too, the table stays"]);
+  check("a room job that mentions a table or chair rail is still a room job", !r2.state.ctx.itemsOnly, JSON.stringify({ only: r2.state.ctx.itemsOnly, items: r2.state.ctx.furnitureItems }));
+}
+{
+  const noDoorsAndDrawers = (t2) => t2.replace(/\[\[[^\]]*\]\]/g, "").replace(/doors,? (?:and )?drawer(?: fronts)?|doors and frames|drawer fronts and frames/gi, "");
+  const ROOM_Q = /ceilings?|\bwalls?\b|baseboards?|\btrim\b|\bdoors?\b|ceiling height|how tall|standard ceiling|rental|living (?:here|there)|anyone (?:be |living )|occupied|which rooms|what rooms|how (?:big|large) is (?:that|the)|inside, (?:the )?outside|interior, exterior|painted before|prep concerns|what kind of shape|good shape/i;
+  const roomQs = (turns) => turns.map(noDoorsAndDrawers).filter((t2) => ROOM_Q.test(t2));
+  const cab = await play([
+    "I want my kitchen cabinets painted white",
+    "about 30 cabinet doors and drawers, they are oak",
+    "yes the inside of the boxes too",
+    "sprayed",
+    "keep the hardware",
+    "same color",
+    "painters choice",
+    "91941",
+    "whenever",
+    "no"
+  ]);
+  const cc = cab.state.ctx;
+  check("cabinets: no ceiling, wall, trim, door, height, occupancy or room-size question anywhere", roomQs(cab.turns).length === 0, roomQs(cab.turns).join(" ## "));
+  check('cabinets: "Want me to add the ceilings" is never asked', !cab.turns.some((t2) => /add the ceilings|fresh ceilings/i.test(t2)), cab.turns.join(" ## "));
+  check("cabinets: the count of doors and drawers is asked first (or read from the first reply)", cab.turns.slice(0, 2).some((t2) => /how many (?:cabinet )?doors|doors and drawers/i.test(t2)), cab.turns.slice(0, 2).join(" ## "));
+  check("cabinets: the inside of the boxes is read as inside + out", cc.cabinetScope === "inside_too" && cc.cabinetDoorCount === 30, JSON.stringify({ s: cc.cabinetScope, n: cc.cabinetDoorCount }));
+  check("cabinets: sprayed is read, and hardware is asked about", cc.cabinetMethod === "sprayed" && cab.turns.some((t2) => /hardware|hinges/i.test(t2)), cc.cabinetMethod);
+  check("cabinets: walls, ceilings, trim and doors stay off", cc.interiorWalls === "no" && cc.interiorCeilings === "no" && cc.interiorTrim === "no" && cc.interiorDoors === "none", JSON.stringify({ w: cc.interiorWalls, c: cc.interiorCeilings, t: cc.interiorTrim, d: cc.interiorDoors }));
+  check("cabinets: no question is asked twice and nothing is circled back to", new Set(cab.turns.map((t2) => t2.split("||").pop().trim())).size === cab.turns.length && !cab.turns.some((t2) => /circling back/i.test(t2)), cab.turns.join(" ## "));
+  const cabE = calculateEstimate(cc);
+  check("cabinets: the price is the cabinets (a few thousand dollars), with no wall, ceiling, trim or door lines", cabE.total > 1500 && cabE.total < 9e3 && !cabE.lineItems.some((l) => /Interior Walls|Ceilings|Trim|Interior Doors/.test(l.description)), cabE.total + " " + JSON.stringify(cabE.lineItems.map((l) => l.description)));
+  const fronts = calculateEstimate({ ...cc, cabinetScope: "fronts_only", cabinetMethod: "brushed" });
+  const sprayedInside = calculateEstimate({ ...cc, cabinetScope: "inside_too", cabinetMethod: "sprayed" });
+  check("cabinets: insides and spraying cost more than outsides brushed", sprayedInside.total > fronts.total, sprayedInside.total + " vs " + fronts.total);
+  const cabPlus = await play(["I want my kitchen cabinets painted white", "and the ceiling too"]);
+  check("cabinets: when the customer adds the ceiling it is in the job", cabPlus.state.ctx.interiorCeilings === "yes", cabPlus.state.ctx.interiorCeilings);
+  const lr = await play(["I want my living room painted", "about 15 by 20", "yes the ceilings too, but not the trim", "no", "no", "no", "no", "91941", "whenever", "no"]);
+  const questionsIn = (turns) => turns.flatMap((t2) => t2.replace(/\[\[[^\]]*\]\]/g, "").split("||")).flatMap((p2) => p2.match(/[^.?!]*\?/g) ?? []).map((q) => q.trim());
+  const afterEx = questionsIn(lr.turns.slice(2));
+  check("living room: ceilings are in, the trim is out, the walls stay in", lr.state.ctx.interiorCeilings === "yes" && lr.state.ctx.interiorTrim === "no" && lr.state.ctx.interiorWalls === "yes", JSON.stringify({ c: lr.state.ctx.interiorCeilings, t: lr.state.ctx.interiorTrim, w: lr.state.ctx.interiorWalls }));
+  check("living room: nothing about the trim or baseboards is asked after it was ruled out", !afterEx.some((t2) => /\btrim\b|baseboards?/i.test(t2)), afterEx.filter((t2) => /\btrim\b|baseboards?/i.test(t2)).join(" ## "));
+  check('living room: the "painted before / bare / stained / primed" question is only about what is still in scope (the doors)', !lr.turns.some((t2) => /painted before|already painted/i.test(t2) && /trim|baseboard/i.test(t2)), lr.turns.join(" ## "));
+  const lrE = calculateEstimate(lr.state.ctx);
+  check("living room: priced for the walls and ceilings (and doors), no trim line, a sensible total", !lrE.lineItems.some((l) => /Trim/i.test(l.description)) && lrE.total > 900 && lrE.total < 5e3, lrE.total + " " + JSON.stringify(lrE.lineItems.map((l) => l.description)));
+  const lrReading = await play(
+    ["I want my living room painted", "about 15 by 20", "yes the ceilings too, but not the trim", "no", "no"],
+    [null, null, { patch: { interiorCeilings: "yes", interiorTrim: "yes", interiorDoors: "some" }, intents: ["provide_info"], acknowledgements: ["ceilings included"] }]
+  );
+  check(`living room (reader kept the trim on): the customer's "not the trim" still wins, and trim is never asked about`, lrReading.state.ctx.interiorTrim === "no" && !questionsIn(lrReading.turns.slice(2)).some((t2) => /\btrim\b|baseboards?/i.test(t2)), JSON.stringify({ t: lrReading.state.ctx.interiorTrim }) + " " + lrReading.turns.slice(2).join(" ## "));
+  const exclusions = [
+    { say: "not the trim", field: (c2) => c2.interiorTrim === "no", asks: /\btrim\b|baseboards?/i },
+    { say: "skip the baseboards", field: (c2) => c2.interiorTrim === "no", asks: /baseboards?|\btrim\b/i },
+    { say: "no doors", field: (c2) => c2.interiorDoors === "none", asks: /\bdoors?\b/i },
+    { say: "no closets", field: (c2) => c2.closets === "none", asks: /closets?/i },
+    { say: "not the ceilings", field: (c2) => c2.interiorCeilings === "no", asks: /ceilings?\b(?! height| standard)/i },
+    // (the height of the walls still matters for the price, so "ceiling height" is not the ceilings)
+    { say: "no walls", field: (c2) => c2.interiorWalls === "no", asks: /how are the walls|walls looking/i }
+  ];
+  for (const ex of exclusions) {
+    const run = await play(["I want my living room, walls, ceilings, trim, doors and closets painted", "about 15 by 20", ex.say, "no", "no", "no", "no", "no", "91941", "whenever", "no"]);
+    const later = questionsIn(run.turns.slice(2));
+    check(`excluded "${ex.say}": that surface is off`, ex.field(run.state.ctx), JSON.stringify({ w: run.state.ctx.interiorWalls, c: run.state.ctx.interiorCeilings, t: run.state.ctx.interiorTrim, d: run.state.ctx.interiorDoors, cl: run.state.ctx.closets }));
+    check(`excluded "${ex.say}": it is never asked about again`, !later.some((t2) => ex.asks.test(t2)), later.filter((t2) => ex.asks.test(t2)).join(" ## "));
+  }
+  const back = await play(["I want my living room painted, walls only", "about 15 by 20", "actually, add the ceilings too"]);
+  check("a surface ruled out earlier comes back when the customer asks for it", back.state.ctx.interiorCeilings === "yes" && !(back.state.ctx.excludedSurfaces ?? []).includes("ceilings"), JSON.stringify({ c: back.state.ctx.interiorCeilings, ex: back.state.ctx.excludedSurfaces }));
 }
 setLLMReaderForTests(void 0);
 console.log(failures ? `

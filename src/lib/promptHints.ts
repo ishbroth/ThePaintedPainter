@@ -18,7 +18,7 @@ const TOPIC_PROMPTS: Record<string, string> = {
   which_rooms: 'Which rooms?',
   room_size: 'About how big is the room?',
   house_size: 'Please estimate square feet',
-  surfaces: 'Which surfaces?',
+  surfaces: 'walls, ceilings, trim, etc…',
   paint_brand: 'Brand, or painter’s choice?',
   paint_grade: 'Standard or premium paint?',
   paint_finish: 'Finish, or painter’s choice?',

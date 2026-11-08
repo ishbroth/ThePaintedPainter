@@ -1299,19 +1299,17 @@ export interface EditableRoom {
 }
 
 /**
- * The rooms in this price, so the customer can drop one. A whole-home job uses the typical room mix for the
- * home's size (the same assumption the price is built on); a job for named rooms uses those rooms.
+ * The rooms in this price, so the customer can drop one — only when the customer actually named specific rooms.
+ * A whole-space job (just a total square footage, no room names — a house or a 4,000 sq ft restaurant alike) is
+ * priced from a typical room mix as an internal sizing assumption, but that mix is never shown or offered as
+ * removable: a commercial space doesn't have "bedrooms" to drop, and even for a house, the customer never
+ * confirmed there really is a "Bedroom 2" of that size. The dollar breakdown itself (walls, ceilings, trim...)
+ * already describes the job in its own honest, generic terms regardless of this list.
  */
 export function getEditableRooms(ctx: EstimatorContext): EditableRoom[] {
   if (ctx.projectType === 'exterior') return [];
-  const sqft = ctx.squareFeet || estimateSqftFromBedrooms(ctx.bedroomCount) || 1500;
-  const base = { ...ctx, excludedRooms: [] as string[] };
-  const keys =
-    ctx.interiorScope === 'specific_rooms' && ctx.selectedRooms.length > 0
-      ? ctx.selectedRooms
-      : ctx.interiorWalls === 'no' && ctx.interiorCeilings !== 'yes' && ctx.interiorTrim !== 'yes'
-      ? []
-      : getLayout(base, sqft).rooms;
+  if (ctx.interiorScope !== 'specific_rooms' || ctx.selectedRooms.length === 0) return [];
+  const keys = ctx.selectedRooms;
   if (keys.length < 2) return []; // a single room can't be taken off; remove its items instead
   const counts: Record<string, number> = {};
   return keys.map((key) => {

@@ -392,7 +392,7 @@ export const TOPICS: Topic[] = [
       if (hasKitchen) {
         return "For the kitchen, what all is getting painted, and are the cabinets included?";
       }
-      return 'What in the room are we painting?';
+      return 'Which surfaces are we painting?';
     },
     clarify: () =>
       "Some folks just want walls refreshed. Others want the whole package — walls, ceiling, trim, doors, closets. Either works. You can also mix and match.",
