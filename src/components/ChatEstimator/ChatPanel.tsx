@@ -15,6 +15,7 @@ import { hapticLight } from '../../lib/haptics';
 import { CHAT_STATE_KEY, QUOTE_EXPIRES_KEY, QUOTE_RESULT_KEY, PRICE_HOLD_MINUTES, startedFromHomeReload, clearEstimatorSession, isExpiredFinishedChat, readWorkWithAgain, clearWorkWithAgain } from '../../lib/chatEstimator/persistence';
 import { composerPrompt, GENERIC_PROMPT } from '../../lib/promptHints';
 import { isTTSSupported, speak, stopSpeaking, setupSpeechUnlock, prefetchSpeech, waitForSpeechEnd } from '../../lib/textToSpeech';
+import { isVoiceInputSupported, startVoiceTurn, stopVoiceTurn } from '../../lib/voiceInput';
 import { uploadQuotePhoto, analyzeQuotePhoto } from '../../lib/chatEstimator/photoUpload';
 import PhotoPopup from './PhotoPopup';
 import { loadAccountChatState, saveAccountChatState, deleteAccountChatState } from '../../lib/chatEstimator/accountPersistence';
@@ -108,6 +109,24 @@ const ChatPanel = () => {
   useEffect(() => {
     readAloudRef.current = readAloud;
   }, [readAloud]);
+
+  // Always the latest state, for the voice loop below: it's one long-running async function that outlives any single
+  // render, so a plain closure over `state` would go stale after its first turn.
+  const stateRef = useRef(state);
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
+
+  // Hands-free voice mode: listens with the phone's own speech engine (not the system keyboard's dictation button — see
+  // voiceInput.ts for why that one can't drive this), sends what it hears, waits for the reply to be spoken, and listens
+  // again — a real back-and-forth instead of type-and-send. Only offered where the native plugin actually works.
+  const [voiceInputSupported, setVoiceInputSupported] = useState(false);
+  useEffect(() => {
+    void isVoiceInputSupported().then(setVoiceInputSupported);
+  }, []);
+  const [voiceMode, setVoiceMode] = useState(false);
+  const voiceModeRef = useRef(false);
+  const [voiceListening, setVoiceListening] = useState(false);
 
   // Speaks the intro greeting once, if read-aloud is on and this is still a
   // fresh conversation. Read through a ref (see below) so callers created
@@ -218,6 +237,14 @@ const ChatPanel = () => {
   }, [state.history, readAloud, ttsSupported]);
 
   useEffect(() => stopSpeaking, []);
+
+  useEffect(
+    () => () => {
+      voiceModeRef.current = false;
+      void stopVoiceTurn();
+    },
+    [],
+  );
 
   useEffect(() => setupSpeechUnlock(), []);
 
@@ -362,23 +389,81 @@ const ChatPanel = () => {
     setState(makeInitialState());
   }
 
+  /** What sending an answer actually does, however it arrived (typed or spoken). Returns the reply so a caller can wait on it. */
+  async function submitText(text: string): Promise<ChatState> {
+    setPendingText(text);
+    setThinking(true);
+    try {
+      const result = await handleUserMessage(stateRef.current, text, user?.id);
+      setState(result.state);
+      return result.state;
+    } finally {
+      setThinking(false);
+      setPendingText('');
+    }
+  }
+
   async function send() {
     if (!input.trim()) return;
     hapticLight();
+    void stopVoiceTurn(); // typing while the mic happened to be open takes over from it
     const text = input;
     setInput('');
     if (composerRef.current) composerRef.current.textContent = '';
     focusComposerNextRef.current = true;
-    setPendingText(text);
-    setThinking(true);
-    try {
-      const result = await handleUserMessage(state, text, user?.id);
-      setState(result.state);
-    } finally {
-      setThinking(false);
-      setPendingText('');
-      // the cursor goes back to the next line, ready for the next answer (focused once the new composer is on screen)
+    // the cursor goes back to the next line, ready for the next answer (focused once the new composer is on screen)
+    await submitText(text);
+  }
+
+  /**
+   * One hands-free round: wait for any reply still being spoken (never listen while the phone is talking — that overlap is
+   * what made the system dictation mic "override" the voice), listen until the phone's own speech engine hears a pause and
+   * decides the person is done (the same instinct a phone operator has — no timer of our own needed), send what it heard,
+   * then wait for that reply to be spoken before going again. Keeps going until voice mode is turned off.
+   */
+  async function runVoiceLoop() {
+    while (voiceModeRef.current) {
+      if (ttsSupported) await waitForSpeechEnd();
+      if (!voiceModeRef.current) break;
+
+      setVoiceListening(true);
+      const heard = await startVoiceTurn((partial) => {
+        if (composerRef.current) composerRef.current.textContent = partial;
+      });
+      setVoiceListening(false);
+      if (composerRef.current) composerRef.current.textContent = '';
+      if (!voiceModeRef.current) break;
+
+      const text = heard.trim();
+      if (!text) continue; // nothing understood (or it was stopped) — listen again rather than send nothing
+
+      hapticLight();
+      const replied = await submitText(text);
+      if (!voiceModeRef.current) break;
+
+      // give the read-aloud effect a moment to notice the new message and start speaking it (it runs in its own effect,
+      // a tick after this state update lands) before asking whether speech has finished — otherwise this could race
+      // ahead and start listening again before the reply has even begun playing.
+      const expectedLen = replied.history.length;
+      const waitStarted = Date.now();
+      while (lastSpokenIndexRef.current < expectedLen && Date.now() - waitStarted < 4000) {
+        await new Promise((r) => setTimeout(r, 60));
+      }
     }
+  }
+
+  function toggleVoiceMode() {
+    if (voiceMode) {
+      voiceModeRef.current = false;
+      setVoiceMode(false);
+      setVoiceListening(false);
+      void stopVoiceTurn();
+      return;
+    }
+    if (!readAloudRef.current) toggleReadAloud(); // a hands-free conversation has to talk back
+    voiceModeRef.current = true;
+    setVoiceMode(true);
+    void runVoiceLoop();
   }
 
   function toggleReadAloud() {
@@ -806,6 +891,18 @@ const ChatPanel = () => {
         )}
 
         <div className="chat-footer-row">
+          {voiceInputSupported && (
+            <button
+              type="button"
+              className={`chat-voice-toggle ${voiceMode ? 'active' : ''} ${voiceListening ? 'listening' : ''}`}
+              onClick={toggleVoiceMode}
+              aria-pressed={voiceMode}
+              aria-label={voiceMode ? 'Stop talking to the estimator' : 'Talk to the estimator'}
+              title={voiceMode ? (voiceListening ? 'Listening…' : 'Talking — tap to stop') : 'Talk instead of typing'}
+            >
+              {voiceMode ? (voiceListening ? '\u{1F3A4} Listening…' : '\u{1F3A4} Talking') : '\u{1F3A4} Talk'}
+            </button>
+          )}
           {ttsSupported && (
             <button
               type="button"

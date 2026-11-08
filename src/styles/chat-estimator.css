@@ -96,6 +96,37 @@
   background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
 
+.chat-voice-toggle {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.chat-voice-toggle.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.chat-voice-toggle.listening {
+  animation: chat-voice-pulse 1.1s ease-in-out infinite;
+}
+
+@keyframes chat-voice-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
 .chat-messages {
   flex: 1 1 auto;
   padding: 10px 16px;

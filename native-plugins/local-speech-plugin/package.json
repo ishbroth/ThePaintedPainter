@@ -1,0 +1,17 @@
+{
+  "name": "local-speech-plugin",
+  "version": "1.0.0",
+  "description": "A local (not published) Capacitor plugin: the phone's own on-device speech recognition, for the estimator's hands-free voice mode. iOS only — there is no Android or web implementation.",
+  "private": true,
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "capacitor": {
+    "ios": {
+      "src": "ios"
+    }
+  },
+  "peerDependencies": {
+    "@capacitor/core": ">=7.0.0"
+  }
+}
