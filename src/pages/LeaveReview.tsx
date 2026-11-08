@@ -1,6 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { supabaseUrl, supabaseAnonKey } from '../lib/supabase';
+import { compressImage, uploadQuotePhoto } from '../lib/chatEstimator/photoUpload';
+
+const MAX_PHOTOS = 6;
 
 interface JobInfo {
   customerName: string | null;
@@ -48,6 +51,9 @@ const LeaveReview = () => {
   const [body, setBody] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [photos, setPhotos] = useState<{ file: File; previewUrl: string }[]>([]);
+  const [photoError, setPhotoError] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!token) {
@@ -67,16 +73,46 @@ const LeaveReview = () => {
       .finally(() => setLoading(false));
   }, [token]);
 
+  async function onPickPhotos(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []).filter((f) => f.type.startsWith('image/'));
+    e.target.value = '';
+    if (files.length === 0) return;
+    setPhotoError('');
+    const room = MAX_PHOTOS - photos.length;
+    if (room <= 0) return setPhotoError(`Up to ${MAX_PHOTOS} photos.`);
+    setPhotos((prev) => [...prev, ...files.slice(0, room).map((file) => ({ file, previewUrl: URL.createObjectURL(file) }))]);
+  }
+
+  function removePhoto(i: number) {
+    setPhotos((prev) => {
+      URL.revokeObjectURL(prev[i].previewUrl);
+      return prev.filter((_, idx) => idx !== i);
+    });
+  }
+
+  useEffect(
+    () => () => {
+      photos.forEach((p) => URL.revokeObjectURL(p.previewUrl));
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token || rating === 0) return;
     setSubmitting(true);
     setError('');
     try {
+      const uploaded: { url: string }[] = [];
+      for (const p of photos) {
+        const small = await compressImage(p.file).catch(() => p.file);
+        uploaded.push({ url: await uploadQuotePhoto(small) });
+      }
       const res = await fetch(`${supabaseUrl}/functions/v1/submit-review`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${supabaseAnonKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, rating, title: title.trim() || undefined, body: body.trim() || undefined }),
+        body: JSON.stringify({ token, rating, title: title.trim() || undefined, body: body.trim() || undefined, photos: uploaded }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to submit review');
@@ -169,6 +205,39 @@ const LeaveReview = () => {
             placeholder="Tell others about your experience..."
             style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--input-border)', background: 'var(--bg-surface)', color: 'var(--text-primary)', resize: 'vertical' }}
           />
+        </div>
+
+        <div style={{ marginBottom: 24 }}>
+          <label style={{ display: 'block', color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: 8 }}>
+            Photos (optional)
+          </label>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+            {photos.map((p, i) => (
+              <div key={i} style={{ position: 'relative', width: 80, height: 80 }}>
+                <img src={p.previewUrl} alt={`Attached photo ${i + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)' }} />
+                <button
+                  type="button"
+                  onClick={() => removePhoto(i)}
+                  aria-label="Remove photo"
+                  style={{ position: 'absolute', top: -6, right: -6, width: 22, height: 22, borderRadius: '50%', border: 'none', background: 'rgba(0,0,0,0.65)', color: '#fff', fontSize: 11, cursor: 'pointer' }}
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+            {photos.length < MAX_PHOTOS && (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                style={{ width: 80, height: 80, borderRadius: 8, border: '2px dashed var(--border-strong)', background: 'none', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2 }}
+              >
+                <span style={{ fontSize: '1.3rem', lineHeight: 1, color: 'var(--accent)' }}>+</span>
+                <span style={{ fontSize: '0.7rem' }}>Add</span>
+              </button>
+            )}
+          </div>
+          {photoError && <p style={{ color: 'var(--danger)', fontSize: '0.8rem', marginTop: 6 }}>{photoError}</p>}
+          <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={onPickPhotos} style={{ display: 'none' }} />
         </div>
 
         {error && <p style={{ color: 'var(--danger)', marginBottom: 16 }}>{error}</p>}

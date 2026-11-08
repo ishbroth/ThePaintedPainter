@@ -59,6 +59,8 @@ export interface PainterReview {
   body: string | null;
   reviewer: string;
   date: string;
+  /** Photos the customer attached to the review. */
+  photos: string[];
 }
 
 export interface PainterDetail {

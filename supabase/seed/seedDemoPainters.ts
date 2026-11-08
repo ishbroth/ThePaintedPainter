@@ -455,6 +455,7 @@ async function seedFlagshipJobs(p: RosterEntry, userId: string, index: number) {
         rating: 1,
         title: 'Not what I expected',
         body: 'The paint was patchy and one wall was missed. I tried to reach the crew but did not hear back.',
+        photos: p.portfolio_images[0] ? [{ url: p.portfolio_images[0] }] : [],
         customer_name: target.customer_name,
         created_at: timestampDaysAgo(3),
       });

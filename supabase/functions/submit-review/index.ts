@@ -40,13 +40,18 @@ serve(async (req: Request) => {
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
     if (!supabaseUrl || !serviceRoleKey) throw new Error('Missing Supabase environment variables')
 
-    const { token, rating, title, body } = await req.json() as {
-      token?: string; rating?: number; title?: string; body?: string
+    const { token, rating, title, body, photos: rawPhotos } = await req.json() as {
+      token?: string; rating?: number; title?: string; body?: string; photos?: unknown
     }
     if (!token) return jsonError('Missing token', 400)
     if (!rating || rating < 1 || rating > 5 || !Number.isInteger(rating)) {
       return jsonError('rating must be an integer from 1 to 5', 400)
     }
+    // up to 6 photos, each just a URL already uploaded to the quote-photos bucket (same as the chat estimator's own photos)
+    const photos = (Array.isArray(rawPhotos) ? rawPhotos : [])
+      .filter((p): p is { url: string } => !!p && typeof p.url === 'string' && /^https?:\/\//.test(p.url))
+      .slice(0, 6)
+      .map((p) => ({ url: p.url }))
 
     const supabase = createClient(supabaseUrl, serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false },
@@ -81,6 +86,7 @@ serve(async (req: Request) => {
         rating,
         title: title?.trim() || null,
         body: body?.trim() || null,
+        photos,
         customer_name: job.customer_name,
       })
 
@@ -118,6 +124,7 @@ serve(async (req: Request) => {
               rating,
               title: title?.trim() || null,
               body: body?.trim() || null,
+              photoCount: photos.length,
               projectLocation: job.customer_city || null,
               completedDate: job.completed_at ? String(job.completed_at).slice(0, 10) : null,
               avgRating: Math.round(avg * 10) / 10,

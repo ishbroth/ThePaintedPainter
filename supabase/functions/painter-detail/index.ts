@@ -66,10 +66,10 @@ serve(async (req: Request) => {
     const { data: reviewRows } = p.user_id
       ? await supabase
           .from('reviews')
-          .select('rating, title, body, customer_name, created_at')
+          .select('rating, title, body, customer_name, created_at, photos')
           .eq('painter_id', p.user_id)
           .order('created_at', { ascending: false })
-      : { data: [] as { rating: number; title: string | null; body: string | null; customer_name: string | null; created_at: string }[] }
+      : { data: [] as { rating: number; title: string | null; body: string | null; customer_name: string | null; created_at: string; photos: { url: string }[] | null }[] }
 
     const all = reviewRows ?? []
     const average = all.length ? Math.round((all.reduce((s, r) => s + r.rating, 0) / all.length) * 10) / 10 : null
@@ -112,6 +112,7 @@ serve(async (req: Request) => {
         body: r.body,
         reviewer: reviewerLabel(r.customer_name),
         date: String(r.created_at).slice(0, 10),
+        photos: (r.photos ?? []).map((p) => p.url).filter((u): u is string => typeof u === 'string'),
       })),
     })
   } catch (error) {

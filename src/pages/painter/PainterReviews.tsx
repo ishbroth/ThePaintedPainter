@@ -9,6 +9,7 @@ interface Review {
   body: string | null;
   customer_name: string | null;
   created_at: string;
+  photos: { url: string }[] | null;
 }
 
 function Stars({ rating, size = 'text-base' }: { rating: number; size?: string }) {
@@ -31,7 +32,7 @@ export default function PainterReviews() {
     if (!session?.user?.id) return;
     supabase
       .from('reviews')
-      .select('id, rating, title, body, customer_name, created_at')
+      .select('id, rating, title, body, customer_name, created_at, photos')
       .eq('painter_id', session.user.id)
       .order('created_at', { ascending: false })
       .then(({ data, error: fetchError }) => {
@@ -95,6 +96,15 @@ export default function PainterReviews() {
                   </div>
                   {review.title && <p className="text-[var(--text-primary)] font-medium text-sm mb-1">{review.title}</p>}
                   {review.body && <p className="text-sm text-[var(--text-secondary)] leading-relaxed">{review.body}</p>}
+                  {review.photos && review.photos.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      {review.photos.map((p, i) => (
+                        <a key={i} href={p.url} target="_blank" rel="noopener noreferrer">
+                          <img src={p.url} alt={`Photo ${i + 1} from this review`} loading="lazy" className="rounded-md object-cover w-20 h-20" />
+                        </a>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

@@ -274,6 +274,7 @@ ${body}
         <p style="margin:0 0 14px;color:#6b7280;font-size:14px;">${rating} out of 5</p>
         ${data.title ? `<p style="margin:0 0 8px;font-size:17px;font-weight:700;">${data.title}</p>` : ''}
         ${body ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="background:#f9fafb;border-left:4px solid #f59e0b;border-radius:4px;padding:14px 16px;font-size:15px;color:#374151;">${body}</td></tr></table>` : '<p style="color:#6b7280;font-size:14px;margin:0;">They left a rating without a written comment.</p>'}
+        ${Number(data.photoCount) > 0 ? `<p style="margin:8px 0 0;font-size:14px;color:#374151;">📷 ${data.photoCount} photo${Number(data.photoCount) === 1 ? '' : 's'} attached — see them on your reviews page.</p>` : ''}
         ${detailTable('Your rating', [
           ['Average', isFinite(avg) && avg > 0 ? `${avg.toFixed(1)} out of 5` : ''],
           ['Total reviews', isFinite(count) && count > 0 ? String(count) : ''],
