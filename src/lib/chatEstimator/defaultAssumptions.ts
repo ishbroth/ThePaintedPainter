@@ -64,7 +64,9 @@ export function defaultAssumptions(ctx: EstimatorContext): Assumption[] {
       label: 'Spot-prime bare wood / raw trim',
       reason: 'Any bare wood exposed by trim carpenters needs primer before paint.',
     });
-  } else if (ctx.projectCondition === 'repaint' || ctx.interiorWalls !== 'no') {
+  } else if ((ctx.projectType === 'interior' || ctx.projectType === 'both') && (ctx.projectCondition === 'repaint' || ctx.interiorWalls !== 'no')) {
+    // Interior wall-repaint prep only — a pure exterior job (a front door, a garage door) never belonged here just because
+    // interiorWalls sits at its untouched default; it has nothing to do with an interior wall.
     // Default "straightforward repaint" scope
     out.push({
       label: 'Light caulking on previously caulked trim',

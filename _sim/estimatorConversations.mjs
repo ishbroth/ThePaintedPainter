@@ -20206,7 +20206,7 @@ function defaultAssumptions(ctx) {
       label: "Spot-prime bare wood / raw trim",
       reason: "Any bare wood exposed by trim carpenters needs primer before paint."
     });
-  } else if (ctx.projectCondition === "repaint" || ctx.interiorWalls !== "no") {
+  } else if ((ctx.projectType === "interior" || ctx.projectType === "both") && (ctx.projectCondition === "repaint" || ctx.interiorWalls !== "no")) {
     out.push({
       label: "Light caulking on previously caulked trim",
       reason: "Standard refresh of any caulk lines that have cracked or pulled away.",
