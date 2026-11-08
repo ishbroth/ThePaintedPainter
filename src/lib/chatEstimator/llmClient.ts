@@ -191,7 +191,8 @@ function sanitize(raw: Record<string, unknown>, prev: EstimatorContext): Partial
   if (doorCount) patch.doorCount = doorCount;
   const windowCount = clampNumber(raw.windowCount, 1, 100);
   if (windowCount) patch.windowCount = windowCount;
-  const chairCount = clampNumber(raw.chairCount, 1, 60);
+  // commercial jobs (a restaurant, a banquet hall) can genuinely have hundreds of chairs — not just a house's handful
+  const chairCount = clampNumber(raw.chairCount, 1, 500);
   if (chairCount) patch.chairCount = chairCount;
   if (isEnum(raw.chairRail, ['yes'] as const)) patch.chairRail = raw.chairRail;
   const chairRailFeet = clampNumber(raw.chairRailLinearFeet, 5, 5000);

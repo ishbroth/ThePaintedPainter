@@ -18263,7 +18263,7 @@ var WORD_NUM = {
   "a couple": 2,
   "a pair": 2
 };
-var NUM = "(\\d{1,2}|a couple of|a couple|a pair of|a pair|an?|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)";
+var NUM = "(\\d{1,3}|a couple of|a couple|a pair of|a pair|an?|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)";
 var ITEM_PATTERNS = [
   { key: "nightstand", re: "night[\\s-]?stands?|bed[\\s-]?side tables?", label: ["nightstand", "nightstands"] },
   { key: "table_end", re: "(?:end|side|coffee|accent|console|sofa) tables?", label: ["small table", "small tables"] },
@@ -18652,7 +18652,7 @@ function extractDetails(text, ctx, askedId) {
     let allCounted = true;
     for (const f of found) {
       if (f.count == null) allCounted = false;
-      for (let i2 = 0; i2 < Math.min(f.count ?? 1, 60); i2++) list.push(f.key);
+      for (let i2 = 0; i2 < Math.min(f.count ?? 1, 500); i2++) list.push(f.key);
     }
     if (!ctx.furnitureCountKnown || askedId === "chair_count" && allCounted) {
       const kinds = [.../* @__PURE__ */ new Set([...ctx.furnitureItems, ...list])];
@@ -18729,7 +18729,7 @@ function extractDetails(text, ctx, askedId) {
       case "chair_count": {
         if (patch.furnitureItems) break;
         const kinds = [...new Set(ctx.furnitureItems)];
-        const n = /\b(?:just|only)?\s*(?:the\s+)?one\b|^\W*(?:a|an)\W*$/i.test(text) ? 1 : parseCount(text, 1, 60);
+        const n = /\b(?:just|only)?\s*(?:the\s+)?one\b|^\W*(?:a|an)\W*$/i.test(text) ? 1 : parseCount(text, 1, 500);
         if (n && kinds.length >= 1) {
           patch.furnitureItems = kinds.flatMap((k) => Array.from({ length: n }, () => k));
           patch.furnitureCountKnown = true;
@@ -18799,7 +18799,15 @@ function extractDetails(text, ctx, askedId) {
       case "furniture_finish": {
         const fin = parseFurnitureFinish(text);
         if (!fin.treatment && !patch.furnitureTreatment && /\b(?:same|existing|current|matching)\b/.test(text.toLowerCase())) patch.furnitureTreatment = ctx.furnitureTreatment || "restain";
-        if (fin.treatment || fin.material || fin.sanding || patch.furnitureTreatment) acks.push("how the pieces are finished");
+        const described = fin.treatment || fin.material || fin.sanding || patch.furnitureTreatment;
+        if (described) {
+          acks.push("how the pieces are finished");
+          const clean = text.replace(/\s+/g, " ").trim();
+          if (clean.length > 3 && !ctx.additionalDetails.toLowerCase().includes(clean.toLowerCase())) {
+            const base = patch.additionalDetails ?? ctx.additionalDetails;
+            patch.additionalDetails = `${base ? base + "; " : ""}customer note: ${clean.slice(0, 300)}`;
+          }
+        }
         break;
       }
       case "shutter_count": {
@@ -21845,7 +21853,10 @@ var TOPICS = [
     // what is being done to the pieces: repaint, refresh the stain, strip and refinish
     id: "furniture_finish",
     priority: 29.96,
-    relevant: (c2) => c2.itemsOnly && c2.furnitureItems.length > 0 && !c2.furnitureTreatment,
+    // Asked whenever any furniture is in the job, not just an items-only job: a chair or a table mentioned alongside a room
+    // still needs its own description — its condition and finish change what it costs, and the customer's own words go in
+    // the notes the painter sees.
+    relevant: (c2) => c2.furnitureItems.length > 0 && !c2.furnitureTreatment,
     alreadyAnswered: (c2) => !!c2.furnitureTreatment || extDone(c2, "furniture_finish"),
     ask: (c2) => pick(
       [
@@ -22691,7 +22702,7 @@ function sanitize(raw, prev) {
   if (doorCount) patch.doorCount = doorCount;
   const windowCount = clampNumber(raw.windowCount, 1, 100);
   if (windowCount) patch.windowCount = windowCount;
-  const chairCount = clampNumber(raw.chairCount, 1, 60);
+  const chairCount = clampNumber(raw.chairCount, 1, 500);
   if (chairCount) patch.chairCount = chairCount;
   if (isEnum(raw.chairRail, ["yes"])) patch.chairRail = raw.chairRail;
   const chairRailFeet = clampNumber(raw.chairRailLinearFeet, 5, 5e3);

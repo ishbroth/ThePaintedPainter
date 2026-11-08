@@ -368,7 +368,8 @@ export function extractDetails(text: string, ctx: EstimatorContext, askedId: str
     let allCounted = true;
     for (const f of found) {
       if (f.count == null) allCounted = false;
-      for (let i = 0; i < Math.min(f.count ?? 1, 60); i++) list.push(f.key);
+      // commercial jobs (a restaurant, a banquet hall) can genuinely have hundreds of pieces — not just a house's handful
+      for (let i = 0; i < Math.min(f.count ?? 1, 500); i++) list.push(f.key);
     }
     // numbers given with the pieces (or when asked how many) replace the guess; a bare repeat of a piece already counted changes nothing
     if (!ctx.furnitureCountKnown || (askedId === 'chair_count' && allCounted)) {
@@ -440,7 +441,8 @@ export function extractDetails(text: string, ctx: EstimatorContext, askedId: str
         // "3", "a couple", "just the one", or "2 chairs and a table": a lone number counts the one kind of piece
         if (patch.furnitureItems) break; // the counted pieces were read above
         const kinds = [...new Set(ctx.furnitureItems)];
-        const n = /\b(?:just|only)?\s*(?:the\s+)?one\b|^\W*(?:a|an)\W*$/i.test(text) ? 1 : parseCount(text, 1, 60);
+        // commercial jobs (a restaurant, a banquet hall) can genuinely have hundreds of pieces — not just a house's handful
+        const n = /\b(?:just|only)?\s*(?:the\s+)?one\b|^\W*(?:a|an)\W*$/i.test(text) ? 1 : parseCount(text, 1, 500);
         if (n && kinds.length >= 1) {
           // one number for several kinds means that many of each
           patch.furnitureItems = kinds.flatMap((k) => Array.from({ length: n }, () => k));
@@ -481,7 +483,18 @@ export function extractDetails(text: string, ctx: EstimatorContext, askedId: str
       case 'furniture_finish': {
         const fin = parseFurnitureFinish(text);
         if (!fin.treatment && !patch.furnitureTreatment && /\b(?:same|existing|current|matching)\b/.test(text.toLowerCase())) patch.furnitureTreatment = ctx.furnitureTreatment || 'restain';
-        if (fin.treatment || fin.material || fin.sanding || patch.furnitureTreatment) acks.push('how the pieces are finished');
+        const described = fin.treatment || fin.material || fin.sanding || patch.furnitureTreatment;
+        if (described) {
+          acks.push('how the pieces are finished');
+          // their own description of the piece(s), word for word, so the painter sees exactly what was said — not just the category it
+          // maps to. Only when the reply actually described something; a reply about an unrelated, already-settled question (the
+          // conversation moved on while this was still pending) never gets dumped into the notes.
+          const clean = text.replace(/\s+/g, ' ').trim();
+          if (clean.length > 3 && !ctx.additionalDetails.toLowerCase().includes(clean.toLowerCase())) {
+            const base = patch.additionalDetails ?? ctx.additionalDetails;
+            patch.additionalDetails = `${base ? base + '; ' : ''}customer note: ${clean.slice(0, 300)}`;
+          }
+        }
         break;
       }
       case 'shutter_count': {

@@ -18,7 +18,8 @@ const WORD_NUM: Record<string, number> = {
   a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12,
   couple: 2, pair: 2, 'a couple': 2, 'a pair': 2,
 };
-const NUM = '(\\d{1,2}|a couple of|a couple|a pair of|a pair|an?|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)';
+// \d{1,3}: a commercial job ("120 chairs" for a restaurant) can give a count well past a house's handful.
+const NUM = '(\\d{1,3}|a couple of|a couple|a pair of|a pair|an?|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)';
 
 // Order matters: the first pattern that claims a word wins (so "nightstand" is not also a "stand" and "end table" is not a dining table).
 const ITEM_PATTERNS: { key: string; re: string; label: [string, string] }[] = [

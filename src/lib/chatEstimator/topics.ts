@@ -797,7 +797,10 @@ export const TOPICS: Topic[] = [
     // what is being done to the pieces: repaint, refresh the stain, strip and refinish
     id: 'furniture_finish',
     priority: 29.96,
-    relevant: (c) => c.itemsOnly && c.furnitureItems.length > 0 && !c.furnitureTreatment,
+    // Asked whenever any furniture is in the job, not just an items-only job: a chair or a table mentioned alongside a room
+    // still needs its own description — its condition and finish change what it costs, and the customer's own words go in
+    // the notes the painter sees.
+    relevant: (c) => c.furnitureItems.length > 0 && !c.furnitureTreatment,
     alreadyAnswered: (c) => !!c.furnitureTreatment || extDone(c, 'furniture_finish'),
     ask: (c) =>
       pick(
