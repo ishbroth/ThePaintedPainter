@@ -11,7 +11,8 @@
 // Setup (once):
 //   1. In the Google Cloud project, enable "Cloud Text-to-Speech API" and make an API key allowed to call it.
 //   2. supabase secrets set GOOGLE_TTS_API_KEY=<that key>
-//      (optional) supabase secrets set TTS_VOICE=en-US-Neural2-D   TTS_RATE=1.0
+//      (optional) supabase secrets set TTS_VOICE=en-US-Neural2-D   TTS_RATE=1.0   TTS_PITCH=0
+//      (TTS_PITCH is in semitones, Google's range is -20 to 20; negative is deeper/more "booming", 0 is the voice's natural pitch)
 //   3. supabase functions deploy tts --no-verify-jwt
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -59,6 +60,7 @@ serve(async (req: Request) => {
 
     const voice = Deno.env.get('TTS_VOICE') ?? 'en-US-Neural2-D'
     const rate = Math.min(1.3, Math.max(0.8, parseFloat(Deno.env.get('TTS_RATE') ?? '1.0') || 1.0))
+    const pitch = Math.min(20, Math.max(-20, parseFloat(Deno.env.get('TTS_PITCH') ?? '0') || 0))
 
     const res = await fetch(`https://texttospeech.googleapis.com/v1/text:synthesize?key=${encodeURIComponent(apiKey)}`, {
       method: 'POST',
@@ -66,7 +68,7 @@ serve(async (req: Request) => {
       body: JSON.stringify({
         input: { text: clean },
         voice: { languageCode: voice.split('-').slice(0, 2).join('-'), name: voice },
-        audioConfig: { audioEncoding: 'MP3', speakingRate: rate, sampleRateHertz: 24000 },
+        audioConfig: { audioEncoding: 'MP3', speakingRate: rate, pitch, sampleRateHertz: 24000 },
       }),
     })
     if (!res.ok) {
