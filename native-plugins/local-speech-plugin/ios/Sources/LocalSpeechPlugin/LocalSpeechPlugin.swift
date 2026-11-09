@@ -34,11 +34,11 @@ public class LocalSpeechPlugin: CAPPlugin, CAPBridgedPlugin {
         call.resolve(["available": recognizer?.isAvailable ?? false])
     }
 
-    @objc func checkPermissions(_ call: CAPPluginCall) {
+    @objc public override func checkPermissions(_ call: CAPPluginCall) {
         call.resolve(["speechRecognition": permissionState()])
     }
 
-    @objc func requestPermissions(_ call: CAPPluginCall) {
+    @objc public override func requestPermissions(_ call: CAPPluginCall) {
         SFSpeechRecognizer.requestAuthorization { [weak self] _ in
             AVAudioSession.sharedInstance().requestRecordPermission { _ in
                 DispatchQueue.main.async {
