@@ -212,9 +212,11 @@ const QuoteResults = () => {
   const ctx = liveCtx ?? state.ctx;
   const { assumptions } = state;
 
-  // "Work with again": that painter is listed first, and the price shown up top is theirs
+  // "Work with again": that painter is listed first, and the price shown up top is theirs. Otherwise the headline
+  // number is the Mystery Painter's price — the one the "guaranteed price" claim actually charges — not the raw
+  // chat-estimator total, which the painters' own real prices (and the Mystery price) deviate from once they're priced.
   const firstPainter = painterMatches && painterMatches.length > 0 ? painterMatches[0] : null;
-  const headlinePrice = firstPainter?.workedWithBefore ? firstPainter.price : estimate.total;
+  const headlinePrice = firstPainter?.workedWithBefore ? firstPainter.price : (results?.mystery.price ?? estimate.total);
   const priceScale = estimate.total > 0 ? headlinePrice / estimate.total : 1;
   const preferredOutcome = results?.preferred;
   const duration = results?.duration ?? estimateDayRange(estimate.total);
