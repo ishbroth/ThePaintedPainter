@@ -1564,7 +1564,22 @@ function lineItemNotes(ctx: EstimatorContext, lineItems: EstimateLineItem[]): st
   return notes;
 }
 
+/**
+ * A last check before pricing, for internal contradictions a single derivation rule can't see because each only looks
+ * at the one message it is reading. The conversation can drift off onto a side topic (a fence, a detail) long enough
+ * that a rule meant for "this is ALL they want" fires after the main job was already established, quietly erasing it
+ * from the price. This catches the clearest case of that: an exterior job with the house's own size, siding or story
+ * count already given can never actually be "no house body" — if it somehow got marked that way, undo it.
+ */
+function reconcileContradictions(ctx: EstimatorContext): EstimatorContext {
+  if (ctx.exteriorBody === 'no' && (ctx.squareFeet != null || ctx.sidingType !== '' || ctx.stories != null)) {
+    return { ...ctx, exteriorBody: 'yes' };
+  }
+  return ctx;
+}
+
 function finalize(ctx: EstimatorContext, transcript: string, loyaltyDiscountPercent: number = 0): ChatResult {
+  ctx = reconcileContradictions(ctx);
   const assumptions = defaultAssumptions(ctx);
   const withAssumptions = applyAssumptions(ctx, assumptions);
 

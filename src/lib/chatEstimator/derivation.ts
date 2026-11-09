@@ -469,8 +469,12 @@ export function derive(ctx: EstimatorContext, transcript: string): Derivation[] 
     }
   }
 
-  // Exterior jobs that are about features, not the house body
-  if (ctx.exteriorBody === '' && (ctx.projectType === 'exterior' || ctx.projectType === 'both' || (!ctx.projectType && !mentionsIndoorRoom))) {
+  // Exterior jobs that are about features, not the house body. Guarded against ever re-deciding this once the house
+  // itself has clearly already come up (its size, its siding, how many stories) — a bug let answering the later
+  // "is there a fence too?" question silently erase an already-established whole-house exterior job and reprice it
+  // as just the fence, because this ran again on that answer with nothing to tell it the house was already in scope.
+  const houseAlreadyEstablished = ctx.squareFeet != null || ctx.sidingType !== '' || ctx.stories != null;
+  if (ctx.exteriorBody === '' && !houseAlreadyEstablished && (ctx.projectType === 'exterior' || ctx.projectType === 'both' || (!ctx.projectType && !mentionsIndoorRoom))) {
     const features = /\b(fence|fences|sheds?|gazebos?|pergolas?|playhouses?|dog ?houses?|barns?|outbuildings?|workshops?|greenhouses?|arbors?|mailbox(?:es)?|swing sets?|overhangs?|patio covers?|deck|shutters?|garage door|front door|entry door|porch|railings?|gutters?|fascia|soffits?|eaves|exterior trim|window trim|patio furniture|outdoor furniture|patio set|pressure wash|power wash|soft wash|driveway|patio)\b/.test(t);
     const bodyWords = /\b(siding|stucco|brick|clapboard|hardie|shingles?|whole (?:house|exterior)|entire (?:house|exterior|outside)|(?:exterior|outside) of (?:my|the|our|a) (?:house|home)|house exterior|(?:exterior|outside) (?:paint|repaint|painting)|repaint (?:the )?(?:house|exterior|outside)|victorian|colonial|ranch|bungalow|barn|shed|two[- ]story|three[- ]story|\d\s*stor(?:y|ies))\b/.test(t);
     // "no painting", "not painting", "without painting" are the opposite of asking for paint

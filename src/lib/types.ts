@@ -126,6 +126,10 @@ export interface EstimatorContext {
   // Exterior
   exteriorScope: string; // full, partial
   sidingType: string; // stucco, wood, vinyl, hardie, brick, stone, mixed
+  // '' = not asked yet, 'average' = a ranch/rambler/typical one- or two-story (or anything not recognized as ornate),
+  // 'ornate' = a style with real architectural detail (Victorian, Georgian, Tudor, Cape Cod, Art Deco, Frank Lloyd
+  // Wright and the like) — priced a bit higher for the extra cutting-in and surface that style brings.
+  houseStyle: string;
   exteriorTrim: string; // yes, no
   soffitsEaves: string; // yes, no, skip
   exteriorShutters: string; // yes, no

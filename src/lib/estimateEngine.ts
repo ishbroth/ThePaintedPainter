@@ -551,6 +551,10 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
 
   // ===== EXTERIOR =====
   const bodyPainted = ctx.exteriorBody !== 'no' && !off('ext_body');
+  // An ornate style (Victorian, Tudor, Cape Cod, Art Deco, Frank Lloyd Wright and the like) means more cutting-in
+  // around detail, more color breaks and more surface than a plain ranch or an average two-story — a straightforward
+  // "normal house" (ranch, rambler, one-story, two-story) stays at the standard rate.
+  const houseStyleFactor = ctx.houseStyle === 'ornate' ? 1.25 : 1;
   if (ctx.projectType === 'exterior' || ctx.projectType === 'both') {
     // Several buildings: the same total floor area spread over more footprints has more wall around it (and gutters, trim and windows with it).
     const buildings = ctx.propertyType === 'multi_unit' && ctx.buildingCount && ctx.buildingCount > 1 ? ctx.buildingCount : 1;
@@ -571,8 +575,8 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
       : extSurface.wallSqFt;
     if (bodyPainted) lineItems.push({
       category: 'Exterior',
-      description: 'Exterior Body / Siding',
-      amount: extWallArea * sidingRate * regionalMult * conditionMultiplier,
+      description: `Exterior Body / Siding${ctx.houseStyle === 'ornate' ? ' (detailed architectural style)' : ''}`,
+      amount: extWallArea * sidingRate * regionalMult * conditionMultiplier * houseStyleFactor,
       key: 'ext_body',
     });
 
@@ -601,8 +605,8 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
       const soffitPart = ctx.soffitsEaves === 'yes' ? extSurface.soffitSqFt * BASE_RATES.exterior.soffit_per_sqft : 0;
       lineItems.push({
         category: 'Exterior',
-        description: 'Trim, Fascia, Soffits & Eaves',
-        amount: (trimPart + soffitPart) * regionalMult,
+        description: `Trim, Fascia, Soffits & Eaves${ctx.houseStyle === 'ornate' ? ' (detailed architectural style)' : ''}`,
+        amount: (trimPart + soffitPart) * regionalMult * houseStyleFactor,
         key: 'ext_trim',
       });
     }

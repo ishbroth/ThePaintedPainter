@@ -23,6 +23,7 @@ const TOPIC_PROMPTS: Record<string, string> = {
   paint_grade: 'Standard or premium paint?',
   paint_finish: 'Finish, or painter’s choice?',
   ext_size: 'Please estimate square feet',
+  ext_style: 'ranch, two-story, Victorian, Tudor, etc.',
   ext_trim: 'Paint the trim and eaves?',
   ext_doors: 'Paint the front door?',
   ext_garage: 'Paint the garage door?',

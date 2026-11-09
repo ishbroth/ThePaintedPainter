@@ -1206,6 +1206,21 @@ export const TOPICS: Topic[] = [
   },
 
   // ——————————————————————————————————————————
+  // House style — a Victorian, Tudor or the like has real architectural detail (more trim, more cutting-in, more
+  // surface) that a plain ranch or an average two-story doesn't. Not asked for a commercial building or one of the
+  // small standalone features (a fence, a shed) — only when the house's own body is actually being painted.
+  // ——————————————————————————————————————————
+  {
+    id: 'ext_style',
+    priority: 48.05,
+    relevant: (c) => (c.projectType === 'exterior' || c.projectType === 'both') && c.exteriorBody !== 'no' && !isCommercialLike(c) && !c.standaloneStructure,
+    alreadyAnswered: (c) => c.houseStyle !== '' || extDone(c, 'ext_style'),
+    ask: (c) => pick(["What style is the house — a typical ranch or two-story, or something with more detail like a Victorian, Tudor or Cape Cod?", "Is the house a standard style (a ranch, a plain two-story), or something more detailed — Victorian, Tudor, Craftsman, that kind of thing?"], seed(c)),
+    clarify: () => "Homes with a lot of architectural detail — gingerbread trim, multiple colors, decorative millwork — take more time to cut in than a plain, modern house, so it's priced a bit differently.",
+    example: () => "'Just a regular two-story' is the most common answer. Or name the style if you know it — 'Victorian', 'Cape Cod', 'Tudor'.",
+  },
+
+  // ——————————————————————————————————————————
   // Location / ZIP — we still need it but it can come late if we have enough
   // ——————————————————————————————————————————
   {

@@ -528,6 +528,16 @@ export function extractDetails(text: string, ctx: EstimatorContext, askedId: str
       case 'detail_feet_chair_rail': { const n = parseLinearFeet(text, true, 5, 5000); if (n) { patch.chairRailLinearFeet = n; acks.push(`${n} ft of chair rail`); } break; }
       case 'detail_feet_trim': { const n = parseLinearFeet(text, true, 5, 20000); if (n) { patch.trimLinearFeet = n; acks.push(`${n} ft of baseboard`); } break; }
       case 'detail_sqft_wainscot': { const a = parseArea(text, true); if (a) { patch.wainscotSqft = a; acks.push(`${a} sq ft of wainscoting`); } break; }
+      case 'ext_style': {
+        // A named, detailed architectural style costs more to cut in than a plain ranch or an average two-story —
+        // and anything the customer didn't name as one of these (a ranch, a rambler, "normal", "just a two-story",
+        // or anything else unclear) safely defaults to the standard rate rather than guessing it's something fancier.
+        const low = text.toLowerCase();
+        const ornate = /\b(victorian|georgian|greek revival|(?:french |english )?tudor|cape cod|art deco|frank lloyd wright|prairie(?:\s+style)?|craftsman|spanish colonial|mediterranean(?:\s+revival)?|mid-century modern|modernist|modern style|modern architecture)\b/.test(low);
+        if (ornate) { patch.houseStyle = 'ornate'; acks.push('a more detailed architectural style'); }
+        else { patch.houseStyle = 'average'; acks.push('a standard house style'); }
+        break;
+      }
     }
   }
   return { patch, acks };
@@ -537,5 +547,5 @@ export function extractDetails(text: string, ctx: EstimatorContext, askedId: str
 export const DETAIL_TOPIC_IDS = new Set([
   'unit_count', 'building_count', 'ceiling_height', 'common_areas', 'balcony_count', 'ext_mu_access',
   'door_count', 'window_count', 'chair_count', 'furniture_kind', 'furniture_finish', 'cabinet_count', 'cabinet_scope', 'cabinet_method', 'cabinet_hardware', 'builtin_count', 'shutter_count', 'closet_count', 'fence_size', 'fence_height', 'deck_size', 'overhang_size', 'railing_length',
-  'detail_rooms', 'detail_feet_crown', 'detail_feet_chair_rail', 'detail_feet_trim', 'detail_sqft_wainscot',
+  'detail_rooms', 'detail_feet_crown', 'detail_feet_chair_rail', 'detail_feet_trim', 'detail_sqft_wainscot', 'ext_style',
 ]);

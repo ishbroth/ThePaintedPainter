@@ -18914,6 +18914,18 @@ function extractDetails(text, ctx, askedId) {
         }
         break;
       }
+      case "ext_style": {
+        const low = text.toLowerCase();
+        const ornate = /\b(victorian|georgian|greek revival|(?:french |english )?tudor|cape cod|art deco|frank lloyd wright|prairie(?:\s+style)?|craftsman|spanish colonial|mediterranean(?:\s+revival)?|mid-century modern|modernist|modern style|modern architecture)\b/.test(low);
+        if (ornate) {
+          patch.houseStyle = "ornate";
+          acks.push("a more detailed architectural style");
+        } else {
+          patch.houseStyle = "average";
+          acks.push("a standard house style");
+        }
+        break;
+      }
     }
   }
   return { patch, acks };
@@ -18946,7 +18958,8 @@ var DETAIL_TOPIC_IDS = /* @__PURE__ */ new Set([
   "detail_feet_crown",
   "detail_feet_chair_rail",
   "detail_feet_trim",
-  "detail_sqft_wainscot"
+  "detail_sqft_wainscot",
+  "ext_style"
 ]);
 
 // src/lib/estimateEngine.ts
@@ -19338,6 +19351,7 @@ function calculateEstimate(ctx) {
     }
   }
   const bodyPainted = ctx.exteriorBody !== "no" && !off("ext_body");
+  const houseStyleFactor = ctx.houseStyle === "ornate" ? 1.25 : 1;
   if (ctx.projectType === "exterior" || ctx.projectType === "both") {
     const buildings = ctx.propertyType === "multi_unit" && ctx.buildingCount && ctx.buildingCount > 1 ? ctx.buildingCount : 1;
     const one = calculateExteriorSurface(sqft / buildings, ctx.stories || 1, ctx.sidingType);
@@ -19353,8 +19367,8 @@ function calculateEstimate(ctx) {
     const extWallArea = ctx.exteriorScope === "partial" ? Math.round(extSurface.wallSqFt * 0.5) : extSurface.wallSqFt;
     if (bodyPainted) lineItems.push({
       category: "Exterior",
-      description: "Exterior Body / Siding",
-      amount: extWallArea * sidingRate * regionalMult * conditionMultiplier,
+      description: `Exterior Body / Siding${ctx.houseStyle === "ornate" ? " (detailed architectural style)" : ""}`,
+      amount: extWallArea * sidingRate * regionalMult * conditionMultiplier * houseStyleFactor,
       key: "ext_body"
     });
     if (!bodyPainted) {
@@ -19377,8 +19391,8 @@ function calculateEstimate(ctx) {
       const soffitPart = ctx.soffitsEaves === "yes" ? extSurface.soffitSqFt * RESOLVED_BASE_RATES.exterior.soffit_per_sqft : 0;
       lineItems.push({
         category: "Exterior",
-        description: "Trim, Fascia, Soffits & Eaves",
-        amount: (trimPart + soffitPart) * regionalMult,
+        description: `Trim, Fascia, Soffits & Eaves${ctx.houseStyle === "ornate" ? " (detailed architectural style)" : ""}`,
+        amount: (trimPart + soffitPart) * regionalMult * houseStyleFactor,
         key: "ext_trim"
       });
     }
@@ -21089,7 +21103,8 @@ function derive(ctx, transcript) {
       out.push({ patch: { standaloneStructure: s[1].replace("doghouse", "dog house"), projectType: ctx.projectType || "exterior", stories: ctx.stories ?? 1 }, reason: "A separate building, not a house" });
     }
   }
-  if (ctx.exteriorBody === "" && (ctx.projectType === "exterior" || ctx.projectType === "both" || !ctx.projectType && !mentionsIndoorRoom)) {
+  const houseAlreadyEstablished = ctx.squareFeet != null || ctx.sidingType !== "" || ctx.stories != null;
+  if (ctx.exteriorBody === "" && !houseAlreadyEstablished && (ctx.projectType === "exterior" || ctx.projectType === "both" || !ctx.projectType && !mentionsIndoorRoom)) {
     const features = /\b(fence|fences|sheds?|gazebos?|pergolas?|playhouses?|dog ?houses?|barns?|outbuildings?|workshops?|greenhouses?|arbors?|mailbox(?:es)?|swing sets?|overhangs?|patio covers?|deck|shutters?|garage door|front door|entry door|porch|railings?|gutters?|fascia|soffits?|eaves|exterior trim|window trim|patio furniture|outdoor furniture|patio set|pressure wash|power wash|soft wash|driveway|patio)\b/.test(t2);
     const bodyWords = /\b(siding|stucco|brick|clapboard|hardie|shingles?|whole (?:house|exterior)|entire (?:house|exterior|outside)|(?:exterior|outside) of (?:my|the|our|a) (?:house|home)|house exterior|(?:exterior|outside) (?:paint|repaint|painting)|repaint (?:the )?(?:house|exterior|outside)|victorian|colonial|ranch|bungalow|barn|shed|two[- ]story|three[- ]story|\d\s*stor(?:y|ies))\b/.test(t2);
     const withoutNoPaint = t2.replace(/\b(?:no|not|without|don'?t want|don'?t need)\s+(?:any\s+)?(?:re-?)?(?:paint|painting|stain|staining)\b/g, " ");
@@ -22198,6 +22213,20 @@ var TOPICS = [
     example: (c2) => isCommercialLike(c2) ? "E.g., 'single story', 'two story', or 'three-story building'." : "E.g., 'single story', 'two story', or 'it's a three-story townhouse'."
   },
   // ——————————————————————————————————————————
+  // House style — a Victorian, Tudor or the like has real architectural detail (more trim, more cutting-in, more
+  // surface) that a plain ranch or an average two-story doesn't. Not asked for a commercial building or one of the
+  // small standalone features (a fence, a shed) — only when the house's own body is actually being painted.
+  // ——————————————————————————————————————————
+  {
+    id: "ext_style",
+    priority: 48.05,
+    relevant: (c2) => (c2.projectType === "exterior" || c2.projectType === "both") && c2.exteriorBody !== "no" && !isCommercialLike(c2) && !c2.standaloneStructure,
+    alreadyAnswered: (c2) => c2.houseStyle !== "" || extDone(c2, "ext_style"),
+    ask: (c2) => pick(["What style is the house \u2014 a typical ranch or two-story, or something with more detail like a Victorian, Tudor or Cape Cod?", "Is the house a standard style (a ranch, a plain two-story), or something more detailed \u2014 Victorian, Tudor, Craftsman, that kind of thing?"], seed(c2)),
+    clarify: () => "Homes with a lot of architectural detail \u2014 gingerbread trim, multiple colors, decorative millwork \u2014 take more time to cut in than a plain, modern house, so it's priced a bit differently.",
+    example: () => "'Just a regular two-story' is the most common answer. Or name the style if you know it \u2014 'Victorian', 'Cape Cod', 'Tudor'."
+  },
+  // ——————————————————————————————————————————
   // Location / ZIP — we still need it but it can come late if we have enough
   // ——————————————————————————————————————————
   {
@@ -22437,6 +22466,7 @@ function makeInitialContext() {
     excludedItems: [],
     exteriorScope: "full",
     sidingType: "",
+    houseStyle: "",
     exteriorTrim: "no",
     soffitsEaves: "no",
     exteriorShutters: "no",
@@ -24033,7 +24063,14 @@ function lineItemNotes(ctx, lineItems) {
   }
   return notes;
 }
+function reconcileContradictions(ctx) {
+  if (ctx.exteriorBody === "no" && (ctx.squareFeet != null || ctx.sidingType !== "" || ctx.stories != null)) {
+    return { ...ctx, exteriorBody: "yes" };
+  }
+  return ctx;
+}
 function finalize(ctx, transcript, loyaltyDiscountPercent = 0) {
+  ctx = reconcileContradictions(ctx);
   const assumptions = defaultAssumptions(ctx);
   const withAssumptions = applyAssumptions(ctx, assumptions);
   const matched = matchSituations(transcript, withAssumptions);
