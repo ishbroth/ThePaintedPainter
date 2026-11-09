@@ -1174,7 +1174,7 @@ function getLayout(ctx: EstimatorContext, sqft: number) {
   }
 
   // Whole house — estimate layout from sqft and bedroom count
-  return estimateHouseLayout(sqft, ctx.bedroomCount || undefined, ctx.excludedRooms);
+  return estimateHouseLayout(sqft, ctx.bedroomCount || undefined, ctx.excludedRooms, ctx.bathroomCount || undefined, ctx.includedExtraRooms);
 }
 
 function getRoomFraction(ctx: EstimatorContext): number {

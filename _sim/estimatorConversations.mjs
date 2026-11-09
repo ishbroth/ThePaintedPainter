@@ -16519,7 +16519,7 @@ var CEILING_HEIGHTS = {
   vaulted_mixed: 12
   // average for vaulted
 };
-function estimateHouseLayout(sqft, bedrooms, excludedRooms = []) {
+function estimateHouseLayout(sqft, bedrooms, excludedRooms = [], bathrooms, includeExtraRooms = []) {
   const beds = bedrooms || estimateBedroomCount(sqft);
   const rooms = [];
   const isStudio = sqft <= 600 && !bedrooms;
@@ -16532,13 +16532,15 @@ function estimateHouseLayout(sqft, bedrooms, excludedRooms = []) {
     if (beds >= 3) rooms.push("bedroom_3");
     if (beds >= 4) rooms.push("bedroom_4");
     if (beds >= 5) rooms.push("bedroom_5");
-    rooms.push("bathroom_master");
-    if (beds >= 2) rooms.push("bathroom_2");
-    if (beds >= 3) rooms.push("bathroom_3");
+    const bathCount = bathrooms ?? (beds >= 3 ? 3 : beds >= 2 ? 2 : 1);
+    if (bathCount >= 1) rooms.push("bathroom_master");
+    if (bathCount >= 2) rooms.push("bathroom_2");
+    if (bathCount >= 3) rooms.push("bathroom_3");
     if (beds >= 3 || sqft >= 1800) rooms.push("dining_room");
     if (sqft >= 2e3) rooms.push("office");
     if (sqft >= 2500) rooms.push("bonus_room");
     if (sqft >= 1200) rooms.push("laundry");
+    for (const extra of includeExtraRooms) if (!rooms.includes(extra)) rooms.push(extra);
   }
   let totalWall = 0, totalCeiling = 0, totalTrim = 0, totalDoors = 0, totalWindows = 0, totalClosets = 0;
   let templateFloorSqFt = 0;
@@ -16927,6 +16929,12 @@ function extractBedroomCount(text) {
   const m2 = text.match(/(\d+|one|two|three|four|five|six|seven)\s*(?:-|\s)?\s*(?:bed(?:room)?s?|br)\b/i);
   if (!m2) return null;
   return parseIntLoose(m2[1]);
+}
+function extractBathroomCount(text) {
+  const m2 = text.match(/(\d+(?:\.5)?|one|two|three|four|five|six)\s*(?:-|\s)?\s*(?:full\s+)?(?:bath(?:room)?s?|ba)\b/i);
+  if (!m2) return null;
+  const n = parseIntLoose(m2[1]) ?? (m2[1].includes(".5") ? Math.ceil(parseFloat(m2[1])) : null);
+  return n;
 }
 function extractStories(text) {
   if (/\b(?:single|one)[\s-]?stor(?:y|ey)\b/i.test(text)) return 1;
@@ -17721,6 +17729,11 @@ function extractAll(text, prev, lastBotTopicId = null) {
   if (beds && !prev.bedroomCount) {
     patch.bedroomCount = beds;
     acks.push(`${beds}-bedroom`);
+  }
+  const baths = extractBathroomCount(text);
+  if (baths && !prev.bathroomCount) {
+    patch.bathroomCount = baths;
+    acks.push(`${baths}-bath`);
   }
   const stories = extractStories(text);
   if (stories && !prev.stories) {
@@ -19798,7 +19811,7 @@ function getLayout(ctx, sqft) {
       totalClosets
     };
   }
-  return estimateHouseLayout(sqft, ctx.bedroomCount || void 0, ctx.excludedRooms);
+  return estimateHouseLayout(sqft, ctx.bedroomCount || void 0, ctx.excludedRooms, ctx.bathroomCount || void 0, ctx.includedExtraRooms);
 }
 function getRoomFraction(ctx) {
   if (ctx.projectType === "exterior") return 0;
@@ -21479,6 +21492,32 @@ var TOPICS = [
     example: (c2) => isCommercialLike(c2) ? "E.g., '3000 sqft' or 'not sure, maybe 5000?'" : "E.g., '1500 sqft' or '4 bedrooms' or 'not sure, maybe 2000?'"
   },
   // ——————————————————————————————————————————
+  // Bathroom count — bathrooms don't scale with bedrooms the way the engine's internal default assumes (a "2 bed,
+  // 1 bath" place is common), so the customer's own count wins when they give one.
+  // ——————————————————————————————————————————
+  {
+    id: "bathroom_count",
+    priority: 23,
+    relevant: (c2) => (c2.projectType === "interior" || c2.projectType === "both") && c2.interiorScope === "whole_house" && c2.bedroomCount != null && !isNarrowInteriorJob(c2) && !isCommercialLike(c2) && c2.propertyType !== "multi_unit",
+    alreadyAnswered: (c2) => c2.bathroomCount != null,
+    ask: (c2) => pick(["And how many bathrooms does it have?", "How many bathrooms?"], seed(c2)),
+    clarify: () => "Just the number of bathrooms, full or half \u2014 each one is its own room to price in, and it doesn't always scale with the bedroom count.",
+    example: () => "Just a number, like 'one' or 'two and a half'."
+  },
+  // ——————————————————————————————————————————
+  // Stories (interior) — a two-story whole-house job has a stairwell to paint, which the exterior-only "stories"
+  // question above doesn't cover for an interior-only job.
+  // ——————————————————————————————————————————
+  {
+    id: "interior_stories",
+    priority: 23.3,
+    relevant: (c2) => (c2.projectType === "interior" || c2.projectType === "both") && c2.interiorScope === "whole_house" && !c2.stories && !isCommercialLike(c2) && c2.propertyType !== "multi_unit" && !isNarrowInteriorJob(c2),
+    alreadyAnswered: (c2) => !!c2.stories,
+    ask: (c2) => pick(["Is it a one-story place, or two?", "One level, or two stories?"], seed(c2)),
+    clarify: () => "A two-story home means a stairwell to paint too \u2014 tall walls, and usually a railing \u2014 which is more work than the same square footage on one level.",
+    example: () => "Just say 'one story' or 'two story'."
+  },
+  // ——————————————————————————————————————————
   // Surfaces — what in the room(s) is getting painted
   // ——————————————————————————————————————————
   {
@@ -21513,6 +21552,24 @@ var TOPICS = [
     },
     clarify: () => "Some folks just want walls refreshed. Others want the whole package \u2014 walls, ceiling, trim, doors, closets. Either works. You can also mix and match.",
     example: () => "'Just walls' is common. Or 'walls and ceiling, no trim'. Or 'everything except the doors'."
+  },
+  // ——————————————————————————————————————————
+  // Room mix — a whole-house job is priced off a template of rooms guessed from the square footage (and bedroom/bath
+  // count), not a list the customer gave room by room. Said out loud, so a place that's missing a room the template
+  // assumes (or has one it doesn't) gets corrected before the price is built on the wrong mix.
+  // ——————————————————————————————————————————
+  {
+    id: "room_assumption",
+    priority: 26,
+    relevant: (c2) => (c2.projectType === "interior" || c2.projectType === "both") && c2.interiorScope === "whole_house" && !!c2.squareFeet && !isNarrowInteriorJob(c2) && !isCommercialLike(c2) && c2.propertyType !== "multi_unit",
+    alreadyAnswered: (c2) => c2.roomAssumptionAddressed,
+    ask: (c2) => {
+      const sqft = c2.squareFeet || 0;
+      const rooms = sqft >= 2500 ? "a living room, dining room, kitchen, hallway, laundry room, and a family/bonus room or office" : "a living room, dining area, kitchen, hallway and laundry room";
+      return `For ${sqft.toLocaleString()} sq ft, I'm assuming ${rooms} \u2014 sound right, or is something different (missing, or not actually part of this)?`;
+    },
+    clarify: () => "Just the general room mix, not a full list \u2014 flag anything that's off from that (a room it's missing, or one that isn't actually there).",
+    example: () => "'That's right' is the most common answer. Or name what's different \u2014 'no office' or 'there's also a den'."
   },
   // ——————————————————————————————————————————
   // Exterior interview: size, then what else beyond the siding gets painted (one question each), the windows, the shape the
@@ -21714,6 +21771,19 @@ var TOPICS = [
     ),
     clarify: () => "I mean the interior doors in those rooms. Painting them at the same time as everything else keeps the whole space looking consistent.",
     example: () => "Just say 'yes, do the doors' or 'no, skip the doors'."
+  },
+  // ——————————————————————————————————————————
+  // Special trim features — a bigger, nicer home is more likely to have crown molding, chair rail or wainscoting, none
+  // of which are priced the same as plain baseboards, so a large home asks once rather than relying on it coming up.
+  // ——————————————————————————————————————————
+  {
+    id: "upsell_special_trim",
+    priority: 36.5,
+    relevant: (c2) => (c2.projectType === "interior" || c2.projectType === "both") && c2.interiorTrim === "yes" && (c2.squareFeet ?? 0) >= 2200 && c2.crownMolding === "no" && c2.chairRail === "no" && c2.wainscoting === "no" && !extDone(c2, "upsell_special_trim"),
+    alreadyAnswered: (c2) => c2.crownMolding === "yes" || c2.chairRail === "yes" || c2.wainscoting === "yes" || extDone(c2, "upsell_special_trim"),
+    ask: (c2) => pick(["A place this size often has some detail trim \u2014 any crown molding, chair rail or wainscoting to price in?", "Does it have any crown molding, chair rail or wainscoting we should include?"], seed(c2)),
+    clarify: () => "Those are priced separately from plain baseboards since they add real cutting-in time \u2014 crown where the wall meets the ceiling, chair rail partway up the wall, wainscoting as a paneled lower section.",
+    example: () => "'No, just plain trim' is the most common answer. Or name what it has \u2014 'crown molding in the living and dining room'."
   },
   {
     // A whole inside, or a kitchen, with the trim in: the cabinets are the next thing worth asking about (they are the biggest single add-on there).
@@ -22563,6 +22633,9 @@ function makeInitialContext() {
     projectCondition: "",
     hasStainedWood: "no",
     bedroomCount: null,
+    bathroomCount: null,
+    roomAssumptionAddressed: false,
+    includedExtraRooms: [],
     trimCondition: "existing_good",
     wallTexture: "smooth",
     doorMaterial: "wood",
@@ -22678,6 +22751,8 @@ function sanitize(raw, prev) {
   if (sqft) patch.squareFeet = sqft;
   const beds = clampNumber(raw.bedroomCount, 0, 20);
   if (beds !== null) patch.bedroomCount = beds;
+  const baths = clampNumber(raw.bathroomCount, 0, 20);
+  if (baths !== null) patch.bathroomCount = baths;
   const stories = clampNumber(raw.stories, 1, 3);
   if (stories) patch.stories = stories;
   const yearBuilt = clampNumber(raw.yearBuilt, 1800, 2030);
@@ -23525,6 +23600,34 @@ async function processMessage(state, trimmed, customerId) {
       }
     }
   }
+  if (state.lastBotTopic?.id === "room_assumption") {
+    const low = trimmed.toLowerCase();
+    ctxWithExplicit.roomAssumptionAddressed = true;
+    const ROOM_WORDS = [
+      [/\boffices?\b/, "office"],
+      [/\b(?:bonus|family|rec(?:reation)?|game)\s*rooms?\b|\bden\b/, "bonus_room"],
+      [/\bdining\s*(?:room|area)?\b/, "dining_room"],
+      [/\blaundry(?:\s*room)?\b/, "laundry"]
+    ];
+    const negated = (word) => new RegExp(`\\b(?:no|not|n'?t|without|skip|except for|minus)\\b[^.,;]{0,20}${word}|${word}[^.,;]{0,20}\\b(?:isn'?t|aren'?t|is not|are not|not (?:there|included|part)|doesn'?t (?:have|exist))\\b`).test(low);
+    for (const [re, room] of ROOM_WORDS) {
+      if (!re.test(low)) continue;
+      if (negated(re.source)) {
+        if (!ctxWithExplicit.excludedRooms.includes(room)) ctxWithExplicit.excludedRooms = [...ctxWithExplicit.excludedRooms, room];
+      } else if (!ctxWithExplicit.includedExtraRooms.includes(room)) {
+        ctxWithExplicit.includedExtraRooms = [...ctxWithExplicit.includedExtraRooms, room];
+      }
+    }
+  }
+  if (state.lastBotTopic?.id === "upsell_special_trim") {
+    const low = trimmed.toLowerCase();
+    const yes = /^\s*(?:yes|yeah|yep|yup|sure|ok|okay|it does|there is|there'?s)\b/.test(low);
+    const no = /^\s*(?:no|nope|nah|none|just plain|plain trim|no thanks)\b/.test(low);
+    if (yes && ctxWithExplicit.crownMolding === "no" && ctxWithExplicit.chairRail === "no" && ctxWithExplicit.wainscoting === "no") {
+      ctxWithExplicit.crownMolding = "yes";
+    }
+    if (yes || no) ctxWithExplicit.extAnswered = [.../* @__PURE__ */ new Set([...ctxWithExplicit.extAnswered ?? state.ctx.extAnswered ?? [], "upsell_special_trim"])];
+  }
   {
     const asked = state.lastBotTopic?.id;
     if (asked && asked.startsWith("ext_")) {
@@ -23693,6 +23796,10 @@ ${trimmed}`.trim();
     responseLengths
   };
   Object.assign(ctxNext, enforceExclusions(ctxNext));
+  if ((ctxNext.projectType === "interior" || ctxNext.projectType === "both") && ctxNext.interiorScope === "whole_house" && ctxNext.stories === 2 && ctxNext.stairways === "none") {
+    ctxNext.stairways = "yes";
+    ctxNext.stairwayDetails = ctxNext.stairwayDetails || "walls_only";
+  }
   const fullScopeAnswer = state.lastBotTopic?.id === "surfaces" && /\b(everything|all of it|the works|full (?:package|scope)|(?:the )?whole (?:thing|room|place|apartment|house|home|unit|space))\b/i.test(trimmed) && ctxNext.surfacesAddressed && ctxNext.interiorWalls !== "no" && ctxNext.interiorCeilings !== "no" && ctxNext.interiorTrim !== "no" && ctxNext.interiorDoors !== "none";
   if (fullScopeAnswer) ctxNext.trimScopeAddressed = true;
   if (ctxNext.zipCode && (ctxNext.zipCode !== state.ctx.zipCode || !ctxNext.zipCity)) {
@@ -24404,7 +24511,7 @@ async function dismissAt(setup, topicWords, dismissal = "doesnt matter just want
 }
 {
   const priceOf = (st2) => calculateEstimate(st2.ctx).total;
-  const start = ["I want the whole inside of my house painted, walls, trim and doors", "2400 sq ft", "walls, ceilings, trim and doors", "yes"];
+  const start = ["I want the whole inside of my house painted, walls, trim and doors", "2400 sq ft", "one story", "walls, ceilings, trim and doors", "sounds right", "yes"];
   const cab = await play([...start, "yes"]);
   check("kitchen cabinets: asked whether they are painted, bare, stained or pre-primed", /cabinets/i.test(cab.last) && /bare/i.test(cab.last), cab.last.slice(0, 300));
   const finishes = {};
@@ -24557,7 +24664,7 @@ async function dismissAt(setup, topicWords, dismissal = "doesnt matter just want
     { role: "bot", text: "Got it. How many doors are we talking about, approximately?" }
   ]);
   check("the same question asked twice is a bot_repeat", repeated.length === 1 && repeated[0].kind === "bot_repeat", JSON.stringify(repeated));
-  const known = await play(["I want the whole inside of my house painted, walls, trim and doors", "2400 sq ft", "walls, ceilings, trim and doors", "yes", "no", "all painted"]);
+  const known = await play(["I want the whole inside of my house painted, walls, trim and doors", "2400 sq ft", "one story", "walls, ceilings, trim and doors", "sounds right", "yes", "no", "all painted"]);
   check("setup: the bot asks how many doors", /doors/i.test(known.last) && /how many|approximately/i.test(known.last), known.last);
   const noticed = await play(["like I said, 14 doors"], [], known.state);
   check('"like I said, 14 doors": the bot owns up, uses the answer and does not ask it again', noticed.state.ctx.doorCount === 14 && /you'?re right|sorry/i.test(noticed.last) && !/how many doors/i.test(noticed.last), noticed.last);

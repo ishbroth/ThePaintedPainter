@@ -47,6 +47,14 @@ export function extractBedroomCount(text: string): number | null {
   return parseIntLoose(m[1]);
 }
 
+/** "2 bed 1 bath", "a 2 bedroom, 2.5 bath house" — a half bath counts as a whole bathroom to paint, not half of one. */
+export function extractBathroomCount(text: string): number | null {
+  const m = text.match(/(\d+(?:\.5)?|one|two|three|four|five|six)\s*(?:-|\s)?\s*(?:full\s+)?(?:bath(?:room)?s?|ba)\b/i);
+  if (!m) return null;
+  const n = parseIntLoose(m[1]) ?? (m[1].includes('.5') ? Math.ceil(parseFloat(m[1])) : null);
+  return n;
+}
+
 export function extractStories(text: string): number | null {
   if (/\b(?:single|one)[\s-]?stor(?:y|ey)\b/i.test(text)) return 1;
   if (/\b(?:two|2)[\s-]?stor(?:y|ey|ies)\b/i.test(text)) return 2;
@@ -1246,6 +1254,12 @@ export function extractAll(text: string, prev: EstimatorContext, lastBotTopicId:
   if (beds && !prev.bedroomCount) {
     patch.bedroomCount = beds;
     acks.push(`${beds}-bedroom`);
+  }
+
+  const baths = extractBathroomCount(text);
+  if (baths && !prev.bathroomCount) {
+    patch.bathroomCount = baths;
+    acks.push(`${baths}-bath`);
   }
 
   const stories = extractStories(text);

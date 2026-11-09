@@ -744,6 +744,41 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
     }
   }
 
+  // The "I'm assuming [these rooms]" question: a forgiving confirmation, not a yes/no. Any reply settles it — this isn't
+  // asked again regardless of whether something was corrected — and a named room, with or without a negation, adjusts
+  // the template (a small place that turns out to have an office gets one priced in; a bigger one without a den drops it).
+  if (state.lastBotTopic?.id === 'room_assumption') {
+    const low = trimmed.toLowerCase();
+    ctxWithExplicit.roomAssumptionAddressed = true;
+    const ROOM_WORDS: Array<[RegExp, string]> = [
+      [/\boffices?\b/, 'office'],
+      [/\b(?:bonus|family|rec(?:reation)?|game)\s*rooms?\b|\bden\b/, 'bonus_room'],
+      [/\bdining\s*(?:room|area)?\b/, 'dining_room'],
+      [/\blaundry(?:\s*room)?\b/, 'laundry'],
+    ];
+    const negated = (word: string) => new RegExp(`\\b(?:no|not|n'?t|without|skip|except for|minus)\\b[^.,;]{0,20}${word}|${word}[^.,;]{0,20}\\b(?:isn'?t|aren'?t|is not|are not|not (?:there|included|part)|doesn'?t (?:have|exist))\\b`).test(low);
+    for (const [re, room] of ROOM_WORDS) {
+      if (!re.test(low)) continue;
+      if (negated(re.source)) {
+        if (!ctxWithExplicit.excludedRooms.includes(room)) ctxWithExplicit.excludedRooms = [...ctxWithExplicit.excludedRooms, room];
+      } else if (!ctxWithExplicit.includedExtraRooms.includes(room)) {
+        ctxWithExplicit.includedExtraRooms = [...ctxWithExplicit.includedExtraRooms, room];
+      }
+    }
+  }
+
+  // The large-home "any crown molding, chair rail or wainscoting?" question: yes defaults to crown molding unless the
+  // reply already named a specific one (the full-transcript detail scan elsewhere picks those up); no just closes it out.
+  if (state.lastBotTopic?.id === 'upsell_special_trim') {
+    const low = trimmed.toLowerCase();
+    const yes = /^\s*(?:yes|yeah|yep|yup|sure|ok|okay|it does|there is|there'?s)\b/.test(low);
+    const no = /^\s*(?:no|nope|nah|none|just plain|plain trim|no thanks)\b/.test(low);
+    if (yes && ctxWithExplicit.crownMolding === 'no' && ctxWithExplicit.chairRail === 'no' && ctxWithExplicit.wainscoting === 'no') {
+      ctxWithExplicit.crownMolding = 'yes';
+    }
+    if (yes || no) ctxWithExplicit.extAnswered = [...new Set([...(ctxWithExplicit.extAnswered ?? state.ctx.extAnswered ?? []), 'upsell_special_trim'])];
+  }
+
   // Answers to the exterior questions (ext_*): yes adds the thing, no leaves it out, and each answer is recorded so the question isn't
   // asked again (or counted as answered when it wasn't).
   {
@@ -928,6 +963,13 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
   // Whatever the customer ruled out stays out, whatever a reading, a default or a later step put back: the questions that depend on it
   // (painted before? bare or stained? how many?) then drop out by themselves, because the thing is no longer in the job.
   Object.assign(ctxNext, enforceExclusions(ctxNext));
+
+  // A two-story whole-house interior job has a stairwell to paint — tall walls, usually a railing — unless the customer
+  // says otherwise later. Defaulted in, the same way trim/fascia/eaves default in together on an exterior job.
+  if ((ctxNext.projectType === 'interior' || ctxNext.projectType === 'both') && ctxNext.interiorScope === 'whole_house' && ctxNext.stories === 2 && ctxNext.stairways === 'none') {
+    ctxNext.stairways = 'yes';
+    ctxNext.stairwayDetails = ctxNext.stairwayDetails || 'walls_only';
+  }
 
   // "The whole room" / "the whole place" / "everything" as the answer to what gets painted: read back what that covers, so the
   // customer can correct it, instead of moving on as if only a word had been said.

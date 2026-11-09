@@ -218,6 +218,12 @@ export interface EstimatorContext {
   projectCondition: string; // repaint, new_construction, renovation
   hasStainedWood: string; // yes, no
   bedroomCount: number | null;
+  bathroomCount: number | null;
+  // Whether the "I'm assuming [these rooms]" question has been asked for a whole-house job, so it's only asked once.
+  roomAssumptionAddressed: boolean;
+  // Rooms a square-footage-sized template wouldn't normally include (office, bonus/family room) that the customer
+  // confirmed are actually part of the place, in answer to that question.
+  includedExtraRooms: string[];
 
   // Surface Detail
   trimCondition: string; // new, existing_good, existing_fair

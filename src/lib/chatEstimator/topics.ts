@@ -359,6 +359,34 @@ export const TOPICS: Topic[] = [
   },
 
   // ——————————————————————————————————————————
+  // Bathroom count — bathrooms don't scale with bedrooms the way the engine's internal default assumes (a "2 bed,
+  // 1 bath" place is common), so the customer's own count wins when they give one.
+  // ——————————————————————————————————————————
+  {
+    id: 'bathroom_count',
+    priority: 23,
+    relevant: (c) => (c.projectType === 'interior' || c.projectType === 'both') && c.interiorScope === 'whole_house' && c.bedroomCount != null && !isNarrowInteriorJob(c) && !isCommercialLike(c) && c.propertyType !== 'multi_unit',
+    alreadyAnswered: (c) => c.bathroomCount != null,
+    ask: (c) => pick(["And how many bathrooms does it have?", "How many bathrooms?"], seed(c)),
+    clarify: () => "Just the number of bathrooms, full or half — each one is its own room to price in, and it doesn't always scale with the bedroom count.",
+    example: () => "Just a number, like 'one' or 'two and a half'.",
+  },
+
+  // ——————————————————————————————————————————
+  // Stories (interior) — a two-story whole-house job has a stairwell to paint, which the exterior-only "stories"
+  // question above doesn't cover for an interior-only job.
+  // ——————————————————————————————————————————
+  {
+    id: 'interior_stories',
+    priority: 23.3,
+    relevant: (c) => (c.projectType === 'interior' || c.projectType === 'both') && c.interiorScope === 'whole_house' && !c.stories && !isCommercialLike(c) && c.propertyType !== 'multi_unit' && !isNarrowInteriorJob(c),
+    alreadyAnswered: (c) => !!c.stories,
+    ask: (c) => pick(["Is it a one-story place, or two?", "One level, or two stories?"], seed(c)),
+    clarify: () => "A two-story home means a stairwell to paint too — tall walls, and usually a railing — which is more work than the same square footage on one level.",
+    example: () => "Just say 'one story' or 'two story'.",
+  },
+
+  // ——————————————————————————————————————————
   // Surfaces — what in the room(s) is getting painted
   // ——————————————————————————————————————————
   {
@@ -398,6 +426,27 @@ export const TOPICS: Topic[] = [
       "Some folks just want walls refreshed. Others want the whole package — walls, ceiling, trim, doors, closets. Either works. You can also mix and match.",
     example: () =>
       "'Just walls' is common. Or 'walls and ceiling, no trim'. Or 'everything except the doors'.",
+  },
+
+  // ——————————————————————————————————————————
+  // Room mix — a whole-house job is priced off a template of rooms guessed from the square footage (and bedroom/bath
+  // count), not a list the customer gave room by room. Said out loud, so a place that's missing a room the template
+  // assumes (or has one it doesn't) gets corrected before the price is built on the wrong mix.
+  // ——————————————————————————————————————————
+  {
+    id: 'room_assumption',
+    priority: 26,
+    relevant: (c) => (c.projectType === 'interior' || c.projectType === 'both') && c.interiorScope === 'whole_house' && !!c.squareFeet && !isNarrowInteriorJob(c) && !isCommercialLike(c) && c.propertyType !== 'multi_unit',
+    alreadyAnswered: (c) => c.roomAssumptionAddressed,
+    ask: (c) => {
+      const sqft = c.squareFeet || 0;
+      const rooms = sqft >= 2500
+        ? 'a living room, dining room, kitchen, hallway, laundry room, and a family/bonus room or office'
+        : 'a living room, dining area, kitchen, hallway and laundry room';
+      return `For ${sqft.toLocaleString()} sq ft, I'm assuming ${rooms} — sound right, or is something different (missing, or not actually part of this)?`;
+    },
+    clarify: () => "Just the general room mix, not a full list — flag anything that's off from that (a room it's missing, or one that isn't actually there).",
+    example: () => "'That's right' is the most common answer. Or name what's different — 'no office' or 'there's also a den'.",
   },
 
   // ——————————————————————————————————————————
@@ -610,6 +659,22 @@ export const TOPICS: Topic[] = [
       ),
     clarify: () => "I mean the interior doors in those rooms. Painting them at the same time as everything else keeps the whole space looking consistent.",
     example: () => "Just say 'yes, do the doors' or 'no, skip the doors'.",
+  },
+
+  // ——————————————————————————————————————————
+  // Special trim features — a bigger, nicer home is more likely to have crown molding, chair rail or wainscoting, none
+  // of which are priced the same as plain baseboards, so a large home asks once rather than relying on it coming up.
+  // ——————————————————————————————————————————
+  {
+    id: 'upsell_special_trim',
+    priority: 36.5,
+    relevant: (c) =>
+      (c.projectType === 'interior' || c.projectType === 'both') && c.interiorTrim === 'yes' && (c.squareFeet ?? 0) >= 2200 &&
+      c.crownMolding === 'no' && c.chairRail === 'no' && c.wainscoting === 'no' && !extDone(c, 'upsell_special_trim'),
+    alreadyAnswered: (c) => c.crownMolding === 'yes' || c.chairRail === 'yes' || c.wainscoting === 'yes' || extDone(c, 'upsell_special_trim'),
+    ask: (c) => pick(["A place this size often has some detail trim — any crown molding, chair rail or wainscoting to price in?", "Does it have any crown molding, chair rail or wainscoting we should include?"], seed(c)),
+    clarify: () => "Those are priced separately from plain baseboards since they add real cutting-in time — crown where the wall meets the ceiling, chair rail partway up the wall, wainscoting as a paneled lower section.",
+    example: () => "'No, just plain trim' is the most common answer. Or name what it has — 'crown molding in the living and dining room'.",
   },
 
   {

@@ -43,6 +43,7 @@ const EXCLUDED_KEYS = new Set<keyof EstimatorContext>([
   'renoStageAddressed',
   'trimScopeAddressed',
   'colorClarificationNeeded',
+  'roomAssumptionAddressed',
 ]);
 
 /** Human-readable labels for fields whose camelCase key wouldn't read well auto-titled. */
@@ -86,6 +87,8 @@ const LABEL_OVERRIDES: Partial<Record<keyof EstimatorContext, string>> = {
   ceilingHeight: 'Ceiling height',
   additionalDetails: 'Notes from the customer',
   bedroomCount: 'Bedrooms',
+  bathroomCount: 'Bathrooms',
+  includedExtraRooms: 'Extra rooms confirmed',
   projectCondition: 'Project type (repaint, renovation, new)',
 };
 

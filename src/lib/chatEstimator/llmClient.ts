@@ -93,6 +93,9 @@ function sanitize(raw: Record<string, unknown>, prev: EstimatorContext): Partial
   const beds = clampNumber(raw.bedroomCount, 0, 20);
   if (beds !== null) patch.bedroomCount = beds;
 
+  const baths = clampNumber(raw.bathroomCount, 0, 20);
+  if (baths !== null) patch.bathroomCount = baths;
+
   const stories = clampNumber(raw.stories, 1, 3);
   if (stories) patch.stories = stories;
 

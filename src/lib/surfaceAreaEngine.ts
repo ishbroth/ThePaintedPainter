@@ -330,7 +330,13 @@ export interface HouseLayout {
   totalClosets: number;
 }
 
-export function estimateHouseLayout(sqft: number, bedrooms?: number, excludedRooms: string[] = []): HouseLayout {
+export function estimateHouseLayout(
+  sqft: number,
+  bedrooms?: number,
+  excludedRooms: string[] = [],
+  bathrooms?: number,
+  includeExtraRooms: string[] = [],
+): HouseLayout {
   const beds = bedrooms || estimateBedroomCount(sqft);
   const rooms: string[] = [];
 
@@ -349,10 +355,11 @@ export function estimateHouseLayout(sqft: number, bedrooms?: number, excludedRoo
   if (beds >= 4) rooms.push('bedroom_4');
   if (beds >= 5) rooms.push('bedroom_5'); // extra bedrooms use standard size
 
-  // Bathrooms scale with bedrooms
-  rooms.push('bathroom_master');
-  if (beds >= 2) rooms.push('bathroom_2');
-  if (beds >= 3) rooms.push('bathroom_3');
+  // Bathrooms: the customer's own count (a "2 bed, 1 bath" place really only has one) wins when given; otherwise scale with bedrooms.
+  const bathCount = bathrooms ?? (beds >= 3 ? 3 : beds >= 2 ? 2 : 1);
+  if (bathCount >= 1) rooms.push('bathroom_master');
+  if (bathCount >= 2) rooms.push('bathroom_2');
+  if (bathCount >= 3) rooms.push('bathroom_3');
 
   // Dining room for 3+ bed homes
   if (beds >= 3 || sqft >= 1800) rooms.push('dining_room');
@@ -365,6 +372,9 @@ export function estimateHouseLayout(sqft: number, bedrooms?: number, excludedRoo
 
   // Laundry
   if (sqft >= 1200) rooms.push('laundry');
+
+  // Rooms a home this size wouldn't normally have, but the customer confirmed are actually there
+  for (const extra of includeExtraRooms) if (!rooms.includes(extra)) rooms.push(extra);
   }
 
   // Aggregate. The template floor area always comes from the FULL room list (the customer's square footage

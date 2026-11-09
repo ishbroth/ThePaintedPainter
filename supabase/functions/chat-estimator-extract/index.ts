@@ -87,6 +87,7 @@ const UPDATE_TOOL = {
       zipCode: { type: 'string', description: '5-digit US ZIP code, if mentioned.' },
       squareFeet: { type: 'number', description: 'Total square footage of the property/unit, if explicitly stated — including a BARE number with no unit when the bot\'s last question directly asked for square footage/size (e.g. bot asked "about how big is the place?" and the user just replied "600" — that\'s 600 sqft, not a value to ignore for lacking "sqft").' },
       bedroomCount: { type: 'integer', description: 'Number of bedrooms, if mentioned.' },
+      bathroomCount: { type: 'number', description: 'Number of bathrooms, if mentioned (e.g. "2 bed 1 bath" -> 1, "2.5 baths" -> 2.5). Bathrooms do NOT scale with bedroom count by default, so this matters even when it is small relative to the bedrooms.' },
       stories: { type: 'integer', enum: [1, 2, 3], description: 'Number of stories of the building, if mentioned.' },
       propertyType: {
         type: 'string', enum: ['residential', 'rental', 'multi_unit', 'commercial'],

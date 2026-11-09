@@ -213,7 +213,7 @@ async function dismissAt(setup: string[], topicWords: RegExp, dismissal = 'doesn
 // The current finish of cabinets, baseboards/trim and doors: asked, read, and priced (painted is the base; bare wood and stained wood cost more prep; pre-primed less).
 {
   const priceOf = (st: ChatState) => calculateEstimate(st.ctx).total;
-  const start = ['I want the whole inside of my house painted, walls, trim and doors', '2400 sq ft', 'walls, ceilings, trim and doors', 'yes'];
+  const start = ['I want the whole inside of my house painted, walls, trim and doors', '2400 sq ft', 'one story', 'walls, ceilings, trim and doors', 'sounds right', 'yes'];
   const cab = await play([...start, 'yes']); // "...the trim: yes", then yes to the kitchen cabinets
   check('kitchen cabinets: asked whether they are painted, bare, stained or pre-primed', /cabinets/i.test(cab.last) && /bare/i.test(cab.last), cab.last.slice(0, 300));
   const finishes: Record<string, number> = {};
@@ -399,7 +399,7 @@ async function dismissAt(setup: string[], topicWords: RegExp, dismissal = 'doesn
   check('the same question asked twice is a bot_repeat', repeated.length === 1 && repeated[0].kind === 'bot_repeat', JSON.stringify(repeated));
 
   // live: the customer already gave the answer, and the notes have it
-  const known = await play(['I want the whole inside of my house painted, walls, trim and doors', '2400 sq ft', 'walls, ceilings, trim and doors', 'yes', 'no', 'all painted']);
+  const known = await play(['I want the whole inside of my house painted, walls, trim and doors', '2400 sq ft', 'one story', 'walls, ceilings, trim and doors', 'sounds right', 'yes', 'no', 'all painted']);
   check('setup: the bot asks how many doors', /doors/i.test(known.last) && /how many|approximately/i.test(known.last), known.last);
   const noticed = await play(['like I said, 14 doors'], [], known.state);
   check('"like I said, 14 doors": the bot owns up, uses the answer and does not ask it again', noticed.state.ctx.doorCount === 14 && /you'?re right|sorry/i.test(noticed.last) && !/how many doors/i.test(noticed.last), noticed.last);
