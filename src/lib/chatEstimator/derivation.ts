@@ -358,12 +358,16 @@ export function derive(ctx: EstimatorContext, transcript: string): Derivation[] 
   const mentionsSurfaceWords = /\b(walls?|ceilings?|whole|entire|every room|all (?:the )?rooms|throughout|bedrooms?|living room|kitchen walls)\b/.test(tNeg);
   const railWords = /\b(stair(?:s|case|way)?\s*(?:rail(?:ing)?s?|banisters?)|banisters?|bannisters?|balusters?|spindles?|handrails?|stair rail)\b/.test(t);
 
-  if (railWords && !/\b(deck|porch|balcon|patio|exterior|outside|outdoor)\b/.test(t) && !/\bwalls?\b/.test(t) && ctx.stairwayDetails !== 'railings_only') {
+  // Once the job's surfaces are already established (an earlier answer to "which surfaces?"), a single feature mentioned in
+  // passing never re-scopes the whole job down to just that feature — the same bug as a backyard fence silently erasing an
+  // already-established whole-house exterior job (see estimateEngine/derivation exterior fix). "Just doors and door casings"
+  // answering a narrower follow-up question (e.g. the baseboards upsell) must not undo the walls and doors already on record.
+  if (railWords && !/\b(deck|porch|balcon|patio|exterior|outside|outdoor)\b/.test(t) && !/\bwalls?\b/.test(t) && ctx.stairwayDetails !== 'railings_only' && !ctx.surfacesAddressed) {
     out.push({
       patch: { ...interiorOff, projectType: ctx.projectType || 'interior', interiorScope: 'specific_rooms', stairways: 'yes', stairwayDetails: 'railings_only', railingType: /\b(spindles?|balusters?)\b/.test(t) ? 'spindles' : 'simple', stairwayCount: ctx.stairwayCount || 1 },
       reason: 'Only the stair railing → price the railing, not the walls',
     });
-  } else if (/\bpopcorn\b|\bacoustic ceiling/.test(t) && /\b(removal|remove|scrape|scraping|get rid of|take off|strip)\b/.test(t) && !/\b(walls?|trim|baseboards?)\b/.test(t.replace(/no walls?/g, '')) && (ctx.interiorCeilings !== 'no' || ctx.interiorWalls !== 'no' || ctx.interiorTrim !== 'no')) {
+  } else if (/\bpopcorn\b|\bacoustic ceiling/.test(t) && /\b(removal|remove|scrape|scraping|get rid of|take off|strip)\b/.test(t) && !/\b(walls?|trim|baseboards?)\b/.test(t.replace(/no walls?/g, '')) && (ctx.interiorCeilings !== 'no' || ctx.interiorWalls !== 'no' || ctx.interiorTrim !== 'no') && !ctx.surfacesAddressed) {
     const noPaint = /\b(?:paint (?:it|them|the ceilings?) (?:ourselves|myself)|(?:we|i)(?:'ll| will| can)? paint|no paint(?:ing)?|without paint(?:ing)?|not (?:paint|painting)|removal only|just the removal|diy the paint)/.test(t);
     const repaint = !noPaint && /\b(repaint|paint(?:ed|ing)?|new paint|refinish)\b/.test(t.replace(/popcorn ceilings? (?:that is|is|are) painted/, ''));
     out.push({
@@ -374,7 +378,7 @@ export function derive(ctx: EstimatorContext, transcript: string): Derivation[] 
     // Only the small trim details ("just the new chair rail", "only crown moulding in two rooms", "closet shelves, nothing else"): no walls, ceilings or doors.
     (mentionedDetails(t).chairRail || mentionedDetails(t).crown || mentionedDetails(t).wainscot || mentionedDetails(t).closetShelves) &&
     !/\b(walls?|ceilings?|whole|entire|every room|all (?:the )?rooms|throughout|doors?|cabinets?|windows?|exterior|outside|fence|deck)\b/.test(tNeg) &&
-    hasOnly && ctx.interiorWalls !== 'no'
+    hasOnly && ctx.interiorWalls !== 'no' && !ctx.surfacesAddressed
   ) {
     const md = mentionedDetails(t);
     out.push({
@@ -390,12 +394,12 @@ export function derive(ctx: EstimatorContext, transcript: string): Derivation[] 
       },
       reason: 'Only trim details (chair rail, crown, wainscoting, closet shelves) → no wall, ceiling or door painting',
     });
-  } else if (/\b(baseboards?|base\s*boards?|trim|casings?|crown)\b/.test(t) && !mentionsSurfaceWords && (ctx.projectType === 'interior' || /\b(interior|inside|baseboards?|casings?|crown)\b/.test(t)) && !/\b(exterior|outside|fascia|soffit)\b/.test(t) && (hasOnly || ctx.trimLinearFeet != null || /\blinear (?:feet|foot)\b/.test(t)) && ctx.interiorWalls !== 'no') {
+  } else if (/\b(baseboards?|base\s*boards?|trim|casings?|crown)\b/.test(t) && !mentionsSurfaceWords && (ctx.projectType === 'interior' || /\b(interior|inside|baseboards?|casings?|crown)\b/.test(t)) && !/\b(exterior|outside|fascia|soffit)\b/.test(t) && (hasOnly || ctx.trimLinearFeet != null || /\blinear (?:feet|foot)\b/.test(t)) && ctx.interiorWalls !== 'no' && !ctx.surfacesAddressed) {
     out.push({
       patch: { ...interiorOff, interiorTrim: 'yes', projectType: ctx.projectType || 'interior', interiorScope: ctx.interiorScope || 'whole_house' },
       reason: 'Trim only → no walls, ceilings or doors',
     });
-  } else if (/\b(cabinets?|vanit(?:y|ies))\b/.test(t) && !/\b(walls?|ceilings?|baseboards?|trim|doors? (?:and|&) trim|whole|entire|every room|bedrooms?|living|house|apartment|condo)\b/.test(t) && ctx.interiorWalls !== 'no' && !/\b(exterior|outside)\b/.test(t)) {
+  } else if (/\b(cabinets?|vanit(?:y|ies))\b/.test(t) && !/\b(walls?|ceilings?|baseboards?|trim|doors? (?:and|&) trim|whole|entire|every room|bedrooms?|living|house|apartment|condo)\b/.test(t) && ctx.interiorWalls !== 'no' && !/\b(exterior|outside)\b/.test(t) && !ctx.surfacesAddressed) {
     out.push({
       patch: { ...interiorOff, projectType: ctx.projectType || 'interior', interiorScope: ctx.interiorScope || 'specific_rooms' },
       reason: 'Cabinets (or a vanity) only → no wall, ceiling or trim painting',

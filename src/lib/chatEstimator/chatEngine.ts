@@ -651,11 +651,14 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
       const yes = /^\s*(?:yes|yeah|yep|yup|sure|ok|okay|please|definitely|absolutely|why not|sounds good|do it|add (?:it|them)|go ahead|let'?s do it|that'?d be (?:great|good|nice)|i guess|fine|of course|love to)\b/.test(low);
       const no = /^\s*(?:no|nope|nah|not (?:now|needed|really|this time)|skip|pass|leave (?:it|them)|that'?s (?:ok|okay|fine|alright)|no thanks|no thank you|i'?m good)\b/.test(low);
       const target = ctxWithExplicit as unknown as Record<string, unknown>;
+      // An exclusive answer that names other surfaces but not this one ("just doors and door casings" to "add the baseboards?")
+      // declines it just as clearly as a plain "no" would — it says what the job is instead of answering yes/no directly.
+      const exclusiveWithoutIt = /\b(?:just|only)\b/.test(low) && !asked.word.test(low) && Object.values(offer).some((o) => o !== asked && o.word.test(low));
       if (yes && !no) {
         target[asked.field] = asked.on;
         added.add(asked.key);
         if (asked.field === 'interiorTrim') ctxWithExplicit.trimScopeAddressed = true;
-      } else if (no) {
+      } else if (no || exclusiveWithoutIt) {
         target[asked.field] = state.ctx[asked.field];
         ruledOut.add(asked.key);
       }
@@ -1278,7 +1281,7 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
         history: [
           ...s.history,
           botMessage(
-            `I'm not sure how that answers my question about ${topicLabel(topic.id, ctxNext.itemsOnly)}, and I'd rather ask than guess. ${recapSentence(recentRecognized(state.history))} ${q} If something above is wrong, just tell me what to change.`.replace(/\s{2,}/g, ' '),
+            `Sorry, I don't think I caught that one — it didn't look like an answer about ${topicLabel(topic.id, ctxNext.itemsOnly)}. ${recapSentence(recentRecognized(state.history))} ${q} If something above is wrong, just tell me what to change.`.replace(/\s{2,}/g, ' '),
           ),
         ],
       };

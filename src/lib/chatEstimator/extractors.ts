@@ -1765,7 +1765,11 @@ export function extractAll(text: string, prev: EstimatorContext, lastBotTopicId:
 
   // Surface scope limiters. Skipped when the reply is answering a different question: "just regular trim" to the trim
   // question means baseboards, not "paint only the trim".
-  const scopeBlockedBy = ['trim_door_finish', 'cabinet_finish', 'trim_scope', 'condition', 'property_ownership', 'color_change', 'location', 'timeline_and_access', 'commercial_access', 'siding', 'stories', 'house_size', 'room_size', 'reno_context', 'popcorn_extent'];
+  // Narrow follow-ups (a specific surface's finish, condition, a yes/no upsell offer...) are never the broad "which surfaces?"
+  // question, so a reply naming one thing in passing ("just doors and door casings", answering the baseboards upsell) must not
+  // be read as the customer re-declaring the whole job's scope — that would silently drop surfaces already established earlier
+  // (the same class of bug as a backyard fence silently erasing an already-established whole-house exterior job).
+  const scopeBlockedBy = ['trim_door_finish', 'cabinet_finish', 'trim_scope', 'condition', 'property_ownership', 'color_change', 'location', 'timeline_and_access', 'commercial_access', 'siding', 'stories', 'house_size', 'room_size', 'reno_context', 'popcorn_extent', 'upsell_ceilings', 'upsell_trim', 'upsell_doors', 'upsell_cabinets'];
   const surf = lastBotTopicId && (scopeBlockedBy.includes(lastBotTopicId) || lastBotTopicId.startsWith('ext_')) ? ({} as ReturnType<typeof extractSurfaceScope>) : extractSurfaceScope(text);
   // A plain list as the answer to "which surfaces?" ("walls", "walls and ceilings", "walls ceilings trim") means exactly those.
   const onlySurfaceWords = /^\s*(?:(?:just|only|and|the|with|plus|also|,|&|\+)\s*)*(?:(?:walls?|ceilings?|trim|baseboards?|doors?)\s*(?:,|and|&|\+|\/)?\s*)+[.!]?\s*$/i.test(text);

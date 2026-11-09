@@ -18142,7 +18142,7 @@ function extractAll(text, prev, lastBotTopicId = null) {
     patch.doorTypes = [...patch.doorTypes ?? prev.doorTypes, "french"];
     acks.push("French doors");
   }
-  const scopeBlockedBy = ["trim_door_finish", "cabinet_finish", "trim_scope", "condition", "property_ownership", "color_change", "location", "timeline_and_access", "commercial_access", "siding", "stories", "house_size", "room_size", "reno_context", "popcorn_extent"];
+  const scopeBlockedBy = ["trim_door_finish", "cabinet_finish", "trim_scope", "condition", "property_ownership", "color_change", "location", "timeline_and_access", "commercial_access", "siding", "stories", "house_size", "room_size", "reno_context", "popcorn_extent", "upsell_ceilings", "upsell_trim", "upsell_doors", "upsell_cabinets"];
   const surf = lastBotTopicId && (scopeBlockedBy.includes(lastBotTopicId) || lastBotTopicId.startsWith("ext_")) ? {} : extractSurfaceScope(text);
   const onlySurfaceWords = /^\s*(?:(?:just|only|and|the|with|plus|also|,|&|\+)\s*)*(?:(?:walls?|ceilings?|trim|baseboards?|doors?)\s*(?:,|and|&|\+|\/)?\s*)+[.!]?\s*$/i.test(text);
   let listParsed = false;
@@ -21033,12 +21033,12 @@ function derive(ctx, transcript) {
   const hasOnly = hasScopeLimiter(t2);
   const mentionsSurfaceWords = /\b(walls?|ceilings?|whole|entire|every room|all (?:the )?rooms|throughout|bedrooms?|living room|kitchen walls)\b/.test(tNeg);
   const railWords = /\b(stair(?:s|case|way)?\s*(?:rail(?:ing)?s?|banisters?)|banisters?|bannisters?|balusters?|spindles?|handrails?|stair rail)\b/.test(t2);
-  if (railWords && !/\b(deck|porch|balcon|patio|exterior|outside|outdoor)\b/.test(t2) && !/\bwalls?\b/.test(t2) && ctx.stairwayDetails !== "railings_only") {
+  if (railWords && !/\b(deck|porch|balcon|patio|exterior|outside|outdoor)\b/.test(t2) && !/\bwalls?\b/.test(t2) && ctx.stairwayDetails !== "railings_only" && !ctx.surfacesAddressed) {
     out.push({
       patch: { ...interiorOff, projectType: ctx.projectType || "interior", interiorScope: "specific_rooms", stairways: "yes", stairwayDetails: "railings_only", railingType: /\b(spindles?|balusters?)\b/.test(t2) ? "spindles" : "simple", stairwayCount: ctx.stairwayCount || 1 },
       reason: "Only the stair railing \u2192 price the railing, not the walls"
     });
-  } else if (/\bpopcorn\b|\bacoustic ceiling/.test(t2) && /\b(removal|remove|scrape|scraping|get rid of|take off|strip)\b/.test(t2) && !/\b(walls?|trim|baseboards?)\b/.test(t2.replace(/no walls?/g, "")) && (ctx.interiorCeilings !== "no" || ctx.interiorWalls !== "no" || ctx.interiorTrim !== "no")) {
+  } else if (/\bpopcorn\b|\bacoustic ceiling/.test(t2) && /\b(removal|remove|scrape|scraping|get rid of|take off|strip)\b/.test(t2) && !/\b(walls?|trim|baseboards?)\b/.test(t2.replace(/no walls?/g, "")) && (ctx.interiorCeilings !== "no" || ctx.interiorWalls !== "no" || ctx.interiorTrim !== "no") && !ctx.surfacesAddressed) {
     const noPaint = /\b(?:paint (?:it|them|the ceilings?) (?:ourselves|myself)|(?:we|i)(?:'ll| will| can)? paint|no paint(?:ing)?|without paint(?:ing)?|not (?:paint|painting)|removal only|just the removal|diy the paint)/.test(t2);
     const repaint = !noPaint && /\b(repaint|paint(?:ed|ing)?|new paint|refinish)\b/.test(t2.replace(/popcorn ceilings? (?:that is|is|are) painted/, ""));
     out.push({
@@ -21047,7 +21047,7 @@ function derive(ctx, transcript) {
     });
   } else if (
     // Only the small trim details ("just the new chair rail", "only crown moulding in two rooms", "closet shelves, nothing else"): no walls, ceilings or doors.
-    (mentionedDetails(t2).chairRail || mentionedDetails(t2).crown || mentionedDetails(t2).wainscot || mentionedDetails(t2).closetShelves) && !/\b(walls?|ceilings?|whole|entire|every room|all (?:the )?rooms|throughout|doors?|cabinets?|windows?|exterior|outside|fence|deck)\b/.test(tNeg) && hasOnly && ctx.interiorWalls !== "no"
+    (mentionedDetails(t2).chairRail || mentionedDetails(t2).crown || mentionedDetails(t2).wainscot || mentionedDetails(t2).closetShelves) && !/\b(walls?|ceilings?|whole|entire|every room|all (?:the )?rooms|throughout|doors?|cabinets?|windows?|exterior|outside|fence|deck)\b/.test(tNeg) && hasOnly && ctx.interiorWalls !== "no" && !ctx.surfacesAddressed
   ) {
     const md = mentionedDetails(t2);
     out.push({
@@ -21063,12 +21063,12 @@ function derive(ctx, transcript) {
       },
       reason: "Only trim details (chair rail, crown, wainscoting, closet shelves) \u2192 no wall, ceiling or door painting"
     });
-  } else if (/\b(baseboards?|base\s*boards?|trim|casings?|crown)\b/.test(t2) && !mentionsSurfaceWords && (ctx.projectType === "interior" || /\b(interior|inside|baseboards?|casings?|crown)\b/.test(t2)) && !/\b(exterior|outside|fascia|soffit)\b/.test(t2) && (hasOnly || ctx.trimLinearFeet != null || /\blinear (?:feet|foot)\b/.test(t2)) && ctx.interiorWalls !== "no") {
+  } else if (/\b(baseboards?|base\s*boards?|trim|casings?|crown)\b/.test(t2) && !mentionsSurfaceWords && (ctx.projectType === "interior" || /\b(interior|inside|baseboards?|casings?|crown)\b/.test(t2)) && !/\b(exterior|outside|fascia|soffit)\b/.test(t2) && (hasOnly || ctx.trimLinearFeet != null || /\blinear (?:feet|foot)\b/.test(t2)) && ctx.interiorWalls !== "no" && !ctx.surfacesAddressed) {
     out.push({
       patch: { ...interiorOff, interiorTrim: "yes", projectType: ctx.projectType || "interior", interiorScope: ctx.interiorScope || "whole_house" },
       reason: "Trim only \u2192 no walls, ceilings or doors"
     });
-  } else if (/\b(cabinets?|vanit(?:y|ies))\b/.test(t2) && !/\b(walls?|ceilings?|baseboards?|trim|doors? (?:and|&) trim|whole|entire|every room|bedrooms?|living|house|apartment|condo)\b/.test(t2) && ctx.interiorWalls !== "no" && !/\b(exterior|outside)\b/.test(t2)) {
+  } else if (/\b(cabinets?|vanit(?:y|ies))\b/.test(t2) && !/\b(walls?|ceilings?|baseboards?|trim|doors? (?:and|&) trim|whole|entire|every room|bedrooms?|living|house|apartment|condo)\b/.test(t2) && ctx.interiorWalls !== "no" && !/\b(exterior|outside)\b/.test(t2) && !ctx.surfacesAddressed) {
     out.push({
       patch: { ...interiorOff, projectType: ctx.projectType || "interior", interiorScope: ctx.interiorScope || "specific_rooms" },
       reason: "Cabinets (or a vanity) only \u2192 no wall, ceiling or trim painting"
@@ -23442,11 +23442,12 @@ async function processMessage(state, trimmed, customerId) {
       const yes = /^\s*(?:yes|yeah|yep|yup|sure|ok|okay|please|definitely|absolutely|why not|sounds good|do it|add (?:it|them)|go ahead|let'?s do it|that'?d be (?:great|good|nice)|i guess|fine|of course|love to)\b/.test(low);
       const no = /^\s*(?:no|nope|nah|not (?:now|needed|really|this time)|skip|pass|leave (?:it|them)|that'?s (?:ok|okay|fine|alright)|no thanks|no thank you|i'?m good)\b/.test(low);
       const target = ctxWithExplicit;
+      const exclusiveWithoutIt = /\b(?:just|only)\b/.test(low) && !asked.word.test(low) && Object.values(offer).some((o) => o !== asked && o.word.test(low));
       if (yes && !no) {
         target[asked.field] = asked.on;
         added.add(asked.key);
         if (asked.field === "interiorTrim") ctxWithExplicit.trimScopeAddressed = true;
-      } else if (no) {
+      } else if (no || exclusiveWithoutIt) {
         target[asked.field] = state.ctx[asked.field];
         ruledOut.add(asked.key);
       }
@@ -23904,7 +23905,7 @@ ${trimmed}`.trim();
         history: [
           ...s.history,
           botMessage(
-            `I'm not sure how that answers my question about ${topicLabel(topic.id, ctxNext.itemsOnly)}, and I'd rather ask than guess. ${recapSentence(recentRecognized(state.history))} ${q} If something above is wrong, just tell me what to change.`.replace(/\s{2,}/g, " ")
+            `Sorry, I don't think I caught that one \u2014 it didn't look like an answer about ${topicLabel(topic.id, ctxNext.itemsOnly)}. ${recapSentence(recentRecognized(state.history))} ${q} If something above is wrong, just tell me what to change.`.replace(/\s{2,}/g, " ")
           )
         ]
       };
