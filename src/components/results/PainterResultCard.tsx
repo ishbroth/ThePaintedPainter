@@ -38,7 +38,7 @@ function StarBar({ value }: { value: number }) {
 function CoverPhoto({ result }: { result: PainterResult }) {
   const cover = result.photos[0];
   return (
-    <div className="relative w-full overflow-hidden" style={{ aspectRatio: '16 / 7', background: '#000' }}>
+    <div className="relative w-full overflow-hidden" style={{ aspectRatio: '3 / 1', background: '#000' }}>
       {cover ? (
         <img src={cover} alt={`${result.companyName} — cover photo`} loading="lazy" className="w-full h-full object-cover" />
       ) : (
@@ -48,7 +48,7 @@ function CoverPhoto({ result }: { result: PainterResult }) {
           </svg>
         </div>
       )}
-      <div className="absolute inset-x-0 top-0 px-3 pt-2 pb-6" style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.72), rgba(0,0,0,0))' }}>
+      <div className="absolute inset-x-0 top-0 px-3 pt-2 pb-4" style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.72), rgba(0,0,0,0))' }}>
         {result.workedWithBefore && (
           <span style={{ display: 'inline-block', marginBottom: 4, padding: '1px 9px', borderRadius: 999, fontSize: '0.68rem', fontWeight: 700, color: '#fff', background: 'rgba(116, 185, 255, 0.35)', border: '1px solid rgba(255,255,255,0.6)' }}>
             ★ Worked with before
@@ -312,11 +312,11 @@ export default function PainterResultCard({
 
   return (
     <div
-      style={{ background: 'var(--bg-surface)', border: result.workedWithBefore ? '2px solid var(--accent-blue)' : '1px solid var(--border)', borderRadius: 12, marginBottom: 10, overflow: 'hidden' }}
+      style={{ background: 'var(--bg-surface)', border: result.workedWithBefore ? '2px solid var(--accent-blue)' : '1px solid var(--border)', borderRadius: 12, marginBottom: 8, overflow: 'hidden' }}
     >
       <CoverPhoto result={result} />
 
-      <div className="p-3 flex flex-col sm:flex-row gap-3 justify-between cursor-pointer" onClick={toggle}>
+      <div className="p-2.5 flex flex-col sm:flex-row gap-2 justify-between cursor-pointer" onClick={toggle}>
         <div className="min-w-0">
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', margin: '0 0 4px' }}>{result.reasons[0]}</p>
 
@@ -342,17 +342,17 @@ export default function PainterResultCard({
           )}
         </div>
 
-        <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-2 flex-shrink-0">
+        <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-1.5 flex-shrink-0">
           <div className="sm:text-right">
-            <div style={{ fontWeight: 800, fontSize: '1.5rem', color: 'var(--accent-blue)', lineHeight: 1.1 }}>{money(result.price)}</div>
-            <div style={{ color: 'var(--text-faint)', fontSize: '0.72rem' }}>guaranteed price</div>
+            <div style={{ fontWeight: 800, fontSize: '1.25rem', color: 'var(--accent-blue)', lineHeight: 1.1 }}>{money(result.price)}</div>
+            <div style={{ color: 'var(--text-faint)', fontSize: '0.7rem' }}>guaranteed price</div>
           </div>
           <button
             type="button"
             disabled={disabled}
             onClick={(e) => { e.stopPropagation(); onSelect(); }}
             style={{
-              background: 'var(--accent)', color: 'var(--accent-ink)', border: 'none', borderRadius: 8, padding: '10px 18px', fontWeight: 700,
+              background: 'var(--accent)', color: 'var(--accent-ink)', border: 'none', borderRadius: 7, padding: '6px 14px', fontWeight: 700, fontSize: '0.85rem',
               cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.55 : 1,
             }}
           >
@@ -365,7 +365,7 @@ export default function PainterResultCard({
         type="button"
         onClick={toggle}
         aria-expanded={open}
-        style={{ width: '100%', background: 'none', border: 'none', borderTop: '1px solid var(--border)', padding: '7px 14px', color: 'var(--accent-blue)', fontSize: '0.85rem', cursor: 'pointer', textAlign: 'left' }}
+        style={{ width: '100%', background: 'none', border: 'none', borderTop: '1px solid var(--border)', padding: '5px 14px', color: 'var(--accent-blue)', fontSize: '0.8rem', cursor: 'pointer', textAlign: 'left' }}
       >
         {open ? 'Hide details ▴' : 'See details — licensing, crew, reviews ▾'}
       </button>
