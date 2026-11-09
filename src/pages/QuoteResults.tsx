@@ -231,7 +231,7 @@ const QuoteResults = () => {
         </div>
         <p className="mystery-painter-desc">
           {(painterMatches?.length ?? 0) > 0 ? (
-            <>Accept the guaranteed price and we'll match you with a verified, licensed painter who bids on your job.</>
+            <>Accept the guaranteed price and we'll match you with a verified, licensed painter who guarantees their work for this price.</>
           ) : (
             <>
               Accept the guaranteed price and we'll actively recruit a verified, licensed painter in your area to take the job at this rate. We
