@@ -343,6 +343,26 @@ export function extractSidingType(
   return null;
 }
 
+/** The trim is almost never the same material as the siding (a stucco or brick house still usually has wood trim), so it's asked and read separately. */
+export function extractTrimMaterial(
+  text: string,
+  answeringTrimMaterial = false,
+): 'wood' | 'aluminum' | 'vinyl' | 'stucco' | null {
+  const t = text.toLowerCase();
+  if (/\b(?:stucco|cement)\s*(?:pop[\s-]?outs?|trim|surrounds?)\b|\bpop[\s-]?outs?\b/.test(t)) return 'stucco';
+  if (/\bwood(?:en)?\s*trim\b/.test(t)) return 'wood';
+  if (/\b(?:aluminum|aluminium)\s*trim\b/.test(t)) return 'aluminum';
+  if (/\bvinyl\s*trim\b/.test(t)) return 'vinyl';
+  // right after "what's the trim made of?" a bare material is the answer
+  if (answeringTrimMaterial) {
+    if (/\bwood(?:en)?\b/.test(t)) return 'wood';
+    if (/\bvinyl\b/.test(t)) return 'vinyl';
+    if (/\b(?:aluminum|aluminium|metal)\b/.test(t)) return 'aluminum';
+    if (/\bstucco\b/.test(t)) return 'stucco';
+  }
+  return null;
+}
+
 export function extractCeilingType(text: string): 'flat' | 'popcorn' | 'vaulted' | null {
   const t = text.toLowerCase();
   if (/\bpopcorn\s+ceiling/.test(t)) return 'popcorn';
@@ -1386,6 +1406,12 @@ export function extractAll(text: string, prev: EstimatorContext, lastBotTopicId:
   if (siding && !prev.sidingType) {
     patch.sidingType = siding;
     acks.push(siding);
+  }
+
+  const trimMat = extractTrimMaterial(text, lastBotTopicId === 'ext_trim_material');
+  if (trimMat && !prev.trimMaterial) {
+    patch.trimMaterial = trimMat;
+    acks.push(`${trimMat} trim`);
   }
 
   const ceiling = extractCeilingType(text);

@@ -1,34 +1,18 @@
-import { useState } from 'react';
 import { useGoogleMaps } from '../lib/googleMaps';
 import PaintersMapView from './PaintersMapView';
-import { hapticMedium } from '../lib/haptics';
 import { useAuth } from '../lib/auth';
 import { useNetworkPainters } from '../lib/networkPainters';
 import { estimatorZip } from '../lib/mapCenter';
 
-/** "Find Painters Near You": a button that opens a real map right on the home page (the page grows downward). */
+/** "Find Painters Near You": the map sits right on the home page, always visible (no show/hide). */
 export default function PaintersMapSection() {
-  const [expanded, setExpanded] = useState(false);
   return (
     <section className="map-section fade-in">
       <h2>Find Painters Near You</h2>
       <p className="map-subtitle">Browse verified painters across the country</p>
-      <button
-        type="button"
-        className="map-link-btn"
-        aria-expanded={expanded}
-        onClick={() => {
-          hapticMedium();
-          setExpanded((e) => !e);
-        }}
-      >
-        {expanded ? '▲ Hide Map' : '▼ Show Map'}
-      </button>
-      {expanded && (
-        <div className="home-map-container">
-          <MapBody />
-        </div>
-      )}
+      <div className="home-map-container">
+        <MapBody />
+      </div>
     </section>
   );
 }

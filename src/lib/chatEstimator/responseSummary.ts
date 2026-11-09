@@ -80,6 +80,7 @@ const LABEL_OVERRIDES: Partial<Record<keyof EstimatorContext, string>> = {
   windowCount: 'Windows to paint',
   pressureWashSqft: 'Pressure-wash area (sq ft)',
   exteriorBody: 'House body painted (siding/stucco/brick)',
+  trimMaterial: 'Trim material',
   soffitsEaves: 'Soffits and eaves',
   exteriorTrim: 'Exterior trim and fascia',
   ceilingHeight: 'Ceiling height',
@@ -140,6 +141,7 @@ const DEPENDS_ON: Record<string, string> = {
   closetCount: 'closets', closetShelving: 'closets', stairwayCount: 'stairways', stairwayDetails: 'stairways', stairRailFeet: 'stairways',
   interiorRailingMaterial: 'stairways', accentWallCount: 'accentWalls', brickTreatment: 'brickSqft', epoxyType: 'epoxyGarageSqft',
   colorChangeScope: 'interiorColorChange', colorChangeExcludedRoomCount: 'interiorColorChange', colorCount: 'interiorColorChange',
+  trimMaterial: 'exteriorTrim',
 };
 /** Work the estimator adds on its own for every repaint; the customer did not ask for it, so it is not listed as theirs. */
 const AUTOMATIC_PREP = new Set(['caulking', 'power_washing']);

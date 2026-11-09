@@ -555,6 +555,10 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
   // around detail, more color breaks and more surface than a plain ranch or an average two-story — a straightforward
   // "normal house" (ranch, rambler, one-story, two-story) stays at the standard rate.
   const houseStyleFactor = ctx.houseStyle === 'ornate' ? 1.25 : 1;
+  // Bare wood trim needs scraping, caulking and spot-priming before it'll take paint; factory-finished aluminum or
+  // vinyl trim needs very little prep. '' (never asked, or genuinely unsure) is priced as wood, the most common case.
+  const trimMaterialFactor =
+    ctx.trimMaterial === 'aluminum' || ctx.trimMaterial === 'vinyl' ? 0.85 : ctx.trimMaterial === 'stucco' ? 1 : 1.15;
   if (ctx.projectType === 'exterior' || ctx.projectType === 'both') {
     // Several buildings: the same total floor area spread over more footprints has more wall around it (and gutters, trim and windows with it).
     const buildings = ctx.propertyType === 'multi_unit' && ctx.buildingCount && ctx.buildingCount > 1 ? ctx.buildingCount : 1;
@@ -603,10 +607,11 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
     if ((ctx.exteriorTrim === 'yes' || ctx.soffitsEaves === 'yes') && !off('ext_trim')) {
       const trimPart = ctx.exteriorTrim === 'yes' ? extSurface.trimLinFt * BASE_RATES.exterior.fascia_per_linft : 0;
       const soffitPart = ctx.soffitsEaves === 'yes' ? extSurface.soffitSqFt * BASE_RATES.exterior.soffit_per_sqft : 0;
+      const trimMaterialNote = ctx.trimMaterial === 'aluminum' || ctx.trimMaterial === 'vinyl' ? ' (aluminum/vinyl trim)' : ctx.trimMaterial === 'wood' ? ' (wood trim)' : '';
       lineItems.push({
         category: 'Exterior',
-        description: `Trim, Fascia, Soffits & Eaves${ctx.houseStyle === 'ornate' ? ' (detailed architectural style)' : ''}`,
-        amount: (trimPart + soffitPart) * regionalMult * houseStyleFactor,
+        description: `Trim, Fascia, Soffits & Eaves${ctx.houseStyle === 'ornate' ? ' (detailed architectural style)' : ''}${trimMaterialNote}`,
+        amount: (trimPart + soffitPart) * regionalMult * houseStyleFactor * trimMaterialFactor,
         key: 'ext_trim',
       });
     }

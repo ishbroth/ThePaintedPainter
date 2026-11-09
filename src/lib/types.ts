@@ -130,6 +130,10 @@ export interface EstimatorContext {
   // 'ornate' = a style with real architectural detail (Victorian, Georgian, Tudor, Cape Cod, Art Deco, Frank Lloyd
   // Wright and the like) — priced a bit higher for the extra cutting-in and surface that style brings.
   houseStyle: string;
+  // '' = not asked yet (priced as wood, the most common default). Trim is almost never the same material as the
+  // siding, so this is tracked separately from sidingType — a brick or stucco house still has wood (or aluminum,
+  // or stucco pop-out) trim around the windows, doors and roofline.
+  trimMaterial: string; // wood, aluminum, vinyl, stucco
   exteriorTrim: string; // yes, no
   soffitsEaves: string; // yes, no, skip
   exteriorShutters: string; // yes, no

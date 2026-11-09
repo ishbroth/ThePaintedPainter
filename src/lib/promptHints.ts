@@ -25,6 +25,7 @@ const TOPIC_PROMPTS: Record<string, string> = {
   ext_size: 'Please estimate square feet',
   ext_style: 'ranch, two-story, Victorian, Tudor, etc.',
   ext_trim: 'Paint the trim and eaves?',
+  ext_trim_material: 'wood, aluminum, vinyl, stucco',
   ext_doors: 'Paint the front door?',
   ext_garage: 'Paint the garage door?',
   ext_garage_count: 'One or two garage doors?',

@@ -425,22 +425,6 @@ export const TOPICS: Topic[] = [
     example: () => "Something like '2,000 square feet', or '4 bedrooms' if you don't know the number.",
   },
   {
-    id: 'ext_trim',
-    priority: 48.1,
-    relevant: (c) => isExteriorJob(c) && c.exteriorTrim !== 'yes' && c.soffitsEaves !== 'yes',
-    alreadyAnswered: (c) => c.exteriorTrim === 'yes' || c.soffitsEaves === 'yes' || extDone(c, 'ext_trim'),
-    ask: (c) =>
-      pick(
-        [
-          "Are we painting the trim, fascia, soffits and eaves too?",
-          "What about the trim, fascia, eaves and soffits, are those getting painted?",
-        ],
-        seed(c),
-      ),
-    clarify: () => "That's the boards around the roofline and around the windows and doors (trim and fascia), plus the underside of the roof overhang (eaves and soffits). They're usually painted along with the siding.",
-    example: () => "Just say 'yes, all of it' or 'no, just the siding'.",
-  },
-  {
     id: 'ext_doors',
     priority: 48.2,
     relevant: (c) => isExteriorJob(c) && c.entryDoor !== 'yes',
@@ -1159,8 +1143,27 @@ export const TOPICS: Topic[] = [
   },
 
   // ——————————————————————————————————————————
-  // Exterior siding — only if project has exterior component
+  // Exterior scope — settled before either material question, so "the exterior" is defined (siding/walls, and whether
+  // trim/fascia/soffits/eaves ride along) before asking what any of it is made of. A house's trim is almost never the
+  // same material as its walls (a brick or stucco house still has wood, stucco-pop-out or aluminum trim around the
+  // windows, doors and roofline), so the siding and trim material questions are asked separately, right after.
   // ——————————————————————————————————————————
+  {
+    id: 'ext_trim',
+    priority: 44,
+    relevant: (c) => isExteriorJob(c) && c.exteriorTrim !== 'yes' && c.soffitsEaves !== 'yes',
+    alreadyAnswered: (c) => c.exteriorTrim === 'yes' || c.soffitsEaves === 'yes' || extDone(c, 'ext_trim'),
+    ask: (c) =>
+      pick(
+        [
+          "When you say the exterior, does that include the trim, fascia, eaves and soffits too, or just the walls themselves?",
+          "Besides the walls themselves, are we also painting the trim, fascia, eaves and soffits?",
+        ],
+        seed(c),
+      ),
+    clarify: () => "That's the boards around the roofline and around the windows and doors (trim and fascia), plus the underside of the roof overhang (eaves and soffits). They're almost always a different material than the walls, so I ask separately.",
+    example: () => "Just say 'yes, all of it' or 'no, just the walls'.",
+  },
   {
     id: 'siding',
     priority: 45,
@@ -1169,16 +1172,26 @@ export const TOPICS: Topic[] = [
     ask: (c) =>
       pick(
         [
-          "What's the exterior made of?",
+          "What's the siding — the wall material itself — made of?",
           "What kind of siding does it have?",
-          "What material is the outside?",
+          "What material are the walls themselves?",
         ],
         seed(c),
       ),
     clarify: () =>
-      "Just the material of the outside walls. In SoCal most homes are stucco. Older homes often have wood siding. Newer ones use Hardie board (fiber cement).",
+      "Just the material of the outside walls (not the trim — that's next). In SoCal most homes are stucco. Older homes often have wood siding. Newer ones use Hardie board (fiber cement).",
     example: () =>
       "Stucco, wood, Hardie, vinyl, brick, stone, or something else — just the general material.",
+  },
+  {
+    id: 'ext_trim_material',
+    priority: 45.5,
+    relevant: (c) => isExteriorJob(c) && (c.exteriorTrim === 'yes' || c.soffitsEaves === 'yes'),
+    alreadyAnswered: (c) => !!c.trimMaterial || extDone(c, 'ext_trim_material'),
+    ask: () => "And the trim itself — what's that made of? Most houses have wood trim, but some have stucco pop-outs or aluminum.",
+    clarify: () =>
+      "Wood trim usually needs scraping, caulking and priming of any bare spots. Aluminum or vinyl trim is factory-finished and needs much less prep. Stucco trim (pop-outs around the windows) is the same material as the walls.",
+    example: () => "'Wood' is the most common answer. Or 'aluminum', 'vinyl', or 'stucco' if that's what it is.",
   },
 
   // ——————————————————————————————————————————
@@ -1430,6 +1443,8 @@ export const metaBank = {
         return "No worries — I'll assume you're doing a different color. Price doesn't change much either way.";
       case 'siding':
         return "No problem — stucco's the most common in SoCal. I'll default to that unless it's clearly wood or brick.";
+      case 'ext_trim_material':
+        return "No problem — wood's the most common for trim. I'll default to that unless it's clearly aluminum, vinyl, or stucco pop-outs.";
       case 'house_size':
         return "No problem — I'll estimate the size from the bedroom count you gave me.";
       default:

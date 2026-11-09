@@ -17135,6 +17135,20 @@ function extractSidingType(text, answeringSiding = false) {
   }
   return null;
 }
+function extractTrimMaterial(text, answeringTrimMaterial = false) {
+  const t2 = text.toLowerCase();
+  if (/\b(?:stucco|cement)\s*(?:pop[\s-]?outs?|trim|surrounds?)\b|\bpop[\s-]?outs?\b/.test(t2)) return "stucco";
+  if (/\bwood(?:en)?\s*trim\b/.test(t2)) return "wood";
+  if (/\b(?:aluminum|aluminium)\s*trim\b/.test(t2)) return "aluminum";
+  if (/\bvinyl\s*trim\b/.test(t2)) return "vinyl";
+  if (answeringTrimMaterial) {
+    if (/\bwood(?:en)?\b/.test(t2)) return "wood";
+    if (/\bvinyl\b/.test(t2)) return "vinyl";
+    if (/\b(?:aluminum|aluminium|metal)\b/.test(t2)) return "aluminum";
+    if (/\bstucco\b/.test(t2)) return "stucco";
+  }
+  return null;
+}
 function extractCeilingType(text) {
   const t2 = text.toLowerCase();
   if (/\bpopcorn\s+ceiling/.test(t2)) return "popcorn";
@@ -17820,6 +17834,11 @@ function extractAll(text, prev, lastBotTopicId = null) {
   if (siding && !prev.sidingType) {
     patch.sidingType = siding;
     acks.push(siding);
+  }
+  const trimMat = extractTrimMaterial(text, lastBotTopicId === "ext_trim_material");
+  if (trimMat && !prev.trimMaterial) {
+    patch.trimMaterial = trimMat;
+    acks.push(`${trimMat} trim`);
   }
   const ceiling = extractCeilingType(text);
   if (ceiling && !prev.ceilingType) {
@@ -19352,6 +19371,7 @@ function calculateEstimate(ctx) {
   }
   const bodyPainted = ctx.exteriorBody !== "no" && !off("ext_body");
   const houseStyleFactor = ctx.houseStyle === "ornate" ? 1.25 : 1;
+  const trimMaterialFactor = ctx.trimMaterial === "aluminum" || ctx.trimMaterial === "vinyl" ? 0.85 : ctx.trimMaterial === "stucco" ? 1 : 1.15;
   if (ctx.projectType === "exterior" || ctx.projectType === "both") {
     const buildings = ctx.propertyType === "multi_unit" && ctx.buildingCount && ctx.buildingCount > 1 ? ctx.buildingCount : 1;
     const one = calculateExteriorSurface(sqft / buildings, ctx.stories || 1, ctx.sidingType);
@@ -19389,10 +19409,11 @@ function calculateEstimate(ctx) {
     if ((ctx.exteriorTrim === "yes" || ctx.soffitsEaves === "yes") && !off("ext_trim")) {
       const trimPart = ctx.exteriorTrim === "yes" ? extSurface.trimLinFt * RESOLVED_BASE_RATES.exterior.fascia_per_linft : 0;
       const soffitPart = ctx.soffitsEaves === "yes" ? extSurface.soffitSqFt * RESOLVED_BASE_RATES.exterior.soffit_per_sqft : 0;
+      const trimMaterialNote = ctx.trimMaterial === "aluminum" || ctx.trimMaterial === "vinyl" ? " (aluminum/vinyl trim)" : ctx.trimMaterial === "wood" ? " (wood trim)" : "";
       lineItems.push({
         category: "Exterior",
-        description: `Trim, Fascia, Soffits & Eaves${ctx.houseStyle === "ornate" ? " (detailed architectural style)" : ""}`,
-        amount: (trimPart + soffitPart) * regionalMult * houseStyleFactor,
+        description: `Trim, Fascia, Soffits & Eaves${ctx.houseStyle === "ornate" ? " (detailed architectural style)" : ""}${trimMaterialNote}`,
+        amount: (trimPart + soffitPart) * regionalMult * houseStyleFactor * trimMaterialFactor,
         key: "ext_trim"
       });
     }
@@ -21513,21 +21534,6 @@ var TOPICS = [
     example: () => "Something like '2,000 square feet', or '4 bedrooms' if you don't know the number."
   },
   {
-    id: "ext_trim",
-    priority: 48.1,
-    relevant: (c2) => isExteriorJob(c2) && c2.exteriorTrim !== "yes" && c2.soffitsEaves !== "yes",
-    alreadyAnswered: (c2) => c2.exteriorTrim === "yes" || c2.soffitsEaves === "yes" || extDone(c2, "ext_trim"),
-    ask: (c2) => pick(
-      [
-        "Are we painting the trim, fascia, soffits and eaves too?",
-        "What about the trim, fascia, eaves and soffits, are those getting painted?"
-      ],
-      seed(c2)
-    ),
-    clarify: () => "That's the boards around the roofline and around the windows and doors (trim and fascia), plus the underside of the roof overhang (eaves and soffits). They're usually painted along with the siding.",
-    example: () => "Just say 'yes, all of it' or 'no, just the siding'."
-  },
-  {
     id: "ext_doors",
     priority: 48.2,
     relevant: (c2) => isExteriorJob(c2) && c2.entryDoor !== "yes",
@@ -22174,8 +22180,26 @@ var TOPICS = [
     example: () => "E.g., 'drywall is up and textured, no trim yet', or 'everything installed, just needs paint', or 'honestly not sure'."
   },
   // ——————————————————————————————————————————
-  // Exterior siding — only if project has exterior component
+  // Exterior scope — settled before either material question, so "the exterior" is defined (siding/walls, and whether
+  // trim/fascia/soffits/eaves ride along) before asking what any of it is made of. A house's trim is almost never the
+  // same material as its walls (a brick or stucco house still has wood, stucco-pop-out or aluminum trim around the
+  // windows, doors and roofline), so the siding and trim material questions are asked separately, right after.
   // ——————————————————————————————————————————
+  {
+    id: "ext_trim",
+    priority: 44,
+    relevant: (c2) => isExteriorJob(c2) && c2.exteriorTrim !== "yes" && c2.soffitsEaves !== "yes",
+    alreadyAnswered: (c2) => c2.exteriorTrim === "yes" || c2.soffitsEaves === "yes" || extDone(c2, "ext_trim"),
+    ask: (c2) => pick(
+      [
+        "When you say the exterior, does that include the trim, fascia, eaves and soffits too, or just the walls themselves?",
+        "Besides the walls themselves, are we also painting the trim, fascia, eaves and soffits?"
+      ],
+      seed(c2)
+    ),
+    clarify: () => "That's the boards around the roofline and around the windows and doors (trim and fascia), plus the underside of the roof overhang (eaves and soffits). They're almost always a different material than the walls, so I ask separately.",
+    example: () => "Just say 'yes, all of it' or 'no, just the walls'."
+  },
   {
     id: "siding",
     priority: 45,
@@ -22183,14 +22207,23 @@ var TOPICS = [
     alreadyAnswered: (c2) => !!c2.sidingType,
     ask: (c2) => pick(
       [
-        "What's the exterior made of?",
+        "What's the siding \u2014 the wall material itself \u2014 made of?",
         "What kind of siding does it have?",
-        "What material is the outside?"
+        "What material are the walls themselves?"
       ],
       seed(c2)
     ),
-    clarify: () => "Just the material of the outside walls. In SoCal most homes are stucco. Older homes often have wood siding. Newer ones use Hardie board (fiber cement).",
+    clarify: () => "Just the material of the outside walls (not the trim \u2014 that's next). In SoCal most homes are stucco. Older homes often have wood siding. Newer ones use Hardie board (fiber cement).",
     example: () => "Stucco, wood, Hardie, vinyl, brick, stone, or something else \u2014 just the general material."
+  },
+  {
+    id: "ext_trim_material",
+    priority: 45.5,
+    relevant: (c2) => isExteriorJob(c2) && (c2.exteriorTrim === "yes" || c2.soffitsEaves === "yes"),
+    alreadyAnswered: (c2) => !!c2.trimMaterial || extDone(c2, "ext_trim_material"),
+    ask: () => "And the trim itself \u2014 what's that made of? Most houses have wood trim, but some have stucco pop-outs or aluminum.",
+    clarify: () => "Wood trim usually needs scraping, caulking and priming of any bare spots. Aluminum or vinyl trim is factory-finished and needs much less prep. Stucco trim (pop-outs around the windows) is the same material as the walls.",
+    example: () => "'Wood' is the most common answer. Or 'aluminum', 'vinyl', or 'stucco' if that's what it is."
   },
   // ——————————————————————————————————————————
   // Exterior stories
@@ -22373,6 +22406,8 @@ var metaBank = {
         return "No worries \u2014 I'll assume you're doing a different color. Price doesn't change much either way.";
       case "siding":
         return "No problem \u2014 stucco's the most common in SoCal. I'll default to that unless it's clearly wood or brick.";
+      case "ext_trim_material":
+        return "No problem \u2014 wood's the most common for trim. I'll default to that unless it's clearly aluminum, vinyl, or stucco pop-outs.";
       case "house_size":
         return "No problem \u2014 I'll estimate the size from the bedroom count you gave me.";
       default:
@@ -22467,6 +22502,7 @@ function makeInitialContext() {
     exteriorScope: "full",
     sidingType: "",
     houseStyle: "",
+    trimMaterial: "",
     exteriorTrim: "no",
     soffitsEaves: "no",
     exteriorShutters: "no",
