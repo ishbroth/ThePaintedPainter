@@ -22900,7 +22900,7 @@ function highestPriceAssumption(topicId, ctx) {
       case "location":
         return { patch: {}, reask: true, say: "I do need a ZIP code. It's how I find painters near you and price it for your area. Nothing else gets saved with it." };
       case "paint_brand":
-        return { patch: { extAnswered: withExt(ctx, topicId) }, say: "No problem, the painter will choose the paint." };
+        return { patch: { paintBrand: "painter_choice", extAnswered: withExt(ctx, topicId) }, say: "No problem, the painter will choose the paint." };
       default:
         return null;
     }
@@ -22980,9 +22980,11 @@ function highestPriceAssumption(topicId, ctx) {
     case "ext_color":
       return { patch: { exteriorColorChange: "different", extAnswered: withExt(ctx, "ext_color") }, say: higher("a different color") };
     case "paint_brand":
+      return { patch: { paintBrand: "painter_choice", extAnswered: withExt(ctx, topicId) }, say: "No problem, the painter will choose the paint." };
     case "paint_grade":
+      return { patch: { paintGrade: "standard", extAnswered: withExt(ctx, topicId) }, say: "No problem, the painter will choose the paint." };
     case "paint_finish":
-      return { patch: { extAnswered: withExt(ctx, topicId) }, say: "No problem, the painter will choose the paint." };
+      return { patch: { paintFinish: "painter_choice", extAnswered: withExt(ctx, topicId) }, say: "No problem, the painter will choose the paint." };
     case "cabinet_scope":
       return { patch: { cabinetScope: "inside_too", extAnswered: withExt(ctx, topicId) }, say: higher("painting the insides of the cabinets too") };
     case "cabinet_method":

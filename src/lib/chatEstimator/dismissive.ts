@@ -61,7 +61,7 @@ export function highestPriceAssumption(topicId: string, ctx: EstimatorContext): 
       case 'location':
         return { patch: {}, reask: true, say: "I do need a ZIP code. It's how I find painters near you and price it for your area. Nothing else gets saved with it." };
       case 'paint_brand':
-        return { patch: { extAnswered: withExt(ctx, topicId) }, say: 'No problem, the painter will choose the paint.' };
+        return { patch: { paintBrand: 'painter_choice', extAnswered: withExt(ctx, topicId) }, say: 'No problem, the painter will choose the paint.' };
       default:
         return null;
     }
@@ -145,10 +145,12 @@ export function highestPriceAssumption(topicId: string, ctx: EstimatorContext): 
     case 'ext_color':
       return { patch: { exteriorColorChange: 'different', extAnswered: withExt(ctx, 'ext_color') }, say: higher('a different color') };
     case 'paint_brand':
+      // "doesn't matter" about the brand settles the grade and finish questions too — they're skipped once paintBrand is 'painter_choice'
+      return { patch: { paintBrand: 'painter_choice', extAnswered: withExt(ctx, topicId) }, say: "No problem, the painter will choose the paint." };
     case 'paint_grade':
+      return { patch: { paintGrade: 'standard', extAnswered: withExt(ctx, topicId) }, say: "No problem, the painter will choose the paint." };
     case 'paint_finish':
-      // "doesn't matter" about paint means "the painter can choose" (standard grade): the paint answers already settle it
-      return { patch: { extAnswered: withExt(ctx, topicId) }, say: "No problem, the painter will choose the paint." };
+      return { patch: { paintFinish: 'painter_choice', extAnswered: withExt(ctx, topicId) }, say: "No problem, the painter will choose the paint." };
     case 'cabinet_scope':
       return { patch: { cabinetScope: 'inside_too', extAnswered: withExt(ctx, topicId) }, say: higher('painting the insides of the cabinets too') };
     case 'cabinet_method':
