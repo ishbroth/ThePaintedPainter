@@ -23077,7 +23077,7 @@ function reportConversation(history, logged = []) {
 }
 
 // src/lib/chatEstimator/chatEngine.ts
-var ACK_LEAD_INS = ["Got it \u2014", "Noted \u2014", "Makes sense \u2014", "Perfect \u2014", "Okay \u2014"];
+var ACK_LEAD_INS = ["Got it \u2014", "Noted \u2014", "Okay \u2014", "Understood \u2014", "Gotcha \u2014", "No problem \u2014"];
 function makeInitialState() {
   return {
     ctx: makeInitialContext(),

@@ -49,7 +49,7 @@ import { reportConversation } from './selfReview';
 
 // Rotates so an acknowledgment lead-in doesn't say the exact same
 // "Got it —" verbatim every single turn of a long conversation.
-const ACK_LEAD_INS = ['Got it —', 'Noted —', 'Makes sense —', 'Perfect —', 'Okay —'];
+const ACK_LEAD_INS = ['Got it —', 'Noted —', 'Okay —', 'Understood —', 'Gotcha —', 'No problem —'];
 
 export type ChatRole = 'bot' | 'user';
 
