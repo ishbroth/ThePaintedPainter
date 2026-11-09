@@ -1188,7 +1188,7 @@ export const TOPICS: Topic[] = [
     priority: 45.5,
     relevant: (c) => isExteriorJob(c) && (c.exteriorTrim === 'yes' || c.soffitsEaves === 'yes'),
     alreadyAnswered: (c) => !!c.trimMaterial || extDone(c, 'ext_trim_material'),
-    ask: () => "And the trim itself — what's that made of? Most houses have wood trim, but some have stucco pop-outs or aluminum.",
+    ask: () => "And the trim itself — what's that made of?",
     clarify: () =>
       "Wood trim usually needs scraping, caulking and priming of any bare spots. Aluminum or vinyl trim is factory-finished and needs much less prep. Stucco trim (pop-outs around the windows) is the same material as the walls.",
     example: () => "'Wood' is the most common answer. Or 'aluminum', 'vinyl', or 'stucco' if that's what it is.",
