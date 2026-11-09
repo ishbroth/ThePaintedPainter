@@ -93,32 +93,48 @@ export function isNeuralBusy(): boolean {
   return playing || loading > 0;
 }
 
-/** Fetches (and remembers) the audio for this text; resolves to a playable URL, or null if the server voice isn't available. */
+/** One attempt at fetching the audio; null on any failure (including a 503, which also marks the server voice unavailable). */
+async function fetchNeural(key: string): Promise<string | null> {
+  try {
+    const res = await fetch(`${supabaseUrl}/functions/v1/tts`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${supabaseAnonKey}`, apikey: supabaseAnonKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: key }),
+    });
+    if (res.status === 503) {
+      markUnavailable();
+      return null;
+    }
+    if (!res.ok) return null;
+    const data = (await res.json()) as { audio?: string };
+    if (!data.audio) return null;
+    const bytes = Uint8Array.from(atob(data.audio), (c) => c.charCodeAt(0));
+    state = 'ready';
+    return URL.createObjectURL(new Blob([bytes], { type: 'audio/mpeg' }));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Fetches (and remembers) the audio for this text; resolves to a playable URL, or null if the server voice isn't
+ * available. The very first call of a session is retried once on failure before giving up — a cold app launch's
+ * network isn't always ready for the first request, and that first failure is the one that matters most (it's the
+ * greeting), so it's worth a second try rather than silently handing that one line to the phone's own voice while
+ * every later line gets the real one.
+ */
 export function prefetchNeural(text: string): Promise<string | null> {
   const key = text.trim();
   if (!key || state === 'unavailable') return Promise.resolve(null);
   const existing = cache.get(key);
   if (existing) return existing;
+  const isFirstEverCall = !hasAttempted;
+  hasAttempted = true;
   const request = (async () => {
-    try {
-      const res = await fetch(`${supabaseUrl}/functions/v1/tts`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${supabaseAnonKey}`, apikey: supabaseAnonKey, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: key }),
-      });
-      if (res.status === 503) {
-        markUnavailable();
-        return null;
-      }
-      if (!res.ok) return null;
-      const data = (await res.json()) as { audio?: string };
-      if (!data.audio) return null;
-      const bytes = Uint8Array.from(atob(data.audio), (c) => c.charCodeAt(0));
-      state = 'ready';
-      return URL.createObjectURL(new Blob([bytes], { type: 'audio/mpeg' }));
-    } catch {
-      return null;
-    }
+    const first = await fetchNeural(key);
+    if (first || state === ('unavailable' as NeuralState) || !isFirstEverCall) return first;
+    await new Promise((r) => setTimeout(r, 400));
+    return fetchNeural(key);
   })();
   cache.set(key, request);
   void request.then((url) => {
@@ -126,6 +142,9 @@ export function prefetchNeural(text: string): Promise<string | null> {
   });
   return request;
 }
+
+/** Whether prefetchNeural has been attempted yet this session — only the very first attempt gets a retry. */
+let hasAttempted = false;
 
 /** Plays the server voice. Resolves true when it played (or was cut off by newer speech), false if the caller should use the phone's voice. */
 export async function speakNeural(text: string, onStart?: () => void): Promise<boolean> {
