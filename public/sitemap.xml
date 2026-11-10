@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!-- This copy only backs local dev (`vite dev`/`vite preview`). The deployed site's sitemap.xml — this list plus
+     every painter's own page — is regenerated at build time by scripts/prerenderPainterPages.ts; see deploy.yml. -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://www.thepaintedpainter.com/</loc>
