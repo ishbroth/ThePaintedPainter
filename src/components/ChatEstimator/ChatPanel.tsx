@@ -433,6 +433,10 @@ const ChatPanel = () => {
       if (ttsSupported) await waitForSpeechEnd();
       if (!voiceModeRef.current) break;
 
+      // The system keyboard has no reason to be up during a hands-free turn (nothing is being typed), and leaving it up is
+      // what let it clip the Talk/Mute row underneath it and jam the layout as the conversation grew — a tap that focused
+      // the composer (to start the greeting, or a prior typed reply) can easily still have it open at this point.
+      composerRef.current?.blur();
       setVoiceListening(true);
       const heard = await startVoiceTurn((partial) => {
         if (composerRef.current) composerRef.current.textContent = partial;
@@ -468,6 +472,7 @@ const ChatPanel = () => {
       return;
     }
     if (!readAloudRef.current) toggleReadAloud(); // a hands-free conversation has to talk back
+    composerRef.current?.blur(); // dismiss the keyboard right away — this is now a spoken conversation, not a typed one
     voiceModeRef.current = true;
     setVoiceMode(true);
     void runVoiceLoop();
