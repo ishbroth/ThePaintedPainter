@@ -73,6 +73,10 @@ const ChatPanel = () => {
   const focusComposerNextRef = useRef(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const sectionRef = useRef<HTMLElement>(null);
+  // Set while the keypad-open layout effect below is actively pinning the conversation's scroll itself (with exact,
+  // refitted height) — the separate "stick to bottom" effect defers to it instead of also writing scrollTop on the
+  // same mutations, which otherwise fought over the same scroll position every message and showed as a jitter.
+  const keyboardOpenRef = useRef(false);
   const navigate = useNavigate();
   const location = useLocation();
   const ttsSupported = isTTSSupported();
@@ -137,6 +141,9 @@ const ChatPanel = () => {
     if (!readAloudRef.current || !ttsSupported) return;
     hasAutoPlayedRef.current = true;
     speak(state.history[0].text);
+    // The moment the greeting is actually spoken, hands-free mode starts listening on its own — runVoiceLoop() waits
+    // for that speech to finish before it opens the mic, so this doesn't talk over "Hello, citizen...".
+    if (voiceInputSupported && !voiceModeRef.current) toggleVoiceMode();
   }
   const playIntroIfFreshRef = useRef(playIntroIfFresh);
   playIntroIfFreshRef.current = playIntroIfFresh;
@@ -589,13 +596,22 @@ const ChatPanel = () => {
     let open = false;
     // The conversation area gets an exact height in pixels while the keypad window is up (the visible height minus the title and the
     // footer), so it always scrolls inside itself instead of stretching to fit its content, and is kept scrolled to the latest line.
+    // The footer row's own height isn't fixed: the voice-talk button only appears once the native plugin check resolves (async, after
+    // mount), and the work-with-banner/post-actions siblings mount and unmount on their own. Any of those changing size after the last
+    // fit() left the reserved space stale, so the footer (voice/mute buttons) silently overflowed below the visible area under the
+    // keypad. Watching every sibling for its own size changes — not just the conversation's content — keeps the reserved space current.
+    const ro = new ResizeObserver(() => { if (open) fit(); });
     const fit = () => {
       const box = messagesRef.current;
       const card = box?.parentElement;
       if (!box || !card) return;
       const visible = vv ? vv.height : window.innerHeight;
       let others = 0;
-      for (const child of Array.from(card.children)) if (child !== box) others += (child as HTMLElement).offsetHeight;
+      for (const child of Array.from(card.children)) {
+        if (child === box) continue;
+        others += (child as HTMLElement).offsetHeight;
+        ro.observe(child);
+      }
       const h = Math.max(80, Math.floor(visible - others));
       box.style.flex = 'none';
       box.style.height = `${h}px`;
@@ -636,6 +652,7 @@ const ChatPanel = () => {
         return;
       }
       open = nowOpen;
+      keyboardOpenRef.current = open;
       if (open) {
         // keep the page the same length while the card is lifted out of it
         section.style.minHeight = `${section.offsetHeight}px`;
@@ -663,6 +680,10 @@ const ChatPanel = () => {
       showDebug();
     });
     if (box) observer.observe(box, { childList: true, subtree: true, characterData: true });
+    // a sibling of the conversation mounting or unmounting (the work-with banner, the "view painters" actions) also changes
+    // how much room the footer row has left, same as a sibling merely resizing (caught by the ResizeObserver in fit() above)
+    const card = box?.parentElement;
+    if (card) observer.observe(card, { childList: true });
     const onFocusIn = (ev: FocusEvent) => {
       if (!(ev.target as HTMLElement | null)?.closest?.('.chat-composer')) return;
       focused = true;
@@ -687,11 +708,13 @@ const ChatPanel = () => {
       vv?.removeEventListener('resize', update);
       vv?.removeEventListener('scroll', update);
       observer.disconnect();
+      ro.disconnect();
       debugBox?.remove();
       unfit();
       section.classList.remove('keyboard-open');
       root.classList.remove('chat-kbd-lock');
       section.style.minHeight = '';
+      keyboardOpenRef.current = false;
     };
   }, [keyboardDevice]);
 
@@ -703,6 +726,7 @@ const ChatPanel = () => {
     const box = messagesRef.current;
     if (!box) return;
     const stick = () => {
+      if (keyboardOpenRef.current) return; // the keypad-open layout effect is already pinning this, with an exact refitted height
       box.scrollTop = box.scrollHeight;
     };
     const observer = new MutationObserver(stick);
