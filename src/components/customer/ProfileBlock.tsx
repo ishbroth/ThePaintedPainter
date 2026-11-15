@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { useAuth } from '../../lib/auth/index.ts';
 import { supabase } from '../../lib/supabase';
 import AddressField from '../AddressField';
+import { formatPhone } from '../../lib/formatPhone';
 
 const input = 'w-full px-3 py-2 bg-[var(--bg-page)] border border-[var(--border)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] transition-colors';
 
@@ -25,7 +26,7 @@ export default function ProfileBlock() {
 
   const [editing, setEditing] = useState(false);
   const [displayName, setDisplayName] = useState(profile?.display_name ?? '');
-  const [phone, setPhone] = useState(profile?.phone ?? '');
+  const [phone, setPhone] = useState(formatPhone(profile?.phone));
   const [zip, setZip] = useState(profile?.zip_code ?? '');
   const [street, setStreet] = useState(profile?.street_address ?? '');
   const [city, setCity] = useState(profile?.city ?? '');
@@ -40,7 +41,7 @@ export default function ProfileBlock() {
   const open = () => {
     // start from what is saved, not from an earlier unsaved edit
     setDisplayName(profile?.display_name ?? '');
-    setPhone(profile?.phone ?? '');
+    setPhone(formatPhone(profile?.phone));
     setZip(profile?.zip_code ?? '');
     setStreet(profile?.street_address ?? '');
     setCity(profile?.city ?? '');
@@ -59,7 +60,7 @@ export default function ProfileBlock() {
     setMessage(null);
     const { error } = await supabase
       .from('profiles')
-      .update({ display_name: displayName.trim(), phone: phone.trim() || null, zip_code: zipClean || null, street_address: street.trim() || null, city: city.trim() || null, state: stateCode.trim().toUpperCase() || null })
+      .update({ display_name: displayName.trim(), phone: formatPhone(phone) || null, zip_code: zipClean || null, street_address: street.trim() || null, city: city.trim() || null, state: stateCode.trim().toUpperCase() || null })
       .eq('id', user.id);
     if (error) {
       setMessage({ kind: 'error', text: "We couldn't save your changes. Please try again." });
@@ -106,7 +107,7 @@ export default function ProfileBlock() {
           </div>
           <div>
             <label htmlFor="phone" className="block text-xs text-[var(--text-secondary)] mb-1">Phone</label>
-            <input id="phone" type="tel" value={phone} onChange={(e) => { setPhone(e.target.value); setMessage(null); }} className={input} placeholder="(555) 123-4567" autoComplete="tel" />
+            <input id="phone" type="tel" value={phone} onChange={(e) => { setPhone(formatPhone(e.target.value)); setMessage(null); }} className={input} placeholder="(555) 123-4567" autoComplete="tel" />
           </div>
           <div>
             <label htmlFor="street" className="block text-xs text-[var(--text-secondary)] mb-1">Address</label>

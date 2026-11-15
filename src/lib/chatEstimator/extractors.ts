@@ -917,7 +917,7 @@ export function extractExteriorFeatures(text: string): {
   // Bannister/railing wording without any "stair(s)" mention nearby means a
   // deck, porch, or balcony railing (exterior). Staircase railings/bannisters
   // are handled separately by extractInteriorDetails as an interior detail.
-  if (/\b(railings?|hand\s*rails?|bannisters?|banisters?|balustrades?)\b/.test(t) && !/\bstair/.test(t)) {
+  if (/\b(railings?|hand\s*rails?|bannisters?|banisters?|balustrades?)\b/.test(t) && !/\bstair|\bstari\b|\bsteps?\b|\bflights?\b/.test(t)) {
     out.railings = true;
     if (/\bspindles?\b/.test(t)) out.railingType = 'spindles';
   }
@@ -972,7 +972,7 @@ export function extractInteriorDetails(text: string): {
     out.interiorShutters = true;
   }
 
-  if (/\b(staircase|stairway|stairs)\b/.test(t)) {
+  if (/\b(staircase|stairway|stairs|stari)\b/.test(t)) {
     out.stairway = true;
     if (/\b(railings?|bannisters?|banisters?|balustrades?|hand\s*rails?)\b/.test(t)) {
       out.stairwayWithRailings = true;
@@ -1162,6 +1162,7 @@ export function extractMultiPhaseRequest(text: string): boolean {
 }
 
 export function extractAll(text: string, prev: EstimatorContext, lastBotTopicId: string | null = null): ExtractResult {
+  text = text.replace(/\bstari\b/gi, 'stair'); // a common typo
   const patch: Partial<EstimatorContext> = {};
   const acks: string[] = [];
 

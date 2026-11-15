@@ -37,11 +37,13 @@ import {
 } from '../pricing/situations';
 import { classifyIntent, hasIntent, type Intent, type IntentResult } from './intents';
 import { derive, applyDerivations } from './derivation';
-import { pickNextTopic, pickRetryTopic, findTopic, metaBank, isStandaloneOnlyJob, type Topic } from './topics';
+import { pickNextTopic, pickRetryTopic, findTopic, metaBank, isStandaloneOnlyJob, wrapupQuestion, type Topic } from './topics';
 import { extractWithLLM } from './llmClient';
 import { highestPriceAssumption, sanitizeLlmPatch } from './dismissive';
 import { makeInitialContext } from './defaultContext';
 import { extractDetails, DETAIL_TOPIC_IDS } from './details';
+import { readDeckDetails, isDeckTalk } from './deckDetails';
+import { readItemAnswers } from './itemInterviews';
 import { detectFriction, type FrictionEvent } from './selfCheck';
 import { reportConversation } from './selfReview';
 
@@ -58,6 +60,8 @@ export interface ChatMessage {
   text: string;
   timestamp: number;
   ackChips?: string[];
+  /** What this bot message is asking, when it isn't the topic in `lastBotTopic` (the closing 'anything else?' and the photos step), so the answer box can show the right hint. */
+  topicId?: string;
 }
 
 /** A restorable snapshot of everything EXCEPT the visible chat history, so
@@ -317,18 +321,13 @@ export function chatStateFromPortable(parsed: unknown): ChatState | null {
 /** Step one of the wrap-up: "anything else I should know?". Its answer is read (fences, notes for the painters...) and kept with the job. Ceiling height is its own question (ceiling_height), not asked here. */
 function notesStep(s: ChatState, ctxNext: EstimatorContext, acknowledgements: string[]): TurnResult {
   const lead = acknowledgements.length > 0 ? `${ACK_LEAD_INS[s.askedIds.length % ACK_LEAD_INS.length]} ${acknowledgements.join(', ')}. ` : '';
-  const examples =
-    ctxNext.projectType === 'exterior'
-      ? 'fences, overhangs, chimneys, decks or shutters'
-      : ctxNext.projectType === 'both'
-        ? 'fences, decks or shutters'
-        : 'anything about the place the painters should know';
   return {
     state: {
       ...s,
       wrapupAsked: true,
+      lastBotTopic: null, // the question on the table is now the closing one, not whatever was asked before it
       askedIds: [...s.askedIds, 'wrapup'],
-      history: [...s.history, botMessage(`${lead}Almost there. Is there anything else I should know, like ${examples}? If not, just say "no".`)],
+      history: [...s.history, { ...botMessage(`${lead}Almost there. ${wrapupQuestion(ctxNext)} If not, just say "no".`), topicId: 'wrapup' }],
     },
     done: null,
   };
@@ -350,12 +349,16 @@ function photosStep(s: ChatState, ctxNext: EstimatorContext, acknowledgements: s
       ...s,
       ctx: alreadyAskedForProperty ? s.ctx : { ...s.ctx, photoRequests: [...s.ctx.photoRequests, { id: 'property', label: 'the property', fulfilled: false }] },
       photosAsked: true,
+      lastBotTopic: null,
       history: [
         ...s.history,
-        botMessage(
+        {
+          ...botMessage(
           `${noted}I think I've got enough to put a number together. ${reminderLeadIn}${reminderMarkers}${reminderMarkers ? ' ' : ''}A couple of photos of the property help painters respond faster and with more confidence, please attach some here. ${propertyMarker}` +
             "When you're ready, just say 'run it' and I'll price it out.",
-        ),
+          ),
+          topicId: 'photos',
+        },
       ],
     },
     done: null,
@@ -553,6 +556,13 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
     return asBot({ friction: frictionLog }, `Sorry about that, I shouldn't have assumed. ${recap} Tell me what's wrong and I'll fix it, or answer this: ${again.charAt(0).toLowerCase()}${again.slice(1)}`);
   }
 
+  // A deck's height ("second-story deck", "I'd have to do the underside") is about the deck. Read as the house's stories, or as a lift for the
+  // house, it turned a deck job into a whole two-story house exterior and priced it that way.
+  if (isDeckTalk(trimmed) && state.ctx.squareFeet == null && !state.ctx.sidingType && state.ctx.stories == null && !patch.sidingType) {
+    delete patch.stories;
+    delete patch.specialEquipment;
+    delete patch.squareFeet; // a size given while talking about the deck is the deck's, never the house's
+  }
   const ctxWithExplicit: EstimatorContext = { ...state.ctx, ...patch };
 
   // Counts, lengths and areas (how many doors, how long and tall the fence, "20 x 20" for a deck) and the small trim details named in passing
@@ -566,6 +576,32 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
     const saidNone = /^\W*(?:no|none|nope|nah|skip|n\/a|zero|all of them|every one|everything)\b/i.test(trimmed);
     if (askedId && DETAIL_TOPIC_IDS.has(askedId) && !trimmed.endsWith('?') && !hasIntent(intent, 'dismissive') && (det.acks.length > 0 || saidNone)) {
       ctxWithExplicit.extAnswered = [...new Set([...(ctxWithExplicit.extAnswered ?? state.ctx.extAnswered ?? []), askedId])];
+    }
+  }
+
+  // The answer to "how big is the deck / fence / patio cover?" is the size of that thing: a bare "600 sq ft" is not the size of the house (it was
+  // being read as both, and the house body got priced on top of the deck).
+  if (state.lastBotTopic && ['deck_size', 'overhang_size', 'fence_size', 'fence_height'].includes(state.lastBotTopic.id)) {
+    if (state.ctx.squareFeet == null && ctxWithExplicit.squareFeet != null) ctxWithExplicit.squareFeet = state.ctx.squareFeet;
+    if (state.ctx.stories == null && ctxWithExplicit.stories != null) ctxWithExplicit.stories = state.ctx.stories;
+  }
+
+  // The deck: how high it is, the underside, railings and what shape it's in, from the answer to that question or volunteered in passing.
+  {
+    const askedForDeck = state.wrapupAsked ? 'wrapup' : state.lastBotTopic?.id ?? null;
+    const deck = readDeckDetails(trimmed, ctxWithExplicit, askedForDeck);
+    if (Object.keys(deck.patch).length > 0) {
+      Object.assign(ctxWithExplicit, deck.patch);
+      for (const a of deck.acks) if (!acknowledgements.includes(a)) acknowledgements.push(a);
+    }
+  }
+
+  // What a painter asks about each item in the job (railing material, fence sides, door style...): the answer to that question, or volunteered.
+  {
+    const item = readItemAnswers(trimmed, ctxWithExplicit, state.wrapupAsked ? null : state.lastBotTopic?.id ?? null);
+    if (Object.keys(item.patch).length > 0) {
+      Object.assign(ctxWithExplicit, item.patch);
+      for (const a of item.acks) if (!acknowledgements.includes(a)) acknowledgements.push(a);
     }
   }
 
@@ -1331,8 +1367,10 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
     }
   }
 
-  // 6. If we're ready to quote and we already asked the wrap-up, finalize
-  if (s.wrapupAsked && readyToQuote(ctxNext)) {
+  // 6. If we're ready to quote and we already asked the wrap-up, finalize, unless what was just said (a deck, a fence, a shed that came up
+  // at the very end) opened questions of its own: those are asked first, so a late mention is never priced off a guess.
+  const openedNewQuestions = s.wrapupAsked && !!(pickNextTopic(ctxNext, s.askedIds) ?? pickRetryTopic(ctxNext, s.askedIds, s.retriedIds)) && !hasIntent(intent, 'ready_to_finish') && !explicitRunIt;
+  if (s.wrapupAsked && readyToQuote(ctxNext) && !openedNewQuestions) {
     if (!s.photosAsked) return photosStep(s, ctxNext, acknowledgements);
     return await finalizeTurn(s, customerId);
   }

@@ -35,6 +35,46 @@ const faqs = [
       'Your painter handles all touch-ups directly — that is part of their commitment when they accept a job. Our review and rating system helps maintain high quality across the platform. Painters whose reviews show a pattern of poor work are removed from the network automatically, so you will not be offered a painter with a habitual bad performance record.',
   },
   {
+    question: 'What if I paid to secure the painter, and work never begins?',
+    answer:
+      'The Painted Painter will verify with the painter assigned to your project, and if no work was completed and the contract was cancelled amicably then your fee will be refunded.',
+  },
+  {
+    question: 'What about my contact information, who gets to see that?',
+    answer:
+      'Only the painter you contract with, after they agree to your job and you agree to contract with them.',
+  },
+  {
+    question: 'Can I change my mind after I pick a painter?',
+    answer:
+      'You can cancel a request before your painter confirms it. Once a contract is in place, changes to the scope, dates or price go through your painter as a change to the contract, and nothing changes until you accept it under My Projects.',
+  },
+  {
+    question: 'What if the scope of the job changes once work starts?',
+    answer:
+      'Your painter sends a change order through the platform. It only takes effect once you accept it, and until then the last version you accepted stays in force.',
+  },
+  {
+    question: 'Are the painters licensed and insured?',
+    answer:
+      'Yes. Painters provide license information where their state requires it and proof of insurance before they can accept jobs. They are independent, well-reviewed painting companies, and you can see each painter\'s credentials on their profile.',
+  },
+  {
+    question: 'Do I have to be home while the work is done?',
+    answer:
+      'That is something you and your painter agree on when you confirm dates. You can message your painter through the platform to arrange access and answer questions as the work goes on.',
+  },
+  {
+    question: 'How will I know when my painter confirms the job and dates?',
+    answer:
+      'You will get an email and a notification, and your project\'s status updates under My Projects, so you always see where things stand from the first offer through completion.',
+  },
+  {
+    question: 'How do I leave a review?',
+    answer:
+      'After the job is finished we check in to see how it went. Your honest rating and feedback appear on the painter\'s profile and help other homeowners. Painters with a pattern of poor reviews are removed from the network.',
+  },
+  {
     question: 'How do I become a painter on the platform?',
     answer:
       'Click "For Painters" in the header to sign up. You\'ll create a profile, set your pricing preferences, upload your portfolio, and start receiving job offers in your area. It\'s free to join — we only take a small platform fee when you complete a job.',
@@ -47,7 +87,7 @@ const faqs = [
   {
     question: 'How do I contact support?',
     answer:
-      'Email us at contact@thepaintedpainter.com or call (619) 724-2702. Our support team is available Monday through Friday, 8 AM to 6 PM Pacific Time.',
+      'Email us at support@thepaintedpainter.com or call (619) 724-2702. Our support team is available Monday through Friday, 8 AM to 6 PM Pacific Time.',
   },
 ];
 
@@ -120,10 +160,10 @@ const Support = () => {
               </div>
               <h3 className="font-bold mb-2">Email</h3>
               <a
-                href="mailto:contact@thepaintedpainter.com"
+                href="mailto:support@thepaintedpainter.com"
                 className="text-[var(--accent-blue)] hover:underline text-sm"
               >
-                contact@thepaintedpainter.com
+                support@thepaintedpainter.com
               </a>
             </div>
             <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-lg p-6">

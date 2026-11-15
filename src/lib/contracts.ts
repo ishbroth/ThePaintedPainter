@@ -55,6 +55,8 @@ export interface ContractView {
     customer: { name: string | null; address: string | null; email: string | null; phone: string | null };
     painter: { companyName: string; ownerName: string | null; email: string | null; phone: string | null };
   };
+  /** For the customer, while the deposit is still due: the page to confirm dates and pay it. */
+  confirmUrl?: string | null;
   versions: ContractVersion[];
   inForceVersionId: string | null;
   pendingVersionId: string | null;

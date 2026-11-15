@@ -256,6 +256,23 @@ function speakWeb(text: string): void {
     if (known.length > 0) selectedVoice = pickBestVoice(known) ?? selectedVoice;
     if (!selectedVoice) prepareVoice();
   }
+  // Desktop: the voice list often isn't loaded yet when the greeting is spoken, and speaking now would use the browser's default
+  // voice for that one line. Nothing there needs the speech to start inside a tap, so wait (briefly) for the real voice first.
+  if (!selectedVoice && !isPhoneLike()) {
+    const waitingRun = ++speakRun;
+    synth.cancel();
+    void Promise.race([getPreferredVoice(), new Promise<null>((r) => window.setTimeout(() => r(null), 1500))]).then(() => {
+      if (waitingRun !== speakRun) return; // something newer started or speech was stopped meanwhile
+      if (!selectedVoice) selectedVoice = pickBestVoice(synth.getVoices()) ?? selectedVoice;
+      speakWebNow(text);
+    });
+    return;
+  }
+  speakWebNow(text);
+}
+
+function speakWebNow(text: string): void {
+  const synth = window.speechSynthesis;
   // cancelling something that is playing makes some phones drop whatever is spoken right after, so that start waits a moment
   const mustCancel = (synth.speaking || synth.pending) && !unlockInFlight;
   if (mustCancel) synth.cancel();

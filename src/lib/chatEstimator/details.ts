@@ -522,7 +522,18 @@ export function extractDetails(text: string, ctx: EstimatorContext, askedId: str
       }
       case 'deck_size': { const a = parseArea(text, true); if (a) { patch.deckSqft = a; acks.push(`${a} sq ft deck`); } break; }
       case 'overhang_size': { const a = parseArea(text, true); if (a) { patch.overhangSqft = a; acks.push(`${a} sq ft overhang`); } break; }
-      case 'railing_length': { const n = parseLinearFeet(text, true, 3, 500); if (n) { patch.stairRailFeet = n; acks.push(`${n} ft of railing`); } break; }
+      case 'railing_length': {
+        const n = parseLinearFeet(text, true, 3, 500);
+        if (n) { patch.stairRailFeet = n; acks.push(`${n} ft of railing`); }
+        else {
+          // flights of stairs (or floors) when the length isn't known: about 14 feet of railing for each
+          const words: Record<string, number> = { one: 1, a: 1, single: 1, two: 2, three: 3, four: 4, five: 5 };
+          const fm = text.toLowerCase().match(/\b(\d{1,2}|one|a|single|two|three|four|five)\s*(?:-\s*)?(?:flights?|stor(?:y|ies|eys?)|floors?|levels?)\b/);
+          const flights = fm ? words[fm[1]] ?? parseInt(fm[1], 10) : 0;
+          if (flights >= 1 && flights <= 8) { patch.stairRailFeet = flights * 14; patch.stairwayCount = flights; acks.push(`${flights} flight${flights === 1 ? '' : 's'} of stairs`); }
+        }
+        break;
+      }
       case 'detail_rooms': { const n = parseCount(text, 1, 40); if (n) { patch.detailRoomCount = n; acks.push(`${n} room${n === 1 ? '' : 's'}`); } break; }
       case 'detail_feet_crown': { const n = parseLinearFeet(text, true, 5, 5000); if (n) { patch.crownLinearFeet = n; acks.push(`${n} ft of crown`); } break; }
       case 'detail_feet_chair_rail': { const n = parseLinearFeet(text, true, 5, 5000); if (n) { patch.chairRailLinearFeet = n; acks.push(`${n} ft of chair rail`); } break; }

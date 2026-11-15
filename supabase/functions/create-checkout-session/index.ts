@@ -22,6 +22,8 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
 import Stripe from 'https://esm.sh/stripe@13.10.0?target=deno'
 import { contractGate } from '../_shared/contractStore.ts'
+import { skipsPayment } from '../_shared/depositBypass.ts'
+import { confirmDepositPaid } from '../_shared/depositPaid.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -64,6 +66,13 @@ serve(async (req: Request) => {
 
     const depositCents = Math.round(Number(job.deposit_amount) * 100)
     if (!Number.isFinite(depositCents) || depositCents < 50) return json({ error: 'This job has no valid deposit amount.' }, 409)
+
+    // the one test account skips Stripe: the deposit is marked paid right here, the same way the webhook does it
+    const { data: owner } = await supabase.from('quote_selections').select('customer_id').eq('id', job.id).maybeSingle()
+    if (await skipsPayment(supabase, owner?.customer_id ?? null)) {
+      await confirmDepositPaid(job.id, null, supabase)
+      return json({ paid: true })
+    }
 
     const { data: painter } = await supabase.from('painters').select('company_name').eq('id', job.accepted_by).maybeSingle()
 

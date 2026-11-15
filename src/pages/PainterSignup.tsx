@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { supabase, supabaseUrl } from '../lib/supabase';
 import ExternalReviewsFields from '../components/painter/ExternalReviewsFields';
 import { emptyExternalForm, fromExternalForm, validateExternalForm, type ExternalFormValue } from '../lib/externalReviews';
+import { formatPhone } from '../lib/formatPhone';
 
 
 // ---------------------------------------------------------------------------
@@ -680,6 +681,8 @@ const PainterSignup = () => {
               }
             } else if (type === 'number') {
               updateField(key, raw === '' ? null : (Number(raw) as never));
+            } else if (type === 'tel') {
+              updateField(key, formatPhone(raw) as never);
             } else {
               updateField(key, raw as never);
             }

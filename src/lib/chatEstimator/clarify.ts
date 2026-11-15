@@ -6,6 +6,7 @@
 // ============================================================================
 
 import type { ChatMessage } from './chatEngine';
+import { itemTopicLabel } from './itemInterviews';
 
 /** "I never said that", "that's not what I said", "no I said...", "you assumed...": the customer is disputing what the bot did. */
 const DENIAL =
@@ -62,6 +63,10 @@ const TOPIC_LABEL: Record<string, string> = {
   fence_size: 'how long and how tall the fence is',
   fence_height: 'how tall the fence is',
   deck_size: 'how big the deck is',
+  ext_deck_level: 'whether the deck is on the ground or raised',
+  ext_deck_underside: 'whether the deck underside is painted',
+  ext_deck_railings: 'whether the deck has railings',
+  ext_deck_condition: 'what shape the deck is in',
   overhang_size: 'how big the overhang or patio cover is',
   ext_extras: 'whether a fence, deck or patio cover is painted too',
   ext_extras_which: 'which of the fence, deck or patio cover',
@@ -87,7 +92,7 @@ const TOPIC_LABEL: Record<string, string> = {
 
 export function topicLabel(id: string | null | undefined, itemsOnly = false): string {
   if (itemsOnly && id === 'timeline_and_access') return 'your timing';
-  return (id && TOPIC_LABEL[id]) || 'that';
+  return (id && (TOPIC_LABEL[id] || itemTopicLabel(id))) || 'that';
 }
 
 /**

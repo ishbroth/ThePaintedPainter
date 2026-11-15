@@ -13,6 +13,7 @@ import { botRepeats, collectFriction, detectFriction } from '../src/lib/chatEsti
 import { buildReport, scrub, setSelfReviewEnabled } from '../src/lib/chatEstimator/selfReview.ts';
 import { defaultAssumptions } from '../src/lib/chatEstimator/defaultAssumptions.ts';
 import { fieldsForKey } from '../src/lib/priceEditing.ts';
+import { composerPrompt } from '../src/lib/promptHints.ts';
 
 setSelfReviewEnabled(false); // no network from the checks
 
@@ -483,6 +484,9 @@ async function dismissAt(setup: string[], topicWords: RegExp, dismissal = 'doesn
     'i need some chairs painted',
     '1 chair to paint',
     'the furniture needs sanded',
+    'solid wood',
+    'plain',
+    'inside',
     'refreshing the stain',
     'same stain color',
     'painters choice',
@@ -521,6 +525,9 @@ async function dismissAt(setup: string[], topicWords: RegExp, dismissal = 'doesn
     'the furniture needs sanded',
     'what does this have to do with anything',
     '1 chair to paint',
+    'solid wood',
+    'plain',
+    'inside',
     'refreshing the stain',
     'same stain color',
   ]);
@@ -618,6 +625,101 @@ async function dismissAt(setup: string[], topicWords: RegExp, dismissal = 'doesn
   // stays excluded through later answers, and comes back only when the customer asks for it
   const back = await play(['I want my living room painted, walls only', 'about 15 by 20', 'actually, add the ceilings too']);
   check('a surface ruled out earlier comes back when the customer asks for it', back.state.ctx.interiorCeilings === 'yes' && !(back.state.ctx.excludedSurfaces ?? []).includes('ceilings'), JSON.stringify({ c: back.state.ctx.interiorCeilings, ex: back.state.ctx.excludedSurfaces }));
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------------
+// 9. A deck is its own job: asked about, priced as a deck, and never turned into a house
+// ---------------------------------------------------------------------------------------------------------------------------------
+{
+  const lastBot = (s: ChatState) => [...s.history].reverse().find((m) => m.role === 'bot')!;
+  const deck = await play(['a deck', '20 feet by 30 feet']);
+  check('deck: after the size, asks how high it is (not the paint brand)', /ground|raised/i.test(deck.last), deck.last);
+  const asked: string[] = [];
+  let st = deck.state;
+  for (const a of ['second story, off the back', 'yes, the underside too', 'yes, railings all around', 'weathered and gray', '40 feet', 'wood', 'painters choice', '91941', 'in 3 weeks']) {
+    const r = await play([a], [], st); st = r.state; asked.push(r.last);
+  }
+  const all = asked.join(' ## ');
+  check('deck: asked the underside, the railings and the condition', st.ctx.deckLevel === 'second_story' && st.ctx.deckUnderside === 'yes' && st.ctx.railings === 'yes' && st.ctx.deckCondition === 'weathered', JSON.stringify({ l: st.ctx.deckLevel, u: st.ctx.deckUnderside, r: st.ctx.railings, c: st.ctx.deckCondition }) + ' ' + all);
+  const wrap = lastBot(st);
+  check('deck: the closing question is about the deck, with no chimneys or shutters', /deck/i.test(wrap.text) && !/chimney|shutter|overhang/i.test(wrap.text), wrap.text);
+  check('deck: the answer box moves on to the closing question (not the timeline one before it)', composerPrompt(wrap.text, wrap.topicId ?? st.lastBotTopic?.id) === 'Anything else to add, or "no"?', composerPrompt(wrap.text, wrap.topicId ?? st.lastBotTopic?.id));
+  const fin = await play(['no', 'run it'], [], st);
+  check('deck: priced as a deck, a second-story deck is never read as a two-story house', fin.state.finalEstimate != null && fin.state.ctx.stories == null && fin.state.ctx.exteriorBody === 'no' && !fin.state.finalEstimate.estimate.lineItems.some((l) => /Siding|Body|Boom/i.test(l.description)) && fin.state.finalEstimate.estimate.lineItems.some((l) => /Underside/.test(l.description)), JSON.stringify(fin.state.finalEstimate?.estimate.lineItems.map((l) => l.description)));
+  check('deck: the estimate is in a sane range for 600 sq ft (not a house exterior)', (fin.state.finalEstimate?.estimate.total ?? 0) < 8000, String(fin.state.finalEstimate?.estimate.total));
+
+  // a bare "600 sq ft" for the deck is not the size of the house
+  const bare = await play(['a deck', '600 sq ft', 'on the ground', 'no', 'faded but solid', 'painters choice', '91941', 'in 3 weeks', 'no', 'run it', 'run it']);
+  check('deck: a bare "600 sq ft" is the deck, not the house (no siding line)', bare.state.ctx.squareFeet == null && !!bare.state.finalEstimate && !bare.state.finalEstimate.estimate.lineItems.some((l) => /Siding|Body/i.test(l.description)), JSON.stringify({ s: bare.state.ctx.squareFeet, li: bare.state.finalEstimate?.estimate.lineItems.map((l) => l.description) }));
+
+  // deck details that come up only after "run it" was offered are asked about, not priced off a guess
+  const late = await play(['a deck', '600 sq ft', 'on the ground', 'no', 'good', 'painters choice', '91941', 'in 3 weeks', 'no', 'there are also railings all around']);
+  check('deck: something said at the photos step opens its own question instead of pricing', !late.state.finalEstimate && /railing/i.test(late.last), late.last);
+
+  // a deck that comes up in the middle of a house exterior gets the whole deck interview, not a blanket cost
+  const house = await play(['I need the outside of my house painted', '2000 sq ft', 'stucco', 'two story', 'yes, the trim too', 'wood', 'it also has a deck', '12 by 15']);
+  check('house + a deck mentioned later: the deck is asked about (height next)', /ground|raised/i.test(house.last), house.last);
+  // wrap-up for a plain house exterior doesn't suggest what it already has
+  const houseWrap = await play(['I need the outside of my house painted', '2000 sq ft', 'stucco', 'two story', 'yes, the trim too', 'wood', 'ranch', 'no', 'painters choice', '91941', 'in 3 weeks', 'good', 'same color', 'no', 'no', 'no', 'no', 'no', 'no']);
+  const hw = [...houseWrap.state.history].reverse().find((m) => m.topicId === 'wrapup');
+  check('house exterior: the closing question lists extras to add, never the deck once it is in', !!hw && /chimney|fence/i.test(hw.text), hw?.text ?? 'no wrapup asked');
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------------
+// 10. Every item gets the questions a painter would ask about it, before the paint brand, and the answers move the price
+// ---------------------------------------------------------------------------------------------------------------------------------
+{
+  const priceOf = async (lines: string[]) => (await play(lines)).state.finalEstimate?.estimate.total ?? 0;
+  const tail = ['painters choice', '91941', 'in 4 weeks', 'no', 'run it'];
+
+  // the staircase railing from the live site: "stari railing" (a typo) used to go straight to the paint brand and price 14 ft at a flat rate
+  const stair = await play(['stari railing']);
+  check('staircase railing (typo "stari"): read as an inside staircase railing, not a deck railing', stair.state.ctx.stairwayDetails === 'railings_only' && stair.state.ctx.projectType === 'interior' && stair.state.ctx.railings === 'none', JSON.stringify({ sd: stair.state.ctx.stairwayDetails, pt: stair.state.ctx.projectType, r: stair.state.ctx.railings }));
+  check('staircase railing: the first question is how long it is (flights or feet), not the paint brand', /long|flights?/i.test(stair.last) && !/brand/i.test(stair.last), stair.last);
+  const flights = await play(['stari railing', '2 flights'], [], stair.state);
+  check('staircase railing: "2 flights" is read as about 28 ft', flights.state.ctx.stairRailFeet === 28, String(flights.state.ctx.stairRailFeet));
+  check('staircase railing: material is asked next', /wood|iron|metal/i.test(flights.last), flights.last);
+  const base = ['stari railing', '2 flights', 'wood', 'painted white', 'lots of spindles', 'good', 'same color', ...tail];
+  const iron = ['stari railing', '2 flights', 'wrought iron', 'lots of spindles', 'good', 'same color', ...tail];
+  const stripped = ['stari railing', '2 flights', 'wood', 'stained oak', 'strip and refinish', 'lots of spindles', 'peeling in spots', 'same color', ...tail];
+  const [pBase, pIron, pStrip] = [await priceOf(base), await priceOf(iron), await priceOf(stripped)];
+  check('staircase railing: wrought iron costs more than painted wood', pIron > pBase * 1.2, pBase + ' vs ' + pIron);
+  check('staircase railing: stained wood to strip and refinish (and peeling) costs much more than a repaint', pStrip > pBase * 1.6, pBase + ' vs ' + pStrip);
+  check('staircase railing: the answers are in the price (nowhere near the old flat 14 ft price)', pBase > 450, String(pBase));
+
+  // each item asks about itself before the paint brand
+  const firstBrandIndex = (turns: string[]) => turns.findIndex((t) => /paint brand|brand in mind/i.test(t));
+  const items: { say: string; asks: RegExp; label: string }[] = [
+    { say: 'I need my fence painted', asks: /both sides|made of|bare, stained|gates/i, label: 'fence' },
+    { say: 'paint my front door', asks: /stain|sidelight|pair|glass/i, label: 'front door' },
+    { say: 'need a shed painted', asks: /T1-11|ten feet|trim, doors/i, label: 'shed' },
+    { say: 'paint my garage door', asks: /steel|panel|inside/i, label: 'garage door' },
+    { say: 'paint my brick fireplace', asks: /brick, stone|limewash|ceiling/i, label: 'fireplace' },
+  ];
+  for (const it of items) {
+    const run = await play([it.say, 'not sure', 'not sure', 'not sure', 'not sure', 'not sure', 'not sure']);
+    const brand = firstBrandIndex(run.turns);
+    const before = run.turns.slice(0, brand < 0 ? run.turns.length : brand);
+    check('item "' + it.label + '": its own questions come before the paint brand', before.some((t) => it.asks.test(t)), run.turns.join(' ## '));
+  }
+  // a fireplace on its own is not a room: no "add the ceilings?"
+  const fire = await play(['paint my brick fireplace', 'not sure', 'not sure', 'not sure', 'not sure', 'not sure']);
+  check('fireplace only: never asks about ceilings, baseboards or doors', !fire.turns.some((t) => /ceilings|baseboards|the doors/i.test(t)), fire.turns.join(' ## '));
+
+  // fence: one side costs less than both; stripping paint costs more
+  const fenceBase = ['I need my fence painted', '100 feet, 6 feet tall', 'wood', 'bare wood', 'paint', 'both sides', 'good', 'none', ...tail];
+  const fenceOne = ['I need my fence painted', '100 feet, 6 feet tall', 'wood', 'bare wood', 'paint', 'just my side', 'good', 'none', ...tail];
+  const [fBoth, fOne] = [await priceOf(fenceBase), await priceOf(fenceOne)];
+  check('fence: one side costs clearly less than both sides', fOne < fBoth * 0.75 && fOne > 0, fOne + ' vs ' + fBoth);
+
+  // the answer box shows the item question's own hint
+  const hintRun = await play(['I need my fence painted', '100 feet, 6 feet tall']);
+  const hb = [...hintRun.state.history].reverse().find((m) => m.role === 'bot')!;
+  check('item question: the answer box hint is for that question', composerPrompt(hb.text, hb.topicId ?? hintRun.state.lastBotTopic?.id) === 'Wood, metal, vinyl, or block?', composerPrompt(hb.text, hb.topicId ?? hintRun.state.lastBotTopic?.id));
+
+  // brushed off: the higher-priced realistic answer is assumed, and it is said out loud
+  const brushed = await play(['stari railing', '2 flights', "doesn't matter"]);
+  check('item question brushed off: takes the higher-priced answer and says so', /higher-priced/.test(brushed.last) || brushed.state.ctx.interiorRailingMaterial === 'wrought_iron', brushed.last);
 }
 
 setLLMReaderForTests(undefined);

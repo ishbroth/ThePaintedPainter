@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabaseUrl, supabaseAnonKey } from '../lib/supabase';
-import { createDepositCheckout } from '../lib/payments/stripe';
+import { createDepositCheckout, DEPOSIT_ALREADY_MARKED_PAID } from '../lib/payments/stripe';
 import { goToCheckout, onResume } from '../lib/native';
 import { addDaysIso, fmtDate, fmtRange, todayIso } from '../lib/dates';
 import AddToCalendar from '../components/AddToCalendar';
@@ -121,6 +121,10 @@ const ConfirmJob = () => {
         setError('We couldn\'t start checkout. Please try again in a moment.');
         return;
       }
+      if (url === DEPOSIT_ALREADY_MARKED_PAID) {
+        await load();
+        return;
+      }
       await goToCheckout(url);
     } catch {
       setError('Something went wrong starting checkout. Please try again.');
@@ -194,7 +198,6 @@ const ConfirmJob = () => {
             <p style={{ margin: '0 0 4px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
               Your timing: {job.customerTiming}{estimate ? ` · Expected time on site: ${estimate}` : ''}
             </p>
-            <p style={{ margin: 0, color: 'var(--text-faint)', fontSize: '0.8rem' }}>Your painter's contact details are shared once your deposit is paid.</p>
           </div>
 
           {job.dateState === 'awaiting_painter_dates' && (

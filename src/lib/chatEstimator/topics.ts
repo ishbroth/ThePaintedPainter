@@ -16,6 +16,7 @@
 import type { EstimatorContext } from '../types';
 import { isIsolatedDetailJob } from './details';
 import { itemsPhrase } from './items';
+import { itemTopics } from './itemInterviews';
 
 export interface Topic {
   id: string;
@@ -73,7 +74,7 @@ const hasTiming = (c: EstimatorContext) => !!(c.timeline || c.startDate || c.end
 const isNarrowInteriorJob = (c: EstimatorContext) =>
   c.interiorWalls === 'no' &&
   c.surfacesAddressed &&
-  (isIsolatedDetailJob(c) || c.closets !== 'none' || c.furnitureItems.length > 0 || c.stairwayDetails === 'railings_only' || c.cabinets !== 'none' || c.trimLinearFeet != null || c.popcornCeilingSqft != null || c.prepWork.includes('popcorn_removal') || c.interiorTrim === 'yes' || c.interiorCeilings === 'yes');
+  (isIsolatedDetailJob(c) || c.specialtyServices.includes('fireplace') || c.specialtyServices.includes('epoxy') || c.closets !== 'none' || c.furnitureItems.length > 0 || c.stairwayDetails === 'railings_only' || c.cabinets !== 'none' || c.trimLinearFeet != null || c.popcornCeilingSqft != null || c.prepWork.includes('popcorn_removal') || c.interiorTrim === 'yes' || c.interiorCeilings === 'yes');
 
 /** The small trim details a stand-alone detail job is about, in words ("chair rail and crown moulding"). */
 function detailLabel(c: EstimatorContext): string {
@@ -99,7 +100,7 @@ export function componentKind(c: EstimatorContext): '' | 'cabinets' | 'builtins'
 
 /** The job is only a few trim details or some furniture, and the customer said so: no "add the ceilings?" suggestions. */
 const skipUpsells = (c: EstimatorContext) =>
-  c.itemsOnly || componentKind(c) !== '' || isIsolatedDetailJob(c) || (c.interiorWalls === 'no' && c.interiorCeilings === 'no' && c.surfacesAddressed && (c.furnitureItems.length > 0 || c.closets !== 'none'));
+  c.itemsOnly || componentKind(c) !== '' || isIsolatedDetailJob(c) || ((c.specialtyServices.includes('fireplace') || c.specialtyServices.includes('epoxy')) && c.interiorWalls === 'no' && c.surfacesAddressed) || (c.interiorWalls === 'no' && c.interiorCeilings === 'no' && c.surfacesAddressed && (c.furnitureItems.length > 0 || c.closets !== 'none'));
 
 const isCommercialLike = (c: EstimatorContext) => c.propertyType === 'commercial' || c.propertyType === 'multi_unit';
 
@@ -569,6 +570,7 @@ export const TOPICS: Topic[] = [
         [
           'Do you have a paint brand in mind, or should the painter choose?',
           'Is there a paint brand you prefer, or is it up to the painter?',
+          ...(Object.values(c.itemAnswers ?? {}).some((v) => /stain|restain|strip/.test(v)) ? ['Is there a paint or stain brand you prefer, or is it up to the painter?'] : []),
         ],
         seed(c),
       ),
@@ -874,9 +876,9 @@ export const TOPICS: Topic[] = [
   {
     id: 'railing_length',
     priority: 34.8,
-    relevant: (c) => c.railings === 'yes' && c.stairRailFeet == null && c.stairwayDetails !== 'railings_only',
+    relevant: (c) => (c.railings === 'yes' || c.stairwayDetails === 'railings_only') && c.stairRailFeet == null,
     alreadyAnswered: (c) => c.stairRailFeet != null || extDone(c, 'railing_length'),
-    ask: (c) => pick(["About how many linear feet of railing is it in total?", "Roughly how long is the railing, in feet?"], seed(c)),
+    ask: (c) => (c.stairwayDetails === 'railings_only' ? pick(["About how long is the railing in total? A rough length is fine, or tell me how many flights of stairs (a flight is about 14 feet), and say if there's a balcony or landing rail too.", "Roughly how long is the staircase railing? Feet is fine, or how many flights of stairs, and whether it also runs along an upstairs landing."], seed(c)) : pick(["About how many linear feet of railing is it in total?", "Roughly how long is the railing, in feet?"], seed(c))),
     clarify: () => "Railings are priced by the linear foot, and spindles take longer than a plain rail. A rough length is fine, and you can add the spindles in your answer.",
     example: () => "Something like '30 feet' or '20 feet with spindles'.",
   },
@@ -913,6 +915,59 @@ export const TOPICS: Topic[] = [
     ask: (c) => pick(["About how many square feet is the deck? Or just its length and width.", "Roughly how big is the deck, in square feet or length by width?"], seed(c)),
     clarify: () => "Decks are priced by the square foot, so the size matters. Length times width is fine, I'll do the math.",
     example: () => "Something like '400 square feet' or '20 x 20'.",
+  },
+  // ——————————————————————————————————————————
+  // A deck is a job of its own, not a line on a house: what a painter quotes depends on how high it is, whether the underside is done,
+  // whether it has railings and what shape the wood is in. Asked whenever a deck is in the job, whether it is the whole job or one
+  // piece of a house exterior. (ext_ ids so the answers are recorded the same way as the other outside questions.)
+  // ——————————————————————————————————————————
+  {
+    id: 'ext_deck_level',
+    priority: 34.61,
+    relevant: (c) => c.deck === 'yes' && !c.deckLevel,
+    alreadyAnswered: (c) => !!c.deckLevel || extDone(c, 'ext_deck_level'),
+    ask: (c) =>
+      pick(
+        ["Is the deck down at ground level, or raised up off the ground, like off a second floor?", "Is it a low deck on the ground, or raised up high enough to walk under?"],
+        seed(c),
+      ),
+    clarify: () => "A deck on the ground is painted from the top only. A raised deck also has an underside and posts to reach, which means ladders or scaffolding and more time.",
+    example: () => "Say 'on the ground', 'a few feet up' or 'off the second floor'.",
+  },
+  {
+    id: 'ext_deck_underside',
+    priority: 34.62,
+    relevant: (c) => c.deck === 'yes' && (c.deckLevel === 'raised' || c.deckLevel === 'second_story') && !c.deckUnderside,
+    alreadyAnswered: (c) => !!c.deckUnderside || extDone(c, 'ext_deck_underside'),
+    ask: (c) =>
+      pick(
+        ["Since it's raised, should the underside be painted too, or just the top?", "Does the underside of the deck need paint as well, or only the top surface?"],
+        seed(c),
+      ),
+    clarify: () => "The underside (the joists and the bottom of the boards) is a lot of overhead work, so it's priced separately from the top.",
+    example: () => "Say 'yes, the underside too' or 'just the top'.",
+  },
+  {
+    id: 'ext_deck_railings',
+    priority: 34.63,
+    relevant: (c) => c.deck === 'yes' && c.railings === 'none',
+    alreadyAnswered: (c) => c.railings !== 'none' || extDone(c, 'ext_deck_railings'),
+    ask: (c) => pick(["Does the deck have railings that need painting too?", "Are there railings around the deck to paint as well?"], seed(c)),
+    clarify: () => "Railings, and especially spindles, take a lot of brush time for their length, so they're priced by the foot on top of the deck surface.",
+    example: () => "Say 'yes, railings all around' or 'no railings'.",
+  },
+  {
+    id: 'ext_deck_condition',
+    priority: 34.64,
+    relevant: (c) => c.deck === 'yes' && !c.deckCondition,
+    alreadyAnswered: (c) => !!c.deckCondition || extDone(c, 'ext_deck_condition'),
+    ask: (c) =>
+      pick(
+        ["What shape is the deck in: sound with a worn finish, bare or weathered wood, peeling paint or stain, or any rotted boards?", "How's the deck holding up: fine and just faded, weathered and gray, peeling, or some soft or rotted spots?"],
+        seed(c),
+      ),
+    clarify: () => "Sound wood with a worn finish just needs a wash and sanding. Peeling or failing coatings have to be scraped and stripped first, and rotted boards need to be replaced before anything goes on.",
+    example: () => "Something like 'faded but solid', 'gray and weathered', 'peeling in places' or 'a few rotted boards'.",
   },
   {
     id: 'overhang_size',
@@ -1387,6 +1442,9 @@ export const TOPICS: Topic[] = [
   },
 ];
 
+// What a painter asks about each kind of item in the job (railing material, fence sides, door style...): see itemInterviews.ts
+TOPICS.push(...itemTopics());
+
 // ===== Topic picker =====
 
 /**
@@ -1403,6 +1461,7 @@ const COMPONENT_TOPICS: Record<string, string[]> = {
 };
 /** An item or part-of-a-room job (cabinets, built-ins, a mantel, a railing) only asks about that item, never about the rest of the room. */
 const askableFor = (ctx: EstimatorContext, id: string) => {
+  if (id.startsWith('item_')) return true; // each item question only applies while its item is in the job, so it is safe on an item-only job too
   if (ctx.itemsOnly) return ITEM_JOB_TOPICS.has(id);
   const kind = componentKind(ctx);
   return !kind || COMPONENT_COMMON.includes(id) || COMPONENT_TOPICS[kind].includes(id);
@@ -1439,6 +1498,45 @@ export function pickRetryTopic(ctx: EstimatorContext, asked: string[], retried: 
   );
   candidates.sort((a, b) => a.priority - b.priority);
   return candidates[0] ?? null;
+}
+
+function orList(items: string[]): string {
+  return items.length <= 1 ? items.join('') : items.slice(0, -1).join(', ') + ' or ' + items[items.length - 1];
+}
+
+/**
+ * The "anything else I should know?" that closes the questions, worded for what the customer is actually painting instead of one fixed
+ * list: a deck job asks about the deck (stairs, benches) and what else could go with it, never about chimneys; a house exterior only
+ * suggests the extras it doesn't already have; an inside job stays open.
+ */
+export function wrapupQuestion(c: EstimatorContext): string {
+  const outside = c.projectType === 'exterior' || c.projectType === 'both';
+  if (outside && !isExteriorJob(c)) {
+    // the job is things that stand apart from a house: name them, ask about those, and offer to add more
+    const things: string[] = [];
+    let aboutIt = '';
+    if (c.deck === 'yes') { things.push('the deck'); aboutIt = 'stairs, lattice or built-in benches'; }
+    if (c.fence === 'yes') { things.push('the fence'); aboutIt = aboutIt || 'gates'; }
+    if (c.overhangs === 'yes') things.push('the patio cover');
+    if (c.standaloneStructure) things.push('the ' + c.standaloneStructure);
+    if (c.exteriorShutters === 'yes') things.push('the shutters');
+    if (things.length > 0) {
+      const subject = orList(things).replace(/ or /g, ' and ');
+      const it = things.length === 1 ? 'it' : 'them';
+      return `Is there anything else about ${subject} I should know${aboutIt ? `, like ${aboutIt}` : ''}, or anything else you'd like painted along with ${it}?`;
+    }
+  }
+  if (outside) {
+    const extras: string[] = [];
+    if (c.fence === 'none') extras.push('fences');
+    if (c.overhangs === 'no') extras.push('overhangs');
+    if (c.projectType === 'exterior') extras.push('chimneys');
+    if (c.deck === 'none') extras.push('decks');
+    if (c.exteriorShutters !== 'yes') extras.push('shutters');
+    if (extras.length > 0) return `Is there anything else I should know, like ${orList(extras)}?`;
+    return 'Is there anything else about the place the painters should know?';
+  }
+  return 'Is there anything else about the place the painters should know?';
 }
 
 export function findTopic(id: string): Topic | null {

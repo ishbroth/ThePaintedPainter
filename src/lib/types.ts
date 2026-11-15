@@ -146,6 +146,9 @@ export interface EstimatorContext {
   balconyCount: number | null;
   deck: string; // none, yes
   deckSize: string; // small, medium, large
+  deckLevel: string; // '' (not asked), ground, raised, second_story
+  deckUnderside: string; // '' (not asked), yes, no (only asked for a raised deck)
+  deckCondition: string; // '' (not asked), good, weathered, peeling, rotted
   fence: string; // none, yes
   fenceLinearFeet: number | null;
   fenceType: string; // picket_4ft, privacy_6ft, chain_link
@@ -244,6 +247,8 @@ export interface EstimatorContext {
   additionalDetails: string;
 
   // Specialty Services
+  /** What the customer said about each item in the job, as "<item>.<question>": "<answer>" (see chatEstimator/itemInterviews.ts). */
+  itemAnswers?: Record<string, string>;
   specialtyServices: string[]; // fireplace, beams, built_ins, epoxy, furniture, brick
   fireplaceType: string; // brick_paint, brick_whitewash, stone, mantel_only, full
   fireplaceCount: number | null;

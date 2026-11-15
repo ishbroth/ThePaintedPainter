@@ -83,7 +83,9 @@ const ChatPanel = () => {
   // First reply: a plain invitation. After that, the core of the question being asked, rephrased short ("Please estimate square feet").
   const lastBotText = [...state.history].reverse().find((m) => m.role === 'bot')?.text ?? '';
   const hasAnswered = state.history.some((m) => m.role === 'user');
-  const composerPlaceholder = hasAnswered ? composerPrompt(lastBotText, state.lastBotTopic?.id) : GENERIC_PROMPT;
+  // (the closing questions carry their own topic, since the topic asked before them is no longer the one on the table)
+  const lastBotTopicId = [...state.history].reverse().find((m) => m.role === 'bot')?.topicId ?? state.lastBotTopic?.id;
+  const composerPlaceholder = hasAnswered ? composerPrompt(lastBotText, lastBotTopicId) : GENERIC_PROMPT;
   // Skip anything already in history at mount (restored conversations, or
   // the initial greeting) — only speak messages that arrive from here on,
   // so turning read-aloud on doesn't unexpectedly narrate the whole past

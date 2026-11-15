@@ -14,6 +14,7 @@ import { RESOLVED_BASE_RATES } from '../pricing/resolvedBaseRates';
 import type { EstimatorContext } from '../types';
 import { derive } from './derivation';
 import { extractAll } from './extractors';
+import { itemDismissal } from './itemInterviews';
 
 export interface Assumption {
   patch: Partial<EstimatorContext>;
@@ -48,6 +49,9 @@ const withExt = (ctx: EstimatorContext, id: string): string[] => [...new Set([..
  * then just moves on). The paint questions are not here: "doesn't matter" about the paint already means the painter chooses.
  */
 export function highestPriceAssumption(topicId: string, ctx: EstimatorContext): Assumption | null {
+  // an item question (railing material, fence sides, door style...): the realistic higher-priced answer
+  const item = itemDismissal(topicId, ctx);
+  if (item) return { patch: { ...item.patch, extAnswered: withExt(ctx, topicId) }, say: higher(item.label) };
   // Movable pieces only: "doesn't matter" never turns them into a house (no whole-inside, walls, ceilings, trim or doors).
   if (ctx.itemsOnly) {
     switch (topicId) {
@@ -97,6 +101,14 @@ export function highestPriceAssumption(topicId: string, ctx: EstimatorContext): 
       return { patch: { drywallRepairExtent: 'major', conditionAddressed: true }, say: higher('walls that need real prep and repair') };
     case 'color_change':
       return { patch: { interiorColorChange: 'dramatic' }, say: higher('a big color change') };
+    case 'ext_deck_level':
+      return { patch: { deckLevel: 'second_story', extAnswered: withExt(ctx, topicId) }, say: higher('a raised second-story deck') };
+    case 'ext_deck_underside':
+      return { patch: { deckUnderside: 'yes', extAnswered: withExt(ctx, topicId) }, say: higher('painting the underside of the deck too') };
+    case 'ext_deck_railings':
+      return { patch: { railings: 'yes', railingType: ctx.railingType || 'simple', extAnswered: withExt(ctx, topicId) }, say: higher('railings around the deck') };
+    case 'ext_deck_condition':
+      return { patch: { deckCondition: 'peeling', extAnswered: withExt(ctx, topicId) }, say: higher('a deck with a failing finish that needs stripping') };
     case 'color_scope_clarify':
       return { patch: { colorClarificationNeeded: '' }, say: higher('painting every wall and room the new color') };
     case 'property_ownership':

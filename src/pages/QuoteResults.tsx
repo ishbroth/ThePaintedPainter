@@ -16,6 +16,7 @@ import { useAuth } from '../lib/auth';
 import { hapticMedium } from '../lib/haptics';
 import { QUOTE_RESULT_KEY, QUOTE_EXPIRES_KEY, CLAIMED_KEY, PRICE_HOLD_MINUTES, clearEstimatorSession } from '../lib/chatEstimator/persistence';
 import { deleteAccountChatState } from '../lib/chatEstimator/accountPersistence';
+import { formatPhone } from '../lib/formatPhone';
 
 interface LocationState {
   estimate: EstimateBreakdown;
@@ -645,7 +646,7 @@ const ClaimPriceModal = ({
               <div style={{ fontSize: '0.8rem', fontWeight: 700, letterSpacing: 0.4, color: 'var(--text-secondary)', textTransform: 'uppercase', marginTop: 6 }}>Your contact info</div>
               <input placeholder="Full name" value={name} onChange={(e) => setName(e.target.value)} style={inputStyle} autoComplete="name" />
               <input placeholder="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} style={inputStyle} autoComplete="email" />
-              <input placeholder="Phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} style={inputStyle} autoComplete="tel" />
+              <input placeholder="Phone" type="tel" value={phone} onChange={(e) => setPhone(formatPhone(e.target.value))} style={inputStyle} autoComplete="tel" />
               <div>
                 <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
                   Preferred start date (optional — the painter will confirm)

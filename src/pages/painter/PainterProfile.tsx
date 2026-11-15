@@ -10,6 +10,7 @@ import CredentialsEditor, { CREDENTIAL_COLUMNS, toCredentials } from '../../comp
 import PortfolioStrip from '../../components/painter/PortfolioStrip';
 import BookedPreference from '../../components/painter/BookedPreference';
 import EditRow, { editInput } from '../../components/painter/EditRow';
+import { formatPhone } from '../../lib/formatPhone';
 
 interface PainterRow {
   id: string;
@@ -69,7 +70,8 @@ function FieldRow({ label, field, row, save, kind = 'text', validate, placeholde
   block?: boolean;
 }) {
   const stored = row[field];
-  const text = stored == null ? '' : String(stored);
+  const text = stored == null ? '' : kind === 'tel' ? formatPhone(String(stored)) : String(stored);
+  const change = (v: string) => setDraft(kind === 'tel' ? formatPhone(v) : v);
   const [draft, setDraft] = useState(text);
   const money = kind === 'number' && prefix === '$';
   const shown = text === '' ? dash : <span className={money ? 'whitespace-nowrap' : undefined}>{prefix}{money ? Number(text).toLocaleString('en-US') : text}{suffix}</span>;
@@ -81,7 +83,7 @@ function FieldRow({ label, field, row, save, kind = 'text', validate, placeholde
       onOpen={() => setDraft(text)}
       editor={kind === 'textarea'
         ? <textarea rows={4} className={editInput + ' resize-y'} value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={placeholder} />
-        : <input type={kind === 'number' ? 'number' : kind} min={kind === 'number' ? 0 : undefined} inputMode={kind === 'number' ? 'numeric' : undefined} className={editInput} value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={placeholder} />}
+        : <input type={kind === 'number' ? 'number' : kind} min={kind === 'number' ? 0 : undefined} inputMode={kind === 'number' ? 'numeric' : undefined} className={editInput} value={draft} onChange={(e) => change(e.target.value)} placeholder={placeholder} />}
       onSave={async () => {
         const problem = validate?.(draft) ?? null;
         if (problem) return problem;

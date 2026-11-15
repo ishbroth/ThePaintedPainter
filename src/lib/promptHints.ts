@@ -10,6 +10,8 @@ export interface PromptSplit {
   hint: string;
 }
 
+import { itemTopicHint } from './chatEstimator/itemInterviews';
+
 export const GENERIC_PROMPT = 'Type or talk here.';
 
 /** Core question by topic, for when the wording itself doesn't give it away. */
@@ -53,6 +55,24 @@ const TOPIC_PROMPTS: Record<string, string> = {
   fence_size: 'How long (linear feet) and how tall is the fence?',
   fence_height: 'How tall is the fence?',
   deck_size: 'How many square feet is the deck?',
+  ext_deck_level: 'On the ground, or raised up?',
+  ext_deck_underside: 'Paint the underside too?',
+  ext_deck_railings: 'Does it have railings?',
+  ext_deck_condition: 'What shape is the deck in?',
+  wrapup: 'Anything else to add, or "no"?',
+  photos: 'Attach photos, or say "run it"',
+  balcony_count: 'How many balconies?',
+  building_count: 'How many buildings?',
+  builtin_count: 'How many built-ins?',
+  cabinet_count: 'How many doors and drawers?',
+  cabinet_hardware: 'Keep the hardware, or replace it?',
+  cabinet_method: 'Sprayed, or brushed?',
+  cabinet_scope: 'Outsides only, or insides too?',
+  ceiling_height: 'About how tall are the ceilings?',
+  commercial_access: 'When can the crew work?',
+  furniture_finish: 'Painted or stained now? Repaint or refinish?',
+  furniture_kind: 'Which pieces, and how many?',
+  unit_count: 'How many units?',
   overhang_size: 'How many square feet is the overhang or patio cover?',
   ext_extras: 'Is there a fence, deck or patio cover to paint too?',
   ext_extras_which: 'Which: fence, deck or patio cover?',
@@ -87,8 +107,15 @@ function coreQuestion(text: string): string {
  * "Please estimate square feet", "How many doors?". Falls back to the generic invitation.
  */
 export function composerPrompt(botText: string, topicId?: string | null): string {
+  // the closing questions are not the topic asked before them: "Anything else I should know?", then the photos and "run it"
+  if (topicId === 'wrapup' || topicId === 'photos') return TOPIC_PROMPTS[topicId];
+  // the deck questions' own wording ("off a second floor", "the underside") would be misread by the text rules below, so their topic decides
+  if (topicId && topicId.startsWith('ext_deck') && TOPIC_PROMPTS[topicId]) return TOPIC_PROMPTS[topicId];
+  const itemHint = itemTopicHint(topicId);
+  if (itemHint) return itemHint;
   // the last question before pricing ("Anything else I should know?... say 'run it'")
   if (/\brun it\b/i.test(botText)) return 'Anything else to add?';
+  if (topicId && topicId.startsWith('ext_deck') && TOPIC_PROMPTS[topicId]) return TOPIC_PROMPTS[topicId];
   const q = coreQuestion(botText);
   if (/\b(square (?:feet|foot|footage)|sq\.? ?ft)\b/i.test(q)) return 'Please estimate square feet';
   if (/\blinear (?:feet|foot)\b/i.test(q)) return 'About how many linear feet?';

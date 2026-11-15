@@ -49,7 +49,7 @@ export function derive(ctx: EstimatorContext, transcript: string): Derivation[] 
   // ceilings, exterior trim, deck railings), so those stay ambiguous on
   // purpose and are deliberately NOT in this list.
   const mentionsIndoorRoom =
-    /\b(room|rooms|bedroom|bathroom|kitchen|living room|dining|hallway|closet|pantry|nursery|den|foyer|mudroom|laundry room|apartment|apt\.?|condo(?:minium)?|duplex|rental unit|the unit|my unit|staircase|stairway|stairs|stairwell|door frames?|door jambs?|cabinets?|cabinet interiors?|vanity|vanities|wainscoting|crown molding|chair rail|baseboards?|fireplace|mantel|built[\s-]?ins?|attic|basement|popcorn ceiling)\b/.test(
+    /\b(room|rooms|bedroom|bathroom|kitchen|living room|dining|hallway|closet|pantry|nursery|den|foyer|mudroom|laundry room|apartment|apt\.?|condo(?:minium)?|duplex|rental unit|the unit|my unit|staircase|stairway|stairs|stari|stairwell|door frames?|door jambs?|cabinets?|cabinet interiors?|vanity|vanities|wainscoting|crown molding|chair rail|baseboards?|fireplace|mantel|built[\s-]?ins?|attic|basement|popcorn ceiling)\b/.test(
       t,
     ) || mentionsHomeOffice;
   // "bedroom walls and the window frames": the frames are inside, not an outside job
@@ -356,12 +356,17 @@ export function derive(ctx: EstimatorContext, transcript: string): Derivation[] 
   const tNeg = t.replace(negRe, ' ');
   const hasOnly = hasScopeLimiter(t);
   const mentionsSurfaceWords = /\b(walls?|ceilings?|whole|entire|every room|all (?:the )?rooms|throughout|bedrooms?|living room|kitchen walls)\b/.test(tNeg);
-  const railWords = /\b(stair(?:s|case|way)?\s*(?:rail(?:ing)?s?|banisters?)|banisters?|bannisters?|balusters?|spindles?|handrails?|stair rail)\b/.test(t);
+  const railWords = /\b((?:stair(?:s|case|way)?|stari)\s*(?:rail(?:ing)?s?|banisters?)|banisters?|bannisters?|balusters?|spindles?|handrails?|stair rail)\b/.test(t);
 
   // Once the job's surfaces are already established (an earlier answer to "which surfaces?"), a single feature mentioned in
   // passing never re-scopes the whole job down to just that feature — the same bug as a backyard fence silently erasing an
   // already-established whole-house exterior job (see estimateEngine/derivation exterior fix). "Just doors and door casings"
   // answering a narrower follow-up question (e.g. the baseboards upsell) must not undo the walls and doors already on record.
+  // A job that is only a fireplace, a mantel or a garage floor: no rooms, walls or ceilings come with it
+  const soloFeature = /\b(?:fireplace|mantel|hearth|epoxy|garage floor)\b/.test(tNeg) && !/\b(?:walls?|ceilings?|trim|baseboards?|doors?|rooms?|bedrooms?|whole|entire|house|kitchen|living|bathroom|exterior|outside)\b/.test(tNeg.replace(/\bgarage\b/g, ' ')) && !ctx.surfacesAddressed;
+  if (soloFeature && ctx.interiorScope !== 'whole_house') {
+    out.push({ patch: { ...interiorOff, projectType: ctx.projectType || 'interior', interiorScope: 'specific_rooms' }, reason: 'Only a fireplace or garage floor → price that, not rooms' });
+  }
   if (railWords && !/\b(deck|porch|balcon|patio|exterior|outside|outdoor)\b/.test(t) && !/\bwalls?\b/.test(t) && ctx.stairwayDetails !== 'railings_only' && !ctx.surfacesAddressed) {
     out.push({
       patch: { ...interiorOff, projectType: ctx.projectType || 'interior', interiorScope: 'specific_rooms', stairways: 'yes', stairwayDetails: 'railings_only', railingType: /\b(spindles?|balusters?)\b/.test(t) ? 'spindles' : 'simple', stairwayCount: ctx.stairwayCount || 1 },

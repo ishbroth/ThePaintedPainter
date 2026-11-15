@@ -167,6 +167,7 @@ export function defaultAssumptions(ctx: EstimatorContext): Assumption[] {
     if (ctx.fenceLinearFeet == null) guess('Fence length assumed (100 ft)', 'You did not give the length of the fence.');
     if (ctx.fenceHeightFt == null && ctx.fenceType !== 'chain_link') guess('Fence height assumed (' + (ctx.fenceType === 'picket_4ft' ? '4' : '6') + ' ft)', 'You did not give the height of the fence, so the usual height for that kind of fence is priced.');
   }
+  if (ctx.deck === 'yes' && ctx.deckLevel === '' && ctx.deckCondition === '') guess('Deck priced as sound and at ground level', 'You did not say how high the deck is or what shape it is in, so it is priced as a sound deck on the ground, top surface only.');
   if (ctx.deck === 'yes' && ctx.deckSqft == null) guess('Deck size assumed', 'You did not give the size of the deck, so a ' + (ctx.deckSize || 'medium') + ' deck is priced.');
   if (ctx.overhangs === 'yes' && ctx.overhangSqft == null) guess('Overhang size estimated', 'You did not give the size of the overhang or patio cover, so it is estimated from the footprint of the house.');
   if (ctx.railings === 'yes' && ctx.stairRailFeet == null) guess('Railing length estimated', 'You did not give the length of the railing, so it is estimated from the size of the house.');

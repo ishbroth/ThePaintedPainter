@@ -180,11 +180,6 @@ const Home = () => {
           service — you pick the option that works for you, lock it in with a small deposit, and your
           painter handles the rest.
         </p>
-        <p>
-          Our network is deliberately small and exclusive. Painters with a pattern of poor reviews are removed
-          automatically, so you are only ever offered painters who have earned their place.
-        </p>
-        <p className="slogan">Transparent pricing. Verified painters. Nationwide coverage.</p>
       </section>
 
       <div className="divider"></div>
@@ -226,6 +221,20 @@ const Home = () => {
 
       {/* Carousel 4 (firefighter, Kool-Aid Man), at the very bottom under the map */}
       <SmoothCarousel triplets={carousel4Triplets} speed={57.5} />
+
+      <div className="divider"></div>
+
+      {/* Closing paragraph, under the last carousel and above the footer links */}
+      <section className="about-text fade-in">
+        <p>
+          The Painted Painter recruits and vets painters all over the continent. A network of independent and
+          well-reviewed painting companies, insured with the applicable licensing, are here to serve you... and The
+          Painted Painter serves to connect the right customer with the right company for the right price. We'll
+          check to see how the job went, and your feedback keeps our painters on the up and up... painters with a
+          pattern of poor reviews are automatically removed from the network.
+        </p>
+        <p className="slogan">Transparent pricing. Verified painters. Nationwide coverage.</p>
+      </section>
     </div>
   );
 };

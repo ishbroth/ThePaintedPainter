@@ -121,6 +121,8 @@ serve(async (req: Request) => {
             phone: role === 'painter' || paid ? painter.phone : null,
           },
         },
+        // the customer's way on to the next step (confirm dates, pay the deposit); only while the deposit is still due
+        confirmUrl: role === 'customer' && !paid && job.status === 'painter_accepted' ? contractUrlFor('customer') : null,
         versions: shaped,
         inForceVersionId: inForce?.id ?? null,
         pendingVersionId: pending?.id ?? null,

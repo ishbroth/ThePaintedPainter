@@ -25,7 +25,7 @@ export function makeInitialContext(): EstimatorContext {
     exteriorScope: 'full', sidingType: '', houseStyle: '', trimMaterial: '', exteriorTrim: 'no', soffitsEaves: 'no',
     exteriorShutters: 'no', exteriorShutterCount: null, garageDoor: 'none', entryDoor: 'no',
     railings: 'none', railingType: '', balconies: 'none', balconyCount: null,
-    deck: 'none', deckSize: '', fence: 'none', fenceLinearFeet: null, fenceType: 'privacy_6ft', gutters: 'no',
+    itemAnswers: {}, deck: 'none', deckSize: '', deckLevel: '', deckUnderside: '', deckCondition: '', fence: 'none', fenceLinearFeet: null, fenceType: 'privacy_6ft', gutters: 'no',
     foundation: 'no', exteriorWindows: 'none', exteriorWindowCount: null, overhangs: 'no',
     accessRestrictions: 'none', exteriorColorChange: '', exteriorCondition: 'good',
     prepWork: [], caulkingExtent: 'minor', drywallRepairExtent: 'minor', conditionAddressed: false,

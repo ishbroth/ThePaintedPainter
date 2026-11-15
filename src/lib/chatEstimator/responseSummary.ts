@@ -8,12 +8,14 @@
 // accepting; the customer's identity stays masked until they confirm.
 // ============================================================================
 
+import { itemSummaryLines } from './itemInterviews';
 import type { EstimatorContext } from '../types';
 import { makeInitialContext } from './defaultContext';
 import { cleanScope, type ScopeEvidence } from './scopeSummary';
 
 /** Fields never shown to a painter pre-acceptance — PII or internal bookkeeping. */
 const EXCLUDED_KEYS = new Set<keyof EstimatorContext>([
+  'itemAnswers',
   'contactName',
   'contactPhone',
   'contactEmail',
@@ -69,6 +71,9 @@ const LABEL_OVERRIDES: Partial<Record<keyof EstimatorContext, string>> = {
   popcornCeilingSqft: 'Popcorn ceiling area (sq ft)',
   cabinetDoorCount: 'Cabinet doors and drawer fronts',
   deckSqft: 'Deck area (sq ft)',
+  deckLevel: 'Deck height (ground level or raised)',
+  deckUnderside: 'Deck underside painted',
+  deckCondition: 'Deck condition',
   overhangSqft: 'Overhang or patio cover area (sq ft)',
   fenceHeightFt: 'Fence height (ft)',
   chairCount: 'Chairs to paint',
@@ -137,7 +142,7 @@ export function timelineLabel(timeline: string): string {
 
 /** A detail only means something while the thing it describes is in the job ("fence type" with no fence is just the form's resting answer). */
 const DEPENDS_ON: Record<string, string> = {
-  fenceType: 'fence', fenceLinearFeet: 'fence', fenceHeightFt: 'fence', chairRailLinearFeet: 'chairRail', deckSize: 'deck', deckSqft: 'deck', railingType: 'railings', exteriorRailingMaterial: 'railings',
+  fenceType: 'fence', fenceLinearFeet: 'fence', fenceHeightFt: 'fence', chairRailLinearFeet: 'chairRail', deckSize: 'deck', deckSqft: 'deck', deckLevel: 'deck', deckUnderside: 'deck', deckCondition: 'deck', railingType: 'railings', exteriorRailingMaterial: 'railings',
   balconyCount: 'balconies', exteriorShutterCount: 'exteriorShutters', exteriorWindowCount: 'exteriorWindows', overhangSqft: 'overhangs',
   doorCount: 'interiorDoors', doorTypes: 'interiorDoors', doorFrames: 'interiorDoors', doorMaterial: 'interiorDoors',
   windowCount: 'interiorWindows', windowTypes: 'interiorWindows', cabinetLocations: 'cabinets', cabinetScope: 'cabinets', cabinetFinish: 'cabinets', trimFinish: 'interiorTrim', doorFinish: 'interiorDoors', cabinetDoorCount: 'cabinets',
@@ -199,6 +204,8 @@ export function buildResponseSummary(ctx: EstimatorContext, evidence?: ScopeEvid
     if (ctx.interiorDoors !== 'none') surfaces.push(ctx.interiorDoors === 'all' ? 'all doors' : 'some doors');
     if (surfaces.length > 0) out.unshift({ question: 'Inside surfaces being painted', answer: surfaces.join(', ') });
   }
+  // what the customer said about each item (material, finish, condition...), for the painter
+  for (const line of itemSummaryLines(ctx)) out.push(line);
   // specific work (a fence, cabinets, chairs...) is listed only when the customer talked about it or it is priced in the job; "no" and blank answers never show
   return cleanScope(out, evidence);
 }

@@ -17,7 +17,7 @@ const Footer = () => {
       <p>Copyright &copy; 2015-{new Date().getFullYear()} The Painted Painter - All Rights Reserved.</p>
       <div className="footer-social">
         <a
-          href="https://www.facebook.com/thepaintedpainter"
+          href="https://www.facebook.com/THEpaintedpainterCA/"
           target="_blank"
           rel="noopener noreferrer"
           aria-label="Facebook"
@@ -27,7 +27,7 @@ const Footer = () => {
           </svg>
         </a>
         <a
-          href="https://www.instagram.com/thepaintedpainter"
+          href="https://www.instagram.com/thepaintedpainterca"
           target="_blank"
           rel="noopener noreferrer"
           aria-label="Instagram"

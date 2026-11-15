@@ -251,24 +251,24 @@ function __generator(thisArg, body) {
     return { value: op[0] ? op[1] : void 0, done: true };
   }
 }
-function __exportStar(m2, o) {
-  for (var p2 in m2) if (p2 !== "default" && !Object.prototype.hasOwnProperty.call(o, p2)) __createBinding(o, m2, p2);
+function __exportStar(m2, o2) {
+  for (var p2 in m2) if (p2 !== "default" && !Object.prototype.hasOwnProperty.call(o2, p2)) __createBinding(o2, m2, p2);
 }
-function __values(o) {
-  var s = typeof Symbol === "function" && Symbol.iterator, m2 = s && o[s], i2 = 0;
-  if (m2) return m2.call(o);
-  if (o && typeof o.length === "number") return {
+function __values(o2) {
+  var s = typeof Symbol === "function" && Symbol.iterator, m2 = s && o2[s], i2 = 0;
+  if (m2) return m2.call(o2);
+  if (o2 && typeof o2.length === "number") return {
     next: function() {
-      if (o && i2 >= o.length) o = void 0;
-      return { value: o && o[i2++], done: !o };
+      if (o2 && i2 >= o2.length) o2 = void 0;
+      return { value: o2 && o2[i2++], done: !o2 };
     }
   };
   throw new TypeError(s ? "Object is not iterable." : "Symbol.iterator is not defined.");
 }
-function __read(o, n) {
-  var m2 = typeof Symbol === "function" && o[Symbol.iterator];
-  if (!m2) return o;
-  var i2 = m2.call(o), r, ar = [], e2;
+function __read(o2, n) {
+  var m2 = typeof Symbol === "function" && o2[Symbol.iterator];
+  if (!m2) return o2;
+  var i2 = m2.call(o2), r, ar = [], e2;
   try {
     while ((n === void 0 || n-- > 0) && !(r = i2.next()).done) ar.push(r.value);
   } catch (error) {
@@ -347,7 +347,7 @@ function __asyncGenerator(thisArg, _arguments, generator) {
     if (f(v), q.shift(), q.length) resume(q[0][0], q[0][1]);
   }
 }
-function __asyncDelegator(o) {
+function __asyncDelegator(o2) {
   var i2, p2;
   return i2 = {}, verb("next"), verb("throw", function(e2) {
     throw e2;
@@ -355,21 +355,21 @@ function __asyncDelegator(o) {
     return this;
   }, i2;
   function verb(n, f) {
-    i2[n] = o[n] ? function(v) {
-      return (p2 = !p2) ? { value: __await(o[n](v)), done: false } : f ? f(v) : v;
+    i2[n] = o2[n] ? function(v) {
+      return (p2 = !p2) ? { value: __await(o2[n](v)), done: false } : f ? f(v) : v;
     } : f;
   }
 }
-function __asyncValues(o) {
+function __asyncValues(o2) {
   if (!Symbol.asyncIterator) throw new TypeError("Symbol.asyncIterator is not defined.");
-  var m2 = o[Symbol.asyncIterator], i2;
-  return m2 ? m2.call(o) : (o = typeof __values === "function" ? __values(o) : o[Symbol.iterator](), i2 = {}, verb("next"), verb("throw"), verb("return"), i2[Symbol.asyncIterator] = function() {
+  var m2 = o2[Symbol.asyncIterator], i2;
+  return m2 ? m2.call(o2) : (o2 = typeof __values === "function" ? __values(o2) : o2[Symbol.iterator](), i2 = {}, verb("next"), verb("throw"), verb("return"), i2[Symbol.asyncIterator] = function() {
     return this;
   }, i2);
   function verb(n) {
-    i2[n] = o[n] && function(v) {
+    i2[n] = o2[n] && function(v) {
       return new Promise(function(resolve3, reject) {
-        v = o[n](v), settle(resolve3, reject, v.done, v.value);
+        v = o2[n](v), settle(resolve3, reject, v.done, v.value);
       });
     };
   }
@@ -497,7 +497,7 @@ var init_tslib_es6 = __esm({
       };
       return __assign.apply(this, arguments);
     };
-    __createBinding = Object.create ? (function(o, m2, k, k2) {
+    __createBinding = Object.create ? (function(o2, m2, k, k2) {
       if (k2 === void 0) k2 = k;
       var desc = Object.getOwnPropertyDescriptor(m2, k);
       if (!desc || ("get" in desc ? !m2.__esModule : desc.writable || desc.configurable)) {
@@ -505,23 +505,23 @@ var init_tslib_es6 = __esm({
           return m2[k];
         } };
       }
-      Object.defineProperty(o, k2, desc);
-    }) : (function(o, m2, k, k2) {
+      Object.defineProperty(o2, k2, desc);
+    }) : (function(o2, m2, k, k2) {
       if (k2 === void 0) k2 = k;
-      o[k2] = m2[k];
+      o2[k2] = m2[k];
     });
-    __setModuleDefault = Object.create ? (function(o, v) {
-      Object.defineProperty(o, "default", { enumerable: true, value: v });
-    }) : function(o, v) {
-      o["default"] = v;
+    __setModuleDefault = Object.create ? (function(o2, v) {
+      Object.defineProperty(o2, "default", { enumerable: true, value: v });
+    }) : function(o2, v) {
+      o2["default"] = v;
     };
-    ownKeys = function(o) {
-      ownKeys = Object.getOwnPropertyNames || function(o2) {
+    ownKeys = function(o2) {
+      ownKeys = Object.getOwnPropertyNames || function(o3) {
         var ar = [];
-        for (var k in o2) if (Object.prototype.hasOwnProperty.call(o2, k)) ar[ar.length] = k;
+        for (var k in o3) if (Object.prototype.hasOwnProperty.call(o3, k)) ar[ar.length] = k;
         return ar;
       };
-      return ownKeys(o);
+      return ownKeys(o2);
     };
     _SuppressedError = typeof SuppressedError === "function" ? SuppressedError : function(error, suppressed, message) {
       var e2 = new Error(message);
@@ -13569,7 +13569,7 @@ var require_main5 = __commonJS({
   "node_modules/@supabase/supabase-js/dist/main/index.js"(exports) {
     "use strict";
     init_define_import_meta_env();
-    var __createBinding2 = exports && exports.__createBinding || (Object.create ? (function(o, m2, k, k2) {
+    var __createBinding2 = exports && exports.__createBinding || (Object.create ? (function(o2, m2, k, k2) {
       if (k2 === void 0) k2 = k;
       var desc = Object.getOwnPropertyDescriptor(m2, k);
       if (!desc || ("get" in desc ? !m2.__esModule : desc.writable || desc.configurable)) {
@@ -13577,10 +13577,10 @@ var require_main5 = __commonJS({
           return m2[k];
         } };
       }
-      Object.defineProperty(o, k2, desc);
-    }) : (function(o, m2, k, k2) {
+      Object.defineProperty(o2, k2, desc);
+    }) : (function(o2, m2, k, k2) {
       if (k2 === void 0) k2 = k;
-      o[k2] = m2[k];
+      o2[k2] = m2[k];
     }));
     var __exportStar2 = exports && exports.__exportStar || function(m2, exports2) {
       for (var p2 in m2) if (p2 !== "default" && !Object.prototype.hasOwnProperty.call(exports2, p2)) __createBinding2(exports2, m2, p2);
@@ -17524,7 +17524,7 @@ function extractExteriorFeatures(text) {
       }
     }
   }
-  if (/\b(railings?|hand\s*rails?|bannisters?|banisters?|balustrades?)\b/.test(t2) && !/\bstair/.test(t2)) {
+  if (/\b(railings?|hand\s*rails?|bannisters?|banisters?|balustrades?)\b/.test(t2) && !/\bstair|\bstari\b|\bsteps?\b|\bflights?\b/.test(t2)) {
     out.railings = true;
     if (/\bspindles?\b/.test(t2)) out.railingType = "spindles";
   }
@@ -17552,7 +17552,7 @@ function extractInteriorDetails(text) {
   if (/\bshutters?\b/.test(t2) && !/\bexterior|\boutside|\bhouse\b/.test(t2)) {
     out.interiorShutters = true;
   }
-  if (/\b(staircase|stairway|stairs)\b/.test(t2)) {
+  if (/\b(staircase|stairway|stairs|stari)\b/.test(t2)) {
     out.stairway = true;
     if (/\b(railings?|bannisters?|banisters?|balustrades?|hand\s*rails?)\b/.test(t2)) {
       out.stairwayWithRailings = true;
@@ -17656,6 +17656,7 @@ function extractMultiPhaseRequest(text) {
   return /\b(space(?:d)? out|spread out|staggered?|different dates|separate dates|in phases|in stages|different times|not all at once|one (?:room|section|part) at a time)\b/.test(t2);
 }
 function extractAll(text, prev, lastBotTopicId = null) {
+  text = text.replace(/\bstari\b/gi, "stair");
   const patch = {};
   const acks = [];
   if (extractMultiPhaseRequest(text) && prev.multiPhaseRequested !== "yes") {
@@ -18903,6 +18904,15 @@ function extractDetails(text, ctx, askedId) {
         if (n) {
           patch.stairRailFeet = n;
           acks.push(`${n} ft of railing`);
+        } else {
+          const words = { one: 1, a: 1, single: 1, two: 2, three: 3, four: 4, five: 5 };
+          const fm = text.toLowerCase().match(/\b(\d{1,2}|one|a|single|two|three|four|five)\s*(?:-\s*)?(?:flights?|stor(?:y|ies|eys?)|floors?|levels?)\b/);
+          const flights = fm ? words[fm[1]] ?? parseInt(fm[1], 10) : 0;
+          if (flights >= 1 && flights <= 8) {
+            patch.stairRailFeet = flights * 14;
+            patch.stairwayCount = flights;
+            acks.push(`${flights} flight${flights === 1 ? "" : "s"} of stairs`);
+          }
         }
         break;
       }
@@ -18993,6 +19003,1157 @@ var DETAIL_TOPIC_IDS = /* @__PURE__ */ new Set([
   "detail_sqft_wainscot",
   "ext_style"
 ]);
+
+// src/lib/chatEstimator/itemInterviews.ts
+init_define_import_meta_env();
+
+// src/lib/chatEstimator/itemSpecs.ts
+init_define_import_meta_env();
+var o = (value, label, match, mult, extra = {}) => ({ value, label, match, mult, ...extra });
+var has = (c2, s) => c2.specialtyServices.includes(s);
+var outside = (c2) => c2.projectType === "exterior" || c2.projectType === "both";
+var onHouse = (c2) => outside(c2) && c2.exteriorBody !== "no" && !c2.standaloneStructure;
+var GOOD = /\b(?:good|great|fine|solid|sound|excellent|decent|ok|okay|no (?:problems|issues))\b/;
+var WORN = /\b(?:faded|worn|chalky|dull|dirty|scuffed|some wear|weathered|mildew|gr[ae]y)\b/;
+var BAD = /\b(?:peel(?:ing|s)?|flak(?:ing|y)|chip(?:ping|ped)|rust(?:y|ed)?|rot(?:ted|ten)?|cracked|cracking|damaged|bad|rough|terrible|awful|falling apart|heavy wear|loose|broken)\b/;
+var ITEM_SPECS = [
+  // ——————————————————————————————————— Staircase railing (inside)
+  {
+    key: "stair_rail",
+    thing: "staircase railing",
+    present: (c2) => c2.stairways === "yes" && ["railings_only", "walls_and_railings", "full"].includes(c2.stairwayDetails),
+    lineKeys: ["stairs"],
+    priority: 34.82,
+    questions: [
+      {
+        key: "material",
+        label: "what the railing is made of",
+        hint: "Wood, or iron/metal?",
+        ask: ["What's the railing made of: wood, wrought iron, or another metal?", "Is the railing wood, or is it iron or metal?"],
+        clarify: "Wood is the most common. Wrought iron and metal balusters take more time (rust prep, a special primer, lots of small surfaces) so they are priced higher.",
+        example: "Say 'wood', 'wood with iron balusters' or 'wrought iron'.",
+        when: (c2) => !c2.interiorRailingMaterial || c2.interiorRailingMaterial === "wood",
+        options: [
+          o("iron", "wrought iron", /\b(?:wrought|iron)\b/, 1, { said: /\bwrought iron\b|\biron (?:rail|baluster|spindle)/, ctxPatch: { interiorRailingMaterial: "wrought_iron" } }),
+          o("metal", "metal", /\b(?:metal|steel|aluminum|aluminium)\b/, 1, { ctxPatch: { interiorRailingMaterial: "metal" } }),
+          o("wood", "wood", /\b(?:wood|wooden|oak|pine|maple)\b/, 1)
+        ]
+      },
+      {
+        key: "now",
+        label: "whether the railing is painted or stained now",
+        hint: "Painted, stained, or bare?",
+        ask: ["Is the railing painted right now, or is it stained or varnished wood?", "What's on the railing now: paint, stain or varnish, or bare wood?"],
+        clarify: "Painted wood just needs a scuff sand and new paint. Stained or varnished wood has to be sanded and primed with a bonding primer before it can be painted, which adds real labor.",
+        example: "Say 'painted white', 'stained oak' or 'bare wood'.",
+        when: (_c, a) => a.material !== "iron" && a.material !== "metal",
+        options: [
+          o("stained", "stained/varnished now", /\b(?:stain|stained|varnish|varnished|natural|dark wood|clear coat|polyurethane|oak)\b/, 1.15, { said: /\b(?:stained|varnished) (?:rail|banister|baluster|stair)|(?:rail|banister|baluster|stair)\w*[^.,;]{0,20}\b(?:stained|varnished)\b/ }),
+          o("bare", "bare wood", /\b(?:bare|raw|unfinished|new wood|never (?:been )?(?:painted|stained))\b/, 1.1),
+          o("painted", "painted now", /\b(?:paint|painted|white|enamel)\b/, 1)
+        ]
+      },
+      {
+        key: "goal",
+        label: "what you want done to the railing",
+        hint: "Paint it, restain, or strip?",
+        ask: ["What do you want done: paint it, restain it, or strip it back and refinish?", "Is the plan to paint it, re-stain it, or strip it down and refinish?"],
+        clarify: "Going from stain to paint needs primer. Keeping it stained means sanding and restaining. Stripping to bare wood and refinishing is the most work.",
+        example: "Say 'paint it white', 'restain it' or 'strip and refinish'.",
+        when: (_c, a) => a.now === "stained" || a.now === "bare",
+        options: [
+          o("strip", "strip and refinish", /\b(?:strip|stripped|stripping|refinish|refinishing|bare wood|down to)\b/, 1.7),
+          o("restain", "restain", /\b(?:re-?stain|stain it|keep (?:it )?stained|keep the stain|same stain|varnish)\b/, 1.3),
+          o("paint", "stain to paint", /\b(?:paint|painted|white|black|go (?:to|with))\b/, 1.3)
+        ]
+      },
+      {
+        key: "style",
+        label: "how many spindles the railing has",
+        hint: "Plain rail, or lots of spindles?",
+        ask: ["Is it a plain rail with a few posts, or does it have lots of spindles (balusters)?", "Does the railing have spindles between the rail and the stairs, or is it more solid?"],
+        clarify: "Every spindle has four sides and often a turned profile, so spindles are what take the time. A solid half-wall is priced like wall.",
+        example: "Say 'lots of spindles', 'just a plain rail' or 'a solid half wall'.",
+        when: (c2) => c2.stairwayDetails === "railings_only",
+        options: [
+          o("spindles", "spindle balusters", /\b(?:spindles?|balusters?|pickets?|lots|many|ornate|turned)\b/, 1, { ctxPatch: { railingType: "spindles" } }),
+          o("solid", "solid/half wall", /\b(?:solid|half[\s-]?wall|panel|closed|wall)\b/, 0.7, { ctxPatch: { railingType: "simple" } }),
+          o("simple", "plain rail", /\b(?:plain|simple|just (?:a )?rail|few|cable|post)\b/, 1, { ctxPatch: { railingType: "simple" } })
+        ]
+      },
+      {
+        key: "condition",
+        label: "what shape the railing is in",
+        hint: "What shape is it in?",
+        ask: ["What shape is the railing in: good, worn, or peeling and damaged?", "How's it holding up: fine, a bit worn, or peeling and beat up?"],
+        clarify: "Peeling, chipped or rusty railings need scraping and repair before any paint goes on.",
+        example: "Say 'good shape', 'a little worn' or 'peeling in spots'.",
+        options: [
+          o("bad", "peeling/damaged", BAD, 1.25),
+          o("worn", "worn", WORN, 1.08),
+          o("good", "good shape", GOOD, 1)
+        ]
+      }
+    ]
+  },
+  // ——————————————————————————————————— Railing outside (deck, porch, balcony)
+  {
+    key: "ext_rail",
+    thing: "exterior railing",
+    present: (c2) => c2.railings === "yes" && outside(c2),
+    lineKeys: ["railings"],
+    priority: 34.81,
+    questions: [
+      {
+        key: "material",
+        label: "what the railing is made of",
+        hint: "Wood, metal, or other?",
+        ask: ["What's the railing made of: wood, metal or iron, aluminum, cable, or composite/vinyl?", "Is the railing wood, metal, or something like composite or vinyl?"],
+        clarify: "Wood and iron are painted or stained. Composite and vinyl usually shouldn't be painted at all, and cable rail only has its posts painted.",
+        example: "Say 'wood', 'wrought iron' or 'composite'.",
+        when: (c2) => !c2.exteriorRailingMaterial || c2.exteriorRailingMaterial === "wood",
+        options: [
+          o("iron", "iron/metal", /\b(?:iron|metal|steel)\b/, 1, { ctxPatch: { exteriorRailingMaterial: "metal" } }),
+          o("aluminum", "aluminum", /\b(?:alumin(?:um|ium))\b/, 1.1),
+          o("cable", "cable rail", /\bcable\b/, 1, { ctxPatch: { exteriorRailingMaterial: "cable" } }),
+          o("composite", "composite/vinyl (may not be paintable)", /\b(?:composite|vinyl|trex|pvc|plastic)\b/, 1, { ctxPatch: { exteriorRailingMaterial: "composite" } }),
+          o("wood", "wood", /\b(?:wood|wooden|cedar|redwood|pine|treated)\b/, 1)
+        ]
+      },
+      {
+        key: "height",
+        label: "how high off the ground the railing is",
+        hint: "Ground level, or upstairs?",
+        ask: ["Is the railing at ground level, or up on a second floor?", "How high up is it: ground level, or a second-story deck or balcony?"],
+        clarify: "A second-story railing means ladder or scaffold work, which adds time.",
+        example: "Say 'ground level' or 'second story'.",
+        when: (c2) => c2.deck !== "yes",
+        // a deck's own height answer covers its railing
+        options: [
+          o("upper", "second story", /\b(?:second|2nd|upper|upstairs|third|high|balcony|story)\b/, 1.25),
+          o("ground", "ground level", /\b(?:ground|first|low|main|level)\b/, 1)
+        ]
+      },
+      {
+        key: "condition",
+        label: "what shape the railing is in",
+        hint: "What shape is it in?",
+        ask: ["What shape is the railing in: fine, weathered, or peeling and rusty?", "How's the railing holding up: solid, weathered and gray, or peeling or rusting?"],
+        clarify: "Weathered wood needs washing and sanding. Peeling paint and rust need scraping, wire brushing and a rust-blocking primer first.",
+        example: "Say 'good', 'weathered' or 'peeling and rusty'.",
+        when: (c2) => c2.deck !== "yes",
+        // on a deck, the deck's own condition answer covers it
+        options: [
+          o("bad", "peeling/rusty", BAD, 1.4),
+          o("worn", "weathered", WORN, 1.2),
+          o("good", "good shape", GOOD, 1)
+        ]
+      }
+    ]
+  },
+  // ——————————————————————————————————— Fence
+  {
+    key: "fence",
+    thing: "fence",
+    present: (c2) => c2.fence === "yes",
+    lineKeys: ["fence"],
+    priority: 34.52,
+    questions: [
+      {
+        key: "material",
+        label: "what the fence is made of",
+        hint: "Wood, metal, vinyl, or block?",
+        ask: ["What's the fence made of: wood, metal or wrought iron, vinyl, or a block wall?", "Is it a wood fence, or metal, vinyl or block?"],
+        clarify: "Wood fences are the usual paint or stain job. Metal needs rust treatment, block needs masonry primer, and vinyl usually shouldn't be painted.",
+        example: "Say 'wood', 'wrought iron' or 'block wall'.",
+        when: (c2) => c2.fenceType !== "chain_link",
+        options: [
+          o("block", "block wall", /\b(?:block|cmu|cinder|masonry|brick|stucco)\b/, 1.3),
+          o("iron", "iron/metal", /\b(?:iron|metal|steel|alumin(?:um|ium))\b/, 1.1),
+          o("vinyl", "vinyl (usually not painted)", /\bvinyl|pvc|plastic\b/, 0.8),
+          o("wood", "wood", /\b(?:wood|wooden|cedar|redwood|pine|picket|privacy|board)\b/, 1)
+        ]
+      },
+      {
+        key: "now",
+        label: "what is on the fence now",
+        hint: "Bare, stained, or painted?",
+        ask: ["Is the wood bare, stained, or painted right now?", "What's on the fence now: nothing (bare wood), stain, or paint?"],
+        clarify: "New bare wood needs a seal coat (and time to dry out if it is brand new). Painted fences need scraping and sanding first, and stain going to paint needs primer.",
+        example: "Say 'bare gray wood', 'stained' or 'painted white'.",
+        when: (_c, a) => a.material === "wood" || a.material === void 0,
+        options: [
+          o("painted", "painted now (scrape and sand)", /\b(?:paint|painted|white)\b/, 1.2),
+          o("stained", "stained now", /\b(?:stain|stained|sealed|sealer)\b/, 1),
+          o("bare", "bare wood", /\b(?:bare|raw|new|unfinished|weathered|gr[ae]y|never)\b/, 1.1)
+        ]
+      },
+      {
+        key: "goal",
+        label: "whether you want the fence painted or stained",
+        hint: "Paint, or stain/seal?",
+        ask: ["Do you want the fence painted, or stained or sealed?", "Paint it, or stain and seal it?"],
+        clarify: "Stain and sealer soak into the wood and are quicker to apply. Paint covers completely, takes a primer coat and lasts differently.",
+        example: "Say 'paint' or 'stain'.",
+        when: (_c, a) => a.material === "wood" || a.material === void 0,
+        options: [
+          o("paint", "paint (primed)", /\b(?:paint|painted|primer|color|solid)\b/, 1.15),
+          o("stain", "stain/seal", /\b(?:stain|seal|sealer|sealant|clear|transparent|natural|waterproof)\b/, 0.9)
+        ]
+      },
+      {
+        key: "sides",
+        label: "whether one side or both sides of the fence are done",
+        hint: "One side, or both?",
+        ask: ["Do you want both sides of the fence done, or just your side?", "Both sides, or only the side you see?"],
+        clarify: "Both sides roughly doubles the work. A fence shared with a neighbor is often just your side.",
+        example: "Say 'both sides' or 'just my side'.",
+        options: [
+          o("both", "both sides", /\b(?:both|two sides|each side|all sides|inside and out)\b/, 1),
+          o("one", "one side only", /\b(?:one|just (?:my|our|the|this)|only (?:my|our|the|this)|my side|our side|front side|one side|single)\b/, 0.55)
+        ]
+      },
+      {
+        key: "condition",
+        label: "what shape the fence is in",
+        hint: "Fine, mildewed, or rotting?",
+        ask: ["What shape is it in: pretty good, gray and mildewy, or peeling with some loose or rotted boards?", "How's the fence holding up: fine, weathered, or falling apart in spots?"],
+        clarify: "Mildew and gray wood need a wash first. Peeling paint gets scraped, and rotted or loose boards need carpentry before painting.",
+        example: "Say 'pretty good', 'gray and mildewy' or 'some rotted boards'.",
+        options: [
+          o("bad", "peeling/rotted boards", BAD, 1.35),
+          o("worn", "needs a wash first", WORN, 1.15),
+          o("good", "good shape", GOOD, 1)
+        ]
+      },
+      {
+        key: "gates",
+        label: "how many gates the fence has",
+        hint: "How many gates?",
+        ask: ["How many gates does the fence have?", "Any gates in it, and how many?"],
+        clarify: "Each gate has two faces plus a frame and edges, so each one is priced on its own.",
+        example: "Say 'none', 'one' or 'three'.",
+        options: [
+          o("many", "3+ gates", /\b(?:three|3|four|4|five|5|several|many|a few)\b/, 1, { add: { description: "Fence gates (3 or more)", amount: 350, category: "Exterior" } }),
+          o("some", "1-2 gates", /\b(?:one|1|two|2|a gate|a couple|single|double)\b/, 1, { add: { description: "Fence gate(s)", amount: 140, category: "Exterior" } }),
+          o("none", "no gates", /\b(?:no|none|zero|nope|without)\b/, 1)
+        ]
+      }
+    ]
+  },
+  // ——————————————————————————————————— Front door
+  {
+    key: "entry_door",
+    thing: "front door",
+    present: (c2) => c2.entryDoor === "yes",
+    lineKeys: ["entry_door"],
+    priority: 34.91,
+    questions: [
+      {
+        key: "finish",
+        label: "what the front door is finished with now",
+        hint: "Painted or stained now?",
+        ask: ["Is the front door painted now, or is it stained or varnished wood?", "What's the front door's finish: paint, or a stain or varnish?"],
+        clarify: "A painted door is the simplest. Stained or varnished wood needs sanding, stripping and several coats of a weather-grade finish, so it takes two or three times as long.",
+        example: "Say 'painted', 'stained wood' or 'stained, and I want it painted'.",
+        options: [
+          o("stain_to_paint", "stained, going to paint", /\b(?:stain\w*|varnish\w*)\b.*\b(?:paint|painted|white|black)\b|\bpaint\b.*\b(?:over|instead)\b/, 1.8),
+          o("stain", "stained/varnished (refinish)", /\b(?:stain|stained|varnish|varnished|natural|wood grain|clear|refinish|stripped?)\b/, 2.2),
+          o("paint", "painted", /\b(?:paint|painted|fiberglass|steel|white|enamel)\b/, 1)
+        ]
+      },
+      {
+        key: "glass",
+        label: "whether the door has glass, sidelights or a transom",
+        hint: "Glass, sidelights, transom?",
+        ask: ["Does the door have glass, side windows (sidelights) or a transom window above it?", "Any glass in or around the door, like sidelights or a transom?"],
+        clarify: "Glass and sidelights have to be masked or cut in around, and each extra frame adds time.",
+        example: "Say 'no glass', 'a glass insert' or 'two sidelights'.",
+        options: [
+          o("sidelights", "sidelights/transom", /\b(?:sidelights?|side lights?|side windows?|transom)\b/, 1.5),
+          o("glass", "glass inserts", /\b(?:glass|window|panes?|lites?)\b/, 1.2),
+          o("none", "plain door", /\b(?:no|none|plain|solid|nope|just a door)\b/, 1)
+        ]
+      },
+      {
+        key: "double",
+        label: "whether it is a single or a double door",
+        hint: "Single or double door?",
+        ask: ["Is it a single door, or a double door?", "One door or a pair?"],
+        clarify: "A pair of doors is nearly twice the surface.",
+        example: "Say 'single' or 'double doors'.",
+        options: [
+          o("double", "double door", /\b(?:double|pair|two doors|french|both doors|2 doors)\b/, 1.8),
+          o("single", "single door", /\b(?:single|one|just one|regular|standard|1)\b/, 1)
+        ]
+      },
+      {
+        key: "sides",
+        label: "whether the inside of the door is painted too",
+        hint: "Outside only, or both sides?",
+        ask: ["Do you want just the outside of the door, or the inside and the frame as well?", "Outside face only, or both sides and the frame?"],
+        clarify: "The inside face, the edges and the frame count as real extra surface.",
+        example: "Say 'outside only' or 'both sides and the frame'.",
+        when: (c2) => !onHouse(c2),
+        options: [
+          o("both", "both sides and frame", /\b(?:both|inside|frame|jamb|all|everything|each side)\b/, 1),
+          o("outside", "outside face only", /\b(?:outside|exterior|just the front|one side|only|front)\b/, 0.65)
+        ]
+      },
+      {
+        key: "condition",
+        label: "what shape the front door is in",
+        hint: "Faded, peeling, or fine?",
+        ask: ["What shape is the door in: good, faded and sun-beaten, or peeling and damaged?", "How's the door holding up: fine, faded, or peeling?"],
+        clarify: "Sun-baked or peeling finish needs sanding and spot repair before any new coat will stick.",
+        example: "Say 'good', 'faded' or 'peeling'.",
+        when: (c2) => !onHouse(c2),
+        options: [
+          o("bad", "peeling/damaged", BAD, 1.4),
+          o("worn", "faded", WORN, 1.15),
+          o("good", "good shape", GOOD, 1)
+        ]
+      }
+    ]
+  },
+  // ——————————————————————————————————— Garage door
+  {
+    key: "garage_door",
+    thing: "garage door",
+    present: (c2) => c2.garageDoor !== "none",
+    lineKeys: ["garage_door"],
+    priority: 34.92,
+    questions: [
+      {
+        key: "material",
+        label: "what the garage door is made of",
+        hint: "Steel, wood, or other?",
+        ask: ["What's the garage door made of: steel, wood, aluminum or fiberglass?", "Is the garage door steel, wood, or something else?"],
+        clarify: "Steel is the most common and the simplest to paint. Wood needs more sanding and more coats.",
+        example: "Say 'steel' or 'wood'.",
+        options: [
+          o("wood", "wood", /\b(?:wood|wooden|cedar)\b/, 1.4),
+          o("other", "aluminum/fiberglass", /\b(?:alumin(?:um|ium)|fiberglass|vinyl|composite)\b/, 1),
+          o("steel", "steel", /\b(?:steel|metal|insulated|standard|normal)\b/, 1)
+        ]
+      },
+      {
+        key: "style",
+        label: "what style the garage door is",
+        hint: "Flat, paneled, or carriage?",
+        ask: ["Is the door flat, paneled, or carriage-style with trim and decorative hardware?", "What style: smooth and flat, raised panels, or carriage-house?"],
+        clarify: "Raised panels and carriage-style doors have a lot more edges and detail than a flat door.",
+        example: "Say 'paneled', 'flat' or 'carriage-house style'.",
+        when: (c2) => !onHouse(c2),
+        options: [
+          o("carriage", "carriage style", /\b(?:carriage|decorative|trim|hardware|windows?)\b/, 1.4),
+          o("panel", "paneled", /\b(?:panel|panels|paneled|raised)\b/, 1.15),
+          o("flat", "flat", /\b(?:flat|smooth|plain|simple)\b/, 1)
+        ]
+      },
+      {
+        key: "inside",
+        label: "whether the inside of the garage door is painted too",
+        hint: "Outside only, or inside too?",
+        ask: ["Do you want the inside of the garage door painted too, or only the outside?", "Just the outside face of the door, or the inside as well?"],
+        clarify: "The inside face is a whole extra side to paint.",
+        example: "Say 'outside only' or 'both sides'.",
+        options: [
+          o("both", "inside too", /\b(?:both|inside|each side|two sides|yes)\b/, 1.7),
+          o("outside", "outside only", /\b(?:outside|exterior|just the front|one side|only|no)\b/, 1)
+        ]
+      },
+      {
+        key: "condition",
+        label: "what shape the garage door is in",
+        hint: "Faded, peeling, or rusty?",
+        ask: ["What shape is it in: good, faded and chalky, or peeling and rusty?", "How's the garage door's finish: fine, faded, or peeling and rusting?"],
+        clarify: "Rust and peeling mean scraping, rust treatment and primer first.",
+        example: "Say 'faded', 'good' or 'peeling'.",
+        when: (c2) => !onHouse(c2),
+        options: [
+          o("bad", "peeling/rusty", BAD, 1.5),
+          o("worn", "faded/chalky", WORN, 1.1),
+          o("good", "good shape", GOOD, 1)
+        ]
+      }
+    ]
+  },
+  // ——————————————————————————————————— Outside shutters
+  {
+    key: "ext_shutters",
+    thing: "exterior shutters",
+    present: (c2) => c2.exteriorShutters === "yes",
+    lineKeys: ["ext_shutters"],
+    priority: 29.96,
+    questions: [
+      {
+        key: "style",
+        label: "what style the shutters are",
+        hint: "Louvered, panel, or plank?",
+        ask: ["Are the shutters louvered (slatted), solid panel, or board-and-batten?", "What style are the shutters: louvered, flat panel, or plank-style?"],
+        clarify: "Louvered shutters take about twice as long because every slat is painted individually.",
+        example: "Say 'louvered' or 'flat panel'.",
+        options: [
+          o("louvered", "louvered", /\b(?:louver\w*|slat\w*|blinds?)\b/, 1.7),
+          o("batten", "board-and-batten", /\b(?:board|batten|plank)\b/, 1.1),
+          o("panel", "panel", /\b(?:panel|panels|solid|flat|raised)\b/, 1)
+        ]
+      },
+      {
+        key: "material",
+        label: "what the shutters are made of",
+        hint: "Wood, vinyl, or composite?",
+        ask: ["What are the shutters made of: wood, vinyl, composite or aluminum?", "Wood shutters, or vinyl or composite?"],
+        clarify: "Vinyl and composite need paint made for them and lighter colors; wood is the usual paint job.",
+        example: "Say 'wood' or 'vinyl'.",
+        options: [
+          o("vinyl", "vinyl/composite", /\b(?:vinyl|composite|plastic|pvc|alumin(?:um|ium))\b/, 1),
+          o("wood", "wood", /\b(?:wood|wooden|cedar)\b/, 1.1)
+        ]
+      },
+      {
+        key: "height",
+        label: "whether the shutters are upstairs",
+        hint: "Ground floor, or upstairs?",
+        ask: ["Are the shutters all on the ground floor, or are some upstairs?", "Any shutters on a second floor?"],
+        clarify: "Upstairs shutters need ladder time.",
+        example: "Say 'all ground floor' or 'some upstairs'.",
+        when: (c2) => !onHouse(c2),
+        options: [
+          o("upper", "some upstairs", /\b(?:upstairs|second|2nd|upper|some|both|top|yes)\b/, 1.3),
+          o("ground", "ground floor", /\b(?:ground|first|downstairs|all|low|no)\b/, 1)
+        ]
+      },
+      {
+        key: "removal",
+        label: "whether the shutters can come off the house",
+        hint: "Take them off, or paint in place?",
+        ask: ["Can the shutters come off the house to be sprayed, or should they be painted in place?", "Okay to take the shutters down for painting, or do they stay up?"],
+        clarify: "Taking them off to spray is quicker and gives a smoother finish; painting in place is slower.",
+        example: "Say 'take them off' or 'paint in place'.",
+        when: (c2) => !onHouse(c2),
+        options: [
+          o("inplace", "painted in place", /\b(?:in place|on the house|stay|leave them|up|don'?t remove)\b/, 1),
+          o("off", "removed and sprayed", /\b(?:off|remove|take (?:them )?(?:down|off)|spray|yes|sure)\b/, 0.85)
+        ]
+      }
+    ]
+  },
+  // ——————————————————————————————————— Inside doors
+  {
+    key: "int_doors",
+    thing: "interior doors",
+    present: (c2) => c2.interiorDoors !== "none" && !!c2.doorsIncluded,
+    lineKeys: ["doors"],
+    priority: 29.915,
+    questions: [
+      {
+        key: "style",
+        label: "what style the doors are",
+        hint: "Flat, paneled, or glass?",
+        ask: ["What style are the doors: flat and smooth, paneled (raised or shaker), or French doors with glass panes?", "Are the doors plain flat slabs, paneled, or glass-pane French doors?"],
+        clarify: "Paneled doors take about a third more time than flat ones, and glass-pane doors take two to three times as long because every pane is cut in.",
+        example: "Say 'flat', 'six-panel' or 'French doors'.",
+        options: [
+          o("french", "French/glass-pane doors", /\b(?:french|glass|panes?|lites?|divided)\b/, 2.5),
+          o("mixed", "mix of door styles", /\b(?:mix|mixed|both|different|variety)\b/, 1.6),
+          o("panel", "paneled doors", /\b(?:panel\w*|shaker|raised|six[\s-]?panel|craftsman)\b/, 1.3),
+          o("flat", "flat doors", /\b(?:flat|smooth|plain|slab|hollow|simple)\b/, 1)
+        ]
+      },
+      {
+        key: "sides",
+        label: "whether both sides of the doors are painted",
+        hint: "Both sides, or one?",
+        ask: ["Both sides of each door and the edges, or just the room side?", "Do you want both faces of the doors done, or only one?"],
+        clarify: "Both sides plus the edges is the full price. One side only is about half.",
+        example: "Say 'both sides' or 'just the room side'.",
+        options: [
+          o("both", "both sides", /\b(?:both|each side|two sides|front and back|all|yes|edges)\b/, 1),
+          o("one", "one side only", /\b(?:one|just|only|room side|single)\b/, 0.6)
+        ]
+      }
+    ]
+  },
+  // ——————————————————————————————————— Windows
+  {
+    key: "windows",
+    thing: "windows",
+    present: (c2) => c2.interiorWindows !== "none" || c2.exteriorWindows !== "none",
+    lineKeys: ["windows", "ext_windows"],
+    priority: 29.925,
+    questions: [
+      {
+        key: "style",
+        label: "what style the windows are",
+        hint: "Plain panes, or many small panes?",
+        ask: ["What kind of windows are they: standard single or double-hung, or many small panes (divided lite), or large bay or bow windows?", "Are the windows plain, or divided into lots of small panes?"],
+        clarify: "Windows divided into small panes take two to four times as long as a plain window, because every pane is cut in separately.",
+        example: "Say 'standard', 'lots of small panes' or 'a big bay window'.",
+        options: [
+          o("divided", "divided-pane windows", /\b(?:divided|small panes?|muntin\w*|grids?|grilles?|many panes?|lots of panes|colonial|french|lites?)\b/, 2.5),
+          o("bay", "bay/bow windows", /\b(?:bay|bow|picture|large|big)\b/, 1.5),
+          o("standard", "standard windows", /\b(?:standard|regular|normal|plain|single|double[\s-]?hung|slider|casement|simple)\b/, 1)
+        ]
+      },
+      {
+        key: "material",
+        label: "what the window frames are made of",
+        hint: "Wood, vinyl, or aluminum?",
+        ask: ["What are the window frames made of: wood, vinyl, aluminum or clad?", "Wood frames, or vinyl or aluminum?"],
+        clarify: "Wood frames are the normal paint job. Vinyl and aluminum usually are not painted, or need a special bonding paint.",
+        example: "Say 'wood' or 'vinyl'.",
+        options: [
+          o("wood", "wood frames", /\b(?:wood|wooden)\b/, 1),
+          o("other", "vinyl/aluminum frames (special paint)", /\b(?:vinyl|alumin(?:um|ium)|clad|fiberglass)\b/, 1.15)
+        ]
+      },
+      {
+        key: "height",
+        label: "whether any windows are on an upper floor",
+        hint: "Ground floor, or upstairs?",
+        ask: ["Are all the windows on the ground floor, or are some on a second floor?", "Any windows upstairs that need a tall ladder?"],
+        clarify: "Second-floor windows outside mean ladder work, which adds about a quarter.",
+        example: "Say 'all ground floor' or 'half are upstairs'.",
+        when: (c2) => c2.exteriorWindows !== "none",
+        options: [
+          o("upper", "some upstairs", /\b(?:upstairs|second|2nd|upper|some|half|several|both|yes)\b/, 1.3),
+          o("ground", "ground floor", /\b(?:ground|first|downstairs|all|low|no)\b/, 1)
+        ]
+      }
+    ]
+  },
+  // ——————————————————————————————————— Gutters
+  {
+    key: "gutters",
+    thing: "gutters",
+    present: (c2) => c2.gutters === "yes",
+    lineKeys: ["gutters"],
+    priority: 34.93,
+    questions: [
+      {
+        key: "material",
+        label: "what the gutters are made of",
+        hint: "Aluminum, steel, copper, or vinyl?",
+        ask: ["What are the gutters made of: aluminum, steel, copper or vinyl?", "Are the gutters metal (aluminum or steel), copper, or vinyl?"],
+        clarify: "Aluminum and steel need a bonding primer. Copper is normally left alone (its green patina is the finish) and vinyl usually shouldn't be painted.",
+        example: "Say 'aluminum', 'steel' or 'vinyl'.",
+        options: [
+          o("steel", "steel/galvanized", /\b(?:steel|galvanized|iron)\b/, 1.15),
+          o("other", "copper/vinyl (special handling)", /\b(?:copper|vinyl|plastic)\b/, 1),
+          o("aluminum", "aluminum", /\b(?:alumin(?:um|ium)|metal|seamless)\b/, 1)
+        ]
+      },
+      {
+        key: "condition",
+        label: "what shape the gutters are in",
+        hint: "Fine, peeling, or rusty?",
+        ask: ["What shape are the gutters in: good, faded, or rusty and peeling?", "Are the gutters in good shape, or rusting and peeling?"],
+        clarify: "Rust gets wire-brushed and primed with a rust blocker before painting.",
+        example: "Say 'good', 'faded' or 'rusty'.",
+        when: (c2) => !onHouse(c2),
+        options: [
+          o("bad", "rusty/peeling", BAD, 1.3),
+          o("worn", "faded", WORN, 1.08),
+          o("good", "good shape", GOOD, 1)
+        ]
+      }
+    ]
+  },
+  // ——————————————————————————————————— A separate building (shed, barn, gazebo...)
+  {
+    key: "outbuilding",
+    thing: "separate building",
+    present: (c2) => !!c2.standaloneStructure,
+    lineKeys: ["ext_body"],
+    priority: 34.94,
+    questions: [
+      {
+        key: "siding",
+        label: "what the building is covered with",
+        hint: "Smooth, rough, or metal?",
+        ask: ["What's the outside of it: smooth lap siding, rough plywood (T1-11) or board-and-batten, or metal?", "What's the outside surface: smooth siding, rough-sawn plywood or board-and-batten, or metal or vinyl?"],
+        clarify: "Rough plywood and board-and-batten soak up 25 to 40 percent more paint and take more brushwork. Metal needs a bonding primer.",
+        example: "Say 'T1-11', 'smooth siding' or 'metal'.",
+        options: [
+          o("rough", "rough T1-11/board-and-batten", /\b(?:t1[\s-]?11|plywood|board|batten|rough|rustic|log|shake)\b/, 1.3),
+          o("metal", "metal", /\b(?:metal|steel|alumin(?:um|ium)|corrugated|tin)\b/, 1.1),
+          o("smooth", "smooth siding", /\b(?:smooth|lap|vinyl|stucco|hardie|plain|regular|standard)\b/, 1)
+        ]
+      },
+      {
+        key: "height",
+        label: "how tall the building is",
+        hint: "Under 10 feet, or taller?",
+        ask: ["How tall are the walls: under about ten feet, or taller than that?", "Is it a low building (ten feet or under), or taller?"],
+        clarify: "Anything over about ten feet needs extension ladders or a lift.",
+        example: "Say 'about 8 feet' or 'two stories tall'.",
+        options: [
+          o("tall", "over 10 ft tall", /\b(?:tall|two[\s-]?stor\w+|2[\s-]?stor\w+|loft|1[1-9]|2\d|over (?:ten|10)|higher|barn|high)\b/, 1.25),
+          o("low", "under 10 ft", /\b(?:under|low|short|single|one[\s-]?stor\w+|[5-9]|ten|10|small|standard)\b/, 1)
+        ]
+      },
+      {
+        key: "extras",
+        label: "what else on the building gets painted",
+        hint: "Outside only, or trim/inside too?",
+        ask: ["Is it just the outside walls, or also the trim and doors, or the inside as well?", "Outside walls only, or the trim, doors and inside too?"],
+        clarify: "Trim and doors are small add-ons. The inside is priced as its own set of walls.",
+        example: "Say 'outside only' or 'inside and out'.",
+        options: [
+          o("inside", "inside as well", /\b(?:inside|interior|in and out|both|everything|all)\b/, 1.5),
+          o("trim", "trim and doors too", /\b(?:trim|doors?|windows?|roof)\b/, 1.1),
+          o("outside", "outside walls only", /\b(?:outside|exterior|just|only|walls|no)\b/, 1)
+        ]
+      },
+      {
+        key: "condition",
+        label: "what shape the building is in",
+        hint: "Good, peeling, or rotting?",
+        ask: ["What shape is it in: good, peeling, or has some rot or mildew?", "How is the paint and wood holding up: fine, peeling, or rotting in spots?"],
+        clarify: "Peeling means scraping and priming, and rot has to be repaired before painting.",
+        example: "Say 'good', 'peeling' or 'some rot'.",
+        options: [
+          o("bad", "peeling/rot/mildew", BAD, 1.4),
+          o("worn", "worn/faded", WORN, 1.1),
+          o("good", "good shape", GOOD, 1)
+        ]
+      }
+    ]
+  },
+  // ——————————————————————————————————— Patio cover / overhang / pergola
+  {
+    key: "patio_cover",
+    thing: "patio cover",
+    present: (c2) => c2.overhangs === "yes",
+    lineKeys: ["overhangs"],
+    priority: 34.71,
+    questions: [
+      {
+        key: "structure",
+        label: "what kind of cover it is",
+        hint: "Solid, open slats, or beadboard?",
+        ask: ["Is it a solid ceiling, open slats and beams (like a pergola), or beadboard?", "Is the cover solid on top, open with slats, or a tongue-and-groove ceiling?"],
+        clarify: "Open slats and beams have four faces each, so they take longer than a flat solid ceiling for the same size.",
+        example: "Say 'solid', 'open slats' or 'beadboard'.",
+        options: [
+          o("open", "open slats/beams", /\b(?:open|slats?|beams?|rafters?|pergola|lattice|louver\w*)\b/, 1.6),
+          o("beadboard", "beadboard/tongue-and-groove", /\b(?:beadboard|bead board|tongue|groove|planks?)\b/, 1.3),
+          o("solid", "solid ceiling", /\b(?:solid|flat|plain|stucco|drywall|plaster)\b/, 1)
+        ]
+      },
+      {
+        key: "material",
+        label: "what the cover is made of",
+        hint: "Wood, stucco, or aluminum?",
+        ask: ["What's it made of: wood, stucco, or aluminum?", "Is the cover wood, stucco or aluminum?"],
+        clarify: "Aluminum covers are usually factory-finished and don't hold paint well. Stucco needs a masonry primer.",
+        example: "Say 'wood', 'stucco' or 'aluminum'.",
+        options: [
+          o("aluminum", "aluminum (special prep)", /\b(?:alumin(?:um|ium)|metal|vinyl)\b/, 1.3),
+          o("stucco", "stucco", /\bstucco|plaster\b/, 1.1),
+          o("wood", "wood", /\b(?:wood|wooden|cedar|redwood)\b/, 1)
+        ]
+      },
+      {
+        key: "height",
+        label: "how high the underside is",
+        hint: "About how high up is it?",
+        ask: ["About how high is the underside: under 9 feet, 9 to 12, or higher?", "How high is the ceiling of the cover?"],
+        clarify: "Overhead work is slower and needs taller ladders or scaffold the higher it goes.",
+        example: "Say 'about 8 feet' or '12 feet'.",
+        options: [
+          o("high", "over 12 ft high", /\b(?:1[3-9]|2\d|over (?:12|twelve)|very high|two[\s-]?stor\w+)\b/, 1.4),
+          o("mid", "9-12 ft high", /\b(?:9|10|11|12|nine|ten|eleven|twelve|medium|tall)\b/, 1.2),
+          o("low", "under 9 ft", /\b(?:[5-8]|eight|seven|low|short|standard|under)\b/, 1)
+        ]
+      },
+      {
+        key: "condition",
+        label: "what shape the cover is in",
+        hint: "Good, peeling, or stained?",
+        ask: ["What shape is it in: good, peeling paint, or stained wood you want painted?", "How does it look now: fine, peeling, or natural or stained wood?"],
+        clarify: "Peeling paint is scraped first, and stained wood needs primer before it can be painted.",
+        example: "Say 'good', 'peeling' or 'stained'.",
+        options: [
+          o("bad", "peeling or stained-to-paint", /\b(?:peel\w*|flak\w*|stain\w*|varnish\w*|bare|weathered|damaged|bad|rot\w*)\b/, 1.3),
+          o("good", "good shape", GOOD, 1)
+        ]
+      }
+    ]
+  },
+  // ——————————————————————————————————— Fireplace and mantel
+  {
+    key: "fireplace",
+    thing: "fireplace",
+    present: (c2) => has(c2, "fireplace") || c2.fireplaceType !== "",
+    lineKeys: ["fireplace"],
+    priority: 30.4,
+    questions: [
+      {
+        key: "material",
+        label: "what the fireplace is made of",
+        hint: "Brick, stone, or tile?",
+        ask: ["What's the fireplace made of: brick, stone, tile, or plaster?", "Is the fireplace brick, stone or tile?"],
+        clarify: "Brick is the usual one. Stone and tile can be painted, but they need a bonding primer and are less durable.",
+        example: "Say 'brick' or 'stone with a wood mantel'.",
+        options: [
+          o("tile", "stone/tile (bonding primer)", /\b(?:stone|tile|marble|granite|slate)\b/, 1.2),
+          o("plaster", "plaster/drywall", /\b(?:plaster|drywall|smooth|stucco)\b/, 0.9),
+          o("brick", "brick", /\b(?:brick|masonry)\b/, 1)
+        ]
+      },
+      {
+        key: "look",
+        label: "what look you want for the fireplace",
+        hint: "Paint, whitewash, or limewash?",
+        ask: ["What look do you want: solid paint, a whitewash, a soft limewash, or a German schmear (mortar wash)?", "Painted solid, whitewashed, limewashed, or German schmear?"],
+        clarify: "Solid paint is the simplest. Limewash and German schmear are more skilled techniques: schmear involves mortar work and is priced the highest.",
+        example: "Say 'just paint it white', 'limewash' or 'German schmear'.",
+        options: [
+          o("schmear", "German schmear", /\b(?:schmear|smear|mortar wash)\b/, 1.7),
+          o("limewash", "limewash", /\blime[\s-]?wash\b/, 1.4),
+          o("whitewash", "whitewash", /\bwhite[\s-]?wash\b/, 1.1),
+          o("paint", "solid paint", /\b(?:paint|painted|solid|white|black|color)\b/, 1)
+        ]
+      },
+      {
+        key: "height",
+        label: "how big the fireplace is",
+        hint: "Fireplace only, or to the ceiling?",
+        ask: ["How big is it: just the fireplace face, up to the mantel, or all the way to the ceiling?", "Is it only the fireplace itself, or does it run up to the ceiling?"],
+        clarify: "A full-height chimney breast is much more surface and needs a taller ladder.",
+        example: "Say 'just the front', 'up to the mantel' or 'floor to ceiling'.",
+        options: [
+          o("ceiling", "floor to ceiling", /\b(?:ceiling|floor to|full|whole wall|all the way|vaulted|chimney)\b/, 1.4),
+          o("face", "fireplace face only", /\b(?:face|front|just|only|mantel|small|surround)\b/, 1)
+        ]
+      },
+      {
+        key: "soot",
+        label: "whether the fireplace has soot staining",
+        hint: "Any soot or smoke staining?",
+        ask: ["Is there soot or smoke staining on it?", "Any black soot or smoke marks on the brick or surround?"],
+        clarify: "Soot has to be cleaned and sealed first, or it bleeds through the paint.",
+        example: "Say 'no', 'a little' or 'quite a bit'.",
+        options: [
+          o("heavy", "heavy soot (cleaning and sealing)", /\b(?:heavy|a lot|quite a bit|lots|bad|black|very|thick|yes)\b/, 1, { add: { description: "Fireplace soot cleaning and sealing", amount: 200 } }),
+          o("light", "light soot", /\b(?:light|little|some|slight|bit|minor)\b/, 1.05),
+          o("none", "no soot", /\b(?:no|none|clean|nope|not)\b/, 1)
+        ]
+      },
+      {
+        key: "firebox",
+        label: "whether the inside of the firebox is painted",
+        hint: "Paint the inside of the firebox?",
+        ask: ["Do you want the inside of the firebox painted too?", "Should the inside firebox be painted with heat-resistant paint?"],
+        clarify: "The firebox needs a special high-heat paint, usually black, priced separately.",
+        example: "Say 'yes' or 'no, leave the inside'.",
+        options: [
+          o("yes", "firebox painted (high-heat paint)", /^\W*(?:yes|yeah|yep|sure|please|inside too|do it)\b/, 1, { add: { description: "Firebox high-heat paint", amount: 175 } }),
+          o("no", "firebox left as is", /\b(?:no|nope|leave|skip|just)\b/, 1)
+        ]
+      }
+    ]
+  },
+  // ——————————————————————————————————— Exposed beams
+  {
+    key: "beams",
+    thing: "beams",
+    present: (c2) => has(c2, "beams"),
+    lineKeys: ["beams"],
+    priority: 30.5,
+    questions: [
+      {
+        key: "height",
+        label: "how high the ceiling is",
+        hint: "How high is the ceiling?",
+        ask: ["How high is the ceiling the beams are on: standard (8 to 9 feet), 10 to 12 feet, or higher or vaulted?", "About how tall is the ceiling where the beams are?"],
+        clarify: "Height is the biggest factor for beams: tall and vaulted ceilings need scaffolding or a lift.",
+        example: "Say 'about 9 feet', '12 feet' or 'vaulted'.",
+        options: [
+          o("vaulted", "high or vaulted (scaffold)", /\b(?:vaulted|cathedral|1[3-9]|2\d|very high|scaffold|lift|high)\b/, 1.7),
+          o("tall", "10-12 ft", /\b(?:10|11|12|ten|eleven|twelve|tall)\b/, 1.3),
+          o("standard", "standard height", /\b(?:8|9|eight|nine|standard|normal|regular)\b/, 1)
+        ]
+      },
+      {
+        key: "finish",
+        label: "what the beams are finished with and what you want",
+        hint: "Stained now? Paint, restain, or whitewash?",
+        ask: ["What do you want done with the beams: paint them, restain them, or whitewash them? And are they stained or painted now?", "Are the beams stained or painted now, and what's the plan: paint, restain or whitewash?"],
+        clarify: "Going from stained wood to paint needs a stain blocker and primer. Restaining means sanding. Whitewashing is a different technique.",
+        example: "Say 'stained now, paint them white', 'restain' or 'whitewash'.",
+        options: [
+          o("stain_to_paint", "stained, going to paint", /\b(?:stain\w*|dark|natural|wood)\b.*\b(?:paint|white|black)\b/, 1.35),
+          o("restain", "restain", /\b(?:re-?stain|stain)\b/, 1.3),
+          o("whitewash", "whitewash", /\bwhite[\s-]?wash|pickl\w*\b/, 1.2),
+          o("paint", "paint over paint", /\b(?:paint|painted|white|same)\b/, 1)
+        ]
+      },
+      {
+        key: "type",
+        label: "what the beams are",
+        hint: "Real wood, faux, or coffered?",
+        ask: ["Are they solid wood beams, faux hollow beams, or a coffered or tray ceiling?", "Real wood beams, faux beams, or a coffered ceiling?"],
+        clarify: "Faux beams are smooth and quicker; rough solid or reclaimed wood soaks up much more finish; coffered ceilings have lots of faces.",
+        example: "Say 'solid rough wood', 'faux' or 'coffered'.",
+        options: [
+          o("rough", "rough/reclaimed solid wood", /\b(?:rough|reclaimed|rustic|solid|real|hand[\s-]?hewn|rough[\s-]?sawn|wood)\b/, 1.2),
+          o("coffer", "coffered/tray", /\b(?:coffer\w*|tray)\b/, 1.2),
+          o("faux", "faux beams", /\b(?:faux|fake|hollow|foam|polyurethane|box|smooth)\b/, 0.85)
+        ]
+      }
+    ]
+  },
+  // ——————————————————————————————————— Brick and masonry
+  {
+    key: "brick",
+    thing: "brick",
+    present: (c2) => has(c2, "brick") || c2.brickSqft != null,
+    lineKeys: ["brick"],
+    priority: 30.6,
+    questions: [
+      {
+        key: "now",
+        label: "whether the brick has been painted before",
+        hint: "Raw, or painted before?",
+        ask: ["Has the brick been painted or sealed before, or is it raw brick?", "Is it bare brick, or has it been painted already?"],
+        clarify: "Raw brick takes whatever finish you like. Painted brick can't take limewash or whitewash without stripping, and peeling paint has to be scraped first.",
+        example: "Say 'raw brick', 'painted and in good shape' or 'painted and peeling'.",
+        options: [
+          o("peeling", "painted and peeling (scrape/strip)", /\b(?:peel\w*|flak\w*|sealed|failing|chip\w*)\b/, 1.3),
+          o("painted", "painted before", /\b(?:paint|painted|coat\w*)\b/, 1),
+          o("raw", "raw brick", /\b(?:raw|bare|unpainted|natural|never|original|exposed|no)\b/, 1)
+        ]
+      },
+      {
+        key: "condition",
+        label: "what condition the mortar and brick are in",
+        hint: "Any white powder or crumbling?",
+        ask: ["Any white powder, crumbling mortar or damp spots on it?", "Does the brick or mortar show white powder, crumbling or moisture?"],
+        clarify: "White powder (efflorescence) and crumbling mortar have to be cleaned and repaired first, or the paint fails.",
+        example: "Say 'no', 'a bit of white powder' or 'crumbling mortar'.",
+        options: [
+          o("bad", "crumbling mortar/moisture", /\b(?:crumbl\w*|damp|moist\w*|water|leak\w*|cracked|loose|bad|a lot)\b/, 1.35),
+          o("powder", "white powder (efflorescence) to clean", /\b(?:powder\w*|white|efflorescence|salt\w*|a bit|some|little)\b/, 1.15),
+          o("good", "sound", /\b(?:no|none|good|fine|clean|nope|solid)\b/, 1)
+        ]
+      },
+      {
+        key: "height",
+        label: "how high the brick is",
+        hint: "One story, or two plus chimney?",
+        ask: ["How high does the brick go: one story, two stories, or a chimney too?", "Is the brick on the ground floor only, or higher up or on a chimney?"],
+        clarify: "A second story or a chimney needs ladders or a lift and adds about half again.",
+        example: "Say 'just one story' or 'up the chimney'.",
+        when: (c2) => outside(c2),
+        options: [
+          o("tall", "second story or chimney", /\b(?:two|2|second|chimney|upper|tall|high|three|3)\b/, 1.5),
+          o("one", "one story", /\b(?:one|1|single|ground|low|first|short)\b/, 1)
+        ]
+      }
+    ]
+  },
+  // ——————————————————————————————————— Garage floor / epoxy
+  {
+    key: "epoxy",
+    thing: "epoxy floor",
+    present: (c2) => has(c2, "epoxy") || c2.epoxyGarageSqft != null,
+    lineKeys: ["epoxy"],
+    priority: 30.7,
+    questions: [
+      {
+        key: "now",
+        label: "what the floor is like now",
+        hint: "Bare, coated, or sealed?",
+        ask: ["What's the floor like now: bare concrete, an old coating or paint, or sealed?", "Is the concrete bare, painted or coated already, or sealed?"],
+        clarify: "An old coating has to be ground off first, and sealer stops new epoxy from bonding, so both add prep.",
+        example: "Say 'bare concrete', 'old epoxy peeling' or 'sealed'.",
+        options: [
+          o("coated", "old coating to remove", /\b(?:coat\w*|paint\w*|epoxy|peel\w*|old)\b/, 1.25),
+          o("sealed", "sealed (grind first)", /\b(?:seal\w*|stain\w*|polished)\b/, 1.1),
+          o("bare", "bare concrete", /\b(?:bare|raw|plain|new|unfinished|concrete)\b/, 1)
+        ]
+      },
+      {
+        key: "condition",
+        label: "what condition the concrete is in",
+        hint: "Cracks, pits, or oil stains?",
+        ask: ["Any cracks, pits, flaking spots or oil stains in the floor?", "How's the concrete itself: smooth, a few cracks, lots of cracks and pitting, or heavy oil stains?"],
+        clarify: "Cracks and pits have to be filled and ground smooth, and heavy oil has to be treated before anything will stick.",
+        example: "Say 'a few hairline cracks', 'lots of cracks' or 'oil stains'.",
+        options: [
+          o("many", "many cracks or pitting (repair)", /\b(?:many|lots|wide|spall\w*|pits?|pitted|pitting|bad|deep|large|big cracks)\b/, 1.4),
+          o("oil", "oil stains (degrease)", /\b(?:oil|grease|stains?|heavy)\b/, 1.2),
+          o("few", "a few cracks", /\b(?:few|some|hairline|small|minor|crack\w*|little)\b/, 1.15),
+          o("good", "smooth and sound", /\b(?:no|none|good|smooth|clean|fine|nope)\b/, 1)
+        ]
+      },
+      {
+        key: "finish",
+        label: "what epoxy finish you want",
+        hint: "Solid, flake, or metallic?",
+        ask: ["What finish do you want: a plain solid color, color flakes, or a metallic?", "Solid color, decorative flake, or metallic epoxy?"],
+        clarify: "Solid color is the basic system. Flake adds a broadcast and a topcoat, and metallic is the most involved.",
+        example: "Say 'solid gray', 'flake' or 'metallic'.",
+        when: (c2) => !c2.epoxyType,
+        options: [
+          o("metallic", "metallic epoxy", /\bmetallic\b/, 1.8),
+          o("flake", "flake system", /\b(?:flake\w*|chips?|speckle\w*|decorative|full system)\b/, 1.4),
+          o("solid", "solid color", /\b(?:solid|plain|basic|simple|one color|gray|grey)\b/, 1)
+        ]
+      },
+      {
+        key: "moisture",
+        label: "whether the floor gets damp",
+        hint: "Does the floor ever get damp?",
+        ask: ["Does the floor ever get damp, with white powder or damp patches after rain?", "Any moisture problems with the slab?"],
+        clarify: "Moisture coming up through the slab makes epoxy peel, so it needs a moisture-barrier primer.",
+        example: "Say 'no' or 'it gets damp sometimes'.",
+        options: [
+          o("damp", "damp slab (moisture barrier)", /\b(?:damp|moist\w*|wet|sometimes|yes|white powder|leak\w*|water)\b/, 1.2),
+          o("dry", "dry", /\b(?:no|dry|never|nope|fine|not)\b/, 1)
+        ]
+      }
+    ]
+  },
+  // ——————————————————————————————————— Built-ins and bookcases
+  {
+    key: "built_ins",
+    thing: "built-in shelving",
+    present: (c2) => has(c2, "built_ins") || c2.builtInCount != null,
+    lineKeys: ["built_ins"],
+    priority: 29.75,
+    questions: [
+      {
+        key: "now",
+        label: "what the built-ins are finished with now",
+        hint: "Painted, stained, or laminate?",
+        ask: ["Are the built-ins painted now, stained wood, or laminate?", "What are they finished with now: paint, stain, or laminate?"],
+        clarify: "Stained wood and laminate need degloss and a bonding primer before paint, which adds a quarter or so.",
+        example: "Say 'painted white', 'stained oak' or 'laminate'.",
+        options: [
+          o("stained", "stained/laminate (degloss and prime)", /\b(?:stain\w*|varnish\w*|laminate|melamine|thermofoil|oak|natural)\b/, 1.25),
+          o("painted", "painted now", /\b(?:paint\w*|white|enamel|mdf)\b/, 1)
+        ]
+      },
+      {
+        key: "shape",
+        label: "what the built-ins are like",
+        hint: "Open shelves, or doors too?",
+        ask: ["Are they open shelves only, or do they have doors and drawers too?", "Just shelves, or shelves with cabinet doors and drawers?"],
+        clarify: "Every shelf has five faces plus the back, and each door or drawer front is priced like a cabinet door.",
+        example: "Say 'open shelves' or 'shelves with doors at the bottom'.",
+        options: [
+          o("doors", "shelves plus doors/drawers", /\b(?:doors?|drawers?|cabinet\w*|both)\b/, 1.3),
+          o("open", "open shelves", /\b(?:open|shelves|shelf|just|only|bookcase)\b/, 1)
+        ]
+      },
+      {
+        key: "height",
+        label: "how tall the built-ins are",
+        hint: "Standard height, or floor to ceiling?",
+        ask: ["How tall are they: standard height, or floor to ceiling with a ladder needed?", "Do they go up past what a normal ladder reaches?"],
+        clarify: "Anything above about eight feet means ladder work.",
+        example: "Say 'about 6 feet' or 'floor to ceiling'.",
+        options: [
+          o("tall", "floor to ceiling", /\b(?:ceiling|tall|high|floor to|10|9|ladder|over (?:8|eight))\b/, 1.15),
+          o("standard", "standard height", /\b(?:standard|normal|short|[3-7]|six|five|four|low)\b/, 1)
+        ]
+      }
+    ]
+  },
+  // ——————————————————————————————————— Furniture
+  {
+    key: "furniture",
+    thing: "furniture",
+    present: (c2) => c2.furnitureItems.length > 0,
+    lineKeys: ["furniture"],
+    priority: 29.97,
+    questions: [
+      {
+        key: "material",
+        label: "what the furniture is made of",
+        hint: "Solid wood, veneer, laminate, or metal?",
+        ask: ["What's it made of: solid wood, veneer, laminate (like a flat-pack piece), or metal?", "Is the furniture solid wood, veneer, laminate or metal?"],
+        clarify: "Veneer is thin and can't be stripped hard. Laminate needs a bonding primer, and metal needs rust treatment and a metal primer.",
+        example: "Say 'solid oak', 'veneer', 'laminate' or 'wrought iron'.",
+        options: [
+          o("metal", "metal (rust treatment, metal primer)", /\b(?:metal|iron|steel|alumin(?:um|ium)|wrought)\b/, 1.25),
+          o("laminate", "laminate (bonding primer)", /\b(?:laminate|particle\s?board|mdf|melamine|ikea|flat[\s-]?pack|thermofoil)\b/, 1.25),
+          o("veneer", "veneer", /\bveneer\b/, 1),
+          o("wood", "solid wood", /\b(?:solid|wood|wooden|oak|pine|maple|cherry|walnut|teak|cedar)\b/, 1)
+        ]
+      },
+      {
+        key: "detail",
+        label: "how detailed the furniture is",
+        hint: "Plain, or carved with spindles?",
+        ask: ["Is it plain, or does it have carvings, spindles or lots of detail?", "Smooth and simple, or lots of spindles and carved detail?"],
+        clarify: "Spindles and carving take a lot of brush time, so heavily detailed pieces are priced higher.",
+        example: "Say 'plain', 'some detail' or 'heavy carving'.",
+        options: [
+          o("heavy", "heavy carving or spindles", /\b(?:heavy|carv\w*|spindles?|ornate|intricate|lots|detailed|fancy)\b/, 1.5),
+          o("some", "some detail", /\b(?:some|bit|little|moderate|trim|routed)\b/, 1.2),
+          o("plain", "plain", /\b(?:plain|simple|smooth|flat|modern|no|clean)\b/, 1)
+        ]
+      },
+      {
+        key: "where",
+        label: "whether the furniture lives outside",
+        hint: "Indoor, or outdoor use?",
+        ask: ["Does it live inside the house, or out on a patio or deck?", "Is it used inside, or outside in the weather?"],
+        clarify: "Outdoor pieces need an exterior-grade finish and more prep for weathering.",
+        example: "Say 'inside' or 'it's patio furniture'.",
+        when: (c2) => c2.projectType !== "interior" || c2.furnitureItems.some((i2) => /lounger|bench|table_dining|chair/.test(i2)),
+        options: [
+          o("outdoor", "outdoor use (exterior-grade finish)", /\b(?:outdoor|outside|patio|deck|garden|porch|yard|pool)\b/, 1.2),
+          o("indoor", "kept inside", /\b(?:indoor|inside|house|living|bedroom|kitchen|dining room)\b/, 1)
+        ]
+      }
+    ]
+  },
+  // ——————————————————————————————————— Closets
+  {
+    key: "closets",
+    thing: "closets",
+    present: (c2) => c2.closets !== "none",
+    lineKeys: ["closets"],
+    priority: 29.935,
+    questions: [
+      {
+        key: "shelves",
+        label: "what the closet shelving is",
+        hint: "Wire, wood, or laminate shelves?",
+        ask: ["What are the closet shelves: wire, wood, or laminate?", "Wire shelving, wood shelves, or laminate?"],
+        clarify: "Wire shelving is slow to paint and often not worth it; wood shelves are normal; laminate needs a bonding primer.",
+        example: "Say 'wire', 'wood' or 'laminate'.",
+        options: [
+          o("laminate", "laminate shelves", /\b(?:laminate|melamine|white shelves)\b/, 1.3),
+          o("wood", "wood shelves", /\b(?:wood|wooden|shelves)\b/, 1.2),
+          o("wire", "wire shelving (left alone)", /\b(?:wire|rod|none|no shelves|just a rod)\b/, 1)
+        ]
+      },
+      {
+        key: "contents",
+        label: "whether the closets are empty",
+        hint: "Empty, or full of stuff?",
+        ask: ["Will the closets be emptied for the painters, or will we work around clothes and shelves?", "Empty closets, or full?"],
+        clarify: "A full closet has to be masked and cut in around, which adds a lot of time.",
+        example: "Say 'empty' or 'full of stuff'.",
+        options: [
+          o("full", "full (work around contents)", /\b(?:full|clothes|stuff|work around|not empty|contents|items)\b/, 1.3),
+          o("empty", "empty", /\b(?:empty|cleared|nothing|will empty|vacant|yes)\b/, 1)
+        ]
+      }
+    ]
+  }
+];
+
+// src/lib/chatEstimator/itemInterviews.ts
+var SPECS = ITEM_SPECS;
+var itemTopicId = (spec, q) => `item_${spec.key}_${q.key}`;
+function answersFor(ctx, specKey) {
+  const out = {};
+  for (const [k, v] of Object.entries(ctx.itemAnswers ?? {})) if (k.startsWith(specKey + ".")) out[k.slice(specKey.length + 1)] = v;
+  return out;
+}
+var seedOf = (c2) => `${c2.zipCode}|${c2.projectType}|${c2.squareFeet}|${Object.keys(c2.itemAnswers ?? {}).length}|${c2.responseLengths.join(",")}`;
+function pick(variants, seedStr) {
+  let h = 0;
+  for (let i2 = 0; i2 < seedStr.length; i2++) h = h * 31 + seedStr.charCodeAt(i2) >>> 0;
+  return variants[h % variants.length];
+}
+function itemTopics() {
+  const topics = [];
+  for (const spec of SPECS) {
+    spec.questions.forEach((q, i2) => {
+      const id = itemTopicId(spec, q);
+      topics.push({
+        id,
+        priority: spec.priority + i2 * 1e-3,
+        relevant: (c2) => spec.present(c2) && (!q.when || q.when(c2, answersFor(c2, spec.key))),
+        alreadyAnswered: (c2) => (c2.itemAnswers ?? {})[`${spec.key}.${q.key}`] != null || (c2.extAnswered ?? []).includes(id),
+        ask: (c2) => pick(q.ask, seedOf(c2)),
+        clarify: () => q.clarify,
+        example: () => q.example
+      });
+    });
+  }
+  return topics;
+}
+function locate(topicId) {
+  if (!topicId || !topicId.startsWith("item_")) return null;
+  for (const spec of SPECS) for (const q of spec.questions) if (itemTopicId(spec, q) === topicId) return { spec, q };
+  return null;
+}
+var itemTopicLabel = (topicId) => locate(topicId)?.q.label ?? null;
+var itemTopicHint = (topicId) => locate(topicId)?.q.hint ?? null;
+function readItemAnswers(text, ctx, askedId) {
+  const low = text.toLowerCase();
+  const answers = { ...ctx.itemAnswers ?? {} };
+  const acks = [];
+  let changed = false;
+  let extra = {};
+  const set = (spec, q, o2) => {
+    const k = `${spec.key}.${q.key}`;
+    if (answers[k] != null) return;
+    answers[k] = o2.value;
+    acks.push(o2.label);
+    if (o2.ctxPatch) extra = { ...extra, ...o2.ctxPatch };
+    changed = true;
+  };
+  const question = text.trim().endsWith("?");
+  if (question) return { patch: {}, acks };
+  const asked = locate(askedId);
+  if (asked && answers[`${asked.spec.key}.${asked.q.key}`] == null) {
+    const o2 = asked.q.options.find((opt) => opt.match.test(low));
+    if (o2) set(asked.spec, asked.q, o2);
+  }
+  for (const spec of SPECS) {
+    if (!spec.present(ctx)) continue;
+    for (const q of spec.questions) {
+      if (answers[`${spec.key}.${q.key}`] != null) continue;
+      const o2 = q.options.find((opt) => opt.said && opt.said.test(low));
+      if (o2) set(spec, q, o2);
+    }
+  }
+  return changed ? { patch: { ...extra, itemAnswers: answers }, acks } : { patch: {}, acks };
+}
+function itemDismissal(topicId, ctx) {
+  const hit = locate(topicId);
+  if (!hit) return null;
+  const o2 = hit.q.dismissive && hit.q.options.find((opt) => opt.value === hit.q.dismissive) || hit.q.options.reduce((best, opt) => (opt.mult ?? 1) > (best.mult ?? 1) ? opt : best, hit.q.options[0]);
+  return { patch: { ...o2.ctxPatch ?? {}, itemAnswers: { ...ctx.itemAnswers ?? {}, [`${hit.spec.key}.${hit.q.key}`]: o2.value } }, label: o2.label };
+}
+function applyItemAnswers(lines, ctx, regionalMult) {
+  const extra = [];
+  for (const spec of SPECS) {
+    if (!spec.present(ctx)) continue;
+    const answers = answersFor(ctx, spec.key);
+    let mult = 1;
+    const notes = [];
+    for (const q of spec.questions) {
+      const v = answers[q.key];
+      const o2 = v != null ? q.options.find((opt) => opt.value === v) : void 0;
+      if (!o2) continue;
+      if (o2.mult && o2.mult !== 1) {
+        mult *= o2.mult;
+        notes.push(o2.label);
+      }
+      if (o2.add) extra.push({ category: o2.add.category ?? "Prep Work", description: o2.add.description, amount: o2.add.amount * regionalMult, key: `${spec.key}_${q.key}` });
+    }
+    if (mult === 1) continue;
+    for (const line of lines) {
+      if (!line.key || !spec.lineKeys.includes(line.key)) continue;
+      line.amount *= mult;
+      line.description += ` \u2014 ${notes.join(", ")}`;
+    }
+  }
+  return [...lines, ...extra];
+}
 
 // src/lib/estimateEngine.ts
 var CABINET_FINISH_MULTIPLIER = { painted: 1, primed: 0.93, bare_wood: 1.18, stained: 1.25, laminate: 1.28 };
@@ -19493,12 +20654,22 @@ function calculateEstimate(ctx) {
     if (ctx.deck === "yes" && !off("deck")) {
       const deckSizes = { small: 100, medium: 250, large: 450 };
       const deckSqft = ctx.deckSqft || deckSizes[ctx.deckSize] || deckSizes.medium;
+      const conditionFactor = ctx.deckCondition === "weathered" ? 1.15 : ctx.deckCondition === "peeling" ? 1.4 : ctx.deckCondition === "rotted" ? 1.4 : 1;
+      const conditionNote = ctx.deckCondition === "weathered" ? ", weathered wood" : ctx.deckCondition === "peeling" ? ", strip and sand" : ctx.deckCondition === "rotted" ? ", board repair" : "";
+      const deckRate = RESOLVED_BASE_RATES.exterior.deck_stain_per_sqft * regionalMult * conditionFactor;
       lineItems.push({
         category: "Exterior",
-        description: ctx.deckSqft ? `Deck (${deckSqft} sq ft)` : "Deck",
-        amount: deckSqft * RESOLVED_BASE_RATES.exterior.deck_stain_per_sqft * regionalMult,
+        description: ctx.deckSqft ? `Deck (${deckSqft} sq ft${conditionNote})` : "Deck",
+        amount: deckSqft * deckRate,
         key: "deck"
       });
+      if (ctx.deckCondition === "rotted") {
+        lineItems.push({ category: "Prep Work", description: "Deck Board Repair Allowance", amount: Math.max(250, deckSqft * 1.25) * regionalMult, key: "deck_repair" });
+      }
+      if (ctx.deckUnderside === "yes" && (ctx.deckLevel === "raised" || ctx.deckLevel === "second_story")) {
+        lineItems.push({ category: "Exterior", description: `Deck Underside (${deckSqft} sq ft)`, amount: deckSqft * deckRate * 0.65, key: "deck_underside" });
+        lineItems.push({ category: "Access", description: ctx.deckLevel === "second_story" ? "Scaffold / Lift Access (second-story deck)" : "Ladder & Scaffold Access (raised deck)", amount: (ctx.deckLevel === "second_story" ? 400 : 150) * regionalMult, key: "deck_access" });
+      }
     }
     if (ctx.fence === "yes" && !off("fence")) {
       const fenceFt = ctx.fenceLinearFeet || 100;
@@ -19672,11 +20843,11 @@ function calculateEstimate(ctx) {
     });
   }
   if (ctx.projectType === "interior" || ctx.projectType === "both") {
-    const has2 = (k) => lineItems.some((l) => l.key === k);
+    const has3 = (k) => lineItems.some((l) => l.key === k);
     const surfaces = ["walls", "ceilings", "trim"];
-    const included = surfaces.filter(has2);
+    const included = surfaces.filter(has3);
     const takenOff = surfaces.filter((s) => ctx.excludedItems.includes(s));
-    const wallsMissing = !has2("walls") && ctx.interiorWalls === "no";
+    const wallsMissing = !has3("walls") && ctx.interiorWalls === "no";
     if (included.length > 0 && (takenOff.length > 0 || wallsMissing)) {
       const base = lineItems.filter((l) => l.key && surfaces.includes(l.key)).reduce((s, l) => s + l.amount, 0);
       const extra = base * Math.min(0.09, 0.03 * Math.max(takenOff.length, 1) + (wallsMissing ? 0.03 : 0));
@@ -19690,6 +20861,7 @@ function calculateEstimate(ctx) {
       if (inside(lineItems[i2])) lineItems[i2] = { ...lineItems[i2], amount: lineItems[i2].amount * scale, description: `${lineItems[i2].description} x ${unitsPainted} units` };
     }
   }
+  lineItems.splice(0, lineItems.length, ...applyItemAnswers(lineItems, ctx, regionalMult));
   let subtotal = lineItems.reduce((sum, item) => sum + item.amount, 0);
   const minCharge = MIN_JOB_CHARGE * regionalMult;
   if (subtotal < minCharge) {
@@ -20178,6 +21350,10 @@ var TOPIC_LABEL = {
   fence_size: "how long and how tall the fence is",
   fence_height: "how tall the fence is",
   deck_size: "how big the deck is",
+  ext_deck_level: "whether the deck is on the ground or raised",
+  ext_deck_underside: "whether the deck underside is painted",
+  ext_deck_railings: "whether the deck has railings",
+  ext_deck_condition: "what shape the deck is in",
   overhang_size: "how big the overhang or patio cover is",
   ext_extras: "whether a fence, deck or patio cover is painted too",
   ext_extras_which: "which of the fence, deck or patio cover",
@@ -20202,7 +21378,7 @@ var TOPIC_LABEL = {
 };
 function topicLabel(id, itemsOnly = false) {
   if (itemsOnly && id === "timeline_and_access") return "your timing";
-  return id && TOPIC_LABEL[id] || "that";
+  return id && (TOPIC_LABEL[id] || itemTopicLabel(id)) || "that";
 }
 function recentRecognized(history, max = 6) {
   const seen = /* @__PURE__ */ new Set();
@@ -20342,6 +21518,7 @@ function defaultAssumptions(ctx) {
     if (ctx.fenceLinearFeet == null) guess("Fence length assumed (100 ft)", "You did not give the length of the fence.");
     if (ctx.fenceHeightFt == null && ctx.fenceType !== "chain_link") guess("Fence height assumed (" + (ctx.fenceType === "picket_4ft" ? "4" : "6") + " ft)", "You did not give the height of the fence, so the usual height for that kind of fence is priced.");
   }
+  if (ctx.deck === "yes" && ctx.deckLevel === "" && ctx.deckCondition === "") guess("Deck priced as sound and at ground level", "You did not say how high the deck is or what shape it is in, so it is priced as a sound deck on the ground, top surface only.");
   if (ctx.deck === "yes" && ctx.deckSqft == null) guess("Deck size assumed", "You did not give the size of the deck, so a " + (ctx.deckSize || "medium") + " deck is priced.");
   if (ctx.overhangs === "yes" && ctx.overhangSqft == null) guess("Overhang size estimated", "You did not give the size of the overhang or patio cover, so it is estimated from the footprint of the house.");
   if (ctx.railings === "yes" && ctx.stairRailFeet == null) guess("Railing length estimated", "You did not give the length of the railing, so it is estimated from the size of the house.");
@@ -20585,7 +21762,7 @@ function matchesContext(needle, haystack) {
 
 // src/lib/chatEstimator/intents.ts
 init_define_import_meta_env();
-function has(t2, ...patterns) {
+function has2(t2, ...patterns) {
   return patterns.some(
     (p2) => typeof p2 === "string" ? t2.includes(p2) : p2.test(t2)
   );
@@ -20598,7 +21775,7 @@ function classifyIntent(rawText) {
   if (/^(hi|hey|hello|yo|howdy|good (morning|afternoon|evening)|sup)\b[.!?,]*$/i.test(t2)) {
     intents.push("greeting");
   }
-  if (has(
+  if (has2(
     t2,
     "start over",
     "restart",
@@ -20616,7 +21793,7 @@ function classifyIntent(rawText) {
   )) {
     intents.push("restart");
   }
-  if (has(
+  if (has2(
     t2,
     /\bhow\s+much\s+(do|does|is|will).*(cost|charge|pay|run)/,
     /\bwhat('?s|\s+is)?\s+the\s+cost/,
@@ -20626,7 +21803,7 @@ function classifyIntent(rawText) {
   )) {
     intents.push("meta_cost");
   }
-  if (has(
+  if (has2(
     t2,
     /\bhow\s+does\s+this\s+work/,
     /\bwhat\s+is\s+this\b/,
@@ -20636,7 +21813,7 @@ function classifyIntent(rawText) {
   )) {
     intents.push("meta_how_it_works");
   }
-  if (has(
+  if (has2(
     t2,
     /\bam\s+i\s+talking\s+to\s+a\s+(bot|robot|person|human)/,
     /\bare\s+you\s+(a\s+)?(bot|ai|robot|real|human)/,
@@ -20650,16 +21827,16 @@ function classifyIntent(rawText) {
       intents.push("meta_bot_check");
     }
   }
-  if (!intents.includes("meta_real_person") && has(t2, /\b(speak|talk)\s+to\s+(a\s+)?(real|human|person|someone|isaac)/, /\bcall\s+me\b/, /\bphone\s+number\b/)) {
+  if (!intents.includes("meta_real_person") && has2(t2, /\b(speak|talk)\s+to\s+(a\s+)?(real|human|person|someone|isaac)/, /\bcall\s+me\b/, /\bphone\s+number\b/)) {
     intents.push("meta_real_person");
   }
-  if (has(t2, /\bhow\s+long\s+(does|will)\s+this\s+take/, /\bhow\s+long\s+will\s+i\s+be\s+here/)) {
+  if (has2(t2, /\bhow\s+long\s+(does|will)\s+this\s+take/, /\bhow\s+long\s+will\s+i\s+be\s+here/)) {
     intents.push("meta_time");
   }
-  if (has(t2, /\bwhere\s+does\s+my\s+(info|information|data)\s+go/, /\bwho\s+sees\s+this/, /\bis\s+this\s+private/)) {
+  if (has2(t2, /\bwhere\s+does\s+my\s+(info|information|data)\s+go/, /\bwho\s+sees\s+this/, /\bis\s+this\s+private/)) {
     intents.push("meta_privacy");
   }
-  if (has(
+  if (has2(
     t2,
     /\bwho('?s|\s+is)\s+(going\s+to|gonna)\s+(do|paint)/,
     /\bcan\s+i\s+(pick|choose)\s+(the|a)\s+painter/,
@@ -20667,7 +21844,7 @@ function classifyIntent(rawText) {
   )) {
     intents.push("painter_question");
   }
-  if (has(
+  if (has2(
     t2,
     /\bhow\s+do\s+i\s+book/,
     /\bhow\s+do\s+i\s+(lock|reserve)/,
@@ -20676,13 +21853,13 @@ function classifyIntent(rawText) {
   )) {
     intents.push("booking_question");
   }
-  if (has(t2, /\bwhat\s+color/, /\bwhat\s+colors?\s+(do|should|would)/, /\bcolor\s+(advice|suggestion|ideas?|recommend)/)) {
+  if (has2(t2, /\bwhat\s+color/, /\bwhat\s+colors?\s+(do|should|would)/, /\bcolor\s+(advice|suggestion|ideas?|recommend)/)) {
     intents.push("color_question");
   }
-  if (has(t2, /\bwhat\s+(do|would)\s+you\s+recommend/, /\byour\s+recommendation/, /\bwhat\s+should\s+i/)) {
+  if (has2(t2, /\bwhat\s+(do|would)\s+you\s+recommend/, /\byour\s+recommendation/, /\bwhat\s+should\s+i/)) {
     intents.push("recommend_question");
   }
-  if (has(
+  if (has2(
     t2,
     /^like\s+what/,
     /^what\s+do\s+you\s+mean/,
@@ -20695,10 +21872,10 @@ function classifyIntent(rawText) {
   )) {
     intents.push("ask_clarification");
   }
-  if (has(t2, /^example/, /\bgive\s+me\s+(an\s+)?example/, /\blike\s+(what|how)\b.*\?$/, /^such\s+as\??$/, /^e\.?g\b/)) {
+  if (has2(t2, /^example/, /\bgive\s+me\s+(an\s+)?example/, /\blike\s+(what|how)\b.*\?$/, /^such\s+as\??$/, /^e\.?g\b/)) {
     intents.push("ask_example");
   }
-  if (has(
+  if (has2(
     t2,
     /\bdoes\s?n'?t\s+(?:really\s+)?matter\b/,
     /\bdon'?t\s+(?:really\s+)?matter\b/,
@@ -20719,7 +21896,7 @@ function classifyIntent(rawText) {
   )) {
     intents.push("dismissive");
   }
-  if (has(
+  if (has2(
     t2,
     /\bnot\s+sure\b/,
     /\bi\s+don'?t\s+know\b/,
@@ -20732,7 +21909,7 @@ function classifyIntent(rawText) {
   )) {
     intents.push("express_uncertainty");
   }
-  if (has(
+  if (has2(
     t2,
     /\bjust\s+give\s+me\s+a\s+(ballpark|rough|quick)/,
     /\bsend\s+(it|me)\s+(to|via|by)?\s*email/,
@@ -20742,7 +21919,7 @@ function classifyIntent(rawText) {
   )) {
     intents.push("deflection");
   }
-  if (has(
+  if (has2(
     t2,
     /\bthat'?s\s+(it|all|everything)\b/,
     /\bnothing\s+else\b/,
@@ -20757,7 +21934,7 @@ function classifyIntent(rawText) {
       intents.push("ready_to_finish");
     }
   }
-  if (has(
+  if (has2(
     t2,
     /\bjust\s+(the\s+)?(walls?|ceiling|trim|doors?|bedrooms?|rooms?)\b/,
     /\bonly\s+(the\s+)?(walls?|ceiling|trim|doors?|bedrooms?|rooms?)\b/,
@@ -20773,7 +21950,7 @@ function classifyIntent(rawText) {
   if (/^(yes|yeah|yep|yup|sure|ok(ay)?|sounds good|correct|right|that'?s right|exactly)[\s.!?,]*$/i.test(t2)) {
     intents.push("confirmation");
   }
-  if (has(
+  if (has2(
     t2,
     /\bthis\s+is\s+(stupid|dumb|ridiculous|pointless|annoying)\b/,
     /\byou'?re\s+not\s+listening\b/,
@@ -20788,7 +21965,7 @@ function classifyIntent(rawText) {
   )) {
     intents.push("frustration");
   }
-  if (has(
+  if (has2(
     t2,
     /\bi\s+(?:already|just)\s+(?:told|said|answered|gave)\b/,
     /\bi\s+said\s+that\s+(?:already|before)?\b/,
@@ -20803,7 +21980,7 @@ function classifyIntent(rawText) {
   )) {
     intents.push("already_answered");
   }
-  if (intents.length === 0 && has(t2, /\bweather\b/, /\bhow('?s|\s+are)\s+you\b/, /\bwhat'?s\s+up\b/)) {
+  if (intents.length === 0 && has2(t2, /\bweather\b/, /\bhow('?s|\s+are)\s+you\b/, /\bwhat'?s\s+up\b/)) {
     intents.push("off_topic");
   }
   if (intents.length === 0) {
@@ -20821,7 +21998,7 @@ function derive(ctx, transcript) {
   const t2 = transcript.toLowerCase();
   const out = [];
   const mentionsHomeOffice = /\boffice\b(?!\s*(?:building|complex|tower|park|space|suite))/.test(t2) && !/\bcommercial\b/.test(t2);
-  const mentionsIndoorRoom = /\b(room|rooms|bedroom|bathroom|kitchen|living room|dining|hallway|closet|pantry|nursery|den|foyer|mudroom|laundry room|apartment|apt\.?|condo(?:minium)?|duplex|rental unit|the unit|my unit|staircase|stairway|stairs|stairwell|door frames?|door jambs?|cabinets?|cabinet interiors?|vanity|vanities|wainscoting|crown molding|chair rail|baseboards?|fireplace|mantel|built[\s-]?ins?|attic|basement|popcorn ceiling)\b/.test(
+  const mentionsIndoorRoom = /\b(room|rooms|bedroom|bathroom|kitchen|living room|dining|hallway|closet|pantry|nursery|den|foyer|mudroom|laundry room|apartment|apt\.?|condo(?:minium)?|duplex|rental unit|the unit|my unit|staircase|stairway|stairs|stari|stairwell|door frames?|door jambs?|cabinets?|cabinet interiors?|vanity|vanities|wainscoting|crown molding|chair rail|baseboards?|fireplace|mantel|built[\s-]?ins?|attic|basement|popcorn ceiling)\b/.test(
     t2
   ) || mentionsHomeOffice;
   const windowFramesIndoors = mentionsIndoorRoom && !/\b(exterior|outside|outdoors?|siding|stucco)\b/.test(t2);
@@ -21045,7 +22222,11 @@ function derive(ctx, transcript) {
   const tNeg = t2.replace(negRe, " ");
   const hasOnly = hasScopeLimiter(t2);
   const mentionsSurfaceWords = /\b(walls?|ceilings?|whole|entire|every room|all (?:the )?rooms|throughout|bedrooms?|living room|kitchen walls)\b/.test(tNeg);
-  const railWords = /\b(stair(?:s|case|way)?\s*(?:rail(?:ing)?s?|banisters?)|banisters?|bannisters?|balusters?|spindles?|handrails?|stair rail)\b/.test(t2);
+  const railWords = /\b((?:stair(?:s|case|way)?|stari)\s*(?:rail(?:ing)?s?|banisters?)|banisters?|bannisters?|balusters?|spindles?|handrails?|stair rail)\b/.test(t2);
+  const soloFeature = /\b(?:fireplace|mantel|hearth|epoxy|garage floor)\b/.test(tNeg) && !/\b(?:walls?|ceilings?|trim|baseboards?|doors?|rooms?|bedrooms?|whole|entire|house|kitchen|living|bathroom|exterior|outside)\b/.test(tNeg.replace(/\bgarage\b/g, " ")) && !ctx.surfacesAddressed;
+  if (soloFeature && ctx.interiorScope !== "whole_house") {
+    out.push({ patch: { ...interiorOff, projectType: ctx.projectType || "interior", interiorScope: "specific_rooms" }, reason: "Only a fireplace or garage floor \u2192 price that, not rooms" });
+  }
   if (railWords && !/\b(deck|porch|balcon|patio|exterior|outside|outdoor)\b/.test(t2) && !/\bwalls?\b/.test(t2) && ctx.stairwayDetails !== "railings_only" && !ctx.surfacesAddressed) {
     out.push({
       patch: { ...interiorOff, projectType: ctx.projectType || "interior", interiorScope: "specific_rooms", stairways: "yes", stairwayDetails: "railings_only", railingType: /\b(spindles?|balusters?)\b/.test(t2) ? "spindles" : "simple", stairwayCount: ctx.stairwayCount || 1 },
@@ -21223,7 +22404,7 @@ function applyDerivations(ctx, derivations) {
 
 // src/lib/chatEstimator/topics.ts
 init_define_import_meta_env();
-function pick(variants, seedStr) {
+function pick2(variants, seedStr) {
   let h = 0;
   for (let i2 = 0; i2 < seedStr.length; i2++) h = h * 31 + seedStr.charCodeAt(i2) >>> 0;
   return variants[h % variants.length];
@@ -21268,7 +22449,7 @@ function roomLabel(room) {
   }
 }
 var hasTiming = (c2) => !!(c2.timeline || c2.startDate || c2.endDate || c2.datesFlexible);
-var isNarrowInteriorJob = (c2) => c2.interiorWalls === "no" && c2.surfacesAddressed && (isIsolatedDetailJob(c2) || c2.closets !== "none" || c2.furnitureItems.length > 0 || c2.stairwayDetails === "railings_only" || c2.cabinets !== "none" || c2.trimLinearFeet != null || c2.popcornCeilingSqft != null || c2.prepWork.includes("popcorn_removal") || c2.interiorTrim === "yes" || c2.interiorCeilings === "yes");
+var isNarrowInteriorJob = (c2) => c2.interiorWalls === "no" && c2.surfacesAddressed && (isIsolatedDetailJob(c2) || c2.specialtyServices.includes("fireplace") || c2.specialtyServices.includes("epoxy") || c2.closets !== "none" || c2.furnitureItems.length > 0 || c2.stairwayDetails === "railings_only" || c2.cabinets !== "none" || c2.trimLinearFeet != null || c2.popcornCeilingSqft != null || c2.prepWork.includes("popcorn_removal") || c2.interiorTrim === "yes" || c2.interiorCeilings === "yes");
 function detailLabel(c2) {
   const parts = [c2.chairRail === "yes" ? "chair rail" : "", c2.crownMolding === "yes" ? "crown moulding" : "", c2.wainscoting === "yes" ? "wainscoting" : "", c2.interiorTrim === "yes" ? "baseboards" : ""].filter(Boolean);
   return parts.length > 1 ? parts.slice(0, -1).join(", ") + " and " + parts[parts.length - 1] : parts[0] ?? "trim";
@@ -21283,7 +22464,7 @@ function componentKind(c2) {
   if (c2.specialtyServices.includes("built_ins") && c2.closets === "none") return "builtins";
   return "";
 }
-var skipUpsells = (c2) => c2.itemsOnly || componentKind(c2) !== "" || isIsolatedDetailJob(c2) || c2.interiorWalls === "no" && c2.interiorCeilings === "no" && c2.surfacesAddressed && (c2.furnitureItems.length > 0 || c2.closets !== "none");
+var skipUpsells = (c2) => c2.itemsOnly || componentKind(c2) !== "" || isIsolatedDetailJob(c2) || (c2.specialtyServices.includes("fireplace") || c2.specialtyServices.includes("epoxy")) && c2.interiorWalls === "no" && c2.surfacesAddressed || c2.interiorWalls === "no" && c2.interiorCeilings === "no" && c2.surfacesAddressed && (c2.furnitureItems.length > 0 || c2.closets !== "none");
 var isCommercialLike = (c2) => c2.propertyType === "commercial" || c2.propertyType === "multi_unit";
 function isStandaloneOnlyJob(c2) {
   if (c2.standaloneStructure || c2.itemsOnly || componentKind(c2) !== "") return true;
@@ -21311,7 +22492,7 @@ var TOPICS = [
     priority: 10,
     relevant: () => true,
     alreadyAnswered: (c2) => !!c2.projectType,
-    ask: (c2) => pick(
+    ask: (c2) => pick2(
       [
         "Quick one, is this interior, exterior, or both?",
         "Are we working on the inside, the outside, or both?",
@@ -21334,7 +22515,7 @@ var TOPICS = [
     priority: 12,
     relevant: (c2) => c2.propertyType === "multi_unit" && (c2.projectType === "interior" || c2.projectType === "both") && c2.unitCount == null,
     alreadyAnswered: (c2) => c2.unitCount != null || extDone(c2, "unit_count"),
-    ask: (c2) => c2.unitsTotal ? "You mentioned " + c2.unitsTotal + " units. Are all " + c2.unitsTotal + " being painted, or only some of them? A number is fine, like 'all " + c2.unitsTotal + "' or 'just two'." : pick(
+    ask: (c2) => c2.unitsTotal ? "You mentioned " + c2.unitsTotal + " units. Are all " + c2.unitsTotal + " being painted, or only some of them? A number is fine, like 'all " + c2.unitsTotal + "' or 'just two'." : pick2(
       ["How many units are being painted? A number is fine, like '12', 'all 8' or 'two of the six'.", "How many units are we painting? Just give me a number, like '6' or 'all 10'."],
       seed(c2)
     ),
@@ -21355,7 +22536,7 @@ var TOPICS = [
     priority: 30.2,
     relevant: (c2) => (c2.projectType === "interior" || c2.projectType === "both") && c2.surfacesAddressed && (c2.interiorWalls !== "no" || c2.interiorCeilings !== "no" || c2.crownMolding === "yes") && !c2.ceilingHeightKnown,
     alreadyAnswered: (c2) => !!c2.ceilingHeightKnown || c2.ceilingHeight !== "standard" || extDone(c2, "ceiling_height"),
-    ask: (c2) => c2.propertyType === "multi_unit" && c2.unitCount != null ? "In a typical unit, is it standard ceiling height (around 8 feet)? If not, about how tall are they: 9 ft, 10 ft, 12 ft or more, or vaulted?" : pick(
+    ask: (c2) => c2.propertyType === "multi_unit" && c2.unitCount != null ? "In a typical unit, is it standard ceiling height (around 8 feet)? If not, about how tall are they: 9 ft, 10 ft, 12 ft or more, or vaulted?" : pick2(
       [
         "Is it standard ceiling height, around 8 feet? If not, about how tall are they (9 ft, 10 ft, 12 ft or more, or vaulted)?",
         "Are the ceilings standard height (about 8 feet), or higher? If higher, roughly how tall: 9 ft, 10 ft, 12 ft or more, or vaulted?"
@@ -21408,7 +22589,7 @@ var TOPICS = [
       if (vague) {
         return "Got it, which room?";
       }
-      return pick(
+      return pick2(
         [
           "Which rooms are we painting?",
           "Which room or rooms should we price out?",
@@ -21436,7 +22617,7 @@ var TOPICS = [
     },
     ask: (c2) => {
       const label = roomLabel(c2.selectedRooms[0]);
-      return pick(
+      return pick2(
         [
           `About how big is that ${label}? Small, medium, large, or do you happen to know the dimensions?`,
           `How big is the ${label} \u2014 rough size or actual dimensions, either works.`,
@@ -21461,7 +22642,7 @@ var TOPICS = [
         return "About how big is a typical unit, in square feet? If they vary, give me the sizes you know (like 'studios 500, one-bedrooms 700, twos 950', or with how many of each) and I'll work out the average. Or how many bedrooms?";
       }
       if (isCommercialLike(c2)) {
-        return pick(
+        return pick2(
           [
             "About how big is the space, in total square feet?",
             "What's the total square footage we're working with?",
@@ -21471,7 +22652,7 @@ var TOPICS = [
         );
       }
       if (c2.bedroomCount) {
-        return pick(
+        return pick2(
           [
             "And about how many square feet is the place?",
             "Got the bedroom count. Do you also know roughly how many square feet it is?"
@@ -21479,7 +22660,7 @@ var TOPICS = [
           seed(c2)
         );
       }
-      return pick(
+      return pick2(
         [
           "About how big is the place?",
           "Roughly how big is it?",
@@ -21500,7 +22681,7 @@ var TOPICS = [
     priority: 23,
     relevant: (c2) => (c2.projectType === "interior" || c2.projectType === "both") && c2.interiorScope === "whole_house" && c2.bedroomCount != null && !isNarrowInteriorJob(c2) && !isCommercialLike(c2) && c2.propertyType !== "multi_unit",
     alreadyAnswered: (c2) => c2.bathroomCount != null,
-    ask: (c2) => pick(["And how many bathrooms does it have?", "How many bathrooms?"], seed(c2)),
+    ask: (c2) => pick2(["And how many bathrooms does it have?", "How many bathrooms?"], seed(c2)),
     clarify: () => "Just the number of bathrooms, full or half \u2014 each one is its own room to price in, and it doesn't always scale with the bedroom count.",
     example: () => "Just a number, like 'one' or 'two and a half'."
   },
@@ -21513,7 +22694,7 @@ var TOPICS = [
     priority: 23.3,
     relevant: (c2) => (c2.projectType === "interior" || c2.projectType === "both") && c2.interiorScope === "whole_house" && !c2.stories && !isCommercialLike(c2) && c2.propertyType !== "multi_unit" && !isNarrowInteriorJob(c2),
     alreadyAnswered: (c2) => !!c2.stories,
-    ask: (c2) => pick(["Is it a one-story place, or two?", "One level, or two stories?"], seed(c2)),
+    ask: (c2) => pick2(["Is it a one-story place, or two?", "One level, or two stories?"], seed(c2)),
     clarify: () => "A two-story home means a stairwell to paint too \u2014 tall walls, and usually a railing \u2014 which is more work than the same square footage on one level.",
     example: () => "Just say 'one story' or 'two story'."
   },
@@ -21580,7 +22761,7 @@ var TOPICS = [
     priority: 46,
     relevant: (c2) => (isExteriorJob(c2) || !!c2.standaloneStructure) && !c2.squareFeet && !c2.bedroomCount,
     alreadyAnswered: (c2) => !!c2.squareFeet || !!c2.bedroomCount,
-    ask: (c2) => c2.standaloneStructure ? `About how big is the ${c2.standaloneStructure}, in square feet? Or its length and width.` : c2.propertyType === "multi_unit" ? "About how big are the buildings, in total square feet of all of them together? Or the number of units and roughly how big each is." : pick(
+    ask: (c2) => c2.standaloneStructure ? `About how big is the ${c2.standaloneStructure}, in square feet? Or its length and width.` : c2.propertyType === "multi_unit" ? "About how big are the buildings, in total square feet of all of them together? Or the number of units and roughly how big each is." : pick2(
       [
         "About how big is the house, in square feet?",
         "Roughly how many square feet is the house? A rough number is fine."
@@ -21595,7 +22776,7 @@ var TOPICS = [
     priority: 48.2,
     relevant: (c2) => isExteriorJob(c2) && c2.entryDoor !== "yes",
     alreadyAnswered: (c2) => c2.entryDoor === "yes" || extDone(c2, "ext_doors"),
-    ask: (c2) => pick(["What about the front door, is that getting painted?", "Is the front door part of the job?"], seed(c2)),
+    ask: (c2) => pick2(["What about the front door, is that getting painted?", "Is the front door part of the job?"], seed(c2)),
     clarify: () => "I mean the front entry door, and any other exterior doors you want painted.",
     example: () => "Just say 'yes, the front door' or 'no'."
   },
@@ -21604,7 +22785,7 @@ var TOPICS = [
     priority: 48.3,
     relevant: (c2) => isExteriorJob(c2) && c2.garageDoor === "none",
     alreadyAnswered: (c2) => c2.garageDoor !== "none" || extDone(c2, "ext_garage"),
-    ask: (c2) => pick(["And the garage door?", "Does the garage door get painted too?"], seed(c2)),
+    ask: (c2) => pick2(["And the garage door?", "Does the garage door get painted too?"], seed(c2)),
     clarify: () => "Garage doors are painted separately from the walls, so I want to know whether to include them.",
     example: () => "Just say 'yes, one garage door', 'yes, two' or 'no'."
   },
@@ -21622,7 +22803,7 @@ var TOPICS = [
     priority: 48.4,
     relevant: (c2) => isExteriorJob(c2) && c2.gutters !== "yes",
     alreadyAnswered: (c2) => c2.gutters === "yes" || extDone(c2, "ext_gutters"),
-    ask: (c2) => pick(["Do the gutters and downspouts need painting too?", "What about the gutters and downspouts, are those getting painted?"], seed(c2)),
+    ask: (c2) => pick2(["Do the gutters and downspouts need painting too?", "What about the gutters and downspouts, are those getting painted?"], seed(c2)),
     clarify: () => "Gutters and downspouts can be painted to match the house.",
     example: () => "Just say 'yes, the gutters too' or 'no'."
   },
@@ -21631,7 +22812,7 @@ var TOPICS = [
     priority: 48.6,
     relevant: (c2) => isExteriorJob(c2) && c2.exteriorWindows === "none",
     alreadyAnswered: (c2) => c2.exteriorWindows !== "none" || extDone(c2, "ext_windows"),
-    ask: (c2) => pick(["What kind of windows does the house have? Vinyl windows don't need painting.", "What are the windows made of?"], seed(c2)),
+    ask: (c2) => pick2(["What kind of windows does the house have? Vinyl windows don't need painting.", "What are the windows made of?"], seed(c2)),
     clarify: () => "Vinyl windows are usually left alone. Wood windows (and French-pane windows with lots of little panes) take real painting time, and aluminum frames sometimes just need the trim around them done.",
     example: () => "Just say 'vinyl', 'wood', 'aluminum', 'French pane', or 'a mix'."
   },
@@ -21640,7 +22821,7 @@ var TOPICS = [
     priority: 48.7,
     relevant: (c2) => isExteriorJob(c2) && c2.exteriorWindows !== "none" && !c2.exteriorWindowCount,
     alreadyAnswered: (c2) => !!c2.exteriorWindowCount || extDone(c2, "ext_window_count"),
-    ask: (c2) => pick(["About how many windows are getting painted?", "How many windows would that be?"], seed(c2)),
+    ask: (c2) => pick2(["About how many windows are getting painted?", "How many windows would that be?"], seed(c2)),
     clarify: () => "A rough count of the windows that need painting is fine.",
     example: () => "Something like '12 windows' or 'about 20'."
   },
@@ -21649,7 +22830,7 @@ var TOPICS = [
     priority: 48.8,
     relevant: (c2) => isExteriorJob(c2),
     alreadyAnswered: (c2) => extDone(c2, "ext_condition"),
-    ask: (c2) => pick(["How is the paint holding up on the outside right now?", "What shape is the outside in right now?"], seed(c2)),
+    ask: (c2) => pick2(["How is the paint holding up on the outside right now?", "What shape is the outside in right now?"], seed(c2)),
     clarify: () => "I mean whether the paint is in decent shape, or fading, peeling or flaking. Peeling paint needs extra prep.",
     example: () => "Something like 'it's faded but fine' or 'peeling in a few spots'."
   },
@@ -21658,7 +22839,7 @@ var TOPICS = [
     priority: 48.9,
     relevant: (c2) => isExteriorJob(c2),
     alreadyAnswered: (c2) => extDone(c2, "ext_repairs"),
-    ask: (c2) => pick(["Is there any repair work needed before painting?", "Any repairs needed first, like rotted wood, cracks or gaps?"], seed(c2)),
+    ask: (c2) => pick2(["Is there any repair work needed before painting?", "Any repairs needed first, like rotted wood, cracks or gaps?"], seed(c2)),
     clarify: () => "Repairs are things like rotted wood to replace, cracks in the stucco, or gaps that need caulking before the paint goes on.",
     example: () => "Something like 'a few rotted boards' or 'no repairs needed'."
   },
@@ -21667,7 +22848,7 @@ var TOPICS = [
     priority: 49,
     relevant: (c2) => isExteriorJob(c2),
     alreadyAnswered: (c2) => !!c2.exteriorColorChange || extDone(c2, "ext_color"),
-    ask: (c2) => pick(["Is the house staying the same color, or going a different color?", "Are you keeping the current color, or changing it?"], seed(c2)),
+    ask: (c2) => pick2(["Is the house staying the same color, or going a different color?", "Are you keeping the current color, or changing it?"], seed(c2)),
     clarify: () => "A new color usually takes an extra coat, and a big change like dark to light takes more.",
     example: () => "Just say 'same color' or 'a different color'."
   },
@@ -21680,10 +22861,11 @@ var TOPICS = [
     priority: 37,
     relevant: (c2) => paintingJob(c2),
     alreadyAnswered: (c2) => !!c2.paintBrand || extDone(c2, "paint_brand"),
-    ask: (c2) => pick(
+    ask: (c2) => pick2(
       [
         "Do you have a paint brand in mind, or should the painter choose?",
-        "Is there a paint brand you prefer, or is it up to the painter?"
+        "Is there a paint brand you prefer, or is it up to the painter?",
+        ...Object.values(c2.itemAnswers ?? {}).some((v) => /stain|restain|strip/.test(v)) ? ["Is there a paint or stain brand you prefer, or is it up to the painter?"] : []
       ],
       seed(c2)
     ),
@@ -21696,7 +22878,7 @@ var TOPICS = [
     relevant: (c2) => paintingJob(c2),
     alreadyAnswered: (c2) => !!c2.paintGrade || extDone(c2, "paint_grade") || c2.paintBrand === "painter_choice",
     // "the painter can choose" covers the grade too (a grade they volunteer is still noted)
-    ask: (c2) => pick(
+    ask: (c2) => pick2(
       [
         "Would you like standard mid-grade paint, or a premium line?",
         "Standard mid-grade paint, or a deluxe premium paint?"
@@ -21712,7 +22894,7 @@ var TOPICS = [
     relevant: (c2) => paintingJob(c2),
     alreadyAnswered: (c2) => !!c2.paintFinish || extDone(c2, "paint_finish") || c2.paintBrand === "painter_choice",
     // ...and the finish
-    ask: (c2) => pick(
+    ask: (c2) => pick2(
       [
         "Do you have a finish in mind, or should the painter pick the right one for each surface?",
         "Any particular finish you want, or is the painter free to choose?"
@@ -21731,7 +22913,7 @@ var TOPICS = [
     priority: 27,
     relevant: (c2) => (c2.projectType === "interior" || c2.projectType === "both") && c2.surfacesAddressed && c2.interiorCeilings === "no" && !(c2.excludedSurfaces ?? []).includes("ceilings") && !skipUpsells(c2),
     alreadyAnswered: (c2) => c2.interiorCeilings !== "no",
-    ask: (c2) => pick(
+    ask: (c2) => pick2(
       [
         "Want me to add the ceilings too? Fresh ceilings make fresh walls look even better.",
         "Should we include the ceilings? They're easy to do while we're already painting the walls."
@@ -21746,7 +22928,7 @@ var TOPICS = [
     priority: 28,
     relevant: (c2) => (c2.projectType === "interior" || c2.projectType === "both") && c2.surfacesAddressed && c2.interiorTrim === "no" && !(c2.excludedSurfaces ?? []).includes("trim") && !skipUpsells(c2),
     alreadyAnswered: (c2) => c2.interiorTrim !== "no",
-    ask: (c2) => pick(
+    ask: (c2) => pick2(
       [
         "How about the baseboards? Crisp, clean baseboards give the whole room a finished look.",
         "What about the baseboards? Fresh ones frame the new wall color nicely."
@@ -21762,7 +22944,7 @@ var TOPICS = [
     relevant: (c2) => (c2.projectType === "interior" || c2.projectType === "both") && c2.surfacesAddressed && c2.interiorDoors === "none" && !skipUpsells(c2) && !(c2.excludedSurfaces ?? []).includes("doors") && !(c2.excludedSurfaces ?? []).includes("trim"),
     // turned down the baseboards: nobody paints doors without trim, so don't suggest them (the closing "anything else?" still lets them mention doors)
     alreadyAnswered: (c2) => c2.interiorDoors !== "none",
-    ask: (c2) => pick(
+    ask: (c2) => pick2(
       [
         "And the doors? Freshly painted doors tie the whole room together.",
         "Would you like the doors done too? It's the finishing touch that makes a room look new."
@@ -21781,7 +22963,7 @@ var TOPICS = [
     priority: 36.5,
     relevant: (c2) => (c2.projectType === "interior" || c2.projectType === "both") && c2.interiorTrim === "yes" && (c2.squareFeet ?? 0) >= 2200 && c2.crownMolding === "no" && c2.chairRail === "no" && c2.wainscoting === "no" && !extDone(c2, "upsell_special_trim"),
     alreadyAnswered: (c2) => c2.crownMolding === "yes" || c2.chairRail === "yes" || c2.wainscoting === "yes" || extDone(c2, "upsell_special_trim"),
-    ask: (c2) => pick(["A place this size often has some detail trim \u2014 any crown molding, chair rail or wainscoting to price in?", "Does it have any crown molding, chair rail or wainscoting we should include?"], seed(c2)),
+    ask: (c2) => pick2(["A place this size often has some detail trim \u2014 any crown molding, chair rail or wainscoting to price in?", "Does it have any crown molding, chair rail or wainscoting we should include?"], seed(c2)),
     clarify: () => "Those are priced separately from plain baseboards since they add real cutting-in time \u2014 crown where the wall meets the ceiling, chair rail partway up the wall, wainscoting as a paneled lower section.",
     example: () => "'No, just plain trim' is the most common answer. Or name what it has \u2014 'crown molding in the living and dining room'."
   },
@@ -21791,7 +22973,7 @@ var TOPICS = [
     priority: 29.5,
     relevant: (c2) => (c2.projectType === "interior" || c2.projectType === "both") && c2.surfacesAddressed && c2.interiorTrim === "yes" && c2.cabinets === "none" && (c2.interiorScope === "whole_house" || c2.selectedRooms.includes("kitchen")) && !(c2.excludedSurfaces ?? []).includes("cabinets"),
     alreadyAnswered: (c2) => c2.cabinets !== "none",
-    ask: (c2) => pick(
+    ask: (c2) => pick2(
       [
         "And the kitchen cabinets? Painted cabinets are the biggest makeover in the house. Want them included?",
         "Are the kitchen cabinets part of this too? They're a big job on their own, so I'd like to price them in if so."
@@ -21808,7 +22990,7 @@ var TOPICS = [
     priority: 29.8,
     relevant: (c2) => (c2.projectType === "interior" || c2.projectType === "both") && c2.cabinets !== "none",
     alreadyAnswered: (c2) => c2.cabinetFinish !== "",
-    ask: (c2) => pick(
+    ask: (c2) => pick2(
       [
         "Are the cabinets (and any vanities) already painted? If not, what are they now: bare wood, stained or varnished wood, or pre-primed?",
         "Have the cabinets been painted before? If they haven't, are they bare wood, stained, or already primed?"
@@ -21824,7 +23006,7 @@ var TOPICS = [
     priority: 29.7,
     relevant: (c2) => componentKind(c2) === "cabinets" && c2.cabinetDoorCount == null,
     alreadyAnswered: (c2) => c2.cabinetDoorCount != null || extDone(c2, "cabinet_count"),
-    ask: (c2) => pick(["About how many cabinet doors and drawer fronts are there? A rough count is fine.", "Roughly how many doors and drawers are we talking about?"], seed(c2)),
+    ask: (c2) => pick2(["About how many cabinet doors and drawer fronts are there? A rough count is fine.", "Roughly how many doors and drawers are we talking about?"], seed(c2)),
     clarify: () => "Cabinets are priced by the door and drawer front, so a rough count (count each door and each drawer face) gets the price close.",
     example: () => "Something like '30 doors and drawers' or 'about 24'."
   },
@@ -21833,7 +23015,7 @@ var TOPICS = [
     priority: 29.82,
     relevant: (c2) => componentKind(c2) === "cabinets" && c2.cabinetScope !== "inside_too",
     alreadyAnswered: (c2) => c2.cabinetScope === "inside_too" || extDone(c2, "cabinet_scope"),
-    ask: (c2) => pick(["Do you want the inside of the cabinet boxes painted too, or just the doors, drawer fronts and frames?", "Just the outsides (doors, drawer fronts, frames), or the insides of the boxes as well?"], seed(c2)),
+    ask: (c2) => pick2(["Do you want the inside of the cabinet boxes painted too, or just the doors, drawer fronts and frames?", "Just the outsides (doors, drawer fronts, frames), or the insides of the boxes as well?"], seed(c2)),
     clarify: () => "Painting the insides adds a lot of time (tight spaces, more coats), so it costs more. Most people paint just the outsides.",
     example: () => "Say 'outsides only' or 'yes, the insides too'."
   },
@@ -21842,7 +23024,7 @@ var TOPICS = [
     priority: 29.84,
     relevant: (c2) => componentKind(c2) === "cabinets" && !c2.cabinetMethod,
     alreadyAnswered: (c2) => !!c2.cabinetMethod || extDone(c2, "cabinet_method"),
-    ask: (c2) => pick(["Sprayed for the smoothest, factory-like finish, or brushed and rolled?", "Do you want them sprayed or brushed and rolled? Spraying looks smoother and costs more."], seed(c2)),
+    ask: (c2) => pick2(["Sprayed for the smoothest, factory-like finish, or brushed and rolled?", "Do you want them sprayed or brushed and rolled? Spraying looks smoother and costs more."], seed(c2)),
     clarify: () => "Spraying gives a smooth, factory-like finish with no brush marks but takes more masking and set-up, so it costs more. Brushed and rolled is the standard way and still looks good.",
     example: () => "Say 'sprayed', 'brushed is fine', or 'painter's choice'."
   },
@@ -21851,7 +23033,7 @@ var TOPICS = [
     priority: 29.86,
     relevant: (c2) => componentKind(c2) === "cabinets" && c2.hardwareReplacement !== "yes",
     alreadyAnswered: (c2) => c2.hardwareReplacement === "yes" || extDone(c2, "cabinet_hardware"),
-    ask: (c2) => pick(["Are the hinges and pulls staying, or are you putting in new hardware?", "What about the hardware: reuse the existing hinges and pulls, or replace them?"], seed(c2)),
+    ask: (c2) => pick2(["Are the hinges and pulls staying, or are you putting in new hardware?", "What about the hardware: reuse the existing hinges and pulls, or replace them?"], seed(c2)),
     clarify: () => "The painter takes the hardware off and puts it back as part of the job. Installing new hinges or pulls is a separate small charge (the hardware itself is extra).",
     example: () => "Say 'keep the hardware' or 'new pulls and hinges'."
   },
@@ -21860,7 +23042,7 @@ var TOPICS = [
     priority: 29.7,
     relevant: (c2) => componentKind(c2) === "builtins" && c2.builtInCount == null,
     alreadyAnswered: (c2) => c2.builtInCount != null || extDone(c2, "builtin_count"),
-    ask: (c2) => pick(["How many built-in units or sections are there?", "About how many built-ins or shelving sections are we painting?"], seed(c2)),
+    ask: (c2) => pick2(["How many built-in units or sections are there?", "About how many built-ins or shelving sections are we painting?"], seed(c2)),
     clarify: () => "Each built-in or shelving section is priced on its own, so a rough count is what I need.",
     example: () => "Something like '2 built-in bookcases' or 'one wall of shelves'."
   },
@@ -21873,7 +23055,7 @@ var TOPICS = [
     ask: (c2) => {
       const what = c2.interiorTrim === "yes" && c2.interiorDoors !== "none" ? "baseboards, trim and doors" : c2.interiorTrim === "yes" ? "baseboards and trim" : "doors";
       const are = c2.interiorTrim === "yes" && c2.interiorDoors !== "none" ? "are" : "is";
-      return pick(
+      return pick2(
         [
           `Are the ${what} already painted? If not, ${are === "are" ? "are they" : "is it"} bare wood, stained or varnished wood, or pre-primed?`,
           `Have the ${what} been painted before, or ${are === "are" ? "are they" : "is it"} bare, stained, or already primed?`
@@ -21894,7 +23076,7 @@ var TOPICS = [
     priority: 29.91,
     relevant: (c2) => (c2.projectType === "interior" || c2.projectType === "both") && c2.interiorDoors !== "none" && (!!c2.doorsIncluded || (c2.addedSurfaces ?? []).includes("doors")) && c2.doorCount == null,
     alreadyAnswered: (c2) => c2.doorCount != null || extDone(c2, "door_count"),
-    ask: (c2) => pick(["About how many doors are getting painted? A rough count is fine.", "And roughly how many doors is that?", "How many doors are we talking about, approximately?"], seed(c2)),
+    ask: (c2) => pick2(["About how many doors are getting painted? A rough count is fine.", "And roughly how many doors is that?", "How many doors are we talking about, approximately?"], seed(c2)),
     clarify: () => "Each door is priced on its own (both sides and the edges), so a rough count of the interior doors that need paint makes the price much closer.",
     example: () => "Something like '12 doors' or 'about 8'."
   },
@@ -21903,7 +23085,7 @@ var TOPICS = [
     priority: 29.92,
     relevant: (c2) => (c2.projectType === "interior" || c2.projectType === "both") && c2.interiorWindows !== "none" && c2.windowCount == null,
     alreadyAnswered: (c2) => c2.windowCount != null || extDone(c2, "window_count"),
-    ask: (c2) => pick(["About how many windows are getting painted?", "How many windows would that be, roughly?"], seed(c2)),
+    ask: (c2) => pick2(["About how many windows are getting painted?", "How many windows would that be, roughly?"], seed(c2)),
     clarify: () => "I price the window frames, sills and trim one window at a time, so a rough count helps.",
     example: () => "Something like '10 windows' or 'about 15'."
   },
@@ -21925,7 +23107,7 @@ var TOPICS = [
       const kinds = [...new Set(c2.furnitureItems)];
       if (kinds.length > 1) return "How many of each piece are we painting? Something like '4 chairs and a table'.";
       const noun = kinds[0] === "chair" || kinds.length === 0 ? "chairs" : itemsPhrase([kinds[0], kinds[0]]).replace(/^2 /, "");
-      return pick([`About how many ${noun} are getting done?`, `How many ${noun} is that?`], seed(c2));
+      return pick2([`About how many ${noun} are getting done?`, `How many ${noun} is that?`], seed(c2));
     },
     clarify: () => "Each piece is priced on its own (chairs take a lot of cutting in around the spindles and legs), so I need a rough count.",
     example: () => "Something like '6 chairs', 'four', or '2 chairs and a table'."
@@ -21936,7 +23118,7 @@ var TOPICS = [
     priority: 29.9,
     relevant: (c2) => c2.furnitureUnspecified && c2.furnitureItems.length === 0,
     alreadyAnswered: (c2) => c2.furnitureItems.length > 0 || extDone(c2, "furniture_kind"),
-    ask: (c2) => pick(["What kind of furniture is it, and how many pieces?", "Which pieces are we painting? A dresser, table, chairs, something else?"], seed(c2)),
+    ask: (c2) => pick2(["What kind of furniture is it, and how many pieces?", "Which pieces are we painting? A dresser, table, chairs, something else?"], seed(c2)),
     clarify: () => "I price each piece on its own (a chair, a dining table, a dresser, a bookcase and so on), so I need to know what they are.",
     example: () => "Something like '4 dining chairs and a table' or 'one dresser and two nightstands'."
   },
@@ -21949,7 +23131,7 @@ var TOPICS = [
     // the notes the painter sees.
     relevant: (c2) => c2.furnitureItems.length > 0 && !c2.furnitureTreatment,
     alreadyAnswered: (c2) => !!c2.furnitureTreatment || extDone(c2, "furniture_finish"),
-    ask: (c2) => pick(
+    ask: (c2) => pick2(
       [
         `What are the ${[...new Set(c2.furnitureItems)].length > 1 ? "pieces" : itemsPhrase([c2.furnitureItems[0], c2.furnitureItems[0]]).replace(/^2 /, "")} like now: painted, stained or bare wood? And do you want them repainted, restained or refinished?`,
         "Is the finish painted or stained right now, and do you want a new coat of paint, a fresh stain, or stripped back and refinished?"
@@ -21971,9 +23153,9 @@ var TOPICS = [
   {
     id: "railing_length",
     priority: 34.8,
-    relevant: (c2) => c2.railings === "yes" && c2.stairRailFeet == null && c2.stairwayDetails !== "railings_only",
+    relevant: (c2) => (c2.railings === "yes" || c2.stairwayDetails === "railings_only") && c2.stairRailFeet == null,
     alreadyAnswered: (c2) => c2.stairRailFeet != null || extDone(c2, "railing_length"),
-    ask: (c2) => pick(["About how many linear feet of railing is it in total?", "Roughly how long is the railing, in feet?"], seed(c2)),
+    ask: (c2) => c2.stairwayDetails === "railings_only" ? pick2(["About how long is the railing in total? A rough length is fine, or tell me how many flights of stairs (a flight is about 14 feet), and say if there's a balcony or landing rail too.", "Roughly how long is the staircase railing? Feet is fine, or how many flights of stairs, and whether it also runs along an upstairs landing."], seed(c2)) : pick2(["About how many linear feet of railing is it in total?", "Roughly how long is the railing, in feet?"], seed(c2)),
     clarify: () => "Railings are priced by the linear foot, and spindles take longer than a plain rail. A rough length is fine, and you can add the spindles in your answer.",
     example: () => "Something like '30 feet' or '20 feet with spindles'."
   },
@@ -21985,7 +23167,7 @@ var TOPICS = [
     ask: (c2) => {
       if (c2.fenceLinearFeet != null) return "And how tall is the fence, roughly?";
       if (c2.fenceHeightFt != null) return "About how long is the fence in total, in linear feet?";
-      return pick(
+      return pick2(
         ["About how long is the fence in linear feet, and how tall is it?", "Roughly how many linear feet of fence is it, and how high does it stand?"],
         seed(c2)
       );
@@ -22007,16 +23189,66 @@ var TOPICS = [
     priority: 34.6,
     relevant: (c2) => c2.deck === "yes" && c2.deckSqft == null && !c2.deckSize,
     alreadyAnswered: (c2) => c2.deckSqft != null || !!c2.deckSize || extDone(c2, "deck_size"),
-    ask: (c2) => pick(["About how many square feet is the deck? Or just its length and width.", "Roughly how big is the deck, in square feet or length by width?"], seed(c2)),
+    ask: (c2) => pick2(["About how many square feet is the deck? Or just its length and width.", "Roughly how big is the deck, in square feet or length by width?"], seed(c2)),
     clarify: () => "Decks are priced by the square foot, so the size matters. Length times width is fine, I'll do the math.",
     example: () => "Something like '400 square feet' or '20 x 20'."
+  },
+  // ——————————————————————————————————————————
+  // A deck is a job of its own, not a line on a house: what a painter quotes depends on how high it is, whether the underside is done,
+  // whether it has railings and what shape the wood is in. Asked whenever a deck is in the job, whether it is the whole job or one
+  // piece of a house exterior. (ext_ ids so the answers are recorded the same way as the other outside questions.)
+  // ——————————————————————————————————————————
+  {
+    id: "ext_deck_level",
+    priority: 34.61,
+    relevant: (c2) => c2.deck === "yes" && !c2.deckLevel,
+    alreadyAnswered: (c2) => !!c2.deckLevel || extDone(c2, "ext_deck_level"),
+    ask: (c2) => pick2(
+      ["Is the deck down at ground level, or raised up off the ground, like off a second floor?", "Is it a low deck on the ground, or raised up high enough to walk under?"],
+      seed(c2)
+    ),
+    clarify: () => "A deck on the ground is painted from the top only. A raised deck also has an underside and posts to reach, which means ladders or scaffolding and more time.",
+    example: () => "Say 'on the ground', 'a few feet up' or 'off the second floor'."
+  },
+  {
+    id: "ext_deck_underside",
+    priority: 34.62,
+    relevant: (c2) => c2.deck === "yes" && (c2.deckLevel === "raised" || c2.deckLevel === "second_story") && !c2.deckUnderside,
+    alreadyAnswered: (c2) => !!c2.deckUnderside || extDone(c2, "ext_deck_underside"),
+    ask: (c2) => pick2(
+      ["Since it's raised, should the underside be painted too, or just the top?", "Does the underside of the deck need paint as well, or only the top surface?"],
+      seed(c2)
+    ),
+    clarify: () => "The underside (the joists and the bottom of the boards) is a lot of overhead work, so it's priced separately from the top.",
+    example: () => "Say 'yes, the underside too' or 'just the top'."
+  },
+  {
+    id: "ext_deck_railings",
+    priority: 34.63,
+    relevant: (c2) => c2.deck === "yes" && c2.railings === "none",
+    alreadyAnswered: (c2) => c2.railings !== "none" || extDone(c2, "ext_deck_railings"),
+    ask: (c2) => pick2(["Does the deck have railings that need painting too?", "Are there railings around the deck to paint as well?"], seed(c2)),
+    clarify: () => "Railings, and especially spindles, take a lot of brush time for their length, so they're priced by the foot on top of the deck surface.",
+    example: () => "Say 'yes, railings all around' or 'no railings'."
+  },
+  {
+    id: "ext_deck_condition",
+    priority: 34.64,
+    relevant: (c2) => c2.deck === "yes" && !c2.deckCondition,
+    alreadyAnswered: (c2) => !!c2.deckCondition || extDone(c2, "ext_deck_condition"),
+    ask: (c2) => pick2(
+      ["What shape is the deck in: sound with a worn finish, bare or weathered wood, peeling paint or stain, or any rotted boards?", "How's the deck holding up: fine and just faded, weathered and gray, peeling, or some soft or rotted spots?"],
+      seed(c2)
+    ),
+    clarify: () => "Sound wood with a worn finish just needs a wash and sanding. Peeling or failing coatings have to be scraped and stripped first, and rotted boards need to be replaced before anything goes on.",
+    example: () => "Something like 'faded but solid', 'gray and weathered', 'peeling in places' or 'a few rotted boards'."
   },
   {
     id: "overhang_size",
     priority: 34.7,
     relevant: (c2) => c2.overhangs === "yes" && c2.overhangSqft == null,
     alreadyAnswered: (c2) => c2.overhangSqft != null || extDone(c2, "overhang_size"),
-    ask: (c2) => pick(["About how many square feet is the overhang or patio cover? Length times width works too.", "Roughly how big is the overhang or patio cover, in square feet or length by width?"], seed(c2)),
+    ask: (c2) => pick2(["About how many square feet is the overhang or patio cover? Length times width works too.", "Roughly how big is the overhang or patio cover, in square feet or length by width?"], seed(c2)),
     clarify: () => "Overhangs, porch ceilings and patio covers are priced by the square foot of the underside, so the size matters.",
     example: () => "Something like '200 square feet' or '10 by 20'."
   },
@@ -22026,7 +23258,7 @@ var TOPICS = [
     priority: 48.95,
     relevant: (c2) => isExteriorJob(c2) && (c2.fence === "none" || c2.deck === "none" || c2.overhangs === "no"),
     alreadyAnswered: (c2) => c2.fence !== "none" && c2.deck !== "none" && c2.overhangs !== "no" || extDone(c2, "ext_extras"),
-    ask: (c2) => pick(
+    ask: (c2) => pick2(
       ["Is there a fence, a deck, or a patio cover or overhang that should get painted too?", "Anything else outside to add, like a fence, a deck or a patio cover?"],
       seed(c2)
     ),
@@ -22098,7 +23330,7 @@ var TOPICS = [
     priority: 26,
     relevant: (c2) => (c2.projectType === "interior" || c2.projectType === "both") && c2.interiorTrim === "yes" && (c2.surfacesAddressed || c2.trimLinearFeet != null || c2.crownMolding === "yes"),
     alreadyAnswered: (c2) => c2.trimScopeAddressed || c2.trimLinearFeet != null || c2.doorFrames === "yes" || c2.specialtyServices.includes("built_ins"),
-    ask: (c2) => pick(
+    ask: (c2) => pick2(
       [
         "Quick one on the trim, what does that include?",
         "When you say trim, what all does that cover?",
@@ -22120,7 +23352,7 @@ var TOPICS = [
       const t2 = c2.additionalDetails.toLowerCase();
       return c2.conditionAddressed || c2.prepWork.length > 0 || c2.drywallRepairExtent === "major" || c2.drywallRepairExtent === "moderate" || c2.projectCondition === "repaint" || c2.projectCondition === "renovation" || /\b(good|clean|great|fine|pristine|move[-\s]?in)\b/.test(t2);
     },
-    ask: (c2) => pick(
+    ask: (c2) => pick2(
       [
         "How are the walls looking right now?",
         "What kind of shape is it in?",
@@ -22145,7 +23377,7 @@ var TOPICS = [
     priority: 31,
     relevant: (c2) => c2.prepWork.includes("popcorn_removal"),
     alreadyAnswered: (c2) => !!c2.popcornCeilingRooms,
-    ask: (c2) => pick(
+    ask: (c2) => pick2(
       [
         "For the popcorn ceiling removal, about how many rooms are we talking?",
         "How many rooms need that popcorn texture scraped off?"
@@ -22164,7 +23396,7 @@ var TOPICS = [
     priority: 32,
     relevant: (c2) => !isStandaloneOnlyJob(c2),
     alreadyAnswered: (c2) => !!c2.propertyType,
-    ask: (c2) => pick(
+    ask: (c2) => pick2(
       [
         "Are you living here, or is it a rental or something you're selling?",
         "Is this your home, or a rental?",
@@ -22195,13 +23427,13 @@ var TOPICS = [
     priority: 35,
     relevant: (c2) => c2.itemsOnly || componentKind(c2) !== "" || (c2.projectType === "interior" || c2.projectType === "both") && (c2.interiorWalls !== "no" || c2.interiorCeilings === "yes" || c2.interiorTrim === "yes" || c2.cabinets !== "none"),
     alreadyAnswered: (c2) => !!c2.interiorColorChange,
-    ask: (c2) => c2.itemsOnly ? pick(
+    ask: (c2) => c2.itemsOnly ? pick2(
       [
         c2.furnitureTreatment === "restain" ? "Are we matching the current stain color, or going a different shade?" : "Are we keeping the current color, or changing it?",
         "Same color as it is now, or something new?"
       ],
       seed(c2)
-    ) : pick(
+    ) : pick2(
       [
         "Is it the same color going back, or a different one?",
         "Are you sticking with the same color, or changing it up?",
@@ -22238,7 +23470,7 @@ var TOPICS = [
     priority: 40,
     relevant: (c2) => c2.projectCondition === "renovation" || c2.projectCondition === "new_construction",
     alreadyAnswered: (c2) => c2.renoStageAddressed || c2.additionalDetails.toLowerCase().includes("drywall") || c2.additionalDetails.toLowerCase().includes("contractor"),
-    ask: (c2) => pick(
+    ask: (c2) => pick2(
       [
         "Since it's a renovation, where are the other trades at?",
         "How far along are the other trades?",
@@ -22260,7 +23492,7 @@ var TOPICS = [
     priority: 44,
     relevant: (c2) => isExteriorJob(c2) && c2.exteriorTrim !== "yes" && c2.soffitsEaves !== "yes",
     alreadyAnswered: (c2) => c2.exteriorTrim === "yes" || c2.soffitsEaves === "yes" || extDone(c2, "ext_trim"),
-    ask: (c2) => pick(
+    ask: (c2) => pick2(
       [
         "When you say the exterior, does that include the trim, fascia, eaves and soffits too, or just the walls themselves?",
         "Besides the walls themselves, are we also painting the trim, fascia, eaves and soffits?"
@@ -22275,7 +23507,7 @@ var TOPICS = [
     priority: 45,
     relevant: (c2) => (c2.projectType === "exterior" || c2.projectType === "both") && c2.exteriorBody !== "no",
     alreadyAnswered: (c2) => !!c2.sidingType,
-    ask: (c2) => pick(
+    ask: (c2) => pick2(
       [
         "What's the siding \u2014 the wall material itself \u2014 made of?",
         "What kind of siding does it have?",
@@ -22305,9 +23537,9 @@ var TOPICS = [
     alreadyAnswered: (c2) => !!c2.stories,
     ask: (c2) => {
       if (isCommercialLike(c2)) {
-        return pick(["How many stories is the building?", "How tall is the building?"], seed(c2));
+        return pick2(["How many stories is the building?", "How tall is the building?"], seed(c2));
       }
-      return pick(
+      return pick2(
         ["How many stories is the house?", "How tall is the house?", "How many stories is the place?"],
         seed(c2)
       );
@@ -22325,7 +23557,7 @@ var TOPICS = [
     priority: 48.05,
     relevant: (c2) => (c2.projectType === "exterior" || c2.projectType === "both") && c2.exteriorBody !== "no" && !isCommercialLike(c2) && !c2.standaloneStructure,
     alreadyAnswered: (c2) => c2.houseStyle !== "" || extDone(c2, "ext_style"),
-    ask: (c2) => pick(["What style is the house \u2014 a typical ranch or two-story, or something with more detail like a Victorian, Tudor or Cape Cod?", "Is the house a standard style (a ranch, a plain two-story), or something more detailed \u2014 Victorian, Tudor, Craftsman, that kind of thing?"], seed(c2)),
+    ask: (c2) => pick2(["What style is the house \u2014 a typical ranch or two-story, or something with more detail like a Victorian, Tudor or Cape Cod?", "Is the house a standard style (a ranch, a plain two-story), or something more detailed \u2014 Victorian, Tudor, Craftsman, that kind of thing?"], seed(c2)),
     clarify: () => "Homes with a lot of architectural detail \u2014 gingerbread trim, multiple colors, decorative millwork \u2014 take more time to cut in than a plain, modern house, so it's priced a bit differently.",
     example: () => "'Just a regular two-story' is the most common answer. Or name the style if you know it \u2014 'Victorian', 'Cape Cod', 'Tudor'."
   },
@@ -22337,7 +23569,7 @@ var TOPICS = [
     priority: 50,
     relevant: () => true,
     alreadyAnswered: (c2) => !!c2.zipCode,
-    ask: (c2) => pick(
+    ask: (c2) => pick2(
       [
         "What ZIP code is the property in?",
         "What's the ZIP code there?",
@@ -22363,14 +23595,14 @@ var TOPICS = [
       const exteriorOnly = c2.projectType === "exterior" || isStandaloneOnlyJob(c2);
       const commercial = isCommercialLike(c2);
       if (exteriorOnly) {
-        return pick(["Last thing, when would you like this done?", "And what's the timeline on this?"], seed(c2));
+        return pick2(["Last thing, when would you like this done?", "And what's the timeline on this?"], seed(c2));
       }
       if (c2.occupancy && !hasTiming(c2)) {
-        return pick(["Last thing, when would you like this done?", "And what's the timeline?"], seed(c2));
+        return pick2(["Last thing, when would you like this done?", "And what's the timeline?"], seed(c2));
       }
       if (!c2.occupancy && hasTiming(c2)) {
         if (commercial) {
-          return pick(
+          return pick2(
             [
               "Last thing, will the space still be open during the work?",
               "Will the business still be running while we work?"
@@ -22378,7 +23610,7 @@ var TOPICS = [
             seed(c2)
           );
         }
-        return pick(
+        return pick2(
           [
             "Last thing, will the property be occupied, furnished, or empty when we work?",
             "Will anyone be living there while we work?"
@@ -22387,7 +23619,7 @@ var TOPICS = [
         );
       }
       if (commercial) {
-        return pick(
+        return pick2(
           [
             "Last thing, when would you like this done, and will the business still be operating during the work?",
             "Two quick ones \u2014 timeline, and will you still be open for business during the work?"
@@ -22395,7 +23627,7 @@ var TOPICS = [
           seed(c2)
         );
       }
-      return pick(
+      return pick2(
         [
           "Last thing, when would you like this done, and will anyone be there while we work?",
           "Two quick ones to wrap up, what's your timeline, and will anyone be there while we work?"
@@ -22413,6 +23645,7 @@ var TOPICS = [
     }
   }
 ];
+TOPICS.push(...itemTopics());
 var ITEM_JOB_TOPICS = /* @__PURE__ */ new Set(["furniture_kind", "chair_count", "furniture_finish", "color_change", "paint_brand", "location", "timeline_and_access"]);
 var COMPONENT_COMMON = ["color_change", "paint_brand", "location", "timeline_and_access"];
 var COMPONENT_TOPICS = {
@@ -22422,6 +23655,7 @@ var COMPONENT_TOPICS = {
   railing: ["railing_length"]
 };
 var askableFor = (ctx, id) => {
+  if (id.startsWith("item_")) return true;
   if (ctx.itemsOnly) return ITEM_JOB_TOPICS.has(id);
   const kind = componentKind(ctx);
   return !kind || COMPONENT_COMMON.includes(id) || COMPONENT_TOPICS[kind].includes(id);
@@ -22439,6 +23673,43 @@ function pickRetryTopic(ctx, asked, retried) {
   );
   candidates.sort((a, b) => a.priority - b.priority);
   return candidates[0] ?? null;
+}
+function orList(items) {
+  return items.length <= 1 ? items.join("") : items.slice(0, -1).join(", ") + " or " + items[items.length - 1];
+}
+function wrapupQuestion(c2) {
+  const outside2 = c2.projectType === "exterior" || c2.projectType === "both";
+  if (outside2 && !isExteriorJob(c2)) {
+    const things = [];
+    let aboutIt = "";
+    if (c2.deck === "yes") {
+      things.push("the deck");
+      aboutIt = "stairs, lattice or built-in benches";
+    }
+    if (c2.fence === "yes") {
+      things.push("the fence");
+      aboutIt = aboutIt || "gates";
+    }
+    if (c2.overhangs === "yes") things.push("the patio cover");
+    if (c2.standaloneStructure) things.push("the " + c2.standaloneStructure);
+    if (c2.exteriorShutters === "yes") things.push("the shutters");
+    if (things.length > 0) {
+      const subject = orList(things).replace(/ or /g, " and ");
+      const it = things.length === 1 ? "it" : "them";
+      return `Is there anything else about ${subject} I should know${aboutIt ? `, like ${aboutIt}` : ""}, or anything else you'd like painted along with ${it}?`;
+    }
+  }
+  if (outside2) {
+    const extras = [];
+    if (c2.fence === "none") extras.push("fences");
+    if (c2.overhangs === "no") extras.push("overhangs");
+    if (c2.projectType === "exterior") extras.push("chimneys");
+    if (c2.deck === "none") extras.push("decks");
+    if (c2.exteriorShutters !== "yes") extras.push("shutters");
+    if (extras.length > 0) return `Is there anything else I should know, like ${orList(extras)}?`;
+    return "Is there anything else about the place the painters should know?";
+  }
+  return "Is there anything else about the place the painters should know?";
 }
 function findTopic(id) {
   return TOPICS.find((t2) => t2.id === id) ?? null;
@@ -22583,8 +23854,12 @@ function makeInitialContext() {
     railingType: "",
     balconies: "none",
     balconyCount: null,
+    itemAnswers: {},
     deck: "none",
     deckSize: "",
+    deckLevel: "",
+    deckUnderside: "",
+    deckCondition: "",
     fence: "none",
     fenceLinearFeet: null,
     fenceType: "privacy_6ft",
@@ -22963,6 +24238,8 @@ var tallest = (ctx) => (ctx.squareFeet ?? 0) >= 3e3 ? 3 : 2;
 var higher = (what) => `No problem, I'll go with ${what}, the higher-priced option, so the price won't come in short. A painter can adjust it once they see the place.`;
 var withExt = (ctx, id) => [.../* @__PURE__ */ new Set([...ctx.extAnswered ?? [], id])];
 function highestPriceAssumption(topicId, ctx) {
+  const item = itemDismissal(topicId, ctx);
+  if (item) return { patch: { ...item.patch, extAnswered: withExt(ctx, topicId) }, say: higher(item.label) };
   if (ctx.itemsOnly) {
     switch (topicId) {
       case "furniture_finish":
@@ -23010,6 +24287,14 @@ function highestPriceAssumption(topicId, ctx) {
       return { patch: { drywallRepairExtent: "major", conditionAddressed: true }, say: higher("walls that need real prep and repair") };
     case "color_change":
       return { patch: { interiorColorChange: "dramatic" }, say: higher("a big color change") };
+    case "ext_deck_level":
+      return { patch: { deckLevel: "second_story", extAnswered: withExt(ctx, topicId) }, say: higher("a raised second-story deck") };
+    case "ext_deck_underside":
+      return { patch: { deckUnderside: "yes", extAnswered: withExt(ctx, topicId) }, say: higher("painting the underside of the deck too") };
+    case "ext_deck_railings":
+      return { patch: { railings: "yes", railingType: ctx.railingType || "simple", extAnswered: withExt(ctx, topicId) }, say: higher("railings around the deck") };
+    case "ext_deck_condition":
+      return { patch: { deckCondition: "peeling", extAnswered: withExt(ctx, topicId) }, say: higher("a deck with a failing finish that needs stripping") };
     case "color_scope_clarify":
       return { patch: { colorClarificationNeeded: "" }, say: higher("painting every wall and room the new color") };
     case "property_ownership":
@@ -23111,6 +24396,95 @@ function sanitizeLlmPatch(text, ctx, lastTopicId, patch) {
   return cleaned;
 }
 
+// src/lib/chatEstimator/deckDetails.ts
+init_define_import_meta_env();
+var YES = /^\W*(?:yes|yeah|yep|yup|sure|please|definitely|absolutely|both|all of it|everything|that too|do it|of course)\b/;
+var NO = /^\W*(?:no|nope|nah|none|not (?:needed|really)|skip|pass|just the top|top only|only the top)\b/;
+function levelFrom(low, asked) {
+  if (/\b(?:second|2nd|upper|top|third|3rd)[\s-]*(?:story|floor|level)\b|\b(?:two|2)[\s-]*stor(?:y|ey)\s+(?:deck|balcon)|\boff (?:of )?the (?:second|2nd|upper) (?:story|floor)\b|\bdeck (?:on|off) the (?:second|2nd|upper)\b/.test(low)) return "second_story";
+  const feet = low.match(/\b(\d{1,2})\s*(?:-|\s)?(?:f(?:oo|ee)?t|')\s*(?:up|high|off the ground|above)\b|\b(\d{1,2})\s*(?:-|\s)?(?:f(?:oo|ee)?t|')\s*(?:tall|high)\s+deck\b/);
+  if (feet) {
+    const n = parseInt(feet[1] ?? feet[2], 10);
+    if (n >= 9) return "second_story";
+    if (n >= 2) return "raised";
+  }
+  if (/\b(?:ground[\s-]*level|on the ground|at ground|flush with the ground|low[\s-]*(?:to[\s-]*the[\s-]*ground )?deck|sits? (?:right )?on the ground|slab|patio[\s-]*level|ground floor|first floor|one level|single level)\b/.test(low)) return "ground";
+  if (/\b(?:raised|elevated|stilts|off the ground|walk (?:under|beneath)|crawl (?:under|beneath)|above the ground|up (?:off|high)|few feet (?:up|off)|several feet|cantilever|hillside|sloped?|built up)\b/.test(low)) return "raised";
+  if (asked) {
+    if (/^\W*(?:ground|low|level)\b/.test(low)) return "ground";
+    if (/^\W*(?:raised|up|high|elevated|above)\b/.test(low)) return "raised";
+    if (/^\W*(?:second|2nd|upstairs|upper)\b/.test(low)) return "second_story";
+  }
+  return "";
+}
+function readDeckDetails(text, ctx, askedId) {
+  const patch = {};
+  const acks = [];
+  const low = text.toLowerCase();
+  const mentionsDeck = /\b(?:decks?|decking|porch|balcony|balconies)\b/.test(low);
+  const aboutDeck = !!askedId && askedId.startsWith("ext_deck");
+  if (ctx.deck !== "yes" && !mentionsDeck) return { patch, acks };
+  if (!mentionsDeck && !aboutDeck && askedId !== "wrapup") return { patch, acks };
+  const question = text.trim().endsWith("?");
+  if (question) return { patch, acks };
+  const level = !ctx.deckLevel ? levelFrom(low, askedId === "ext_deck_level") : "";
+  if (level) {
+    patch.deckLevel = level;
+    acks.push(level === "ground" ? "ground-level deck" : level === "second_story" ? "second-story deck" : "raised deck");
+  }
+  const effectiveLevel = ctx.deckLevel || level;
+  if (!ctx.deckUnderside) {
+    const saysUnderside = /\bunder\s?side\b|\bunderneath\b|\bbeneath\b|\bjoists?\b|\bbottom of the deck\b|\bbelow the deck\b|\bunder the deck\b/.test(low);
+    const negated = /\b(?:no|not|without|skip|don'?t|doesn'?t|won'?t|leave)\b[^.,;]{0,25}\b(?:under\s?side|underneath|beneath|joists?|under the deck)\b|\b(?:just|only)\s+(?:the\s+)?(?:top|surface)\b|\btop(?:\s+side)?\s+only\b|\bone side\b/.test(low);
+    if (saysUnderside) {
+      patch.deckUnderside = negated ? "no" : "yes";
+      if (!negated) acks.push("underside painted");
+      if (!negated && !effectiveLevel) patch.deckLevel = "raised";
+    } else if (askedId === "ext_deck_underside") {
+      if (YES.test(low)) {
+        patch.deckUnderside = "yes";
+        acks.push("underside painted");
+      } else if (NO.test(low) || /\b(?:just|only)\b.*\b(?:top|surface)\b/.test(low)) patch.deckUnderside = "no";
+    } else if (effectiveLevel === "ground") {
+      patch.deckUnderside = "no";
+    } else if (negated && /\b(?:just|only|top)\b/.test(low) && mentionsDeck) {
+      patch.deckUnderside = "no";
+    }
+  }
+  if (ctx.railings === "none") {
+    const rail = /\brail(?:ing)?s?\b|\bbalusters?\b|\bspindles?\b|\bbanisters?\b/.test(low);
+    const noRail = /\b(?:no|without|doesn'?t have|don'?t have|not have|none)\b[^.,;]{0,20}\brail(?:ing)?s?\b|\brail(?:ing)?s?\b[^.,;]{0,15}\b(?:no|none|aren'?t|isn'?t|not)\b/.test(low);
+    if (rail && !noRail) {
+      patch.railings = "yes";
+      patch.railingType = /\b(?:spindles?|balusters?|pickets?)\b/.test(low) ? "spindles" : ctx.railingType || "simple";
+      acks.push("deck railings");
+    } else if (aboutDeck && askedId === "ext_deck_railings" && !noRail) {
+      if (YES.test(low)) {
+        patch.railings = "yes";
+        patch.railingType = ctx.railingType || "simple";
+        acks.push("deck railings");
+      }
+    }
+  }
+  if (!ctx.deckCondition && (mentionsDeck || askedId === "ext_deck_condition")) {
+    let cond = "";
+    if (/\b(?:rot|rotted|rotten|rotting|dry[\s-]rot|soft (?:spots?|boards?|wood)|termites?|damaged (?:boards?|wood)|broken boards?|replace (?:some )?boards?|splintered|splitting boards?)\b/.test(low)) cond = "rotted";
+    else if (/\b(?:peel(?:ing|ed|s)?|flak(?:ing|ed|y)|chipp(?:ing|ed)|blister(?:ing|ed)?|bubbl(?:ing|ed)|failing|crack(?:ing|ed)\s+(?:paint|stain|finish)|stripped back|needs? (?:to be )?stripp?ed)\b/.test(low)) cond = "peeling";
+    else if (/\b(?:weathered|gr[ae]y(?:ed|ing)?|bare(?:\s+wood)?|raw|unfinished|never (?:been )?(?:stained|painted|sealed|treated)|sun[\s-]?bleached|dried out|dry)\b/.test(low) && !/\bgray\s+(?:paint|stain)\b/.test(low)) cond = "weathered";
+    else if (/\b(?:good|great|fine|solid|sound|excellent|decent|okay|ok|faded|worn|pretty good|new|recently|well[\s-]kept|maintained|clean)\b/.test(low) && (askedId === "ext_deck_condition" || /\bdeck\b[^.,;]{0,30}\b(?:good|great|fine|solid|sound|excellent|decent|faded|worn|new)\b|\b(?:good|great|fine|solid|sound|excellent|decent|faded|worn|new)\b[^.,;]{0,20}\bdeck\b/.test(low))) cond = "good";
+    if (cond) {
+      patch.deckCondition = cond;
+      acks.push(cond === "good" ? "deck in good shape" : cond === "weathered" ? "weathered deck" : cond === "peeling" ? "peeling deck finish" : "rotted deck boards");
+    }
+  }
+  return { patch, acks };
+}
+function isDeckTalk(text) {
+  const low = text.toLowerCase();
+  if (!/\b(?:decks?|decking|porch|balcony|balconies|underside|underneath)\b/.test(low)) return false;
+  return !/\b(?:my|the|our)\s+(?:house|home)\b|\bsiding\b|\bstucco\b|\bwhole (?:house|exterior)\b|\bhouse exterior\b|\bexterior (?:of|paint)\b/.test(low);
+}
+
 // src/lib/chatEstimator/selfCheck.ts
 init_define_import_meta_env();
 var REPEAT_COMPLAINT = [
@@ -23179,7 +24553,7 @@ function collectFriction(history, logged = []) {
       out.push({ kind, turn: userTurns, user: m2.text.slice(0, 200), bot: before?.text.slice(0, 200) });
     }
   });
-  for (const e2 of botRepeats(history)) if (!out.some((o) => o.kind === "bot_repeat" && o.turn === e2.turn)) out.push(e2);
+  for (const e2 of botRepeats(history)) if (!out.some((o2) => o2.kind === "bot_repeat" && o2.turn === e2.turn)) out.push(e2);
   return out.slice(0, 20);
 }
 
@@ -23242,13 +24616,14 @@ function makeInitialState() {
 }
 function notesStep(s, ctxNext, acknowledgements) {
   const lead = acknowledgements.length > 0 ? `${ACK_LEAD_INS[s.askedIds.length % ACK_LEAD_INS.length]} ${acknowledgements.join(", ")}. ` : "";
-  const examples = ctxNext.projectType === "exterior" ? "fences, overhangs, chimneys, decks or shutters" : ctxNext.projectType === "both" ? "fences, decks or shutters" : "anything about the place the painters should know";
   return {
     state: {
       ...s,
       wrapupAsked: true,
+      lastBotTopic: null,
+      // the question on the table is now the closing one, not whatever was asked before it
       askedIds: [...s.askedIds, "wrapup"],
-      history: [...s.history, botMessage(`${lead}Almost there. Is there anything else I should know, like ${examples}? If not, just say "no".`)]
+      history: [...s.history, { ...botMessage(`${lead}Almost there. ${wrapupQuestion(ctxNext)} If not, just say "no".`), topicId: "wrapup" }]
     },
     done: null
   };
@@ -23265,11 +24640,15 @@ function photosStep(s, ctxNext, acknowledgements) {
       ...s,
       ctx: alreadyAskedForProperty ? s.ctx : { ...s.ctx, photoRequests: [...s.ctx.photoRequests, { id: "property", label: "the property", fulfilled: false }] },
       photosAsked: true,
+      lastBotTopic: null,
       history: [
         ...s.history,
-        botMessage(
-          `${noted}I think I've got enough to put a number together. ${reminderLeadIn}${reminderMarkers}${reminderMarkers ? " " : ""}A couple of photos of the property help painters respond faster and with more confidence, please attach some here. ${propertyMarker}When you're ready, just say 'run it' and I'll price it out.`
-        )
+        {
+          ...botMessage(
+            `${noted}I think I've got enough to put a number together. ${reminderLeadIn}${reminderMarkers}${reminderMarkers ? " " : ""}A couple of photos of the property help painters respond faster and with more confidence, please attach some here. ${propertyMarker}When you're ready, just say 'run it' and I'll price it out.`
+          ),
+          topicId: "photos"
+        }
       ]
     },
     done: null
@@ -23416,6 +24795,11 @@ async function processMessage(state, trimmed, customerId) {
     const again = state.lastBotTopic ? state.lastBotTopic.ask(state.ctx) : "What would you like me to change?";
     return asBot({ friction: frictionLog }, `Sorry about that, I shouldn't have assumed. ${recap} Tell me what's wrong and I'll fix it, or answer this: ${again.charAt(0).toLowerCase()}${again.slice(1)}`);
   }
+  if (isDeckTalk(trimmed) && state.ctx.squareFeet == null && !state.ctx.sidingType && state.ctx.stories == null && !patch.sidingType) {
+    delete patch.stories;
+    delete patch.specialEquipment;
+    delete patch.squareFeet;
+  }
   const ctxWithExplicit = { ...state.ctx, ...patch };
   {
     const askedId = state.lastBotTopic?.id ?? null;
@@ -23425,6 +24809,25 @@ async function processMessage(state, trimmed, customerId) {
     const saidNone = /^\W*(?:no|none|nope|nah|skip|n\/a|zero|all of them|every one|everything)\b/i.test(trimmed);
     if (askedId && DETAIL_TOPIC_IDS.has(askedId) && !trimmed.endsWith("?") && !hasIntent(intent, "dismissive") && (det.acks.length > 0 || saidNone)) {
       ctxWithExplicit.extAnswered = [.../* @__PURE__ */ new Set([...ctxWithExplicit.extAnswered ?? state.ctx.extAnswered ?? [], askedId])];
+    }
+  }
+  if (state.lastBotTopic && ["deck_size", "overhang_size", "fence_size", "fence_height"].includes(state.lastBotTopic.id)) {
+    if (state.ctx.squareFeet == null && ctxWithExplicit.squareFeet != null) ctxWithExplicit.squareFeet = state.ctx.squareFeet;
+    if (state.ctx.stories == null && ctxWithExplicit.stories != null) ctxWithExplicit.stories = state.ctx.stories;
+  }
+  {
+    const askedForDeck = state.wrapupAsked ? "wrapup" : state.lastBotTopic?.id ?? null;
+    const deck = readDeckDetails(trimmed, ctxWithExplicit, askedForDeck);
+    if (Object.keys(deck.patch).length > 0) {
+      Object.assign(ctxWithExplicit, deck.patch);
+      for (const a of deck.acks) if (!acknowledgements.includes(a)) acknowledgements.push(a);
+    }
+  }
+  {
+    const item = readItemAnswers(trimmed, ctxWithExplicit, state.wrapupAsked ? null : state.lastBotTopic?.id ?? null);
+    if (Object.keys(item.patch).length > 0) {
+      Object.assign(ctxWithExplicit, item.patch);
+      for (const a of item.acks) if (!acknowledgements.includes(a)) acknowledgements.push(a);
     }
   }
   {
@@ -23517,7 +24920,7 @@ async function processMessage(state, trimmed, customerId) {
       const yes = /^\s*(?:yes|yeah|yep|yup|sure|ok|okay|please|definitely|absolutely|why not|sounds good|do it|add (?:it|them)|go ahead|let'?s do it|that'?d be (?:great|good|nice)|i guess|fine|of course|love to)\b/.test(low);
       const no = /^\s*(?:no|nope|nah|not (?:now|needed|really|this time)|skip|pass|leave (?:it|them)|that'?s (?:ok|okay|fine|alright)|no thanks|no thank you|i'?m good)\b/.test(low);
       const target = ctxWithExplicit;
-      const exclusiveWithoutIt = /\b(?:just|only)\b/.test(low) && !asked.word.test(low) && Object.values(offer).some((o) => o !== asked && o.word.test(low));
+      const exclusiveWithoutIt = /\b(?:just|only)\b/.test(low) && !asked.word.test(low) && Object.values(offer).some((o2) => o2 !== asked && o2.word.test(low));
       if (yes && !no) {
         target[asked.field] = asked.on;
         added.add(asked.key);
@@ -23528,11 +24931,11 @@ async function processMessage(state, trimmed, customerId) {
       }
     }
     if (asked && !/^\s*(?:no|nope|nah)\b/.test(low)) {
-      for (const o of Object.values(offer)) {
-        if (o.word.test(low) && !ruledOut.has(o.key)) {
-          ctxWithExplicit[o.field] = o.on;
-          added.add(o.key);
-          if (o.field === "interiorTrim") ctxWithExplicit.trimScopeAddressed = true;
+      for (const o2 of Object.values(offer)) {
+        if (o2.word.test(low) && !ruledOut.has(o2.key)) {
+          ctxWithExplicit[o2.field] = o2.on;
+          added.add(o2.key);
+          if (o2.field === "interiorTrim") ctxWithExplicit.trimScopeAddressed = true;
         }
       }
     }
@@ -24019,7 +25422,8 @@ ${trimmed}`.trim();
       return { state: s, done: null };
     }
   }
-  if (s.wrapupAsked && readyToQuote(ctxNext)) {
+  const openedNewQuestions = s.wrapupAsked && !!(pickNextTopic(ctxNext, s.askedIds) ?? pickRetryTopic(ctxNext, s.askedIds, s.retriedIds)) && !hasIntent(intent, "ready_to_finish") && !explicitRunIt;
+  if (s.wrapupAsked && readyToQuote(ctxNext) && !openedNewQuestions) {
     if (!s.photosAsked) return photosStep(s, ctxNext, acknowledgements);
     return await finalizeTurn(s, customerId);
   }
@@ -24352,6 +25756,119 @@ function fieldsForKey(key) {
     default:
       return [];
   }
+}
+
+// src/lib/promptHints.ts
+init_define_import_meta_env();
+var GENERIC_PROMPT = "Type or talk here.";
+var TOPIC_PROMPTS = {
+  project_type: "Inside, outside, or both?",
+  which_rooms: "Which rooms?",
+  room_size: "About how big is the room?",
+  house_size: "Please estimate square feet",
+  bathroom_count: "How many bathrooms?",
+  interior_stories: "One story, or two?",
+  surfaces: "walls, ceilings, trim, etc\u2026",
+  room_assumption: "Sounds right, or what\u2019s different?",
+  upsell_special_trim: "Crown molding, chair rail, etc.?",
+  paint_brand: "Brand, or painter\u2019s choice?",
+  paint_grade: "Standard or premium paint?",
+  paint_finish: "Finish, or painter\u2019s choice?",
+  ext_size: "Please estimate square feet",
+  ext_style: "ranch, two-story, Victorian, Tudor, etc.",
+  ext_trim: "Paint the trim and eaves?",
+  ext_trim_material: "wood, aluminum, vinyl, stucco",
+  ext_doors: "Paint the front door?",
+  ext_garage: "Paint the garage door?",
+  ext_garage_count: "One or two garage doors?",
+  ext_gutters: "Paint the gutters?",
+  ext_windows: "What are the windows made of?",
+  ext_window_count: "How many windows?",
+  ext_condition: "How is the paint holding up?",
+  ext_repairs: "Any repairs needed?",
+  ext_color: "Same color or a new one?",
+  upsell_ceilings: "Add the ceilings?",
+  upsell_trim: "Add the baseboards?",
+  upsell_doors: "Add the doors?",
+  upsell_cabinets: "Add the kitchen cabinets?",
+  cabinet_finish: "Are the cabinets painted, bare wood, stained or pre-primed?",
+  door_count: "About how many doors?",
+  window_count: "About how many windows?",
+  closet_count: "How many closets?",
+  chair_count: "How many chairs?",
+  shutter_count: "How many shutters?",
+  railing_length: "About how many feet of railing?",
+  fence_size: "How long (linear feet) and how tall is the fence?",
+  fence_height: "How tall is the fence?",
+  deck_size: "How many square feet is the deck?",
+  ext_deck_level: "On the ground, or raised up?",
+  ext_deck_underside: "Paint the underside too?",
+  ext_deck_railings: "Does it have railings?",
+  ext_deck_condition: "What shape is the deck in?",
+  wrapup: 'Anything else to add, or "no"?',
+  photos: 'Attach photos, or say "run it"',
+  balcony_count: "How many balconies?",
+  building_count: "How many buildings?",
+  builtin_count: "How many built-ins?",
+  cabinet_count: "How many doors and drawers?",
+  cabinet_hardware: "Keep the hardware, or replace it?",
+  cabinet_method: "Sprayed, or brushed?",
+  cabinet_scope: "Outsides only, or insides too?",
+  ceiling_height: "About how tall are the ceilings?",
+  commercial_access: "When can the crew work?",
+  furniture_finish: "Painted or stained now? Repaint or refinish?",
+  furniture_kind: "Which pieces, and how many?",
+  unit_count: "How many units?",
+  overhang_size: "How many square feet is the overhang or patio cover?",
+  ext_extras: "Is there a fence, deck or patio cover to paint too?",
+  ext_extras_which: "Which: fence, deck or patio cover?",
+  detail_rooms: "How many rooms is the trim in?",
+  detail_feet_chair_rail: "About how many linear feet of chair rail?",
+  detail_feet_crown: "About how many linear feet of crown moulding?",
+  detail_feet_trim: "About how many linear feet of baseboard?",
+  detail_sqft_wainscot: "About how many square feet of wainscoting?",
+  trim_door_finish: "Are the trim and doors painted, bare wood, stained or pre-primed?",
+  trim_scope: "What does the trim include?",
+  condition: "What shape are the surfaces in?",
+  popcorn_extent: "How many rooms have popcorn ceilings?",
+  property_ownership: "Do you live there, or is it a rental?",
+  color_change: "Same color, or a new one?",
+  color_scope_clarify: "How many colors?",
+  reno_context: "Where does the other work stand?",
+  siding: "What is the outside made of?",
+  stories: "How many stories?",
+  location: "ZIP code?",
+  timeline_and_access: "When would you like it done?"
+};
+function coreQuestion(text) {
+  const flat = text.replace(/\[\[photos?[:|][^\]]*\]\]/g, " ").replace(/\s+/g, " ");
+  const questions = flat.match(/[^.!?]*\?/g);
+  return questions && questions[questions.length - 1].trim() || flat;
+}
+function composerPrompt(botText, topicId) {
+  if (topicId === "wrapup" || topicId === "photos") return TOPIC_PROMPTS[topicId];
+  if (topicId && topicId.startsWith("ext_deck") && TOPIC_PROMPTS[topicId]) return TOPIC_PROMPTS[topicId];
+  const itemHint = itemTopicHint(topicId);
+  if (itemHint) return itemHint;
+  if (/\brun it\b/i.test(botText)) return "Anything else to add?";
+  if (topicId && topicId.startsWith("ext_deck") && TOPIC_PROMPTS[topicId]) return TOPIC_PROMPTS[topicId];
+  const q = coreQuestion(botText);
+  if (/\b(square (?:feet|foot|footage)|sq\.? ?ft)\b/i.test(q)) return "Please estimate square feet";
+  if (/\blinear (?:feet|foot)\b/i.test(q)) return "About how many linear feet?";
+  const many = q.match(/\bhow many ((?!of\b)[a-z-]+(?: [a-z-]+)?)/i);
+  if (many) {
+    const noun = many[1].replace(/\b(are|is|do|does|did|will|would|you|we|there|need|needs|get|getting|in|on|to|that|of)\b.*$/i, "").trim();
+    if (noun) return `How many ${noun}?`;
+  }
+  if (/\b(living here|live here|rental|renting)\b/i.test(q)) return "Do you live there, or is it a rental?";
+  if (/\bzip\b/i.test(q)) return "ZIP code?";
+  if (/\b(stories|story)\b/i.test(q)) return "How many stories?";
+  if (/\b(interior or exterior|inside,? (?:the )?outside|inside or outside)\b/i.test(q)) return "Inside, outside, or both?";
+  if (/\bwhich rooms?\b/i.test(q)) return "Which rooms?";
+  if (/\bwhen would you like\b|\btimeline\b/i.test(q)) {
+    return /occupied|furnished|empty|vacant/i.test(q) ? "When, and is it occupied or empty?" : "When would you like it done?";
+  }
+  return topicId && TOPIC_PROMPTS[topicId] || GENERIC_PROMPT;
 }
 
 // scripts/estimatorConversations.ts
@@ -24737,6 +26254,9 @@ async function dismissAt(setup, topicWords, dismissal = "doesnt matter just want
     "i need some chairs painted",
     "1 chair to paint",
     "the furniture needs sanded",
+    "solid wood",
+    "plain",
+    "inside",
     "refreshing the stain",
     "same stain color",
     "painters choice",
@@ -24773,6 +26293,9 @@ async function dismissAt(setup, topicWords, dismissal = "doesnt matter just want
     "the furniture needs sanded",
     "what does this have to do with anything",
     "1 chair to paint",
+    "solid wood",
+    "plain",
+    "inside",
     "refreshing the stain",
     "same stain color"
   ]);
@@ -24856,6 +26379,77 @@ async function dismissAt(setup, topicWords, dismissal = "doesnt matter just want
   }
   const back = await play(["I want my living room painted, walls only", "about 15 by 20", "actually, add the ceilings too"]);
   check("a surface ruled out earlier comes back when the customer asks for it", back.state.ctx.interiorCeilings === "yes" && !(back.state.ctx.excludedSurfaces ?? []).includes("ceilings"), JSON.stringify({ c: back.state.ctx.interiorCeilings, ex: back.state.ctx.excludedSurfaces }));
+}
+{
+  const lastBot = (s) => [...s.history].reverse().find((m2) => m2.role === "bot");
+  const deck = await play(["a deck", "20 feet by 30 feet"]);
+  check("deck: after the size, asks how high it is (not the paint brand)", /ground|raised/i.test(deck.last), deck.last);
+  const asked = [];
+  let st2 = deck.state;
+  for (const a of ["second story, off the back", "yes, the underside too", "yes, railings all around", "weathered and gray", "40 feet", "wood", "painters choice", "91941", "in 3 weeks"]) {
+    const r = await play([a], [], st2);
+    st2 = r.state;
+    asked.push(r.last);
+  }
+  const all = asked.join(" ## ");
+  check("deck: asked the underside, the railings and the condition", st2.ctx.deckLevel === "second_story" && st2.ctx.deckUnderside === "yes" && st2.ctx.railings === "yes" && st2.ctx.deckCondition === "weathered", JSON.stringify({ l: st2.ctx.deckLevel, u: st2.ctx.deckUnderside, r: st2.ctx.railings, c: st2.ctx.deckCondition }) + " " + all);
+  const wrap = lastBot(st2);
+  check("deck: the closing question is about the deck, with no chimneys or shutters", /deck/i.test(wrap.text) && !/chimney|shutter|overhang/i.test(wrap.text), wrap.text);
+  check("deck: the answer box moves on to the closing question (not the timeline one before it)", composerPrompt(wrap.text, wrap.topicId ?? st2.lastBotTopic?.id) === 'Anything else to add, or "no"?', composerPrompt(wrap.text, wrap.topicId ?? st2.lastBotTopic?.id));
+  const fin = await play(["no", "run it"], [], st2);
+  check("deck: priced as a deck, a second-story deck is never read as a two-story house", fin.state.finalEstimate != null && fin.state.ctx.stories == null && fin.state.ctx.exteriorBody === "no" && !fin.state.finalEstimate.estimate.lineItems.some((l) => /Siding|Body|Boom/i.test(l.description)) && fin.state.finalEstimate.estimate.lineItems.some((l) => /Underside/.test(l.description)), JSON.stringify(fin.state.finalEstimate?.estimate.lineItems.map((l) => l.description)));
+  check("deck: the estimate is in a sane range for 600 sq ft (not a house exterior)", (fin.state.finalEstimate?.estimate.total ?? 0) < 8e3, String(fin.state.finalEstimate?.estimate.total));
+  const bare = await play(["a deck", "600 sq ft", "on the ground", "no", "faded but solid", "painters choice", "91941", "in 3 weeks", "no", "run it", "run it"]);
+  check('deck: a bare "600 sq ft" is the deck, not the house (no siding line)', bare.state.ctx.squareFeet == null && !!bare.state.finalEstimate && !bare.state.finalEstimate.estimate.lineItems.some((l) => /Siding|Body/i.test(l.description)), JSON.stringify({ s: bare.state.ctx.squareFeet, li: bare.state.finalEstimate?.estimate.lineItems.map((l) => l.description) }));
+  const late = await play(["a deck", "600 sq ft", "on the ground", "no", "good", "painters choice", "91941", "in 3 weeks", "no", "there are also railings all around"]);
+  check("deck: something said at the photos step opens its own question instead of pricing", !late.state.finalEstimate && /railing/i.test(late.last), late.last);
+  const house = await play(["I need the outside of my house painted", "2000 sq ft", "stucco", "two story", "yes, the trim too", "wood", "it also has a deck", "12 by 15"]);
+  check("house + a deck mentioned later: the deck is asked about (height next)", /ground|raised/i.test(house.last), house.last);
+  const houseWrap = await play(["I need the outside of my house painted", "2000 sq ft", "stucco", "two story", "yes, the trim too", "wood", "ranch", "no", "painters choice", "91941", "in 3 weeks", "good", "same color", "no", "no", "no", "no", "no", "no"]);
+  const hw = [...houseWrap.state.history].reverse().find((m2) => m2.topicId === "wrapup");
+  check("house exterior: the closing question lists extras to add, never the deck once it is in", !!hw && /chimney|fence/i.test(hw.text), hw?.text ?? "no wrapup asked");
+}
+{
+  const priceOf = async (lines) => (await play(lines)).state.finalEstimate?.estimate.total ?? 0;
+  const tail = ["painters choice", "91941", "in 4 weeks", "no", "run it"];
+  const stair = await play(["stari railing"]);
+  check('staircase railing (typo "stari"): read as an inside staircase railing, not a deck railing', stair.state.ctx.stairwayDetails === "railings_only" && stair.state.ctx.projectType === "interior" && stair.state.ctx.railings === "none", JSON.stringify({ sd: stair.state.ctx.stairwayDetails, pt: stair.state.ctx.projectType, r: stair.state.ctx.railings }));
+  check("staircase railing: the first question is how long it is (flights or feet), not the paint brand", /long|flights?/i.test(stair.last) && !/brand/i.test(stair.last), stair.last);
+  const flights = await play(["stari railing", "2 flights"], [], stair.state);
+  check('staircase railing: "2 flights" is read as about 28 ft', flights.state.ctx.stairRailFeet === 28, String(flights.state.ctx.stairRailFeet));
+  check("staircase railing: material is asked next", /wood|iron|metal/i.test(flights.last), flights.last);
+  const base = ["stari railing", "2 flights", "wood", "painted white", "lots of spindles", "good", "same color", ...tail];
+  const iron = ["stari railing", "2 flights", "wrought iron", "lots of spindles", "good", "same color", ...tail];
+  const stripped = ["stari railing", "2 flights", "wood", "stained oak", "strip and refinish", "lots of spindles", "peeling in spots", "same color", ...tail];
+  const [pBase, pIron, pStrip] = [await priceOf(base), await priceOf(iron), await priceOf(stripped)];
+  check("staircase railing: wrought iron costs more than painted wood", pIron > pBase * 1.2, pBase + " vs " + pIron);
+  check("staircase railing: stained wood to strip and refinish (and peeling) costs much more than a repaint", pStrip > pBase * 1.6, pBase + " vs " + pStrip);
+  check("staircase railing: the answers are in the price (nowhere near the old flat 14 ft price)", pBase > 450, String(pBase));
+  const firstBrandIndex = (turns) => turns.findIndex((t2) => /paint brand|brand in mind/i.test(t2));
+  const items = [
+    { say: "I need my fence painted", asks: /both sides|made of|bare, stained|gates/i, label: "fence" },
+    { say: "paint my front door", asks: /stain|sidelight|pair|glass/i, label: "front door" },
+    { say: "need a shed painted", asks: /T1-11|ten feet|trim, doors/i, label: "shed" },
+    { say: "paint my garage door", asks: /steel|panel|inside/i, label: "garage door" },
+    { say: "paint my brick fireplace", asks: /brick, stone|limewash|ceiling/i, label: "fireplace" }
+  ];
+  for (const it of items) {
+    const run = await play([it.say, "not sure", "not sure", "not sure", "not sure", "not sure", "not sure"]);
+    const brand = firstBrandIndex(run.turns);
+    const before = run.turns.slice(0, brand < 0 ? run.turns.length : brand);
+    check('item "' + it.label + '": its own questions come before the paint brand', before.some((t2) => it.asks.test(t2)), run.turns.join(" ## "));
+  }
+  const fire = await play(["paint my brick fireplace", "not sure", "not sure", "not sure", "not sure", "not sure"]);
+  check("fireplace only: never asks about ceilings, baseboards or doors", !fire.turns.some((t2) => /ceilings|baseboards|the doors/i.test(t2)), fire.turns.join(" ## "));
+  const fenceBase = ["I need my fence painted", "100 feet, 6 feet tall", "wood", "bare wood", "paint", "both sides", "good", "none", ...tail];
+  const fenceOne = ["I need my fence painted", "100 feet, 6 feet tall", "wood", "bare wood", "paint", "just my side", "good", "none", ...tail];
+  const [fBoth, fOne] = [await priceOf(fenceBase), await priceOf(fenceOne)];
+  check("fence: one side costs clearly less than both sides", fOne < fBoth * 0.75 && fOne > 0, fOne + " vs " + fBoth);
+  const hintRun = await play(["I need my fence painted", "100 feet, 6 feet tall"]);
+  const hb = [...hintRun.state.history].reverse().find((m2) => m2.role === "bot");
+  check("item question: the answer box hint is for that question", composerPrompt(hb.text, hb.topicId ?? hintRun.state.lastBotTopic?.id) === "Wood, metal, vinyl, or block?", composerPrompt(hb.text, hb.topicId ?? hintRun.state.lastBotTopic?.id));
+  const brushed = await play(["stari railing", "2 flights", "doesn't matter"]);
+  check("item question brushed off: takes the higher-priced answer and says so", /higher-priced/.test(brushed.last) || brushed.state.ctx.interiorRailingMaterial === "wrought_iron", brushed.last);
 }
 setLLMReaderForTests(void 0);
 console.log(failures ? `

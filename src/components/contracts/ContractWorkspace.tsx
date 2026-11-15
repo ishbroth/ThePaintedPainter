@@ -72,8 +72,14 @@ export default function ContractWorkspace({ auth, onChange, compact = false }: {
   const inForce = view.versions.find((v) => v.id === view.inForceVersionId);
   const waitingOnCustomer = pending && view.role === 'customer';
 
+  // after the customer has signed: a way on to the next step (confirm dates, pay the deposit), at the top and the bottom of the page
+  const nextStep = !compact && view.role === 'customer' && inForce && !pending && view.confirmUrl
+    ? <a href={view.confirmUrl} style={{ ...primary, display: 'inline-block', textDecoration: 'none' }}>Confirm dates →</a>
+    : null;
+
   return (
     <div>
+      {nextStep && <div style={{ marginBottom: 16 }}>{nextStep}</div>}
       {/* where things stand */}
       <div style={card}>
         <p style={{ margin: 0, fontWeight: 700, color: 'var(--text-primary)' }}>
@@ -139,6 +145,8 @@ export default function ContractWorkspace({ auth, onChange, compact = false }: {
           setError={setError}
         />
       )}
+
+      {nextStep && <div style={{ marginTop: 16 }}>{nextStep}</div>}
     </div>
   );
 }

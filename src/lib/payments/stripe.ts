@@ -37,10 +37,15 @@ export function getStripe(): Promise<Stripe | null> {
  * its deposit with dates agreed, and uses the deposit amount stored in the database (10% of the guaranteed price),
  * so the amount can't be changed from here. See supabase/functions/create-checkout-session.
  */
+export const DEPOSIT_ALREADY_MARKED_PAID = 'marked-paid';
+
 export async function createDepositCheckout(confirmToken: string): Promise<string | null> {
   const { data, error } = await supabase.functions.invoke('create-checkout-session', {
     body: { confirmToken },
   });
+
+  // the one test account skips Stripe: the server has already marked the deposit paid
+  if (!error && data?.paid) return DEPOSIT_ALREADY_MARKED_PAID;
 
   if (error || !data?.url) {
     console.error('Failed to create checkout session:', error ?? data);

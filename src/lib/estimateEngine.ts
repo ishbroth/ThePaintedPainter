@@ -10,6 +10,7 @@ import {
   estimateHouseLayout,
 } from './surfaceAreaEngine';
 import { isIsolatedDetailJob, TRIM_FEET_PER_ROOM } from './chatEstimator/details';
+import { applyItemAnswers } from './chatEstimator/itemInterviews';
 
 // ===== Main Estimate Calculation =====
 
@@ -698,12 +699,26 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
     if (ctx.deck === 'yes' && !off('deck')) {
       const deckSizes = { small: 100, medium: 250, large: 450 };
       const deckSqft = ctx.deckSqft || deckSizes[ctx.deckSize as keyof typeof deckSizes] || deckSizes.medium;
+      // What shape the wood is in decides the prep: a worn finish needs a wash and sanding, a failing one has to be scraped and stripped first,
+      // and rotted boards need repair work as well.
+      const conditionFactor = ctx.deckCondition === 'weathered' ? 1.15 : ctx.deckCondition === 'peeling' ? 1.4 : ctx.deckCondition === 'rotted' ? 1.4 : 1;
+      const conditionNote = ctx.deckCondition === 'weathered' ? ', weathered wood' : ctx.deckCondition === 'peeling' ? ', strip and sand' : ctx.deckCondition === 'rotted' ? ', board repair' : '';
+      const deckRate = BASE_RATES.exterior.deck_stain_per_sqft * regionalMult * conditionFactor;
       lineItems.push({
         category: 'Exterior',
-        description: ctx.deckSqft ? `Deck (${deckSqft} sq ft)` : 'Deck',
-        amount: deckSqft * BASE_RATES.exterior.deck_stain_per_sqft * regionalMult,
+        description: ctx.deckSqft ? `Deck (${deckSqft} sq ft${conditionNote})` : 'Deck',
+        amount: deckSqft * deckRate,
         key: 'deck',
       });
+      if (ctx.deckCondition === 'rotted') {
+        lineItems.push({ category: 'Prep Work', description: 'Deck Board Repair Allowance', amount: Math.max(250, deckSqft * 1.25) * regionalMult, key: 'deck_repair' });
+      }
+      // A raised deck's underside is overhead work (joists, the bottom of every board, the posts), slower than the top, and needs ladders
+      // or scaffolding to reach; one on the second floor needs the most.
+      if (ctx.deckUnderside === 'yes' && (ctx.deckLevel === 'raised' || ctx.deckLevel === 'second_story')) {
+        lineItems.push({ category: 'Exterior', description: `Deck Underside (${deckSqft} sq ft)`, amount: deckSqft * deckRate * 0.65, key: 'deck_underside' });
+        lineItems.push({ category: 'Access', description: ctx.deckLevel === 'second_story' ? 'Scaffold / Lift Access (second-story deck)' : 'Ladder & Scaffold Access (raised deck)', amount: (ctx.deckLevel === 'second_story' ? 400 : 150) * regionalMult, key: 'deck_access' });
+      }
     }
 
     // Fence
@@ -965,6 +980,9 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
   }
 
   // ===== SUBTOTAL =====
+  // What the customer said about each item (railing material and finish, fence sides, door style...) scales that item's price line
+  lineItems.splice(0, lineItems.length, ...applyItemAnswers(lineItems, ctx, regionalMult));
+
   let subtotal = lineItems.reduce((sum, item) => sum + item.amount, 0);
   // A painter won't mobilize for less than a minimum job fee, however small the item.
   const minCharge = MIN_JOB_CHARGE * regionalMult;
