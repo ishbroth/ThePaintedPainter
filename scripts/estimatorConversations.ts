@@ -215,7 +215,9 @@ async function dismissAt(setup: string[], topicWords: RegExp, dismissal = 'doesn
 {
   const priceOf = (st: ChatState) => calculateEstimate(st.ctx).total;
   const start = ['I want the whole inside of my house painted, walls, trim and doors', '2400 sq ft', 'one story', 'walls, ceilings, trim and doors', 'sounds right', 'yes'];
-  const cab = await play([...start, 'yes']); // "...the trim: yes", then yes to the kitchen cabinets
+  const cab0 = await play([...start, 'yes', 'no']); // "...the trim: yes", then yes to the kitchen cabinets: asked how many doors and drawers first
+  check('kitchen cabinets with a house: asked for a rough count of doors and drawers', /doors and drawer|doors and drawers|cabinet doors/i.test(cab0.last), cab0.last.slice(0, 300));
+  const cab = await play(['about 30 doors and drawers'], [], cab0.state);
   check('kitchen cabinets: asked whether they are painted, bare, stained or pre-primed', /cabinets/i.test(cab.last) && /bare/i.test(cab.last), cab.last.slice(0, 300));
   const finishes: Record<string, number> = {};
   for (const [name, reply] of [['painted', 'they are painted white'], ['bare', 'bare wood'], ['stained', 'stained oak'], ['primed', 'pre-primed']] as const) {
@@ -227,13 +229,23 @@ async function dismissAt(setup: string[], topicWords: RegExp, dismissal = 'doesn
   const said = await play(['I want the kitchen cabinets painted, they are stained oak']);
   check('stained oak cabinets said up front are read', said.state.ctx.cabinetFinish === 'stained', JSON.stringify(said.state.ctx.cabinetFinish));
 
-  const trim = await play([...start, 'no']); // no to the kitchen cabinets: the trim and doors question comes next
+  const trim = await play([...start, 'no', 'no']); // no to the kitchen cabinets: the trim and doors question comes next
   check('trim and doors: asked whether they are painted, bare, stained or pre-primed', /doors/i.test(trim.last) && /bare/i.test(trim.last), trim.last.slice(0, 300));
   const mixed = await play(['stained oak doors, painted baseboards'], [], trim.state);
   check('"stained oak doors, painted baseboards" is read per item', mixed.state.ctx.doorFinish === 'stained' && mixed.state.ctx.trimFinish === 'painted', JSON.stringify([mixed.state.ctx.trimFinish, mixed.state.ctx.doorFinish]));
   const allPainted = await play(['all painted white'], [], trim.state);
   const bareAll = await play(['all bare wood'], [], trim.state);
   check('trim and doors: bare wood costs more to prep than painted', priceOf(bareAll.state) > priceOf(allPainted.state), String([priceOf(bareAll.state), priceOf(allPainted.state)]));
+
+  // closets: asked for a bedroom/hallway/whole-house job (never assumed), and with the trim in, a "yes" asks about their shelves
+  const cl = await play([...start, 'no']); // no to the cabinets: the closets come next
+  check('closets: a whole-house inside job asks whether the closets are included', /closets/i.test(cl.last), cl.last);
+  const clYes = await play(['yes, the closets too'], [], cl.state);
+  check('closets: a yes (with the trim in) asks whether they have shelves to paint', clYes.state.ctx.closets !== 'none' && /shelves|shelving/i.test(clYes.last), clYes.last);
+  const clShelves = await play(['yes, built-in shelves'], [], clYes.state);
+  check('closets: the shelves answer is read', clShelves.state.ctx.closetShelving === 'built_in', JSON.stringify(clShelves.state.ctx.closetShelving));
+  const clNo = await play(['no'], [], cl.state);
+  check('closets: a no leaves them out and does not ask about shelves', clNo.state.ctx.closets === 'none' && !/shelves|shelving|closets/i.test(clNo.last), clNo.last);
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------------
@@ -400,7 +412,7 @@ async function dismissAt(setup: string[], topicWords: RegExp, dismissal = 'doesn
   check('the same question asked twice is a bot_repeat', repeated.length === 1 && repeated[0].kind === 'bot_repeat', JSON.stringify(repeated));
 
   // live: the customer already gave the answer, and the notes have it
-  const known = await play(['I want the whole inside of my house painted, walls, trim and doors', '2400 sq ft', 'one story', 'walls, ceilings, trim and doors', 'sounds right', 'yes', 'no', 'all painted']);
+  const known = await play(['I want the whole inside of my house painted, walls, trim and doors', '2400 sq ft', 'one story', 'walls, ceilings, trim and doors', 'sounds right', 'yes', 'no', 'no', 'all painted']);
   check('setup: the bot asks how many doors', /doors/i.test(known.last) && /how many|approximately/i.test(known.last), known.last);
   const noticed = await play(['like I said, 14 doors'], [], known.state);
   check('"like I said, 14 doors": the bot owns up, uses the answer and does not ask it again', noticed.state.ctx.doorCount === 14 && /you'?re right|sorry/i.test(noticed.last) && !/how many doors/i.test(noticed.last), noticed.last);
@@ -636,7 +648,7 @@ async function dismissAt(setup: string[], topicWords: RegExp, dismissal = 'doesn
   check('deck: after the size, asks how high it is (not the paint brand)', /ground|raised/i.test(deck.last), deck.last);
   const asked: string[] = [];
   let st = deck.state;
-  for (const a of ['second story, off the back', 'yes, the underside too', 'yes, railings all around', 'weathered and gray', '40 feet', 'wood', 'painters choice', '91941', 'in 3 weeks']) {
+  for (const a of ['second story, off the back', 'yes, the underside too', 'yes, railings all around', 'weathered and gray', 'wood', 'bare gray wood', 'paint', '40 feet', 'wood', 'painters choice', '91941', 'in 3 weeks']) {
     const r = await play([a], [], st); st = r.state; asked.push(r.last);
   }
   const all = asked.join(' ## ');
@@ -649,11 +661,11 @@ async function dismissAt(setup: string[], topicWords: RegExp, dismissal = 'doesn
   check('deck: the estimate is in a sane range for 600 sq ft (not a house exterior)', (fin.state.finalEstimate?.estimate.total ?? 0) < 8000, String(fin.state.finalEstimate?.estimate.total));
 
   // a bare "600 sq ft" for the deck is not the size of the house
-  const bare = await play(['a deck', '600 sq ft', 'on the ground', 'no', 'faded but solid', 'painters choice', '91941', 'in 3 weeks', 'no', 'run it', 'run it']);
+  const bare = await play(['a deck', '600 sq ft', 'on the ground', 'no', 'faded but solid', 'wood', 'bare gray wood', 'paint', 'painters choice', '91941', 'in 3 weeks', 'no', 'run it', 'run it']);
   check('deck: a bare "600 sq ft" is the deck, not the house (no siding line)', bare.state.ctx.squareFeet == null && !!bare.state.finalEstimate && !bare.state.finalEstimate.estimate.lineItems.some((l) => /Siding|Body/i.test(l.description)), JSON.stringify({ s: bare.state.ctx.squareFeet, li: bare.state.finalEstimate?.estimate.lineItems.map((l) => l.description) }));
 
   // deck details that come up only after "run it" was offered are asked about, not priced off a guess
-  const late = await play(['a deck', '600 sq ft', 'on the ground', 'no', 'good', 'painters choice', '91941', 'in 3 weeks', 'no', 'there are also railings all around']);
+  const late = await play(['a deck', '600 sq ft', 'on the ground', 'no', 'good', 'wood', 'bare gray wood', 'paint', 'painters choice', '91941', 'in 3 weeks', 'no', 'there are also railings all around']);
   check('deck: something said at the photos step opens its own question instead of pricing', !late.state.finalEstimate && /railing/i.test(late.last), late.last);
 
   // a deck that comes up in the middle of a house exterior gets the whole deck interview, not a blanket cost

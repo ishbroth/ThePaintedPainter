@@ -50,6 +50,8 @@ const TOPIC_LABEL: Record<string, string> = {
   door_count: 'how many doors',
   window_count: 'how many windows',
   closet_count: 'how many closets',
+  closets_included: 'whether the closets are painted too',
+  closet_shelves: 'whether the closets have shelves to paint',
   chair_count: 'how many pieces are being painted',
   cabinet_count: 'how many cabinet doors and drawers',
   cabinet_scope: 'whether the insides of the cabinets are painted',

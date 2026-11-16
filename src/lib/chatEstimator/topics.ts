@@ -82,6 +82,9 @@ function detailLabel(c: EstimatorContext): string {
   return parts.length > 1 ? parts.slice(0, -1).join(', ') + ' and ' + parts[parts.length - 1] : parts[0] ?? 'trim';
 }
 
+/** Cabinets (or vanities) are part of an inside job, on their own or along with a house: they get the same questions either way. */
+const cabinetsInJob = (c: EstimatorContext) => (c.projectType === 'interior' || c.projectType === 'both') && c.cabinets !== 'none';
+
 /**
  * The job is one fixed item or part of a room, not the room: the cabinets (or vanities), built-in shelving, a mantel, a railing. The walls,
  * ceilings, trim and doors are off (the customer said so, or it was only that item), so the room questions never apply unless the customer
@@ -701,6 +704,41 @@ export const TOPICS: Topic[] = [
   },
 
   {
+    // Closets are part of a bedroom, a hallway or entry, or the whole inside, but only when the customer wants them painted: asked once the
+    // surfaces are settled, never assumed.
+    id: 'closets_included',
+    priority: 29.6,
+    relevant: (c) =>
+      (c.projectType === 'interior' || c.projectType === 'both') && c.surfacesAddressed && c.closets === 'none' && !skipUpsells(c) &&
+      !(c.excludedSurfaces ?? []).includes('closets') &&
+      (c.interiorScope === 'whole_house' || c.selectedRooms.some((r) => /bedroom|hallway|entryway/.test(r))),
+    alreadyAnswered: (c) => c.closets !== 'none' || extDone(c, 'closets_included'),
+    ask: (c) =>
+      pick(
+        c.interiorScope === 'whole_house'
+          ? ["Are the closets getting painted too?", "Should I include the insides of the closets?"]
+          : ["Do the closets in there get painted too?", "Are the closets part of it, or just the room itself?"],
+        seed(c),
+      ),
+    clarify: () => "I mean the inside of any closets: walls, ceiling and door. They're priced each, so it helps to know if they're in.",
+    example: () => "Say 'yes, the closets too', 'a walk-in closet' or 'no, just the rooms'.",
+  },
+  {
+    // With the trim in, a closet usually brings shelves and rods that are painted too (a separate bit of labor).
+    id: 'closet_shelves',
+    priority: 29.61,
+    relevant: (c) => (c.projectType === 'interior' || c.projectType === 'both') && c.closets !== 'none' && c.interiorTrim === 'yes' && c.closetShelving === 'none' && !skipUpsells(c),
+    alreadyAnswered: (c) => c.closetShelving !== 'none' || extDone(c, 'closet_shelves'),
+    ask: (c) =>
+      pick(
+        ["Do the closets have shelves (and rods) that need painting too?", "Since the trim is in, do the closets have shelving that gets painted as well?"],
+        seed(c),
+      ),
+    clarify: () => "Closet shelves and the cleats and rods under them take their own time to paint, so I price them separately from the closet walls.",
+    example: () => "Say 'yes, built-in shelves', 'wire shelving' or 'no shelves'.",
+  },
+
+  {
     // Cabinets and vanities: what they are finished with now decides the prep (bare wood needs primer, stained wood must be deglossed and sealed against bleed-through,
     // factory-primed needs the least, laminate needs a special adhesion primer), so it changes the price.
     id: 'cabinet_finish',
@@ -723,16 +761,16 @@ export const TOPICS: Topic[] = [
   {
     id: 'cabinet_count',
     priority: 29.7,
-    relevant: (c) => componentKind(c) === 'cabinets' && c.cabinetDoorCount == null,
+    relevant: (c) => cabinetsInJob(c) && c.cabinetDoorCount == null,
     alreadyAnswered: (c) => c.cabinetDoorCount != null || extDone(c, 'cabinet_count'),
-    ask: (c) => pick(["About how many cabinet doors and drawer fronts are there? A rough count is fine.", "Roughly how many doors and drawers are we talking about?"], seed(c)),
+    ask: (c) => pick(["About how many cabinet doors and drawer fronts are there in all? A rough estimate is fine.", "Roughly how many cabinet doors and drawers are we talking about? A ballpark is fine, count each door and each drawer face."], seed(c)),
     clarify: () => "Cabinets are priced by the door and drawer front, so a rough count (count each door and each drawer face) gets the price close.",
     example: () => "Something like '30 doors and drawers' or 'about 24'.",
   },
   {
     id: 'cabinet_scope',
     priority: 29.82,
-    relevant: (c) => componentKind(c) === 'cabinets' && c.cabinetScope !== 'inside_too',
+    relevant: (c) => cabinetsInJob(c) && c.cabinetScope !== 'inside_too',
     alreadyAnswered: (c) => c.cabinetScope === 'inside_too' || extDone(c, 'cabinet_scope'),
     ask: (c) => pick(["Do you want the inside of the cabinet boxes painted too, or just the doors, drawer fronts and frames?", "Just the outsides (doors, drawer fronts, frames), or the insides of the boxes as well?"], seed(c)),
     clarify: () => "Painting the insides adds a lot of time (tight spaces, more coats), so it costs more. Most people paint just the outsides.",
@@ -741,7 +779,7 @@ export const TOPICS: Topic[] = [
   {
     id: 'cabinet_method',
     priority: 29.84,
-    relevant: (c) => componentKind(c) === 'cabinets' && !c.cabinetMethod,
+    relevant: (c) => cabinetsInJob(c) && !c.cabinetMethod,
     alreadyAnswered: (c) => !!c.cabinetMethod || extDone(c, 'cabinet_method'),
     ask: (c) => pick(["Sprayed for the smoothest, factory-like finish, or brushed and rolled?", "Do you want them sprayed or brushed and rolled? Spraying looks smoother and costs more."], seed(c)),
     clarify: () => "Spraying gives a smooth, factory-like finish with no brush marks but takes more masking and set-up, so it costs more. Brushed and rolled is the standard way and still looks good.",
@@ -750,7 +788,7 @@ export const TOPICS: Topic[] = [
   {
     id: 'cabinet_hardware',
     priority: 29.86,
-    relevant: (c) => componentKind(c) === 'cabinets' && c.hardwareReplacement !== 'yes',
+    relevant: (c) => cabinetsInJob(c) && c.hardwareReplacement !== 'yes',
     alreadyAnswered: (c) => c.hardwareReplacement === 'yes' || extDone(c, 'cabinet_hardware'),
     ask: (c) => pick(["Are the hinges and pulls staying, or are you putting in new hardware?", "What about the hardware: reuse the existing hinges and pulls, or replace them?"], seed(c)),
     clarify: () => "The painter takes the hardware off and puts it back as part of the job. Installing new hinges or pulls is a separate small charge (the hardware itself is extra).",

@@ -63,6 +63,23 @@ const WORK: { label: RegExp; said: RegExp }[] = [
   { label: /^(windows? to paint|window count)/i, said: /window/i },
 ]
 
+/**
+ * Repairs and prep (wood rot, caulking, drywall repair, mold...). The estimator carries a resting answer for these ("minor") and fills
+ * in assumed ones when a question was brushed off ("whatever" to "any repairs needed?" assumes rot and caulking so the price is not
+ * short). Neither is something the customer said, so they are listed only when the customer's own words mention that kind of work;
+ * the priced lines of the breakdown do not count here, since an assumed repair is priced too.
+ */
+const REPAIR: { label: RegExp; said: RegExp }[] = [
+  { label: /wood rot|\brot\b/i, said: /\b(rot|rotted|rotten|rotting|soft wood|damaged wood|wood damage)\b/i },
+  { label: /caulk/i, said: /\b(caulk|caulking|gaps?|seams?)\b/i },
+  { label: /drywall|patch|nail.?hole|repair extent/i, said: /\b(drywall|sheetrock|patch|patching|holes?|cracks?|cracked|dents?|dings?|damage|damaged|repairs?|spackle|nail)\b/i },
+  { label: /mold|mildew/i, said: /\b(mold|mildew|moss|algae)\b/i },
+  { label: /lead/i, said: /\blead\b/i },
+  { label: /stain cover|stain.?block/i, said: /\b(stains?|water (damage|spots?)|smoke|smoke damage|odor|smell)\b/i },
+  { label: /wallpaper removal/i, said: /wallpaper/i },
+  { label: /popcorn/i, said: /\b(popcorn|textur\w*)\b/i },
+]
+
 /** Bookkeeping that is not scope. */
 const NOT_SCOPE = /^(zip|state|answered|response|photo|contact|utilities$)/i
 /** Answers that say nothing. */
@@ -85,6 +102,26 @@ function haystack(evidence?: ScopeEvidence): string {
   return parts.join(' \n ').toLowerCase()
 }
 
+/** The customer's own messages only, lowercased ('' when none were passed, so nothing is dropped for lack of them). */
+function customerWordsOnly(evidence?: ScopeEvidence): string {
+  if (!Array.isArray(evidence?.conversation)) return ''
+  return evidence.conversation.filter((l): l is string => typeof l === 'string').join(' \n ').toLowerCase()
+}
+
+/** A repair or prep item the customer never talked about (an assumed or resting answer) is dropped; "Prep work" keeps only the parts they did. */
+function repairAnswer(question: string, answer: string, said: string): string | null {
+  if (!said) return answer
+  if (/^prep work/i.test(question)) {
+    const kept = answer.split(/,\s*/).filter((part) => {
+      const rule = REPAIR.find((r) => r.label.test(part))
+      return !rule || rule.said.test(said)
+    })
+    return kept.length > 0 ? kept.join(', ') : null
+  }
+  const rule = REPAIR.find((r) => r.label.test(question))
+  return rule && !rule.said.test(said) ? null : answer
+}
+
 /**
  * The items that belong to this job, in their original order. Specific pieces of work stay only when the customer talked about them or
  * they are priced in the job; without any evidence to check against (nothing was passed), nothing is dropped for lack of it.
@@ -92,12 +129,16 @@ function haystack(evidence?: ScopeEvidence): string {
 export function cleanScope(input: unknown, evidence?: ScopeEvidence, max = 40): ScopeItem[] {
   if (!Array.isArray(input)) return []
   const hay = haystack(evidence)
+  const customerSaid = customerWordsOnly(evidence)
   const seen = new Set<string>()
   const out: ScopeItem[] = []
   for (const raw of input) {
     const question = typeof raw?.question === 'string' ? raw.question.replace(/\s+/g, ' ').trim() : ''
-    const answer = typeof raw?.answer === 'string' ? raw.answer.trim() : typeof raw?.answer === 'number' ? String(raw.answer) : ''
+    let answer = typeof raw?.answer === 'string' ? raw.answer.trim() : typeof raw?.answer === 'number' ? String(raw.answer) : ''
     if (!question || !answer || EMPTY_ANSWER.test(answer) || NOT_SCOPE.test(question)) continue
+    const checked = repairAnswer(question, answer, customerSaid)
+    if (checked === null) continue
+    answer = checked
     if (hay) {
       const work = WORK.find((w) => w.label.test(question))
       if (work && !work.said.test(hay)) continue

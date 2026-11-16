@@ -163,6 +163,10 @@ export function highestPriceAssumption(topicId: string, ctx: EstimatorContext): 
       return { patch: { paintGrade: 'standard', extAnswered: withExt(ctx, topicId) }, say: "No problem, the painter will choose the paint." };
     case 'paint_finish':
       return { patch: { paintFinish: 'painter_choice', extAnswered: withExt(ctx, topicId) }, say: "No problem, the painter will choose the paint." };
+    case 'closets_included':
+    case 'closet_shelves':
+      // never assumed in: an unanswered "closets?" leaves them out rather than pricing something that was not asked for
+      return { patch: { extAnswered: withExt(ctx, topicId) }, say: topicId === 'closets_included' ? "No problem, I'll leave the closets out." : "No problem, I'll leave the closet shelves out." };
     case 'cabinet_scope':
       return { patch: { cabinetScope: 'inside_too', extAnswered: withExt(ctx, topicId) }, say: higher('painting the insides of the cabinets too') };
     case 'cabinet_method':

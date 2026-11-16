@@ -18771,6 +18771,30 @@ function extractDetails(text, ctx, askedId) {
         }
         break;
       }
+      case "closets_included": {
+        const low = text.toLowerCase();
+        if (/^\W*(?:no|nope|nah|none|skip)\b|\b(?:no|without|skip|leave out|don'?t)\b[^.]{0,15}\bclosets?\b/.test(low)) break;
+        if (/\bwalk[\s-]?in\b/.test(low)) {
+          patch.closets = "walkin";
+          acks.push("walk-in closet");
+        } else if (/^\W*(?:yes|yeah|yep|yup|sure|please|definitely|absolutely|all of them|every one|everything|them too|include|of course)\b|\bclosets?\b|\b(?:both|all)\b/.test(low)) {
+          patch.closets = "standard";
+          acks.push("the closets");
+        }
+        break;
+      }
+      case "closet_shelves": {
+        const low = text.toLowerCase();
+        if (/^\W*(?:no|nope|nah|none|skip)\b|\bno\s+(?:shelves|shelving|shelf)\b/.test(low)) break;
+        if (/\bwire\b/.test(low)) {
+          patch.closetShelving = "wire";
+          acks.push("wire shelving");
+        } else if (/^\W*(?:yes|yeah|yep|yup|sure|please|definitely|absolutely|all of them|every one|everything|of course)\b|\b(?:shelves|shelving|shelf|rods?|built[\s-]?in)\b/.test(low)) {
+          patch.closetShelving = "built_in";
+          acks.push("closet shelves");
+        }
+        break;
+      }
       case "cabinet_count": {
         const n = parseCount(text, 2, 300);
         if (n) {
@@ -18979,6 +19003,8 @@ var DETAIL_TOPIC_IDS = /* @__PURE__ */ new Set([
   "common_areas",
   "balcony_count",
   "ext_mu_access",
+  "closets_included",
+  "closet_shelves",
   "door_count",
   "window_count",
   "chair_count",
@@ -19121,6 +19147,33 @@ var ITEM_SPECS = [
         ]
       },
       {
+        key: "now",
+        label: "what is on the railing now",
+        hint: "Bare, stained, or painted?",
+        ask: ["Is the wood bare, stained, or painted right now?", "What's on the railing now: nothing (bare wood), stain, or paint?"],
+        clarify: "New bare wood needs a seal coat (and time to dry out if it is brand new). Painted wood needs scraping and sanding first, and stain going to paint needs primer.",
+        example: "Say 'bare gray wood', 'stained' or 'painted white'.",
+        when: (c2, a) => c2.deck !== "yes" && (a.material === "wood" || a.material === void 0),
+        options: [
+          o("painted", "painted now (scrape and sand)", /\b(?:paint|painted|white)\b/, 1.2),
+          o("stained", "stained now", /\b(?:stain|stained|sealed|sealer)\b/, 1),
+          o("bare", "bare wood", /\b(?:bare|raw|new|unfinished|weathered|gr[ae]y|never)\b/, 1.1)
+        ]
+      },
+      {
+        key: "goal",
+        label: "whether you want the railing painted or stained",
+        hint: "Paint, or stain/seal?",
+        ask: ["Do you want the railing painted, or stained or sealed?", "Paint it, or stain and seal it?"],
+        clarify: "Stain and sealer soak into the wood and are quicker to apply. Paint covers completely, takes a primer coat and lasts differently.",
+        example: "Say 'paint' or 'stain'.",
+        when: (c2, a) => c2.deck !== "yes" && (a.material === "wood" || a.material === void 0),
+        options: [
+          o("paint", "paint (primed)", /\b(?:paint|painted|primer|color|solid)\b/, 1.15),
+          o("stain", "stain/seal", /\b(?:stain|seal|sealer|sealant|clear|transparent|natural|waterproof)\b/, 0.9)
+        ]
+      },
+      {
         key: "height",
         label: "how high off the ground the railing is",
         hint: "Ground level, or upstairs?",
@@ -19147,6 +19200,56 @@ var ITEM_SPECS = [
           o("bad", "peeling/rusty", BAD, 1.4),
           o("worn", "weathered", WORN, 1.2),
           o("good", "good shape", GOOD, 1)
+        ]
+      }
+    ]
+  },
+  // ——————————————————————————————————— Deck (its height, underside, railings and condition are asked from topics.ts)
+  {
+    key: "deck",
+    thing: "deck",
+    present: (c2) => c2.deck === "yes",
+    lineKeys: ["deck"],
+    priority: 34.645,
+    questions: [
+      {
+        key: "material",
+        label: "what the deck is made of",
+        hint: "Wood, composite, or concrete?",
+        ask: ["What's the deck made of: wood, composite, or a concrete slab?", "Is it a wood deck, composite (like Trex), or concrete?"],
+        clarify: "Wood decks are the usual paint or stain job. Composite usually shouldn't be painted (it needs special paint if so), and concrete takes a masonry coating.",
+        example: "Say 'wood', 'composite' or 'concrete'.",
+        options: [
+          o("concrete", "concrete (masonry coating)", /\b(?:concrete|slab|cement|pavers?)\b/, 1.2, { said: /\bconcrete (?:deck|patio|slab)\b/ }),
+          o("composite", "composite (special paint)", /\b(?:composite|trex|azek|vinyl|pvc|plastic)\b/, 0.9, { said: /\b(?:composite|trex|azek)\b/ }),
+          o("wood", "wood", /\b(?:wood|wooden|cedar|redwood|pine|treated|pressure[\s-]treated|ipe)\b/, 1)
+        ]
+      },
+      {
+        key: "now",
+        label: "what is on the deck now",
+        hint: "Bare, stained, or painted?",
+        ask: ["Is the wood bare, stained, or painted right now?", "What's on the deck now: nothing (bare wood), stain, or paint?"],
+        clarify: "New bare wood needs a seal coat (and time to dry out if it is brand new). Painted wood needs scraping and sanding first, and stain going to paint needs primer.",
+        example: "Say 'bare gray wood', 'stained' or 'painted white'.",
+        when: (_c, a) => a.material === "wood" || a.material === void 0,
+        options: [
+          o("painted", "painted now (scrape and sand)", /\b(?:paint|painted|white)\b/, 1.2),
+          o("stained", "stained now", /\b(?:stain|stained|sealed|sealer)\b/, 1),
+          o("bare", "bare wood", /\b(?:bare|raw|new|unfinished|weathered|gr[ae]y|never)\b/, 1.1)
+        ]
+      },
+      {
+        key: "goal",
+        label: "whether you want the deck painted or stained",
+        hint: "Paint, or stain/seal?",
+        ask: ["Do you want the deck painted, or stained or sealed?", "Paint it, or stain and seal it?"],
+        clarify: "Stain and sealer soak into the wood and are quicker to apply. Paint covers completely, takes a primer coat and lasts differently.",
+        example: "Say 'paint' or 'stain'.",
+        when: (_c, a) => a.material === "wood" || a.material === void 0,
+        options: [
+          o("paint", "paint (primed)", /\b(?:paint|painted|primer|color|solid)\b/, 1.15),
+          o("stain", "stain/seal", /\b(?:stain|seal|sealer|sealant|clear|transparent|natural|waterproof)\b/, 0.9)
         ]
       }
     ]
@@ -19413,6 +19516,33 @@ var ITEM_SPECS = [
         ]
       },
       {
+        key: "now",
+        label: "what is on the shutters now",
+        hint: "Bare, stained, or painted?",
+        ask: ["Is the wood bare, stained, or painted right now?", "What's on the shutters now: nothing (bare wood), stain, or paint?"],
+        clarify: "New bare wood needs a seal coat (and time to dry out if it is brand new). Painted wood needs scraping and sanding first, and stain going to paint needs primer.",
+        example: "Say 'bare gray wood', 'stained' or 'painted white'.",
+        when: (_c, a) => a.material === "wood" || a.material === void 0,
+        options: [
+          o("painted", "painted now (scrape and sand)", /\b(?:paint|painted|white)\b/, 1.2),
+          o("stained", "stained now", /\b(?:stain|stained|sealed|sealer)\b/, 1),
+          o("bare", "bare wood", /\b(?:bare|raw|new|unfinished|weathered|gr[ae]y|never)\b/, 1.1)
+        ]
+      },
+      {
+        key: "goal",
+        label: "whether you want the shutters painted or stained",
+        hint: "Paint, or stain/seal?",
+        ask: ["Do you want the shutters painted, or stained or sealed?", "Paint it, or stain and seal it?"],
+        clarify: "Stain and sealer soak into the wood and are quicker to apply. Paint covers completely, takes a primer coat and lasts differently.",
+        example: "Say 'paint' or 'stain'.",
+        when: (_c, a) => a.material === "wood" || a.material === void 0,
+        options: [
+          o("paint", "paint (primed)", /\b(?:paint|painted|primer|color|solid)\b/, 1.15),
+          o("stain", "stain/seal", /\b(?:stain|seal|sealer|sealant|clear|transparent|natural|waterproof)\b/, 0.9)
+        ]
+      },
+      {
         key: "height",
         label: "whether the shutters are upstairs",
         hint: "Ground floor, or upstairs?",
@@ -19657,6 +19787,33 @@ var ITEM_SPECS = [
         ]
       },
       {
+        key: "now",
+        label: "what is on the cover now",
+        hint: "Bare, stained, or painted?",
+        ask: ["Is the wood bare, stained, or painted right now?", "What's on the cover now: nothing (bare wood), stain, or paint?"],
+        clarify: "New bare wood needs a seal coat (and time to dry out if it is brand new). Painted wood needs scraping and sanding first, and stain going to paint needs primer.",
+        example: "Say 'bare gray wood', 'stained' or 'painted white'.",
+        when: (_c, a) => a.material === "wood" || a.material === void 0,
+        options: [
+          o("painted", "painted now (scrape and sand)", /\b(?:paint|painted|white)\b/, 1.2),
+          o("stained", "stained now", /\b(?:stain|stained|sealed|sealer)\b/, 1),
+          o("bare", "bare wood", /\b(?:bare|raw|new|unfinished|weathered|gr[ae]y|never)\b/, 1.1)
+        ]
+      },
+      {
+        key: "goal",
+        label: "whether you want the cover painted or stained",
+        hint: "Paint, or stain/seal?",
+        ask: ["Do you want the cover painted, or stained or sealed?", "Paint it, or stain and seal it?"],
+        clarify: "Stain and sealer soak into the wood and are quicker to apply. Paint covers completely, takes a primer coat and lasts differently.",
+        example: "Say 'paint' or 'stain'.",
+        when: (_c, a) => a.material === "wood" || a.material === void 0,
+        options: [
+          o("paint", "paint (primed)", /\b(?:paint|painted|primer|color|solid)\b/, 1.15),
+          o("stain", "stain/seal", /\b(?:stain|seal|sealer|sealant|clear|transparent|natural|waterproof)\b/, 0.9)
+        ]
+      },
+      {
         key: "height",
         label: "how high the underside is",
         hint: "About how high up is it?",
@@ -19667,6 +19824,19 @@ var ITEM_SPECS = [
           o("high", "over 12 ft high", /\b(?:1[3-9]|2\d|over (?:12|twelve)|very high|two[\s-]?stor\w+)\b/, 1.4),
           o("mid", "9-12 ft high", /\b(?:9|10|11|12|nine|ten|eleven|twelve|medium|tall)\b/, 1.2),
           o("low", "under 9 ft", /\b(?:[5-8]|eight|seven|low|short|standard|under)\b/, 1)
+        ]
+      },
+      {
+        key: "posts",
+        label: "whether the posts or columns holding it up get painted",
+        hint: "Paint the posts or columns too?",
+        ask: ["Are there posts or columns holding it up that should be painted too?", "Should the posts or columns under the cover get painted as well?"],
+        clarify: "Posts and columns have four sides and a base to cut in around, so they're priced on top of the ceiling and beams.",
+        example: "Say 'yes, the posts too' or 'no, just the ceiling'.",
+        dismissive: "yes",
+        options: [
+          o("no", "ceiling/beams only", /\b(?:no|nope|nah|none|just the (?:ceiling|top|beams?)|only the (?:ceiling|top|beams?)|skip|don'?t)\b/, 1),
+          o("yes", "posts/columns too", /\b(?:yes|yeah|yep|yup|sure|please|posts?|columns?|pillars?|both|all|everything|too)\b/, 1, { add: { description: "Patio cover posts/columns", amount: 180, category: "Exterior" } })
         ]
       },
       {
@@ -21337,6 +21507,8 @@ var TOPIC_LABEL = {
   door_count: "how many doors",
   window_count: "how many windows",
   closet_count: "how many closets",
+  closets_included: "whether the closets are painted too",
+  closet_shelves: "whether the closets have shelves to paint",
   chair_count: "how many pieces are being painted",
   cabinet_count: "how many cabinet doors and drawers",
   cabinet_scope: "whether the insides of the cabinets are painted",
@@ -22454,6 +22626,7 @@ function detailLabel(c2) {
   const parts = [c2.chairRail === "yes" ? "chair rail" : "", c2.crownMolding === "yes" ? "crown moulding" : "", c2.wainscoting === "yes" ? "wainscoting" : "", c2.interiorTrim === "yes" ? "baseboards" : ""].filter(Boolean);
   return parts.length > 1 ? parts.slice(0, -1).join(", ") + " and " + parts[parts.length - 1] : parts[0] ?? "trim";
 }
+var cabinetsInJob = (c2) => (c2.projectType === "interior" || c2.projectType === "both") && c2.cabinets !== "none";
 function componentKind(c2) {
   if (c2.itemsOnly) return "";
   const off = c2.interiorWalls === "no" && c2.interiorCeilings !== "yes" && c2.interiorTrim !== "yes" && c2.interiorDoors === "none" && c2.surfacesAddressed;
@@ -22984,6 +23157,33 @@ var TOPICS = [
     example: () => "Just say 'yes, the kitchen cabinets too', 'cabinets in the kitchen and bathrooms', or 'no, leave the cabinets'."
   },
   {
+    // Closets are part of a bedroom, a hallway or entry, or the whole inside, but only when the customer wants them painted: asked once the
+    // surfaces are settled, never assumed.
+    id: "closets_included",
+    priority: 29.6,
+    relevant: (c2) => (c2.projectType === "interior" || c2.projectType === "both") && c2.surfacesAddressed && c2.closets === "none" && !skipUpsells(c2) && !(c2.excludedSurfaces ?? []).includes("closets") && (c2.interiorScope === "whole_house" || c2.selectedRooms.some((r) => /bedroom|hallway|entryway/.test(r))),
+    alreadyAnswered: (c2) => c2.closets !== "none" || extDone(c2, "closets_included"),
+    ask: (c2) => pick2(
+      c2.interiorScope === "whole_house" ? ["Are the closets getting painted too?", "Should I include the insides of the closets?"] : ["Do the closets in there get painted too?", "Are the closets part of it, or just the room itself?"],
+      seed(c2)
+    ),
+    clarify: () => "I mean the inside of any closets: walls, ceiling and door. They're priced each, so it helps to know if they're in.",
+    example: () => "Say 'yes, the closets too', 'a walk-in closet' or 'no, just the rooms'."
+  },
+  {
+    // With the trim in, a closet usually brings shelves and rods that are painted too (a separate bit of labor).
+    id: "closet_shelves",
+    priority: 29.61,
+    relevant: (c2) => (c2.projectType === "interior" || c2.projectType === "both") && c2.closets !== "none" && c2.interiorTrim === "yes" && c2.closetShelving === "none" && !skipUpsells(c2),
+    alreadyAnswered: (c2) => c2.closetShelving !== "none" || extDone(c2, "closet_shelves"),
+    ask: (c2) => pick2(
+      ["Do the closets have shelves (and rods) that need painting too?", "Since the trim is in, do the closets have shelving that gets painted as well?"],
+      seed(c2)
+    ),
+    clarify: () => "Closet shelves and the cleats and rods under them take their own time to paint, so I price them separately from the closet walls.",
+    example: () => "Say 'yes, built-in shelves', 'wire shelving' or 'no shelves'."
+  },
+  {
     // Cabinets and vanities: what they are finished with now decides the prep (bare wood needs primer, stained wood must be deglossed and sealed against bleed-through,
     // factory-primed needs the least, laminate needs a special adhesion primer), so it changes the price.
     id: "cabinet_finish",
@@ -23004,16 +23204,16 @@ var TOPICS = [
   {
     id: "cabinet_count",
     priority: 29.7,
-    relevant: (c2) => componentKind(c2) === "cabinets" && c2.cabinetDoorCount == null,
+    relevant: (c2) => cabinetsInJob(c2) && c2.cabinetDoorCount == null,
     alreadyAnswered: (c2) => c2.cabinetDoorCount != null || extDone(c2, "cabinet_count"),
-    ask: (c2) => pick2(["About how many cabinet doors and drawer fronts are there? A rough count is fine.", "Roughly how many doors and drawers are we talking about?"], seed(c2)),
+    ask: (c2) => pick2(["About how many cabinet doors and drawer fronts are there in all? A rough estimate is fine.", "Roughly how many cabinet doors and drawers are we talking about? A ballpark is fine, count each door and each drawer face."], seed(c2)),
     clarify: () => "Cabinets are priced by the door and drawer front, so a rough count (count each door and each drawer face) gets the price close.",
     example: () => "Something like '30 doors and drawers' or 'about 24'."
   },
   {
     id: "cabinet_scope",
     priority: 29.82,
-    relevant: (c2) => componentKind(c2) === "cabinets" && c2.cabinetScope !== "inside_too",
+    relevant: (c2) => cabinetsInJob(c2) && c2.cabinetScope !== "inside_too",
     alreadyAnswered: (c2) => c2.cabinetScope === "inside_too" || extDone(c2, "cabinet_scope"),
     ask: (c2) => pick2(["Do you want the inside of the cabinet boxes painted too, or just the doors, drawer fronts and frames?", "Just the outsides (doors, drawer fronts, frames), or the insides of the boxes as well?"], seed(c2)),
     clarify: () => "Painting the insides adds a lot of time (tight spaces, more coats), so it costs more. Most people paint just the outsides.",
@@ -23022,7 +23222,7 @@ var TOPICS = [
   {
     id: "cabinet_method",
     priority: 29.84,
-    relevant: (c2) => componentKind(c2) === "cabinets" && !c2.cabinetMethod,
+    relevant: (c2) => cabinetsInJob(c2) && !c2.cabinetMethod,
     alreadyAnswered: (c2) => !!c2.cabinetMethod || extDone(c2, "cabinet_method"),
     ask: (c2) => pick2(["Sprayed for the smoothest, factory-like finish, or brushed and rolled?", "Do you want them sprayed or brushed and rolled? Spraying looks smoother and costs more."], seed(c2)),
     clarify: () => "Spraying gives a smooth, factory-like finish with no brush marks but takes more masking and set-up, so it costs more. Brushed and rolled is the standard way and still looks good.",
@@ -23031,7 +23231,7 @@ var TOPICS = [
   {
     id: "cabinet_hardware",
     priority: 29.86,
-    relevant: (c2) => componentKind(c2) === "cabinets" && c2.hardwareReplacement !== "yes",
+    relevant: (c2) => cabinetsInJob(c2) && c2.hardwareReplacement !== "yes",
     alreadyAnswered: (c2) => c2.hardwareReplacement === "yes" || extDone(c2, "cabinet_hardware"),
     ask: (c2) => pick2(["Are the hinges and pulls staying, or are you putting in new hardware?", "What about the hardware: reuse the existing hinges and pulls, or replace them?"], seed(c2)),
     clarify: () => "The painter takes the hardware off and puts it back as part of the job. Installing new hinges or pulls is a separate small charge (the hardware itself is extra).",
@@ -24345,6 +24545,9 @@ function highestPriceAssumption(topicId, ctx) {
       return { patch: { paintGrade: "standard", extAnswered: withExt(ctx, topicId) }, say: "No problem, the painter will choose the paint." };
     case "paint_finish":
       return { patch: { paintFinish: "painter_choice", extAnswered: withExt(ctx, topicId) }, say: "No problem, the painter will choose the paint." };
+    case "closets_included":
+    case "closet_shelves":
+      return { patch: { extAnswered: withExt(ctx, topicId) }, say: topicId === "closets_included" ? "No problem, I'll leave the closets out." : "No problem, I'll leave the closet shelves out." };
     case "cabinet_scope":
       return { patch: { cabinetScope: "inside_too", extAnswered: withExt(ctx, topicId) }, say: higher("painting the insides of the cabinets too") };
     case "cabinet_method":
@@ -26029,7 +26232,9 @@ async function dismissAt(setup, topicWords, dismissal = "doesnt matter just want
 {
   const priceOf = (st2) => calculateEstimate(st2.ctx).total;
   const start = ["I want the whole inside of my house painted, walls, trim and doors", "2400 sq ft", "one story", "walls, ceilings, trim and doors", "sounds right", "yes"];
-  const cab = await play([...start, "yes"]);
+  const cab0 = await play([...start, "yes", "no"]);
+  check("kitchen cabinets with a house: asked for a rough count of doors and drawers", /doors and drawer|doors and drawers|cabinet doors/i.test(cab0.last), cab0.last.slice(0, 300));
+  const cab = await play(["about 30 doors and drawers"], [], cab0.state);
   check("kitchen cabinets: asked whether they are painted, bare, stained or pre-primed", /cabinets/i.test(cab.last) && /bare/i.test(cab.last), cab.last.slice(0, 300));
   const finishes = {};
   for (const [name, reply] of [["painted", "they are painted white"], ["bare", "bare wood"], ["stained", "stained oak"], ["primed", "pre-primed"]]) {
@@ -26040,13 +26245,21 @@ async function dismissAt(setup, topicWords, dismissal = "doesnt matter just want
   check("cabinets: bare wood and stained wood cost more than painted, pre-primed costs less", finishes.bare > finishes.painted && finishes.stained > finishes.bare && finishes.primed < finishes.painted, JSON.stringify(finishes));
   const said = await play(["I want the kitchen cabinets painted, they are stained oak"]);
   check("stained oak cabinets said up front are read", said.state.ctx.cabinetFinish === "stained", JSON.stringify(said.state.ctx.cabinetFinish));
-  const trim = await play([...start, "no"]);
+  const trim = await play([...start, "no", "no"]);
   check("trim and doors: asked whether they are painted, bare, stained or pre-primed", /doors/i.test(trim.last) && /bare/i.test(trim.last), trim.last.slice(0, 300));
   const mixed = await play(["stained oak doors, painted baseboards"], [], trim.state);
   check('"stained oak doors, painted baseboards" is read per item', mixed.state.ctx.doorFinish === "stained" && mixed.state.ctx.trimFinish === "painted", JSON.stringify([mixed.state.ctx.trimFinish, mixed.state.ctx.doorFinish]));
   const allPainted = await play(["all painted white"], [], trim.state);
   const bareAll = await play(["all bare wood"], [], trim.state);
   check("trim and doors: bare wood costs more to prep than painted", priceOf(bareAll.state) > priceOf(allPainted.state), String([priceOf(bareAll.state), priceOf(allPainted.state)]));
+  const cl2 = await play([...start, "no"]);
+  check("closets: a whole-house inside job asks whether the closets are included", /closets/i.test(cl2.last), cl2.last);
+  const clYes = await play(["yes, the closets too"], [], cl2.state);
+  check("closets: a yes (with the trim in) asks whether they have shelves to paint", clYes.state.ctx.closets !== "none" && /shelves|shelving/i.test(clYes.last), clYes.last);
+  const clShelves = await play(["yes, built-in shelves"], [], clYes.state);
+  check("closets: the shelves answer is read", clShelves.state.ctx.closetShelving === "built_in", JSON.stringify(clShelves.state.ctx.closetShelving));
+  const clNo = await play(["no"], [], cl2.state);
+  check("closets: a no leaves them out and does not ask about shelves", clNo.state.ctx.closets === "none" && !/shelves|shelving|closets/i.test(clNo.last), clNo.last);
 }
 {
   for (const t2 of ["20 x 20", "20 by 20", "20x20 ft", "20' x 20'", "20 X 20 feet", "about 20 by 20 feet"]) check(`"${t2}" is 400 sq ft`, parseArea(t2, true) === 400, String(parseArea(t2, true)));
@@ -26181,7 +26394,7 @@ async function dismissAt(setup, topicWords, dismissal = "doesnt matter just want
     { role: "bot", text: "Got it. How many doors are we talking about, approximately?" }
   ]);
   check("the same question asked twice is a bot_repeat", repeated.length === 1 && repeated[0].kind === "bot_repeat", JSON.stringify(repeated));
-  const known = await play(["I want the whole inside of my house painted, walls, trim and doors", "2400 sq ft", "one story", "walls, ceilings, trim and doors", "sounds right", "yes", "no", "all painted"]);
+  const known = await play(["I want the whole inside of my house painted, walls, trim and doors", "2400 sq ft", "one story", "walls, ceilings, trim and doors", "sounds right", "yes", "no", "no", "all painted"]);
   check("setup: the bot asks how many doors", /doors/i.test(known.last) && /how many|approximately/i.test(known.last), known.last);
   const noticed = await play(["like I said, 14 doors"], [], known.state);
   check('"like I said, 14 doors": the bot owns up, uses the answer and does not ask it again', noticed.state.ctx.doorCount === 14 && /you'?re right|sorry/i.test(noticed.last) && !/how many doors/i.test(noticed.last), noticed.last);
@@ -26386,7 +26599,7 @@ async function dismissAt(setup, topicWords, dismissal = "doesnt matter just want
   check("deck: after the size, asks how high it is (not the paint brand)", /ground|raised/i.test(deck.last), deck.last);
   const asked = [];
   let st2 = deck.state;
-  for (const a of ["second story, off the back", "yes, the underside too", "yes, railings all around", "weathered and gray", "40 feet", "wood", "painters choice", "91941", "in 3 weeks"]) {
+  for (const a of ["second story, off the back", "yes, the underside too", "yes, railings all around", "weathered and gray", "wood", "bare gray wood", "paint", "40 feet", "wood", "painters choice", "91941", "in 3 weeks"]) {
     const r = await play([a], [], st2);
     st2 = r.state;
     asked.push(r.last);
@@ -26399,9 +26612,9 @@ async function dismissAt(setup, topicWords, dismissal = "doesnt matter just want
   const fin = await play(["no", "run it"], [], st2);
   check("deck: priced as a deck, a second-story deck is never read as a two-story house", fin.state.finalEstimate != null && fin.state.ctx.stories == null && fin.state.ctx.exteriorBody === "no" && !fin.state.finalEstimate.estimate.lineItems.some((l) => /Siding|Body|Boom/i.test(l.description)) && fin.state.finalEstimate.estimate.lineItems.some((l) => /Underside/.test(l.description)), JSON.stringify(fin.state.finalEstimate?.estimate.lineItems.map((l) => l.description)));
   check("deck: the estimate is in a sane range for 600 sq ft (not a house exterior)", (fin.state.finalEstimate?.estimate.total ?? 0) < 8e3, String(fin.state.finalEstimate?.estimate.total));
-  const bare = await play(["a deck", "600 sq ft", "on the ground", "no", "faded but solid", "painters choice", "91941", "in 3 weeks", "no", "run it", "run it"]);
+  const bare = await play(["a deck", "600 sq ft", "on the ground", "no", "faded but solid", "wood", "bare gray wood", "paint", "painters choice", "91941", "in 3 weeks", "no", "run it", "run it"]);
   check('deck: a bare "600 sq ft" is the deck, not the house (no siding line)', bare.state.ctx.squareFeet == null && !!bare.state.finalEstimate && !bare.state.finalEstimate.estimate.lineItems.some((l) => /Siding|Body/i.test(l.description)), JSON.stringify({ s: bare.state.ctx.squareFeet, li: bare.state.finalEstimate?.estimate.lineItems.map((l) => l.description) }));
-  const late = await play(["a deck", "600 sq ft", "on the ground", "no", "good", "painters choice", "91941", "in 3 weeks", "no", "there are also railings all around"]);
+  const late = await play(["a deck", "600 sq ft", "on the ground", "no", "good", "wood", "bare gray wood", "paint", "painters choice", "91941", "in 3 weeks", "no", "there are also railings all around"]);
   check("deck: something said at the photos step opens its own question instead of pricing", !late.state.finalEstimate && /railing/i.test(late.last), late.last);
   const house = await play(["I need the outside of my house painted", "2000 sq ft", "stucco", "two story", "yes, the trim too", "wood", "it also has a deck", "12 by 15"]);
   check("house + a deck mentioned later: the deck is asked about (height next)", /ground|raised/i.test(house.last), house.last);

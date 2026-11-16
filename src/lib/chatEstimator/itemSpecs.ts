@@ -118,6 +118,29 @@ export const ITEM_SPECS: ItemSpec[] = [
         ],
       },
       {
+        key: 'now', label: 'what is on the railing now', hint: 'Bare, stained, or painted?',
+        ask: ["Is the wood bare, stained, or painted right now?", "What's on the railing now: nothing (bare wood), stain, or paint?"],
+        clarify: "New bare wood needs a seal coat (and time to dry out if it is brand new). Painted wood needs scraping and sanding first, and stain going to paint needs primer.",
+        example: "Say 'bare gray wood', 'stained' or 'painted white'.",
+        when: (c, a) => c.deck !== 'yes' && (a.material === 'wood' || a.material === undefined),
+        options: [
+          o('painted', 'painted now (scrape and sand)', /\b(?:paint|painted|white)\b/, 1.2),
+          o('stained', 'stained now', /\b(?:stain|stained|sealed|sealer)\b/, 1),
+          o('bare', 'bare wood', /\b(?:bare|raw|new|unfinished|weathered|gr[ae]y|never)\b/, 1.1),
+        ],
+      },
+      {
+        key: 'goal', label: 'whether you want the railing painted or stained', hint: 'Paint, or stain/seal?',
+        ask: ["Do you want the railing painted, or stained or sealed?", "Paint it, or stain and seal it?"],
+        clarify: "Stain and sealer soak into the wood and are quicker to apply. Paint covers completely, takes a primer coat and lasts differently.",
+        example: "Say 'paint' or 'stain'.",
+        when: (c, a) => c.deck !== 'yes' && (a.material === 'wood' || a.material === undefined),
+        options: [
+          o('paint', 'paint (primed)', /\b(?:paint|painted|primer|color|solid)\b/, 1.15),
+          o('stain', 'stain/seal', /\b(?:stain|seal|sealer|sealant|clear|transparent|natural|waterproof)\b/, 0.9),
+        ],
+      },
+      {
         key: 'height', label: 'how high off the ground the railing is', hint: 'Ground level, or upstairs?',
         ask: ["Is the railing at ground level, or up on a second floor?", "How high up is it: ground level, or a second-story deck or balcony?"],
         clarify: "A second-story railing means ladder or scaffold work, which adds time.",
@@ -138,6 +161,51 @@ export const ITEM_SPECS: ItemSpec[] = [
           o('bad', 'peeling/rusty', BAD, 1.4),
           o('worn', 'weathered', WORN, 1.2),
           o('good', 'good shape', GOOD, 1),
+        ],
+      },
+    ],
+  },
+
+  // ——————————————————————————————————— Deck (its height, underside, railings and condition are asked from topics.ts)
+  {
+    key: 'deck',
+    thing: 'deck',
+    present: (c) => c.deck === 'yes',
+    lineKeys: ['deck'],
+    priority: 34.645,
+    questions: [
+      {
+        key: 'material', label: 'what the deck is made of', hint: 'Wood, composite, or concrete?',
+        ask: ["What's the deck made of: wood, composite, or a concrete slab?", "Is it a wood deck, composite (like Trex), or concrete?"],
+        clarify: "Wood decks are the usual paint or stain job. Composite usually shouldn't be painted (it needs special paint if so), and concrete takes a masonry coating.",
+        example: "Say 'wood', 'composite' or 'concrete'.",
+        options: [
+          o('concrete', 'concrete (masonry coating)', /\b(?:concrete|slab|cement|pavers?)\b/, 1.2, { said: /\bconcrete (?:deck|patio|slab)\b/ }),
+          o('composite', 'composite (special paint)', /\b(?:composite|trex|azek|vinyl|pvc|plastic)\b/, 0.9, { said: /\b(?:composite|trex|azek)\b/ }),
+          o('wood', 'wood', /\b(?:wood|wooden|cedar|redwood|pine|treated|pressure[\s-]treated|ipe)\b/, 1),
+        ],
+      },
+      {
+        key: 'now', label: 'what is on the deck now', hint: 'Bare, stained, or painted?',
+        ask: ["Is the wood bare, stained, or painted right now?", "What's on the deck now: nothing (bare wood), stain, or paint?"],
+        clarify: "New bare wood needs a seal coat (and time to dry out if it is brand new). Painted wood needs scraping and sanding first, and stain going to paint needs primer.",
+        example: "Say 'bare gray wood', 'stained' or 'painted white'.",
+        when: (_c, a) => (a.material === 'wood' || a.material === undefined),
+        options: [
+          o('painted', 'painted now (scrape and sand)', /\b(?:paint|painted|white)\b/, 1.2),
+          o('stained', 'stained now', /\b(?:stain|stained|sealed|sealer)\b/, 1),
+          o('bare', 'bare wood', /\b(?:bare|raw|new|unfinished|weathered|gr[ae]y|never)\b/, 1.1),
+        ],
+      },
+      {
+        key: 'goal', label: 'whether you want the deck painted or stained', hint: 'Paint, or stain/seal?',
+        ask: ["Do you want the deck painted, or stained or sealed?", "Paint it, or stain and seal it?"],
+        clarify: "Stain and sealer soak into the wood and are quicker to apply. Paint covers completely, takes a primer coat and lasts differently.",
+        example: "Say 'paint' or 'stain'.",
+        when: (_c, a) => (a.material === 'wood' || a.material === undefined),
+        options: [
+          o('paint', 'paint (primed)', /\b(?:paint|painted|primer|color|solid)\b/, 1.15),
+          o('stain', 'stain/seal', /\b(?:stain|seal|sealer|sealant|clear|transparent|natural|waterproof)\b/, 0.9),
         ],
       },
     ],
@@ -374,6 +442,29 @@ export const ITEM_SPECS: ItemSpec[] = [
         ],
       },
       {
+        key: 'now', label: 'what is on the shutters now', hint: 'Bare, stained, or painted?',
+        ask: ["Is the wood bare, stained, or painted right now?", "What's on the shutters now: nothing (bare wood), stain, or paint?"],
+        clarify: "New bare wood needs a seal coat (and time to dry out if it is brand new). Painted wood needs scraping and sanding first, and stain going to paint needs primer.",
+        example: "Say 'bare gray wood', 'stained' or 'painted white'.",
+        when: (_c, a) => (a.material === 'wood' || a.material === undefined),
+        options: [
+          o('painted', 'painted now (scrape and sand)', /\b(?:paint|painted|white)\b/, 1.2),
+          o('stained', 'stained now', /\b(?:stain|stained|sealed|sealer)\b/, 1),
+          o('bare', 'bare wood', /\b(?:bare|raw|new|unfinished|weathered|gr[ae]y|never)\b/, 1.1),
+        ],
+      },
+      {
+        key: 'goal', label: 'whether you want the shutters painted or stained', hint: 'Paint, or stain/seal?',
+        ask: ["Do you want the shutters painted, or stained or sealed?", "Paint it, or stain and seal it?"],
+        clarify: "Stain and sealer soak into the wood and are quicker to apply. Paint covers completely, takes a primer coat and lasts differently.",
+        example: "Say 'paint' or 'stain'.",
+        when: (_c, a) => (a.material === 'wood' || a.material === undefined),
+        options: [
+          o('paint', 'paint (primed)', /\b(?:paint|painted|primer|color|solid)\b/, 1.15),
+          o('stain', 'stain/seal', /\b(?:stain|seal|sealer|sealant|clear|transparent|natural|waterproof)\b/, 0.9),
+        ],
+      },
+      {
         key: 'height', label: 'whether the shutters are upstairs', hint: 'Ground floor, or upstairs?',
         ask: ["Are the shutters all on the ground floor, or are some upstairs?", "Any shutters on a second floor?"],
         clarify: "Upstairs shutters need ladder time.",
@@ -593,6 +684,29 @@ export const ITEM_SPECS: ItemSpec[] = [
         ],
       },
       {
+        key: 'now', label: 'what is on the cover now', hint: 'Bare, stained, or painted?',
+        ask: ["Is the wood bare, stained, or painted right now?", "What's on the cover now: nothing (bare wood), stain, or paint?"],
+        clarify: "New bare wood needs a seal coat (and time to dry out if it is brand new). Painted wood needs scraping and sanding first, and stain going to paint needs primer.",
+        example: "Say 'bare gray wood', 'stained' or 'painted white'.",
+        when: (_c, a) => (a.material === 'wood' || a.material === undefined),
+        options: [
+          o('painted', 'painted now (scrape and sand)', /\b(?:paint|painted|white)\b/, 1.2),
+          o('stained', 'stained now', /\b(?:stain|stained|sealed|sealer)\b/, 1),
+          o('bare', 'bare wood', /\b(?:bare|raw|new|unfinished|weathered|gr[ae]y|never)\b/, 1.1),
+        ],
+      },
+      {
+        key: 'goal', label: 'whether you want the cover painted or stained', hint: 'Paint, or stain/seal?',
+        ask: ["Do you want the cover painted, or stained or sealed?", "Paint it, or stain and seal it?"],
+        clarify: "Stain and sealer soak into the wood and are quicker to apply. Paint covers completely, takes a primer coat and lasts differently.",
+        example: "Say 'paint' or 'stain'.",
+        when: (_c, a) => (a.material === 'wood' || a.material === undefined),
+        options: [
+          o('paint', 'paint (primed)', /\b(?:paint|painted|primer|color|solid)\b/, 1.15),
+          o('stain', 'stain/seal', /\b(?:stain|seal|sealer|sealant|clear|transparent|natural|waterproof)\b/, 0.9),
+        ],
+      },
+      {
         key: 'height', label: 'how high the underside is', hint: 'About how high up is it?',
         ask: ["About how high is the underside: under 9 feet, 9 to 12, or higher?", "How high is the ceiling of the cover?"],
         clarify: "Overhead work is slower and needs taller ladders or scaffold the higher it goes.",
@@ -601,6 +715,17 @@ export const ITEM_SPECS: ItemSpec[] = [
           o('high', 'over 12 ft high', /\b(?:1[3-9]|2\d|over (?:12|twelve)|very high|two[\s-]?stor\w+)\b/, 1.4),
           o('mid', '9-12 ft high', /\b(?:9|10|11|12|nine|ten|eleven|twelve|medium|tall)\b/, 1.2),
           o('low', 'under 9 ft', /\b(?:[5-8]|eight|seven|low|short|standard|under)\b/, 1),
+        ],
+      },
+      {
+        key: 'posts', label: 'whether the posts or columns holding it up get painted', hint: 'Paint the posts or columns too?',
+        ask: ["Are there posts or columns holding it up that should be painted too?", "Should the posts or columns under the cover get painted as well?"],
+        clarify: "Posts and columns have four sides and a base to cut in around, so they're priced on top of the ceiling and beams.",
+        example: "Say 'yes, the posts too' or 'no, just the ceiling'.",
+        dismissive: 'yes',
+        options: [
+          o('no', 'ceiling/beams only', /\b(?:no|nope|nah|none|just the (?:ceiling|top|beams?)|only the (?:ceiling|top|beams?)|skip|don'?t)\b/, 1),
+          o('yes', 'posts/columns too', /\b(?:yes|yeah|yep|yup|sure|please|posts?|columns?|pillars?|both|all|everything|too)\b/, 1, { add: { description: 'Patio cover posts/columns', amount: 180, category: 'Exterior' } }),
         ],
       },
       {

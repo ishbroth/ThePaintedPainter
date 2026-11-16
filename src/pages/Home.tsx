@@ -198,9 +198,6 @@ const Home = () => {
               <div className="review-stars">★★★★★</div>
               <img src={review.image} alt="Review" className="review-image" />
               <p className="review-text">{review.text}</p>
-              <a href={review.link} className="review-link" target="_blank" rel="noopener noreferrer">
-                Read full review →
-              </a>
               <p className="review-source">{review.source}</p>
             </div>
           ))}

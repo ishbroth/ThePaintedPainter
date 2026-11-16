@@ -11,6 +11,9 @@ const TITLE_TOP = 0.4655;
 const TITLE_BOTTOM = 0.6492;
 /** On a phone held upright the picture is a hair wider than the screen, which puts the tips of the roller and the brush right at the margins. */
 const PHONE_WIDTH_OVER_SCREEN = 1.065;
+/** The lettering glistens while the page is scrolled less than this (it starts again once back above the first number; the gap stops it flickering). */
+const GLISTEN_START_SCROLL = 40;
+const GLISTEN_STOP_SCROLL = 110;
 /** The estimator card starts this many pixels below the lettering. */
 const CARD_GAP = 34;
 /** The lettering starts at least this far below the header (the sign-in button), so a tall header under a phone's status bar pushes the picture down rather than hiding the lettering behind it. */
@@ -39,6 +42,7 @@ const SiteBackground = () => {
     let screenHeight = 0;
     let startShift = 0; // how far up the picture starts (0 = its top is at the top of the page)
     let isPhone = false;
+    let glistening = false;
 
     const layout = () => {
       screenHeight = window.innerHeight;
@@ -89,6 +93,14 @@ const SiteBackground = () => {
           opacity = Math.min(1, Math.max(0, (cardTop - titleTop) / Math.max(1, titleBottom - titleTop)));
         }
         root.style.setProperty('--hero-title-opacity', opacity.toFixed(3));
+
+        // The glisten runs while the page is at the top (Superman and the lettering in full view, as on first landing); a little
+        // scrolling stops it, and getting back to the top (or arriving on the home page again) starts it again from the beginning.
+        const wantGlisten = window.scrollY < (glistening ? GLISTEN_STOP_SCROLL : GLISTEN_START_SCROLL);
+        if (wantGlisten !== glistening) {
+          glistening = wantGlisten;
+          document.querySelector('.site-hero-bg__title')?.classList.toggle('is-glistening', glistening);
+        }
       }
     };
     const onScroll = () => {
@@ -107,6 +119,7 @@ const SiteBackground = () => {
       if (frame) cancelAnimationFrame(frame);
       window.removeEventListener('scroll', onScroll);
       window.removeEventListener('resize', layout);
+      document.querySelector('.site-hero-bg__title')?.classList.remove('is-glistening');
     };
   }, [pathname]);
 

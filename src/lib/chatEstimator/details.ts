@@ -452,6 +452,20 @@ export function extractDetails(text: string, ctx: EstimatorContext, askedId: str
         }
         break;
       }
+      case 'closets_included': {
+        const low = text.toLowerCase();
+        if (/^\W*(?:no|nope|nah|none|skip)\b|\b(?:no|without|skip|leave out|don'?t)\b[^.]{0,15}\bclosets?\b/.test(low)) break; // recorded as answered by the caller
+        if (/\bwalk[\s-]?in\b/.test(low)) { patch.closets = 'walkin'; acks.push('walk-in closet'); }
+        else if (/^\W*(?:yes|yeah|yep|yup|sure|please|definitely|absolutely|all of them|every one|everything|them too|include|of course)\b|\bclosets?\b|\b(?:both|all)\b/.test(low)) { patch.closets = 'standard'; acks.push('the closets'); }
+        break;
+      }
+      case 'closet_shelves': {
+        const low = text.toLowerCase();
+        if (/^\W*(?:no|nope|nah|none|skip)\b|\bno\s+(?:shelves|shelving|shelf)\b/.test(low)) break;
+        if (/\bwire\b/.test(low)) { patch.closetShelving = 'wire'; acks.push('wire shelving'); }
+        else if (/^\W*(?:yes|yeah|yep|yup|sure|please|definitely|absolutely|all of them|every one|everything|of course)\b|\b(?:shelves|shelving|shelf|rods?|built[\s-]?in)\b/.test(low)) { patch.closetShelving = 'built_in'; acks.push('closet shelves'); }
+        break;
+      }
       case 'cabinet_count': { const n = parseCount(text, 2, 300); if (n) { patch.cabinetDoorCount = n; acks.push(`${n} doors and drawers`); } break; }
       case 'builtin_count': { const n = parseCount(text, 1, 40); if (n) { patch.builtInCount = n; acks.push(`${n} built-in${n === 1 ? '' : 's'}`); } break; }
       case 'cabinet_scope': {
@@ -557,6 +571,6 @@ export function extractDetails(text: string, ctx: EstimatorContext, askedId: str
 /** Topic ids of the follow-up questions in this file (their answers are recorded so they are never asked twice). */
 export const DETAIL_TOPIC_IDS = new Set([
   'unit_count', 'building_count', 'ceiling_height', 'common_areas', 'balcony_count', 'ext_mu_access',
-  'door_count', 'window_count', 'chair_count', 'furniture_kind', 'furniture_finish', 'cabinet_count', 'cabinet_scope', 'cabinet_method', 'cabinet_hardware', 'builtin_count', 'shutter_count', 'closet_count', 'fence_size', 'fence_height', 'deck_size', 'overhang_size', 'railing_length',
+  'closets_included', 'closet_shelves', 'door_count', 'window_count', 'chair_count', 'furniture_kind', 'furniture_finish', 'cabinet_count', 'cabinet_scope', 'cabinet_method', 'cabinet_hardware', 'builtin_count', 'shutter_count', 'closet_count', 'fence_size', 'fence_height', 'deck_size', 'overhang_size', 'railing_length',
   'detail_rooms', 'detail_feet_crown', 'detail_feet_chair_rail', 'detail_feet_trim', 'detail_sqft_wainscot', 'ext_style',
 ]);
