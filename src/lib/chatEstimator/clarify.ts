@@ -118,7 +118,7 @@ export function recentRecognized(history: ChatMessage[], max = 6): string[] {
   return out.reverse();
 }
 
-export function recapSentence(items: string[]): string {
-  if (items.length === 0) return '';
-  return `Here's what I have so far: ${items.map((i) => `“${i}”`).join(', ')}.`;
+/** Reading the whole list of what was understood back after every hiccup was noise customers asked us to stop: no recap is spoken. */
+export function recapSentence(_items: string[]): string {
+  return '';
 }

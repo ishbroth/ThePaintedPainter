@@ -43,6 +43,9 @@ export function repeatUnitFactor(units: number): number {
   return units >= 50 ? 0.33 : units >= 25 ? 0.44 : units >= 10 ? 0.55 : units >= 4 ? 0.70 : units >= 2 ? 0.88 : 1;
 }
 
+/** Gutters that are not being painted still have to be masked and cut around along the whole roofline: this share of what painting them would cost (the labor part). */
+const GUTTER_MASKING_SHARE = 0.4;
+
 export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
   const lineItems: EstimateLineItem[] = [];
   let volumeEfficiencyUsed = 1;
@@ -748,6 +751,16 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
         description: 'Gutters & Downspouts',
         amount: extSurface.gutterLinFt * BASE_RATES.exterior.gutter_per_linft * regionalMult,
         key: 'gutters',
+      });
+    } else if (ctx.gutters !== 'yes' && bodyPainted && !off('gutter_masking')) {
+      // Gutters left unpainted still run along the whole roofline and down every corner: no paint or material for them, but the painters
+      // have to mask them and cut in around them all the way, which is more labor than painting a plain wall. Priced as a share of what
+      // painting the gutters would have cost (the labor part of that rate), so it scales with the same lineal feet.
+      lineItems.push({
+        category: 'Exterior',
+        description: 'Masking and painting around gutters & downspouts (not painted)',
+        amount: extSurface.gutterLinFt * BASE_RATES.exterior.gutter_per_linft * GUTTER_MASKING_SHARE * regionalMult,
+        key: 'gutter_masking',
       });
     }
 

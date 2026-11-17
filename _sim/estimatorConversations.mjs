@@ -16936,11 +16936,13 @@ function extractBathroomCount(text) {
   const n = parseIntLoose(m2[1]) ?? (m2[1].includes(".5") ? Math.ceil(parseFloat(m2[1])) : null);
   return n;
 }
+var STORY_WORDS = { single: 1, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12 };
 function extractStories(text) {
-  if (/\b(?:single|one)[\s-]?stor(?:y|ey)\b/i.test(text)) return 1;
-  if (/\b(?:two|2)[\s-]?stor(?:y|ey|ies)\b/i.test(text)) return 2;
-  if (/\b(?:three|3)[\s-]?stor(?:y|ey|ies)\b/i.test(text)) return 3;
-  return null;
+  const t2 = text.toLowerCase();
+  const m2 = t2.match(/\b(\d{1,2}|single|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)[\s-]*stor(?:y|ey|ies)\b/) || t2.match(/\b(\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)[\s-]*floors?[\s-]*(?:building|complex|apartment|tower|house|home|property)\b/);
+  if (!m2) return null;
+  const n = /^\d/.test(m2[1]) ? parseInt(m2[1], 10) : STORY_WORDS[m2[1]];
+  return n >= 1 && n <= 40 ? n : null;
 }
 function extractProjectType(text) {
   const t2 = text.toLowerCase();
@@ -18434,6 +18436,14 @@ function parseArea(text, bare = false) {
   }
   return null;
 }
+function areaWithCount(text, area) {
+  if (area == null) return null;
+  const t2 = digitize(text).toLowerCase();
+  if (!/\b(?:each|per|apiece|every one|every single one|a piece)\b/.test(t2)) return area;
+  const m2 = t2.match(/\b(\d{1,3})\s+(?:of them|of these|total|in total|in all|overhangs?|covers?|decks?|patios?|porches|porch|units?|areas?)\b/) || t2.match(/\b(?:there (?:are|is)|i have|we have|got)\s+(\d{1,3})\b/) || t2.match(/\b(\d{1,3})\s+(?:\w+\s+){0,2}(?:of them)\b/);
+  const count = m2 ? parseInt(m2[1], 10) : 0;
+  return count >= 2 && count <= 100 ? Math.min(area * count, 1e5) : area;
+}
 function parseLinearFeet(text, bare = false, min = 3, max = 2e4) {
   const t2 = digitize(text);
   const m2 = t2.match(/(\d[\d,]*(?:\.\d+)?)\s*(?:linear\s*|lin\.?\s*)?(?:feet|foot|ft\.?|lf|')/);
@@ -18489,8 +18499,10 @@ function parseUnits(text, answering, knownTotal) {
   }
   if (painted == null && answering && /\b(?:all|every|each|whole|entire)\b/.test(t2) && knownTotal) painted = knownTotal;
   if (painted == null && total == null) {
-    const n = t2.match(/\b(\d{1,3})[\s-]+(?:\w+[\s-]+){0,2}?(?:units?|apartments?|condos?|town ?homes?|town ?houses?|rental units?)\b/) || t2.match(/\b(\d{1,3})[\s-]?plex\b/);
-    if (n && !/\bbed(?:room)?s?\b/.test(n[0])) total = parseInt(n[1], 10);
+    const unitMatches = [...t2.matchAll(/\b(\d{1,3})[\s-]+(?:\w+[\s-]+){0,2}?(?:units?|apartments?|condos?|town ?homes?|town ?houses?|rental units?)\b/g)];
+    const denied = (x) => /\b(?:not|no|never said|never mentioned|didn'?t say|didn'?t mention|isn'?t|aren'?t)\s*$/.test(t2.slice(Math.max(0, (x.index ?? 0) - 16), x.index ?? 0));
+    const n = unitMatches.find((x) => !denied(x) && !/\b(?:stor(?:y|ey|ies)|floors?|levels?|bed(?:room)?s?|bath(?:room)?s?|buildings?)\b/.test(x[0])) || t2.match(/\b(\d{1,3})[\s-]?plex\b/);
+    if (n) total = parseInt(n[1], 10);
     else if (/\bduplex/.test(t2)) total = 2;
     else if (/\btriplex/.test(t2)) total = 3;
     else if (/\b(?:four|quad)[\s-]?plex/.test(t2)) total = 4;
@@ -18576,7 +18588,7 @@ function extractDetails(text, ctx, askedId) {
       patch.unitCount = u.painted;
       acks.push(u.painted + " unit" + (u.painted === 1 ? "" : "s"));
     }
-    if (u.total != null && (ctx.unitsTotal == null || askedId === "unit_count")) patch.unitsTotal = u.total;
+    if (u.total != null && (ctx.unitsTotal == null || askedId === "unit_count" || u.total !== ctx.unitsTotal)) patch.unitsTotal = u.total;
     if (u.painted == null && u.total != null && ctx.unitsTotal == null) acks.push(u.total + "-unit property");
     if (askedId === "building_count") {
       const b = parseCount(text, 1, 100);
@@ -18916,7 +18928,7 @@ function extractDetails(text, ctx, askedId) {
         break;
       }
       case "overhang_size": {
-        const a = parseArea(text, true);
+        const a = areaWithCount(text, parseArea(text, true));
         if (a) {
           patch.overhangSqft = a;
           acks.push(`${a} sq ft overhang`);
@@ -20337,6 +20349,7 @@ var CEILING_ACCESS_CHARGE = { twelve_plus: 300, vaulted_mixed: 600 };
 function repeatUnitFactor(units) {
   return units >= 50 ? 0.33 : units >= 25 ? 0.44 : units >= 10 ? 0.55 : units >= 4 ? 0.7 : units >= 2 ? 0.88 : 1;
 }
+var GUTTER_MASKING_SHARE = 0.4;
 function calculateEstimate(ctx) {
   const lineItems = [];
   let volumeEfficiencyUsed = 1;
@@ -20860,6 +20873,13 @@ function calculateEstimate(ctx) {
         description: "Gutters & Downspouts",
         amount: extSurface.gutterLinFt * RESOLVED_BASE_RATES.exterior.gutter_per_linft * regionalMult,
         key: "gutters"
+      });
+    } else if (ctx.gutters !== "yes" && bodyPainted && !off("gutter_masking")) {
+      lineItems.push({
+        category: "Exterior",
+        description: "Masking and painting around gutters & downspouts (not painted)",
+        amount: extSurface.gutterLinFt * RESOLVED_BASE_RATES.exterior.gutter_per_linft * GUTTER_MASKING_SHARE * regionalMult,
+        key: "gutter_masking"
       });
     }
     if (ctx.foundation === "yes" && !off("foundation")) {
@@ -21396,12 +21416,11 @@ var STRONG = [
   "nigger",
   "nigga",
   "piss",
-  "pissed",
   "wtf",
   "stfu",
   "gtfo"
 ];
-var MILD = ["damn", "dammit", "goddamn", "hell", "crap", "ass", "idiot", "stupid", "dumb", "suck", "sucks", "moron", "screw"];
+var MILD = ["damn", "dammit", "goddamn", "hell", "crap", "ass", "idiot", "stupid", "dumb", "suck", "sucks", "moron", "pissed"];
 var INSULT_PHRASES = [/\byour (mom|mother|momma|mama|mum)\b/i, /\byou (suck|are stupid|are dumb|idiot|moron)\b/i, /\b(shut up|go to hell|piss off|screw you|f+u+c+k+ (you|off))\b/i];
 function normalize(text) {
   return text.toLowerCase().replace(/@/g, "a").replace(/\$/g, "s").replace(/0/g, "o").replace(/1/g, "i").replace(/3/g, "e").replace(/5/g, "s").replace(/!/g, "i").replace(/[*#%^+_.\-]/g, "").replace(/(.)\1{2,}/g, "$1$1");
@@ -21430,17 +21449,23 @@ var DISMISSIVE = [
 function dismissiveCount(messages) {
   return messages.filter((m2) => DISMISSIVE.some((re) => re.test(m2))).length;
 }
+function isFlaggedMessage(text) {
+  const s = profanityScan(text);
+  return s.strong > 0 || s.insult || s.mild >= 2;
+}
 function reviewLocally(messages) {
   let strong = 0;
   let mild = 0;
   let insulted = false;
+  let milderInOne = false;
   for (const m2 of messages) {
     const s = profanityScan(m2.text);
     strong += s.strong;
     mild += s.mild;
+    if (s.mild >= 2) milderInOne = true;
     if (s.insult) insulted = true;
   }
-  if (strong > 0 || insulted || mild >= 2) return { ok: false, reason: "abusive" };
+  if (strong > 0 || insulted || milderInOne || mild >= 4) return { ok: false, reason: "abusive" };
   if (dismissiveCount(messages.map((m2) => m2.text)) >= 2) return { ok: false, reason: "dismissive" };
   return { ok: true };
 }
@@ -21456,16 +21481,17 @@ async function reviewWithAI(messages) {
     return null;
   }
 }
-function retryMessage(reason) {
+function keepMessage(reason, setAside) {
+  if (reason === "abusive" && setAside) return `Hmm\u2026 let's keep this friendly. I've set that message aside, and everything else you told me is saved. Anything else to add, or say "run it" to get your price?`;
   switch (reason) {
     case "abusive":
-      return "Hmm\u2026 let's keep this friendly and try that again. What do you need painted?";
+      return `Hmm\u2026 let's keep this friendly. Everything you told me is saved. Anything else to add, or say "run it" to try again?`;
     case "dismissive":
-      return "Hmm\u2026 it sounds like there may not be a painting project right now. If there is one, can we try that again? What do you need painted?";
+      return "Hmm\u2026 it sounds like there may not be a painting project right now. Everything you told me is saved. If there is one, tell me a bit more about what needs painting.";
     case "no_project":
-      return "Hmm\u2026 I couldn't tell what you'd like painted, so I can't give you a price yet. Can we try that again? What do you need painted?";
+      return "Hmm\u2026 I couldn't tell what you'd like painted, so I can't give you a price yet. Everything you told me is saved. What needs painting?";
     default:
-      return "Hmm\u2026 that didn't quite add up to a painting project. Can we try that again? What do you need painted?";
+      return "Hmm\u2026 that didn't quite add up to a painting project yet. Everything you told me is saved. Tell me a bit more about what needs painting.";
   }
 }
 
@@ -21568,9 +21594,106 @@ function recentRecognized(history, max = 6) {
   }
   return out.reverse();
 }
-function recapSentence(items) {
-  if (items.length === 0) return "";
-  return `Here's what I have so far: ${items.map((i2) => `\u201C${i2}\u201D`).join(", ")}.`;
+function recapSentence(_items) {
+  return "";
+}
+
+// src/lib/chatEstimator/retractions.ts
+init_define_import_meta_env();
+var RETRACT_CUE = new RegExp(
+  "\\b(?:i\\s+)?(?:changed my mind|change my mind|changing my mind|never\\s?mind|nvm|wait,?\\s+no|scratch (?:that|it)|strike that|forget (?:it|that|about|the|all)|actually,?\\s+(?:no|skip|let'?s skip|don'?t|leave|forget|take)|cancel (?:that|it)|take (?:that|it|them) (?:out|off)|on second thought|not anymore|oops,?\\s+no|no wait)\\b",
+  "i"
+);
+var TARGETS = [
+  { re: /\b(?:common (?:areas?|spaces?)|hall(?:way)?s|corridors?|lobb(?:y|ies)|stair(?:well)?s|laundry (?:room|area))\b/, label: "the common areas", patch: { commonAreas: "no", commonAreaSqft: null }, answered: ["common_areas"] },
+  { re: /\b(?:closet shel(?:ves|ving|f)|shel(?:ves|ving) in the closets?)\b|\bshel(?:ves|ving)\b/, label: "the closet shelves", patch: { closetShelving: "none" }, answered: ["closet_shelves"] },
+  { re: /\bclosets?\b/, label: "the closets", patch: { closets: "none", closetShelving: "none", closetCount: null }, answered: ["closets_included", "closet_shelves", "closet_count"], excluded: ["closets"] },
+  { re: /\bcabinet(?:s|ry)?\b|\bvanit(?:y|ies)\b/, label: "the cabinets", patch: { cabinets: "none", cabinetLocations: [], cabinetDoorCount: null }, answered: ["upsell_cabinets", "cabinet_finish", "cabinet_count", "cabinet_scope", "cabinet_method", "cabinet_hardware"], excluded: ["cabinets"] },
+  { re: /\bceilings?\b/, label: "the ceilings", patch: { interiorCeilings: "no" }, excluded: ["ceilings"] },
+  { re: /\b(?:trim|baseboards?)\b/, label: "the trim", patch: { interiorTrim: "no", trimLinearFeet: null }, excluded: ["trim"] },
+  { re: /\bdoors?\b/, label: "the doors", patch: { interiorDoors: "none", doorCount: null, doorsIncluded: false }, excluded: ["doors"] },
+  { re: /\bfenc(?:e|es|ing)\b/, label: "the fence", patch: { fence: "none", fenceLinearFeet: null, fenceHeightFt: null }, answered: ["fence_size", "fence_height"] },
+  { re: /\bdeck\b/, label: "the deck", patch: { deck: "none", deckSqft: null, deckSize: "" }, answered: ["deck_size"] },
+  { re: /\b(?:overhangs?|patio covers?|pergolas?|carports?)\b/, label: "the overhangs", patch: { overhangs: "no", overhangSqft: null }, answered: ["overhang_size"] },
+  { re: /\b(?:gutters?|downspouts?)\b/, label: "the gutters", patch: { gutters: "no" } },
+  { re: /\bshutters?\b/, label: "the shutters", patch: { exteriorShutters: "no", exteriorShutterCount: null, interiorShutters: "no", interiorShutterCount: null }, answered: ["shutter_count"] },
+  { re: /\bgarage doors?\b/, label: "the garage door", patch: { garageDoor: "none" } },
+  { re: /\b(?:front|entry|entrance) doors?\b/, label: "the entry door", patch: { entryDoor: "no" } },
+  { re: /\b(?:balcon(?:y|ies)|breezeways?)\b/, label: "the balconies", patch: { balconies: "none", balconyCount: null } },
+  { re: /\brailings?\b/, label: "the railings", patch: { railings: "none", railingType: "" } },
+  { re: /\bwindows?\b/, label: "the windows", patch: { exteriorWindows: "none", exteriorWindowCount: null, interiorWindows: "none", windowCount: null } },
+  { re: /\bfireplace|mantel\b/, label: "the fireplace", patch: { fireplaceType: "", fireplaceCount: null } }
+];
+function readRetraction(text) {
+  const low = text.toLowerCase();
+  const cue = RETRACT_CUE.test(low);
+  if (!cue) return null;
+  for (const t2 of TARGETS) {
+    if (!t2.re.test(low)) continue;
+    return { patch: t2.patch, answered: t2.answered, excluded: t2.excluded, label: t2.label };
+  }
+  if (low.split(/\s+/).filter(Boolean).length <= 5) return { generic: true };
+  return null;
+}
+
+// src/lib/chatEstimator/conflicts.ts
+init_define_import_meta_env();
+var FACTS = [
+  { field: "unitsTotal", label: "units", topics: ["unit_count"] },
+  { field: "stories", label: "stories", topics: ["stories", "interior_stories"] },
+  { field: "buildingCount", label: "buildings", topics: ["building_count"] }
+];
+var CORRECTING = /\b(?:never said|never mentioned|didn'?t say|did not say|didn'?t mention|not \d|actually|i meant|correction|that'?s wrong|that was wrong|changed my mind|mis(?:spoke|typed)|typo|my mistake)\b/i;
+var WORD_NUMBERS = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12 };
+function numbersIn(text) {
+  const out = [];
+  for (const m2 of text.toLowerCase().matchAll(/\b(\d{1,3}|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b/g)) {
+    out.push(/^\d/.test(m2[1]) ? parseInt(m2[1], 10) : WORD_NUMBERS[m2[1]]);
+  }
+  return out;
+}
+function holdConflicts(prev, next, text, lastTopicId) {
+  const correcting = CORRECTING.test(text);
+  for (const f of FACTS) {
+    const before = prev[f.field];
+    const now = next[f.field];
+    if (typeof before !== "number" || typeof now !== "number" || before === now) continue;
+    const answeredDirectly = !!lastTopicId && f.topics.includes(lastTopicId);
+    if (correcting || answeredDirectly) {
+      next.conflicts = (next.conflicts ?? []).filter((c2) => c2.field !== f.field);
+      continue;
+    }
+    next[f.field] = before;
+    const existing = (next.conflicts ?? []).find((c2) => c2.field === f.field);
+    if (existing) {
+      if (!existing.values.includes(now)) existing.values = [...existing.values, now];
+    } else {
+      next.conflicts = [...next.conflicts ?? [], { field: f.field, label: f.label, values: [before, now], asked: 0 }];
+    }
+  }
+}
+function settleConflicts(ctx, text) {
+  const open = ctx.conflicts ?? [];
+  if (open.length === 0) return ctx;
+  const c2 = open[0];
+  const low = text.toLowerCase();
+  const nums = numbersIn(low);
+  let pick3 = nums.find((n) => c2.values.includes(n)) ?? null;
+  if (pick3 == null && /\b(?:first|original|earlier|before|the old)\b/.test(low)) pick3 = c2.values[0];
+  if (pick3 == null && /\b(?:second|latest|newer|new one|last one|the newer)\b/.test(low)) pick3 = c2.values[c2.values.length - 1];
+  if (pick3 == null && nums.length > 0) pick3 = nums[0];
+  const rest = open.slice(1);
+  if (pick3 != null) return { ...ctx, [c2.field]: pick3, conflicts: rest };
+  if (c2.asked + 1 >= 2) {
+    const latest = c2.values[c2.values.length - 1];
+    const note = `Customer gave both ${c2.values.join(" and ")} ${c2.label}; used ${latest}`;
+    return { ...ctx, [c2.field]: latest, conflicts: rest, additionalDetails: ctx.additionalDetails ? `${ctx.additionalDetails}; ${note}` : note };
+  }
+  return { ...ctx, conflicts: [{ ...c2, asked: c2.asked + 1 }, ...rest] };
+}
+function conflictQuestion(c2) {
+  const [a, b] = [c2.values[0], c2.values[c2.values.length - 1]];
+  return c2.asked === 0 ? `I thought you said ${a} ${c2.label}, but now I see ${b}. Which one is it?` : `I still need to know which is right: ${a} or ${b} ${c2.label}?`;
 }
 
 // src/lib/chatEstimator/defaultAssumptions.ts
@@ -23049,8 +23172,8 @@ var TOPICS = [
     id: "paint_grade",
     priority: 38,
     relevant: (c2) => paintingJob(c2),
-    alreadyAnswered: (c2) => !!c2.paintGrade || extDone(c2, "paint_grade") || c2.paintBrand === "painter_choice",
-    // "the painter can choose" covers the grade too (a grade they volunteer is still noted)
+    alreadyAnswered: (c2) => !!c2.paintGrade || extDone(c2, "paint_grade") || c2.paintBrand === "painter_choice" || c2.paintBrand === "customer_provided",
+    // "the painter can choose" (or the customer buying the paint) covers the grade too (a grade they volunteer is still noted)
     ask: (c2) => pick2(
       [
         "Would you like standard mid-grade paint, or a premium line?",
@@ -23065,7 +23188,7 @@ var TOPICS = [
     id: "paint_finish",
     priority: 39,
     relevant: (c2) => paintingJob(c2),
-    alreadyAnswered: (c2) => !!c2.paintFinish || extDone(c2, "paint_finish") || c2.paintBrand === "painter_choice",
+    alreadyAnswered: (c2) => !!c2.paintFinish || extDone(c2, "paint_finish") || c2.paintBrand === "painter_choice" || c2.paintBrand === "customer_provided",
     // ...and the finish
     ask: (c2) => pick2(
       [
@@ -23855,6 +23978,7 @@ var COMPONENT_TOPICS = {
   railing: ["railing_length"]
 };
 var askableFor = (ctx, id) => {
+  if (id === "resolve_conflict") return true;
   if (id.startsWith("item_")) return true;
   if (ctx.itemsOnly) return ITEM_JOB_TOPICS.has(id);
   const kind = componentKind(ctx);
@@ -23971,6 +24095,26 @@ var metaBank = {
   },
   greeting: () => "Hey! What do you need painted?"
 };
+TOPICS.push({
+  id: "resolve_conflict",
+  priority: 0.5,
+  relevant: (c2) => (c2.conflicts?.length ?? 0) > 0,
+  alreadyAnswered: (c2) => (c2.conflicts?.length ?? 0) === 0,
+  // (once settled there is nothing left to ask: these stay safe to call on the notes that settled it)
+  ask: (c2) => c2.conflicts?.[0] ? conflictQuestion(c2.conflicts[0]) : "Anything else I should know?",
+  clarify: (c2) => c2.conflicts?.[0] ? `You gave me two different numbers, so I want to be sure which one to use: ${c2.conflicts[0].values.join(" or ")} ${c2.conflicts[0].label}.` : "Got it.",
+  example: (c2) => c2.conflicts?.[0] ? `Just say ${c2.conflicts[0].values.join(" or ")}.` : "Just tell me."
+});
+function forProperty(text, c2) {
+  if (c2.propertyType !== "multi_unit") return text;
+  const plural = (c2.buildingCount ?? 2) > 1;
+  const b = plural ? "the buildings" : "the building";
+  return text.replace("What about the front door, is that getting painted?", "What about the front doors (the entry door to each unit, or just the main building entrances)? Are those getting painted?").replace("Is the front door part of the job?", "Are the front doors part of the job: each unit's entry door, or just the main entrances?").replace("What kind of windows does the house have?", `What kind of windows ${plural ? "do the buildings" : "does the building"} have?`).replace("Is the house staying the same color, or going a different color?", `Are ${b} staying the same color, or going a different color?`).replace("How many stories is the house?", plural ? "How many stories are the buildings?" : "How many stories is the building?").replace("How tall is the house?", plural ? "How tall are the buildings?" : "How tall is the building?").replace(/\bthe house\b/g, b);
+}
+for (const t2 of TOPICS) {
+  const original = t2.ask;
+  t2.ask = (c2) => forProperty(original(c2), c2);
+}
 
 // src/lib/chatEstimator/llmClient.ts
 init_define_import_meta_env();
@@ -24902,7 +25046,30 @@ function snapshotOf(state) {
 async function handleUserMessage(state, userText, customerId) {
   const trimmed = userText.trim();
   if (!trimmed) return { state, done: null };
-  if (BACK_UP_RE.test(trimmed)) {
+  const retraction = readRetraction(trimmed);
+  if (retraction?.patch && state.askedIds.length > 0) {
+    const userMsg = { role: "user", text: trimmed, timestamp: Date.now() };
+    const ctx = {
+      ...state.ctx,
+      ...retraction.patch,
+      extAnswered: [.../* @__PURE__ */ new Set([...state.ctx.extAnswered ?? [], ...retraction.answered ?? []])],
+      excludedSurfaces: [.../* @__PURE__ */ new Set([...state.ctx.excludedSurfaces ?? [], ...retraction.excluded ?? []])]
+    };
+    const open = state.lastBotTopic && !state.lastBotTopic.alreadyAnswered(ctx) ? state.lastBotTopic : pickNextTopic(ctx, state.askedIds);
+    const lead = `No problem, I've taken ${retraction.label} off the list.`;
+    return {
+      state: {
+        ...state,
+        ctx,
+        finalEstimate: null,
+        lastBotTopic: open ?? state.lastBotTopic,
+        askedIds: open && !state.askedIds.includes(open.id) ? [...state.askedIds, open.id] : state.askedIds,
+        history: [...state.history, userMsg, botMessage(open ? `${lead} ${open.ask(ctx)}` : `${lead} Anything else I should know?`)]
+      },
+      done: null
+    };
+  }
+  if (BACK_UP_RE.test(trimmed) || retraction?.generic) {
     const userMsg = { role: "user", text: trimmed, timestamp: Date.now() };
     if (!state.undoSnapshot) {
       return {
@@ -24934,9 +25101,19 @@ async function handleUserMessage(state, userText, customerId) {
   }
   const preTurnSnapshot = snapshotOf(state);
   const result = await processMessage(state, trimmed, customerId);
-  return { ...result, state: { ...result.state, undoSnapshot: preTurnSnapshot } };
+  let after = result.state;
+  const conflictTopic = findTopic("resolve_conflict");
+  if (!result.done && conflictTopic && (after.ctx.conflicts?.length ?? 0) > 0 && after.lastBotTopic?.id !== "resolve_conflict" && !after.finalEstimate) {
+    after = {
+      ...after,
+      lastBotTopic: conflictTopic,
+      history: [...after.history, botMessage(conflictTopic.ask(after.ctx))]
+    };
+  }
+  return { ...result, state: { ...after, undoSnapshot: preTurnSnapshot } };
 }
 async function processMessage(state, trimmed, customerId) {
+  if ((state.ctx.conflicts?.length ?? 0) > 0 && state.lastBotTopic?.id === "resolve_conflict") state = { ...state, ctx: settleConflicts(state.ctx, trimmed) };
   const understood = await understand(trimmed, state);
   const frictionKind = detectFriction(trimmed);
   const intent = frictionKind === "repeat_complaint" && state.lastBotTopic && !hasIntent(understood.intent, "already_answered") ? { ...understood.intent, intents: [...understood.intent.intents, "already_answered"] } : understood.intent;
@@ -24970,7 +25147,9 @@ async function processMessage(state, trimmed, customerId) {
       return asBot({}, `Let's keep this friendly. I'm here to get you a price for a painting job. ${again}`);
     }
   }
-  if (state.askedIds.length > 0 && (isDenial(trimmed) || frictionKind === "misunderstood")) {
+  const detailsHere = extractDetails(trimmed, state.ctx, state.lastBotTopic?.id ?? null);
+  const bringsFacts = acknowledgements.length > 0 || Object.keys(patch).length > 0 || detailsHere.acks.length > 0 || Object.keys(detailsHere.patch).length > 0;
+  if (state.askedIds.length > 0 && !bringsFacts && (isDenial(trimmed) || frictionKind === "misunderstood")) {
     if (denialIsAboutScope(trimmed) && state.ctx.projectType !== "exterior") {
       const reset = {
         ...state.ctx,
@@ -25181,6 +25360,10 @@ async function processMessage(state, trimmed, customerId) {
       [/\bvista\b/, "Vista"]
     ];
     const painterChoice = hasIntent(intent, "dismissive") || /\b(?:painter'?s? (?:choice|call|picks?|decision)|up to (?:the )?painter|you (?:pick|choose|decide)|their choice|your choice|doesn'?t matter|don'?t care|no preference|no brand|any(?:thing)? (?:is )?(?:fine|works|ok|okay)|whatever (?:they|you)|not picky|let (?:them|him|her|the painter) (?:pick|choose|decide))\b/.test(low);
+    if (/\b(?:i|we)(?:'ll|'re| will| am| are| can| plan to| would)?\s*(?:going to\s+)?(?:provide|supply|buy|purchase|bring|furnish|pick up|get)\s+(?:the\s+|my own\s+|our own\s+|all (?:the|of the)\s+)?paint\b|\b(?:i|we)\s+(?:already\s+)?(?:have|got)\s+(?:the\s+|all (?:the\s+)?)?paint\b|\bmy own paint\b|\bour own paint\b|\bowner[- ]supplied\b|\bcustomer[- ](?:supplied|provided)\b|\b(?:paint|materials?)\s+(?:is|are)\s+(?:provided|supplied)\b|\bsupplying (?:the )?paint\b/.test(low)) {
+      ctxWithExplicit.paintBrand = "customer_provided";
+      ctxWithExplicit.extAnswered = [.../* @__PURE__ */ new Set([...ctxWithExplicit.extAnswered ?? state.ctx.extAnswered ?? [], "paint_brand", "paint_grade", "paint_finish"])];
+    }
     if (!state.ctx.paintBrand || state.ctx.paintBrand === "painter_choice") {
       const named = brands.find(([re]) => re.test(low));
       if (named) ctxWithExplicit.paintBrand = named[1];
@@ -25425,7 +25608,7 @@ ${trimmed}`.trim();
   }
   if (ctxNext.projectType === "interior" || ctxNext.projectType === "exterior" || !ctxNext.projectType) {
     const msg = trimmed.toLowerCase();
-    const bareBoth = state.lastBotTopic?.id === "project_type" && /^\W*(?:both|all of it|everything|the whole (?:thing|house)|inside and out(?:side)?|in and out)\W*$/.test(msg);
+    const bareBoth = state.lastBotTopic?.id === "project_type" && (/^\W*(?:both|all of it|everything|the whole (?:thing|house)|inside and out(?:side)?|in and out)\W*$/.test(msg) || /\b(?:both|inside and out(?:side)?|in and out|interior and exterior)\b/.test(msg) && !/\b(?:not|no|neither)\s+both\b/.test(msg));
     const otherSide = ctxNext.projectType === "interior" ? /\b(?:siding|stucco|soffits?|fascia|eaves|gutters?|exterior|outside(?! of the (?:closet|room|cabinet))|outdoors?)\b/ : ctxNext.projectType === "exterior" ? /\b(?:interior|inside|indoors?|ceilings?|baseboards?|bedrooms?|living room|kitchen|bathrooms?|hallways?)\b/ : null;
     const negated = /\b(?:not|no|except|without|skip|don'?t need|doesn'?t need)\b[^.,;]{0,25}\b(?:siding|soffits?|fascia|eaves|gutters?|exterior|outside|interior|inside|ceilings?|baseboards?|bedrooms?|kitchen|bathrooms?)\b/.test(msg);
     if (bareBoth || otherSide && otherSide.test(msg) && !negated && !hasIntent(intent, "ask_clarification")) ctxNext.projectType = "both";
@@ -25451,6 +25634,13 @@ ${trimmed}`.trim();
     ];
   }
   const photoLinkMarker = newPhotoTriggers.map((t2) => `[[photo:${t2.key}|${t2.label}]]`).join(" ");
+  holdConflicts(state.ctx, ctxNext, trimmed, state.lastBotTopic?.id);
+  {
+    const words = (a) => new Set(a.toLowerCase().replace(/[^a-z0-9\s-]/g, " ").replace(/-/g, " ").split(/\s+/).filter((w2) => w2 && !/^(?:the|a|an|of|included|interior|exterior|painted|being|to|too)$/.test(w2)).map((w2) => w2.replace(/s$/, "")));
+    const sets = acknowledgements.map(words);
+    const keep = acknowledgements.filter((_, i2) => !sets.some((o2, j) => j !== i2 && sets[i2].size > 0 && [...sets[i2]].every((w2) => o2.has(w2)) && (o2.size > sets[i2].size || j < i2)));
+    acknowledgements.splice(0, acknowledgements.length, ...keep);
+  }
   const userMsg = {
     role: "user",
     text: trimmed,
@@ -25618,7 +25808,7 @@ ${trimmed}`.trim();
         history: [
           ...s.history,
           botMessage(
-            `Sorry, I don't think I caught that one \u2014 it didn't look like an answer about ${topicLabel(topic.id, ctxNext.itemsOnly)}. ${recapSentence(recentRecognized(state.history))} ${q} If something above is wrong, just tell me what to change.`.replace(/\s{2,}/g, " ")
+            `Sorry, I didn't catch that as an answer about ${topicLabel(topic.id, ctxNext.itemsOnly)}. ${q}`.replace(/\s{2,}/g, " ")
           )
         ]
       };
@@ -25630,7 +25820,10 @@ ${trimmed}`.trim();
     if (!s.photosAsked) return photosStep(s, ctxNext, acknowledgements);
     return await finalizeTurn(s, customerId);
   }
-  const next = pickNextTopic(ctxNext, s.askedIds);
+  if ((ctxNext.conflicts?.length ?? 0) > 0 && s.askedIds.includes("resolve_conflict")) s = { ...s, askedIds: s.askedIds.filter((id) => id !== "resolve_conflict") };
+  const reaskCore = state.lastBotTopic && state.lastBotTopic.id === "project_type" && !state.lastBotTopic.alreadyAnswered(ctxNext) && !s.retriedIds.includes("project_type") ? state.lastBotTopic : null;
+  if (reaskCore) s = { ...s, retriedIds: [...s.retriedIds, "project_type"] };
+  const next = reaskCore ?? pickNextTopic(ctxNext, s.askedIds);
   if (!next) {
     const retry = pickRetryTopic(ctxNext, s.askedIds, s.retriedIds);
     if (retry) {
@@ -25650,7 +25843,12 @@ ${trimmed}`.trim();
     return await finalizeTurn(s, customerId);
   }
   const ackLeadIn = fullScopeAnswer ? "Got it, so the walls, ceilings, trim and doors, correct? " : acknowledgements.length > 0 ? `${ACK_LEAD_INS[s.askedIds.length % ACK_LEAD_INS.length]} ${acknowledgements.join(", ")}. ` : "";
-  const prompt = ackLeadIn + (photoLinkMarker ? `${photoLinkMarker} ` : "") + next.ask(ctxNext);
+  const EXTERIOR_IDS = /* @__PURE__ */ new Set(["siding", "stories", "overhang_size", "fence_size", "fence_height", "deck_size", "balcony_count", "ext_mu_access"]);
+  const isExteriorId = (id) => !!id && (id.startsWith("ext_") || EXTERIOR_IDS.has(id));
+  const crossingToOutside = ctxNext.projectType === "both" && isExteriorId(next.id) && !isExteriorId(state.lastBotTopic?.id) && !(ctxNext.extAnswered ?? []).includes("seg_exterior");
+  const segue = crossingToOutside ? (ctxNext.buildingCount ?? 1) > 1 || ctxNext.propertyType === "multi_unit" ? "That covers the inside of the units. Now the outside of the building: " : "That covers the inside. Now the outside: " : "";
+  if (crossingToOutside) ctxNext.extAnswered = [.../* @__PURE__ */ new Set([...ctxNext.extAnswered ?? [], "seg_exterior"])];
+  const prompt = ackLeadIn + segue + (photoLinkMarker ? `${photoLinkMarker} ` : "") + next.ask(ctxNext);
   s = {
     ...s,
     askedIds: [...s.askedIds, next.id],
@@ -25759,12 +25957,16 @@ async function fetchLoyaltyDiscountPercent(customerId) {
     return 0;
   }
 }
-function restartAfterReview(reason) {
-  const fresh = makeInitialState();
-  return { state: { ...fresh, history: [{ role: "bot", text: retryMessage(reason), timestamp: Date.now() }] }, done: null };
+function keepAfterReview(state, reason, setAsideTexts) {
+  const aside = new Set(setAsideTexts);
+  const history = state.history.map((m2) => m2.role === "user" && aside.has(m2.text) ? { ...m2, setAside: true } : m2);
+  return { state: { ...state, history: [...history, { role: "bot", text: keepMessage(reason, aside.size > 0), timestamp: Date.now() }], finalEstimate: null }, done: null };
 }
 async function finalizeTurn(state, customerId) {
-  const userTurns = state.history.filter((m2) => m2.role === "user");
+  const allUserTurns = state.history.filter((m2) => m2.role === "user" && !m2.setAside);
+  const abusive = allUserTurns.filter((m2) => isFlaggedMessage(m2.text));
+  if (abusive.length > 0) return keepAfterReview(state, "abusive", abusive.map((m2) => m2.text));
+  const userTurns = allUserTurns;
   let verdict = reviewLocally(userTurns.map((m2) => ({ text: m2.text, recognized: !!(m2.ackChips && m2.ackChips.length > 0) })));
   let aiApproved = false;
   if (verdict.ok) {
@@ -25772,13 +25974,13 @@ async function finalizeTurn(state, customerId) {
     if (ai && !ai.ok) verdict = ai;
     aiApproved = !!ai?.ok;
   }
-  if (!verdict.ok) return restartAfterReview(verdict.reason);
+  if (!verdict.ok) return keepAfterReview(state, verdict.reason, []);
   const loyaltyDiscountPercent = customerId ? await fetchLoyaltyDiscountPercent(customerId) : 0;
   const result = finalize(state.ctx, state.transcript, loyaltyDiscountPercent);
   reportConversation(state.history.map((m2) => ({ role: m2.role, text: m2.text })), state.friction ?? []);
   const PAINTABLE_WORDS = /\b(windows?|doors?|railings?|rails?|fences?|gates?|shutters?|mailbox|walls?|ceilings?|cabinets?|trim|baseboards?|molding|deck|porch|garage|shed|siding|stairs?|stairway|closets?|room|bedroom|bathroom|kitchen|living room|dining|hallway|basement|furniture|chair|table|dresser|desk|bookcase|fireplace|mantel|pantry|house|apartment|condo)\b/i;
   const describedSomething = userTurns.some((m2) => PAINTABLE_WORDS.test(m2.text)) || !!(state.ctx.projectType || state.ctx.selectedRooms.length > 0 || state.ctx.squareFeet || state.ctx.bedroomCount || state.ctx.furnitureItems.length > 0 || state.ctx.cabinets !== "none");
-  if (!hasPaintingScope(result.estimate.lineItems) && !aiApproved && !describedSomething) return restartAfterReview("no_project");
+  if (!hasPaintingScope(result.estimate.lineItems) && !aiApproved && !describedSomething) return keepAfterReview(state, "no_project", []);
   const s = {
     ...state,
     history: [...state.history, botMessage(result.summary)],
@@ -26398,12 +26600,12 @@ async function dismissAt(setup, topicWords, dismissal = "doesnt matter just want
   check("setup: the bot asks how many doors", /doors/i.test(known.last) && /how many|approximately/i.test(known.last), known.last);
   const noticed = await play(["like I said, 14 doors"], [], known.state);
   check('"like I said, 14 doors": the bot owns up, uses the answer and does not ask it again', noticed.state.ctx.doorCount === 14 && /you'?re right|sorry/i.test(noticed.last) && !/how many doors/i.test(noticed.last), noticed.last);
-  check("...and what it understood is read back", /14 doors/.test(noticed.last), noticed.last);
+  check("...and the answer is used, with no read-back of everything so far", noticed.state.ctx.doorCount === 14 && !/here's what i have so far/i.test(noticed.last), noticed.last);
   check("...and the friction is on record", (noticed.state.friction ?? []).some((e2) => e2.kind === "repeat_complaint"), JSON.stringify(noticed.state.friction));
   const asked = await play(["I already told you that"], [], { ...known.state, ctx: { ...known.state.ctx, doorCount: 9 } });
   check('"I already told you": when the notes already hold it, the bot apologises and moves on without asking again', /sorry|right/i.test(asked.last) && !/how many doors/i.test(asked.last), asked.last);
   const confused = await play(["no that's not what I meant"], [], known.state);
-  check(`"that's not what I meant": a brief apology, what it has so far, and no pushing on with a default`, /sorry/i.test(confused.last) && /what i have so far|here's what/i.test(confused.last), confused.last);
+  check(`"that's not what I meant": a brief apology, no recap of everything so far, and no pushing on with a default`, /sorry/i.test(confused.last) && !/what i have so far|here's what/i.test(confused.last) && !/if something above is wrong/i.test(confused.last), confused.last);
   check("...and it is logged as a misunderstanding", (confused.state.friction ?? []).some((e2) => e2.kind === "misunderstood"), JSON.stringify(confused.state.friction));
   const transcript = [
     { role: "bot", text: "How many doors are we talking about?" },
@@ -26616,6 +26818,10 @@ async function dismissAt(setup, topicWords, dismissal = "doesnt matter just want
   check('deck: a bare "600 sq ft" is the deck, not the house (no siding line)', bare.state.ctx.squareFeet == null && !!bare.state.finalEstimate && !bare.state.finalEstimate.estimate.lineItems.some((l) => /Siding|Body/i.test(l.description)), JSON.stringify({ s: bare.state.ctx.squareFeet, li: bare.state.finalEstimate?.estimate.lineItems.map((l) => l.description) }));
   const late = await play(["a deck", "600 sq ft", "on the ground", "no", "good", "wood", "bare gray wood", "paint", "painters choice", "91941", "in 3 weeks", "no", "there are also railings all around"]);
   check("deck: something said at the photos step opens its own question instead of pricing", !late.state.finalEstimate && /railing/i.test(late.last), late.last);
+  const rude = await play(["a deck", "600 sq ft", "on the ground", "no", "faded but solid", "wood", "bare gray wood", "paint", "this is taking forever, damn it is a pain in the ass", "painters choice", "91941", "in 3 weeks", "no", "run it"]);
+  check("review: a rude message keeps the conversation (nothing is wiped) and says so", rude.state.ctx.deckSqft === 600 && rude.state.history.length > 10 && /keep this friendly/i.test(rude.last) && rude.state.history.some((m2) => m2.setAside), rude.last);
+  const rude2 = await play(["run it"], [], rude.state);
+  check("review: after the rude message is set aside, the price still comes", !!rude2.state.finalEstimate, rude2.last);
   const house = await play(["I need the outside of my house painted", "2000 sq ft", "stucco", "two story", "yes, the trim too", "wood", "it also has a deck", "12 by 15"]);
   check("house + a deck mentioned later: the deck is asked about (height next)", /ground|raised/i.test(house.last), house.last);
   const houseWrap = await play(["I need the outside of my house painted", "2000 sq ft", "stucco", "two story", "yes, the trim too", "wood", "ranch", "no", "painters choice", "91941", "in 3 weeks", "good", "same color", "no", "no", "no", "no", "no", "no"]);
@@ -26663,6 +26869,44 @@ async function dismissAt(setup, topicWords, dismissal = "doesnt matter just want
   check("item question: the answer box hint is for that question", composerPrompt(hb.text, hb.topicId ?? hintRun.state.lastBotTopic?.id) === "Wood, metal, vinyl, or block?", composerPrompt(hb.text, hb.topicId ?? hintRun.state.lastBotTopic?.id));
   const brushed = await play(["stari railing", "2 flights", "doesn't matter"]);
   check("item question brushed off: takes the higher-priced answer and says so", /higher-priced/.test(brushed.last) || brushed.state.ctx.interiorRailingMaterial === "wrought_iron", brushed.last);
+}
+{
+  const apt1 = await play(["i have a 4 story apartment complex"]);
+  check('apartments: "4 story" is the height, not four units', apt1.state.ctx.stories === 4 && apt1.state.ctx.unitsTotal == null, JSON.stringify({ s: apt1.state.ctx.stories, u: apt1.state.ctx.unitsTotal }));
+  const apt2 = await play(["i never said 4 units, just 4 stories. there are 24 units in the complex"], [], apt1.state);
+  check("apartments: a correction that also gives the facts uses them (no apology loop, no recap)", apt2.state.ctx.unitsTotal === 24 && apt2.state.ctx.stories === 4 && !/here's what i have so far|if something above is wrong/i.test(apt2.last), apt2.last);
+  const apt3 = await play(["nope, not 4 units, 24 units. we are painting both"], [], apt2.state);
+  check('apartments: "both" inside a longer answer counts, and the inside/outside question is not skipped', apt3.state.ctx.projectType === "both" || /inside, outside, or both|interior, exterior|inside or outside|inside, the outside/i.test(apt2.last), apt2.last);
+  check("apartments: the stale 4 is gone", apt3.state.ctx.unitsTotal === 24 && !/(?:^|[^0-9])4 units/.test(apt3.last), apt3.last);
+  const dd = await play(["i have a 24 unit apartment complex, 4 stories, inside and out", "all 24", "1 building", "600 sq ft studio, 1000 sq ft one bedroom, 1400 sq ft two bedroom", "everything except cabinets", "no", "no", "painted", "48", "plain", "yes both", "pretty good", "8 ft", "yes"]);
+  const cm = await play(["i changed my mind no common areas"], [], dd.state);
+  check('retraction: "I changed my mind, no common areas" takes them off the list', cm.state.ctx.commonAreas === "no" && /off the list/i.test(cm.last), cm.last);
+  const paint = await play(["i will provide the paint"], [], cm.state);
+  check('paint: "I will provide the paint" is recognised and the brand/grade/finish questions are not asked', paint.state.ctx.paintBrand === "customer_provided" && !/paint brand|mid-grade|finish in mind/i.test(paint.last), paint.last);
+  check("transition: moving from the inside to the outside is said out loud", /now the outside/i.test(paint.last), paint.last);
+  const trimYes = await play(["yes the trim too", "stucco", "wood"], [], paint.state);
+  check("apartments: stories already said are not asked again", !/how many stories/i.test(trimYes.turns.join(" ")) && trimYes.state.ctx.stories === 4, trimYes.turns.join(" | "));
+  check('apartments: the front door question is about front doors (plural) and not "the house"', /front doors/i.test(trimYes.last) && !/the house/i.test(trimYes.last), trimYes.last);
+  const c1 = await play(["i have a 24 unit apartment complex, inside and out", "all 24", "1 building"]);
+  const c2 = await play(["about 900 sq ft each, there are 12 units in total"], [], c1.state);
+  check("conflict: a different unit count is held as two versions and asked about, not overwritten", c2.state.ctx.unitsTotal === 24 && (c2.state.ctx.conflicts?.length ?? 0) === 1 && /I thought you said 24 units, but now I see 12/i.test(c2.last), c2.last);
+  const c3 = await play(["not sure"], [], c2.state);
+  check("conflict: it is asked again when the reply did not settle it", /still need to know which is right/i.test(c3.last), c3.last);
+  const c4 = await play(["the first one"], [], c3.state);
+  check('conflict: "the first one" settles it', c4.state.ctx.unitsTotal === 24 && (c4.state.ctx.conflicts?.length ?? 0) === 0, JSON.stringify(c4.state.ctx.conflicts));
+  const oh = await play(["an overhang"], []);
+  const oh2 = await play(["each one is about 400 sq ft there are 6 of them"], [], oh.state);
+  check('overhangs: "each is 400 sq ft, there are 6" is 2,400 sq ft', oh2.state.ctx.overhangSqft === 2400, String(oh2.state.ctx.overhangSqft));
+}
+{
+  const house = { ...makeInitialState().ctx, projectType: "exterior", exteriorBody: "yes", squareFeet: 2e3, stories: 1, sidingType: "stucco", zipCode: "91941" };
+  const painted = calculateEstimate({ ...house, gutters: "yes" });
+  const left = calculateEstimate({ ...house, gutters: "no" });
+  const gone = calculateEstimate({ ...house, gutters: "no", excludedItems: ["gutter_masking"] });
+  const gutterLine = (e2) => e2.lineItems.find((l) => /gutter/i.test(l.description));
+  check("gutters painted: a gutters line (paint and labor)", /Gutters & Downspouts/.test(gutterLine(painted)?.description ?? ""), String(gutterLine(painted)?.description));
+  check("gutters not painted: no gutter painting, but a masking line for the labor around them", /Masking and painting around gutters/.test(gutterLine(left)?.description ?? "") && !/^Gutters & Downspouts$/.test(gutterLine(left)?.description ?? ""), String(gutterLine(left)?.description));
+  check("gutters: masking costs less than painting them, but more than nothing", gutterLine(left).amount > 0 && gutterLine(left).amount < gutterLine(painted).amount && left.total > gone.total, JSON.stringify([gutterLine(left)?.amount, gutterLine(painted)?.amount, left.total, gone.total]));
 }
 setLLMReaderForTests(void 0);
 console.log(failures ? `

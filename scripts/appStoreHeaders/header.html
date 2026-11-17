@@ -1,0 +1,111 @@
+<!doctype html>
+<!-- App Store header art for The Painted Painter. Rendered by render.mjs (headless Chrome) at both sizes: ?v=wide (3840x1646) and ?v=tall (5244x2950).
+     Laid out on a 2000-px-wide canvas; the renderer scales it up. -->
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Barlow:wght@500;600&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  :root { --navy: #0b1530; --orange: #ff7a2f; --gold: #f6c84a; --cream: #fff3c4; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 2000px; background: var(--navy); overflow: hidden; }
+  body { font-family: 'Barlow', 'Segoe UI', sans-serif; color: #fff; }
+
+  .frame { position: relative; width: 2000px; overflow: hidden; background: radial-gradient(120% 120% at 70% 40%, #12214a 0%, var(--navy) 60%, #070d20 100%); }
+  .wide .frame { height: 857px; }
+  .tall .frame { height: 1125px; }
+
+  /* the picture: Superman with the lettering on his chest */
+  .art { position: absolute; background: url('../../public/hero-superman.jpg') 0 0 / 100% 100% no-repeat; }
+  .wide .art { left: 258px; top: 0; width: 1742px; height: 861px; }
+  .tall .art { left: 477px; top: 185px; width: 1550px; height: 766px;
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 14%, #000 100%), linear-gradient(to bottom, transparent 0, #000 12%, #000 88%, transparent 100%);
+    -webkit-mask-composite: source-in; mask-composite: intersect; }
+  /* the left of the picture fades into the navy so the text sits on a dark ground */
+  .fade { position: absolute; inset: 0; background: linear-gradient(to right, rgba(11,21,48,.97) 0%, rgba(11,21,48,.93) 30%, rgba(11,21,48,.55) 46%, rgba(11,21,48,0) 60%); }
+  .wide .fade { background: linear-gradient(to right, rgba(11,21,48,.98) 0%, rgba(11,21,48,.94) 32%, rgba(11,21,48,.6) 47%, rgba(11,21,48,0) 62%); }
+
+  .border { position: absolute; border: 3px solid var(--orange); border-radius: 40px; box-shadow: 0 0 22px rgba(255,122,47,.55), inset 0 0 22px rgba(255,122,47,.35); }
+  .wide .border { inset: 14px 14px 14px 14px; }
+  .tall .border { inset: 20px; }
+
+  /* the text column is designed at 900px wide and scaled for the taller picture */
+  .col { position: absolute; left: 48px; width: 900px; transform-origin: 0 0; }
+  .wide .col { top: 34px; }
+  .tall .col { top: 112px; transform: scale(1.22); }
+
+  .brand { display: flex; align-items: center; gap: 22px; }
+  .icon { width: 88px; height: 88px; border-radius: 23px; background: url('../../ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png') center / cover; box-shadow: 0 0 0 3px rgba(255,255,255,.85), 0 0 22px 4px rgba(255,122,47,.7); }
+  .brand b { font: 700 27px 'Barlow Condensed', sans-serif; letter-spacing: 8px; color: var(--orange); }
+
+  .book { font: 400 84px/1 'Anton', Impact, sans-serif; letter-spacing: 1px; margin-top: 12px; text-shadow: 0 4px 18px rgba(0,0,0,.55); }
+
+  /* ---------- the wheel ---------- */
+  .spin { position: relative; height: 322px; margin-top: 4px; }
+  .arrow { position: absolute; left: 0; top: 126px; width: 132px; height: 70px; filter: drop-shadow(0 4px 8px rgba(0,0,0,.6)); }
+  .arrow .gold { position: absolute; inset: 0; background: linear-gradient(#ffe38a, #d99a14); clip-path: polygon(0 22%, 56% 22%, 56% 0, 100% 50%, 56% 100%, 56% 78%, 0 78%); }
+  .arrow .red { position: absolute; inset: 6px; background: linear-gradient(#ff4b3a, #b8100c); clip-path: polygon(0 22%, 56% 22%, 56% 0, 100% 50%, 56% 100%, 56% 78%, 0 78%); }
+  .arrow .bulbs { position: absolute; inset: 0; clip-path: polygon(0 22%, 56% 22%, 56% 0, 100% 50%, 56% 100%, 56% 78%, 0 78%); background: radial-gradient(circle, #fff9d6 0 2.4px, transparent 3.2px) 0 0 / 15px 15px; opacity: .85; }
+
+  .drum { position: absolute; left: 150px; top: 0; width: 520px; height: 322px; }
+  /* gold bulb columns either side, like the stage arches */
+  .rail { position: absolute; top: 0; bottom: 0; width: 26px; border-radius: 8px; background: linear-gradient(90deg, #7a4a07, #e9b43a 40%, #7a4a07); box-shadow: 0 0 14px rgba(246,200,74,.55); z-index: 5; }
+  .rail::after { content: ''; position: absolute; inset: 3px; background: radial-gradient(circle, #fffbe0 0 3.2px, #ffd96a 4px, transparent 5px) 0 0 / 20px 20px; }
+  .rail.l { left: 0; } .rail.r { right: 0; }
+  .view { position: absolute; left: 22px; right: 22px; top: 0; bottom: 0; background: linear-gradient(#050914, #101b3d 50%, #050914); overflow: hidden; border-top: 3px solid #8a5d0c; border-bottom: 3px solid #8a5d0c; }
+  .roll { position: absolute; left: 0; right: 0; top: 50%; height: 0; }
+  .row { position: absolute; left: 0; right: 0; height: 47px; margin-top: -23.5px; display: flex; align-items: center; justify-content: center; font: 400 34px/1 'Anton', Impact, sans-serif; letter-spacing: 3px; color: #e9eefc;
+    background: linear-gradient(#17254d, #0c1633); border-top: 2px solid #c8921c; border-bottom: 2px solid #c8921c; }
+  .row.hit { color: #fff; background: linear-gradient(#ff9a4d, #e8561a 55%, #c43f0c); border-color: #ffe38a; text-shadow: 0 2px 6px rgba(0,0,0,.45); font-size: 46px; letter-spacing: 5px; }
+  /* shading toward the top and bottom edges of the drum */
+  .shade { position: absolute; inset: 0; z-index: 4; pointer-events: none; background: linear-gradient(rgba(5,9,20,.96) 0, rgba(5,9,20,.55) 22%, rgba(5,9,20,0) 38%, rgba(5,9,20,0) 62%, rgba(5,9,20,.55) 78%, rgba(5,9,20,.96) 100%); }
+  /* a soft white glint across the middle of the drum */
+  .glint { position: absolute; left: 22px; right: 22px; top: 131px; height: 60px; z-index: 6; pointer-events: none; background: linear-gradient(100deg, transparent 20%, rgba(255,255,255,.28) 38%, transparent 52%); }
+
+  .tag { font: 500 27px/1.28 'Barlow', sans-serif; margin-top: 16px; width: 740px; color: #f2f5ff; text-shadow: 0 2px 8px rgba(0,0,0,.6); }
+  .steps { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 16px; width: 760px; }
+  .steps span { font: 700 25px/1 'Barlow Condensed', sans-serif; letter-spacing: 4.5px; text-transform: uppercase; padding: 12px 24px; border: 2.5px solid var(--orange); border-radius: 12px; background: linear-gradient(rgba(70,30,30,.55), rgba(30,16,28,.7)); box-shadow: 0 0 14px rgba(255,122,47,.45); }
+</style>
+</head>
+<body>
+<div class="frame" id="frame">
+  <div class="art"></div>
+  <div class="fade"></div>
+  <div class="border"></div>
+  <div class="col">
+    <div class="brand"><div class="icon"></div><b>THE PAINTED PAINTER</b></div>
+    <div class="book">BOOK YOUR</div>
+    <div class="spin">
+      <div class="arrow"><div class="gold"></div><div class="red"></div><div class="bulbs"></div></div>
+      <div class="drum">
+        <div class="rail l"></div><div class="rail r"></div>
+        <div class="view"><div class="roll" id="roll"></div></div>
+        <div class="shade" style="left:22px;right:22px"></div>
+        <div class="glint"></div>
+      </div>
+    </div>
+    <div class="tag">The Marketplace Where Qualified Painters Compete for Your Job, at Your Price.</div>
+    <div class="steps"><span>Describe the Job</span><span>Pick Your Price</span><span>Pick Your Painter</span><span>Book It</span></div>
+  </div>
+</div>
+<script>
+  const v = new URLSearchParams(location.search).get('v') === 'tall' ? 'tall' : 'wide';
+  document.body.className = v;
+  // PAINTER lands in the middle, as if the wheel had just been spun; the other words (in a shuffled, fixed order) trail off either side
+  const words = ['POOL', 'DOGSITTER', 'VACATION', 'RESERVATIONS', 'PAINTER', 'HOTEL', 'TRAILER', 'BABYSITTER', 'CAR'];
+  const STEP = 15, R = 186; // degrees between rows, and the drum radius
+  const roll = document.getElementById('roll');
+  words.forEach((w, i) => {
+    const el = document.createElement('div');
+    el.className = 'row' + (w === 'PAINTER' ? ' hit' : '');
+    el.textContent = w;
+    const a = (i - 4) * STEP;
+    const r = a * Math.PI / 180; // a flat take on a drum: rows bunch up and flatten toward the top and bottom, as on a cylinder
+    el.style.transform = `translateY(${(R * Math.sin(r)).toFixed(1)}px) scaleY(${Math.cos(r).toFixed(3)})`;
+    roll.appendChild(el);
+  });
+  document.fonts.ready.then(() => { document.title = 'ready'; });
+</script>
+</body>
+</html>

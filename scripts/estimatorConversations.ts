@@ -416,7 +416,7 @@ async function dismissAt(setup: string[], topicWords: RegExp, dismissal = 'doesn
   check('setup: the bot asks how many doors', /doors/i.test(known.last) && /how many|approximately/i.test(known.last), known.last);
   const noticed = await play(['like I said, 14 doors'], [], known.state);
   check('"like I said, 14 doors": the bot owns up, uses the answer and does not ask it again', noticed.state.ctx.doorCount === 14 && /you'?re right|sorry/i.test(noticed.last) && !/how many doors/i.test(noticed.last), noticed.last);
-  check('...and what it understood is read back', /14 doors/.test(noticed.last), noticed.last);
+  check('...and the answer is used, with no read-back of everything so far', noticed.state.ctx.doorCount === 14 && !/here's what i have so far/i.test(noticed.last), noticed.last);
   check('...and the friction is on record', (noticed.state.friction ?? []).some((e) => e.kind === 'repeat_complaint'), JSON.stringify(noticed.state.friction));
 
   // live: the bot is asking something the notes already hold
@@ -425,7 +425,7 @@ async function dismissAt(setup: string[], topicWords: RegExp, dismissal = 'doesn
 
   // live: not what I meant
   const confused = await play(["no that's not what I meant"], [], known.state);
-  check('"that\'s not what I meant": a brief apology, what it has so far, and no pushing on with a default', /sorry/i.test(confused.last) && /what i have so far|here's what/i.test(confused.last), confused.last);
+  check('"that\'s not what I meant": a brief apology, no recap of everything so far, and no pushing on with a default', /sorry/i.test(confused.last) && !/what i have so far|here's what/i.test(confused.last) && !/if something above is wrong/i.test(confused.last), confused.last);
   check('...and it is logged as a misunderstanding', (confused.state.friction ?? []).some((e) => e.kind === 'misunderstood'), JSON.stringify(confused.state.friction));
 
   // after the quote: what would be sent for the self-review
@@ -668,6 +668,12 @@ async function dismissAt(setup: string[], topicWords: RegExp, dismissal = 'doesn
   const late = await play(['a deck', '600 sq ft', 'on the ground', 'no', 'good', 'wood', 'bare gray wood', 'paint', 'painters choice', '91941', 'in 3 weeks', 'no', 'there are also railings all around']);
   check('deck: something said at the photos step opens its own question instead of pricing', !late.state.finalEstimate && /railing/i.test(late.last), late.last);
 
+  // a swear word mid-conversation no longer wipes the chat: that one message is set aside, everything else stays, and the price still comes
+  const rude = await play(['a deck', '600 sq ft', 'on the ground', 'no', 'faded but solid', 'wood', 'bare gray wood', 'paint', 'this is taking forever, damn it is a pain in the ass', 'painters choice', '91941', 'in 3 weeks', 'no', 'run it']);
+  check('review: a rude message keeps the conversation (nothing is wiped) and says so', rude.state.ctx.deckSqft === 600 && rude.state.history.length > 10 && /keep this friendly/i.test(rude.last) && rude.state.history.some((m) => m.setAside), rude.last);
+  const rude2 = await play(['run it'], [], rude.state);
+  check('review: after the rude message is set aside, the price still comes', !!rude2.state.finalEstimate, rude2.last);
+
   // a deck that comes up in the middle of a house exterior gets the whole deck interview, not a blanket cost
   const house = await play(['I need the outside of my house painted', '2000 sq ft', 'stucco', 'two story', 'yes, the trim too', 'wood', 'it also has a deck', '12 by 15']);
   check('house + a deck mentioned later: the deck is asked about (height next)', /ground|raised/i.test(house.last), house.last);
@@ -732,6 +738,56 @@ async function dismissAt(setup: string[], topicWords: RegExp, dismissal = 'doesn
   // brushed off: the higher-priced realistic answer is assumed, and it is said out loud
   const brushed = await play(['stari railing', '2 flights', "doesn't matter"]);
   check('item question brushed off: takes the higher-priced answer and says so', /higher-priced/.test(brushed.last) || brushed.state.ctx.interiorRailingMaterial === 'wrought_iron', brushed.last);
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------------
+// 12. A big apartment complex: facts read right, corrections and retractions honoured, two versions of a fact asked about, no recap spam
+// ---------------------------------------------------------------------------------------------------------------------------------
+{
+  const apt1 = await play(['i have a 4 story apartment complex']);
+  check('apartments: "4 story" is the height, not four units', apt1.state.ctx.stories === 4 && apt1.state.ctx.unitsTotal == null, JSON.stringify({ s: apt1.state.ctx.stories, u: apt1.state.ctx.unitsTotal }));
+  const apt2 = await play(['i never said 4 units, just 4 stories. there are 24 units in the complex'], [], apt1.state);
+  check('apartments: a correction that also gives the facts uses them (no apology loop, no recap)', apt2.state.ctx.unitsTotal === 24 && apt2.state.ctx.stories === 4 && !/here's what i have so far|if something above is wrong/i.test(apt2.last), apt2.last);
+  const apt3 = await play(['nope, not 4 units, 24 units. we are painting both'], [], apt2.state);
+  check('apartments: "both" inside a longer answer counts, and the inside/outside question is not skipped', apt3.state.ctx.projectType === 'both' || /inside, outside, or both|interior, exterior|inside or outside|inside, the outside/i.test(apt2.last), apt2.last);
+  check('apartments: the stale 4 is gone', apt3.state.ctx.unitsTotal === 24 && !/(?:^|[^0-9])4 units/.test(apt3.last), apt3.last);
+
+  // the rest of the conversation, from the point the interior questions are done
+  const dd = await play(['i have a 24 unit apartment complex, 4 stories, inside and out', 'all 24', '1 building', '600 sq ft studio, 1000 sq ft one bedroom, 1400 sq ft two bedroom', 'everything except cabinets', 'no', 'no', 'painted', '48', 'plain', 'yes both', 'pretty good', '8 ft', 'yes']);
+  const cm = await play(['i changed my mind no common areas'], [], dd.state);
+  check('retraction: "I changed my mind, no common areas" takes them off the list', cm.state.ctx.commonAreas === 'no' && /off the list/i.test(cm.last), cm.last);
+  const paint = await play(['i will provide the paint'], [], cm.state);
+  check('paint: "I will provide the paint" is recognised and the brand/grade/finish questions are not asked', paint.state.ctx.paintBrand === 'customer_provided' && !/paint brand|mid-grade|finish in mind/i.test(paint.last), paint.last);
+  check('transition: moving from the inside to the outside is said out loud', /now the outside/i.test(paint.last), paint.last);
+  const trimYes = await play(['yes the trim too', 'stucco', 'wood'], [], paint.state);
+  check('apartments: stories already said are not asked again', !/how many stories/i.test(trimYes.turns.join(' ')) && trimYes.state.ctx.stories === 4, trimYes.turns.join(' | '));
+  check('apartments: the front door question is about front doors (plural) and not "the house"', /front doors/i.test(trimYes.last) && !/the house/i.test(trimYes.last), trimYes.last);
+
+  // two versions of a fact
+  const c1 = await play(['i have a 24 unit apartment complex, inside and out', 'all 24', '1 building']);
+  const c2 = await play(['about 900 sq ft each, there are 12 units in total'], [], c1.state);
+  check('conflict: a different unit count is held as two versions and asked about, not overwritten', c2.state.ctx.unitsTotal === 24 && (c2.state.ctx.conflicts?.length ?? 0) === 1 && /I thought you said 24 units, but now I see 12/i.test(c2.last), c2.last);
+  const c3 = await play(['not sure'], [], c2.state);
+  check('conflict: it is asked again when the reply did not settle it', /still need to know which is right/i.test(c3.last), c3.last);
+  const c4 = await play(['the first one'], [], c3.state);
+  check('conflict: "the first one" settles it', c4.state.ctx.unitsTotal === 24 && (c4.state.ctx.conflicts?.length ?? 0) === 0, JSON.stringify(c4.state.ctx.conflicts));
+
+  // a size said per item, with how many there are
+  const oh = await play(['an overhang'], []);
+  const oh2 = await play(['each one is about 400 sq ft there are 6 of them'], [], oh.state);
+  check('overhangs: "each is 400 sq ft, there are 6" is 2,400 sq ft', oh2.state.ctx.overhangSqft === 2400, String(oh2.state.ctx.overhangSqft));
+}
+
+// gutters: painted = material and labor to paint them; not painted = no paint for them, but labor to mask and cut in around them
+{
+  const house = { ...makeInitialState().ctx, projectType: 'exterior', exteriorBody: 'yes', squareFeet: 2000, stories: 1, sidingType: 'stucco', zipCode: '91941' } as EstimatorContext;
+  const painted = calculateEstimate({ ...house, gutters: 'yes' });
+  const left = calculateEstimate({ ...house, gutters: 'no' });
+  const gone = calculateEstimate({ ...house, gutters: 'no', excludedItems: ['gutter_masking'] });
+  const gutterLine = (e: ReturnType<typeof calculateEstimate>) => e.lineItems.find((l) => /gutter/i.test(l.description));
+  check('gutters painted: a gutters line (paint and labor)', /Gutters & Downspouts/.test(gutterLine(painted)?.description ?? ''), String(gutterLine(painted)?.description));
+  check('gutters not painted: no gutter painting, but a masking line for the labor around them', /Masking and painting around gutters/.test(gutterLine(left)?.description ?? '') && !/^Gutters & Downspouts$/.test(gutterLine(left)?.description ?? ''), String(gutterLine(left)?.description));
+  check('gutters: masking costs less than painting them, but more than nothing', gutterLine(left)!.amount > 0 && gutterLine(left)!.amount < gutterLine(painted)!.amount && left.total > gone.total, JSON.stringify([gutterLine(left)?.amount, gutterLine(painted)?.amount, left.total, gone.total]));
 }
 
 setLLMReaderForTests(undefined);

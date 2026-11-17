@@ -14,6 +14,7 @@
 // ============================================================================
 
 import type { EstimatorContext } from '../types';
+import { conflictQuestion } from './conflicts';
 import { isIsolatedDetailJob } from './details';
 import { itemsPhrase } from './items';
 import { itemTopics } from './itemInterviews';
@@ -584,7 +585,7 @@ export const TOPICS: Topic[] = [
     id: 'paint_grade',
     priority: 38,
     relevant: (c) => paintingJob(c),
-    alreadyAnswered: (c) => !!c.paintGrade || extDone(c, 'paint_grade') || c.paintBrand === 'painter_choice', // "the painter can choose" covers the grade too (a grade they volunteer is still noted)
+    alreadyAnswered: (c) => !!c.paintGrade || extDone(c, 'paint_grade') || c.paintBrand === 'painter_choice' || c.paintBrand === 'customer_provided', // "the painter can choose" (or the customer buying the paint) covers the grade too (a grade they volunteer is still noted)
     ask: (c) =>
       pick(
         [
@@ -600,7 +601,7 @@ export const TOPICS: Topic[] = [
     id: 'paint_finish',
     priority: 39,
     relevant: (c) => paintingJob(c),
-    alreadyAnswered: (c) => !!c.paintFinish || extDone(c, 'paint_finish') || c.paintBrand === 'painter_choice', // ...and the finish
+    alreadyAnswered: (c) => !!c.paintFinish || extDone(c, 'paint_finish') || c.paintBrand === 'painter_choice' || c.paintBrand === 'customer_provided', // ...and the finish
     ask: (c) =>
       pick(
         [
@@ -1499,6 +1500,7 @@ const COMPONENT_TOPICS: Record<string, string[]> = {
 };
 /** An item or part-of-a-room job (cabinets, built-ins, a mantel, a railing) only asks about that item, never about the rest of the room. */
 const askableFor = (ctx: EstimatorContext, id: string) => {
+  if (id === 'resolve_conflict') return true; // two versions of a fact are always settled first
   if (id.startsWith('item_')) return true; // each item question only applies while its item is in the job, so it is safe on an item-only job too
   if (ctx.itemsOnly) return ITEM_JOB_TOPICS.has(id);
   const kind = componentKind(ctx);
@@ -1671,3 +1673,36 @@ export const metaBank = {
   greeting: () =>
     "Hey! What do you need painted?",
 };
+
+// Two versions of the same fact (24 units, then 4): asked about until the customer says which is right. See conflicts.ts.
+TOPICS.push({
+  id: 'resolve_conflict',
+  priority: 0.5,
+  relevant: (c) => (c.conflicts?.length ?? 0) > 0,
+  alreadyAnswered: (c) => (c.conflicts?.length ?? 0) === 0,
+  // (once settled there is nothing left to ask: these stay safe to call on the notes that settled it)
+  ask: (c) => (c.conflicts?.[0] ? conflictQuestion(c.conflicts[0]) : 'Anything else I should know?'),
+  clarify: (c) => (c.conflicts?.[0] ? `You gave me two different numbers, so I want to be sure which one to use: ${c.conflicts[0].values.join(' or ')} ${c.conflicts[0].label}.` : 'Got it.'),
+  example: (c) => (c.conflicts?.[0] ? `Just say ${c.conflicts[0].values.join(' or ')}.` : 'Just tell me.'),
+});
+
+// ===== Wording that fits what is being painted =====
+// A 24-unit apartment complex has front doors (plural), buildings and an exterior, not "the front door" of "the house". The same questions are
+// reworded once here for multi-unit properties so each topic does not need a second version of its text.
+function forProperty(text: string, c: EstimatorContext): string {
+  if (c.propertyType !== 'multi_unit') return text;
+  const plural = (c.buildingCount ?? 2) > 1;
+  const b = plural ? 'the buildings' : 'the building';
+  return text
+    .replace('What about the front door, is that getting painted?', 'What about the front doors (the entry door to each unit, or just the main building entrances)? Are those getting painted?')
+    .replace('Is the front door part of the job?', 'Are the front doors part of the job: each unit\'s entry door, or just the main entrances?')
+    .replace("What kind of windows does the house have?", `What kind of windows ${plural ? 'do the buildings' : 'does the building'} have?`)
+    .replace('Is the house staying the same color, or going a different color?', `Are ${b} staying the same color, or going a different color?`)
+    .replace('How many stories is the house?', plural ? 'How many stories are the buildings?' : 'How many stories is the building?')
+    .replace('How tall is the house?', plural ? 'How tall are the buildings?' : 'How tall is the building?')
+    .replace(/\bthe house\b/g, b);
+}
+for (const t of TOPICS) {
+  const original = t.ask;
+  t.ask = (c) => forProperty(original(c), c);
+}

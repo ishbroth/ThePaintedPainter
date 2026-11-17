@@ -24,9 +24,11 @@ import { extractAll, extractExteriorFeatures, extractCeilingHeight, extractPhoto
 import { getStateFromZip } from '../zipCodeData';
 import { hasScopeLimiter } from './scopeWords';
 import { lookupZipCity } from '../zipLookup';
-import { reviewLocally, reviewWithAI, hasPaintingScope, retryMessage, profanityScan, type ReviewResult } from './conversationReview';
+import { reviewLocally, reviewWithAI, hasPaintingScope, retryMessage, keepMessage, isFlaggedMessage, profanityScan, type ReviewResult } from './conversationReview';
 import { saysItemsOnly } from './items';
 import { isDenial, denialIsAboutScope, topicLabel, recentRecognized, recapSentence } from './clarify';
+import { readRetraction } from './retractions';
+import { holdConflicts, settleConflicts } from './conflicts';
 import { extractTiming, timelineFromStart } from './dateParsing';
 import { defaultAssumptions, applyAssumptions, type Assumption } from './defaultAssumptions';
 import {
@@ -62,6 +64,8 @@ export interface ChatMessage {
   ackChips?: string[];
   /** What this bot message is asking, when it isn't the topic in `lastBotTopic` (the closing 'anything else?' and the photos step), so the answer box can show the right hint. */
   topicId?: string;
+  /** A message the review set aside (abuse): it stays on screen but is never priced from or sent on to painters. */
+  setAside?: boolean;
 }
 
 /** A restorable snapshot of everything EXCEPT the visible chat history, so
@@ -439,7 +443,32 @@ export async function handleUserMessage(state: ChatState, userText: string, cust
   const trimmed = userText.trim();
   if (!trimmed) return { state, done: null };
 
-  if (BACK_UP_RE.test(trimmed)) {
+  // Taking something back: "I changed my mind, no common areas" takes that off the list; a bare "never mind" / "wait no" backs up a step
+  const retraction = readRetraction(trimmed);
+  if (retraction?.patch && state.askedIds.length > 0) {
+    const userMsg: ChatMessage = { role: 'user', text: trimmed, timestamp: Date.now() };
+    const ctx: EstimatorContext = {
+      ...state.ctx,
+      ...retraction.patch,
+      extAnswered: [...new Set([...(state.ctx.extAnswered ?? []), ...(retraction.answered ?? [])])],
+      excludedSurfaces: [...new Set([...(state.ctx.excludedSurfaces ?? []), ...(retraction.excluded ?? [])])],
+    };
+    // carry on with the question that was open, or the next one
+    const open = state.lastBotTopic && !state.lastBotTopic.alreadyAnswered(ctx) ? state.lastBotTopic : pickNextTopic(ctx, state.askedIds);
+    const lead = `No problem, I've taken ${retraction.label} off the list.`;
+    return {
+      state: {
+        ...state,
+        ctx,
+        finalEstimate: null,
+        lastBotTopic: open ?? state.lastBotTopic,
+        askedIds: open && !state.askedIds.includes(open.id) ? [...state.askedIds, open.id] : state.askedIds,
+        history: [...state.history, userMsg, botMessage(open ? `${lead} ${open.ask(ctx)}` : `${lead} Anything else I should know?`)],
+      },
+      done: null,
+    };
+  }
+  if (BACK_UP_RE.test(trimmed) || retraction?.generic) {
     const userMsg: ChatMessage = { role: 'user', text: trimmed, timestamp: Date.now() };
     if (!state.undoSnapshot) {
       return {
@@ -471,10 +500,22 @@ export async function handleUserMessage(state: ChatState, userText: string, cust
 
   const preTurnSnapshot = snapshotOf(state);
   const result = await processMessage(state, trimmed, customerId);
-  return { ...result, state: { ...result.state, undoSnapshot: preTurnSnapshot } };
+  let after = result.state;
+  // Two versions of a fact still open and the reply did not ask about it (some branches answer a "not sure" and move on): ask again
+  const conflictTopic = findTopic('resolve_conflict');
+  if (!result.done && conflictTopic && (after.ctx.conflicts?.length ?? 0) > 0 && after.lastBotTopic?.id !== 'resolve_conflict' && !after.finalEstimate) {
+    after = {
+      ...after,
+      lastBotTopic: conflictTopic,
+      history: [...after.history, botMessage(conflictTopic.ask(after.ctx))],
+    };
+  }
+  return { ...result, state: { ...after, undoSnapshot: preTurnSnapshot } };
 }
 
 async function processMessage(state: ChatState, trimmed: string, customerId?: string): Promise<TurnResult> {
+  // The reply to "which one is it?" settles the two versions of a fact (or uses up one more try)
+  if ((state.ctx.conflicts?.length ?? 0) > 0 && state.lastBotTopic?.id === 'resolve_conflict') state = { ...state, ctx: settleConflicts(state.ctx, trimmed) };
   // 1. Understand the message (LLM first, local rules engine as fallback),
   //    then apply derivations against the full transcript
   const understood = await understand(trimmed, state);
@@ -527,7 +568,10 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
 
   // The customer is disputing something the bot did ("I never said trim", "I didn't say walls only"): apologise, say what
   // was actually understood, and ask — never fill in a default. Nothing in the message is applied.
-  if (state.askedIds.length > 0 && (isDenial(trimmed) || frictionKind === 'misunderstood')) {
+  // (When the same message also gives the right facts, "I never said 4 units, there are 24 units", those are used: the correction is the answer.)
+  const detailsHere = extractDetails(trimmed, state.ctx, state.lastBotTopic?.id ?? null);
+  const bringsFacts = acknowledgements.length > 0 || Object.keys(patch).length > 0 || detailsHere.acks.length > 0 || Object.keys(detailsHere.patch).length > 0;
+  if (state.askedIds.length > 0 && !bringsFacts && (isDenial(trimmed) || frictionKind === 'misunderstood')) {
     if (denialIsAboutScope(trimmed) && state.ctx.projectType !== 'exterior') {
       const reset: EstimatorContext = {
         ...state.ctx,
@@ -753,6 +797,11 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
       [/\bvista\b/, 'Vista'],
     ];
     const painterChoice = hasIntent(intent, 'dismissive') || /\b(?:painter'?s? (?:choice|call|picks?|decision)|up to (?:the )?painter|you (?:pick|choose|decide)|their choice|your choice|doesn'?t matter|don'?t care|no preference|no brand|any(?:thing)? (?:is )?(?:fine|works|ok|okay)|whatever (?:they|you)|not picky|let (?:them|him|her|the painter) (?:pick|choose|decide))\b/.test(low);
+    // "I will provide the paint", "we're buying the paint ourselves", "I have the paint": no brand, grade or finish to ask about
+    if (/\b(?:i|we)(?:'ll|'re| will| am| are| can| plan to| would)?\s*(?:going to\s+)?(?:provide|supply|buy|purchase|bring|furnish|pick up|get)\s+(?:the\s+|my own\s+|our own\s+|all (?:the|of the)\s+)?paint\b|\b(?:i|we)\s+(?:already\s+)?(?:have|got)\s+(?:the\s+|all (?:the\s+)?)?paint\b|\bmy own paint\b|\bour own paint\b|\bowner[- ]supplied\b|\bcustomer[- ](?:supplied|provided)\b|\b(?:paint|materials?)\s+(?:is|are)\s+(?:provided|supplied)\b|\bsupplying (?:the )?paint\b/.test(low)) {
+      ctxWithExplicit.paintBrand = 'customer_provided';
+      ctxWithExplicit.extAnswered = [...new Set([...(ctxWithExplicit.extAnswered ?? state.ctx.extAnswered ?? []), 'paint_brand', 'paint_grade', 'paint_finish'])];
+    }
     if (!state.ctx.paintBrand || state.ctx.paintBrand === 'painter_choice') {
       const named = brands.find(([re]) => re.test(low));
       if (named) ctxWithExplicit.paintBrand = named[1];
@@ -1041,7 +1090,8 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
   // that now mentions siding or eaves, an outside job that now mentions ceilings or baseboards), makes it both. Said-no ("not the inside") doesn't.
   if (ctxNext.projectType === 'interior' || ctxNext.projectType === 'exterior' || !ctxNext.projectType) {
     const msg = trimmed.toLowerCase();
-    const bareBoth = state.lastBotTopic?.id === 'project_type' && /^\W*(?:both|all of it|everything|the whole (?:thing|house)|inside and out(?:side)?|in and out)\W*$/.test(msg);
+    // (a "both" inside a longer answer counts too: "nope, not 4 units, 24 units. we are painting both")
+    const bareBoth = state.lastBotTopic?.id === 'project_type' && (/^\W*(?:both|all of it|everything|the whole (?:thing|house)|inside and out(?:side)?|in and out)\W*$/.test(msg) || (/\b(?:both|inside and out(?:side)?|in and out|interior and exterior)\b/.test(msg) && !/\b(?:not|no|neither)\s+both\b/.test(msg)));
     const otherSide = ctxNext.projectType === 'interior'
       ? /\b(?:siding|stucco|soffits?|fascia|eaves|gutters?|exterior|outside(?! of the (?:closet|room|cabinet))|outdoors?)\b/
       : ctxNext.projectType === 'exterior'
@@ -1085,6 +1135,15 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
   // customer just said and before the next question, per spec.
   const photoLinkMarker = newPhotoTriggers.map((t) => `[[photo:${t.key}|${t.label}]]`).join(' ');
 
+  // a fact that now differs from what was said before is held as two versions and asked about, not quietly overwritten
+  holdConflicts(state.ctx, ctxNext, trimmed, state.lastBotTopic?.id);
+  // the same fact said twice by different readers ("closets included, the closets", "24-unit complex, 24 units") is said once
+  {
+    const words = (a: string) => new Set(a.toLowerCase().replace(/[^a-z0-9\s-]/g, ' ').replace(/-/g, ' ').split(/\s+/).filter((w) => w && !/^(?:the|a|an|of|included|interior|exterior|painted|being|to|too)$/.test(w)).map((w) => w.replace(/s$/, '')));
+    const sets = acknowledgements.map(words);
+    const keep = acknowledgements.filter((_, i) => !sets.some((o, j) => j !== i && sets[i].size > 0 && [...sets[i]].every((w) => o.has(w)) && (o.size > sets[i].size || j < i)));
+    acknowledgements.splice(0, acknowledgements.length, ...keep);
+  }
   const userMsg: ChatMessage = {
     role: 'user',
     text: trimmed,
@@ -1359,7 +1418,7 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
         history: [
           ...s.history,
           botMessage(
-            `Sorry, I don't think I caught that one — it didn't look like an answer about ${topicLabel(topic.id, ctxNext.itemsOnly)}. ${recapSentence(recentRecognized(state.history))} ${q} If something above is wrong, just tell me what to change.`.replace(/\s{2,}/g, ' '),
+            `Sorry, I didn't catch that as an answer about ${topicLabel(topic.id, ctxNext.itemsOnly)}. ${q}`.replace(/\s{2,}/g, ' '),
           ),
         ],
       };
@@ -1378,7 +1437,12 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
   // 7. Pick the next topic; if none, try circling back to anything asked but
   // never satisfactorily answered; if that's also exhausted, invite wrap-up
   // then finalize.
-  const next = pickNextTopic(ctxNext, s.askedIds);
+  // Inside or outside is what everything else hangs on: when a reply gave other facts but not this one, it is asked again right away (once),
+  // not skipped to the next question.
+  if ((ctxNext.conflicts?.length ?? 0) > 0 && s.askedIds.includes('resolve_conflict')) s = { ...s, askedIds: s.askedIds.filter((id) => id !== 'resolve_conflict') };
+  const reaskCore = state.lastBotTopic && state.lastBotTopic.id === 'project_type' && !state.lastBotTopic.alreadyAnswered(ctxNext) && !s.retriedIds.includes('project_type') ? state.lastBotTopic : null;
+  if (reaskCore) s = { ...s, retriedIds: [...s.retriedIds, 'project_type'] };
+  const next = reaskCore ?? pickNextTopic(ctxNext, s.askedIds);
   if (!next) {
     const retry = pickRetryTopic(ctxNext, s.askedIds, s.retriedIds);
     if (retry) {
@@ -1413,7 +1477,15 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
     : acknowledgements.length > 0
     ? `${ACK_LEAD_INS[s.askedIds.length % ACK_LEAD_INS.length]} ${acknowledgements.join(', ')}. `
     : '';
-  const prompt = ackLeadIn + (photoLinkMarker ? `${photoLinkMarker} ` : '') + next.ask(ctxNext);
+  // Moving from the inside of a job to the outside (or the other way) is said out loud, especially across several buildings
+  const EXTERIOR_IDS = new Set(['siding', 'stories', 'overhang_size', 'fence_size', 'fence_height', 'deck_size', 'balcony_count', 'ext_mu_access']);
+  const isExteriorId = (id: string | undefined) => !!id && (id.startsWith('ext_') || EXTERIOR_IDS.has(id));
+  const crossingToOutside = ctxNext.projectType === 'both' && isExteriorId(next.id) && !isExteriorId(state.lastBotTopic?.id) && !(ctxNext.extAnswered ?? []).includes('seg_exterior');
+  const segue = crossingToOutside
+    ? ((ctxNext.buildingCount ?? 1) > 1 || ctxNext.propertyType === 'multi_unit' ? "That covers the inside of the units. Now the outside of the building: " : "That covers the inside. Now the outside: ")
+    : '';
+  if (crossingToOutside) ctxNext.extAnswered = [...new Set([...(ctxNext.extAnswered ?? []), 'seg_exterior'])];
+  const prompt = ackLeadIn + segue + (photoLinkMarker ? `${photoLinkMarker} ` : '') + next.ask(ctxNext);
   s = {
     ...s,
     askedIds: [...s.askedIds, next.id],
@@ -1568,16 +1640,30 @@ async function fetchLoyaltyDiscountPercent(customerId: string): Promise<number> 
   }
 }
 
-/** A clean start with an explanation: nothing from the blocked conversation is priced or sent to anyone. */
+/** A clean start with an explanation: nothing from the blocked conversation is priced or sent to anyone. (Only used when nothing at all is worth keeping.) */
 function restartAfterReview(reason: ReviewResult['reason']): TurnResult {
   const fresh = makeInitialState();
   return { state: { ...fresh, history: [{ role: 'bot', text: retryMessage(reason), timestamp: Date.now() }] }, done: null };
 }
 
+/**
+ * The review stopped the price, but the conversation stays: what the customer already told the estimator is kept, any message that was
+ * abuse is set aside (shown, but never priced from or sent on), and the bot says what happened. No price is made and nothing goes to anyone.
+ */
+function keepAfterReview(state: ChatState, reason: ReviewResult['reason'], setAsideTexts: string[]): TurnResult {
+  const aside = new Set(setAsideTexts);
+  const history = state.history.map((m) => (m.role === 'user' && aside.has(m.text) ? { ...m, setAside: true } : m));
+  return { state: { ...state, history: [...history, { role: 'bot', text: keepMessage(reason, aside.size > 0), timestamp: Date.now() }], finalEstimate: null }, done: null };
+}
+
 async function finalizeTurn(state: ChatState, customerId?: string): Promise<TurnResult> {
   // Review the whole conversation before any price goes out: profanity, "I don't need anything painted", answers that make no
   // sense, or nothing that adds up to a job all stop here with a "can we try that again?".
-  const userTurns = state.history.filter((m) => m.role === 'user');
+  const allUserTurns = state.history.filter((m) => m.role === 'user' && !m.setAside);
+  // a message that is abuse on its own is set aside (not priced from, not sent to painters); the rest of the conversation is kept
+  const abusive = allUserTurns.filter((m) => isFlaggedMessage(m.text));
+  if (abusive.length > 0) return keepAfterReview(state, 'abusive', abusive.map((m) => m.text));
+  const userTurns = allUserTurns;
   let verdict = reviewLocally(userTurns.map((m) => ({ text: m.text, recognized: !!(m.ackChips && m.ackChips.length > 0) })));
   let aiApproved = false;
   if (verdict.ok) {
@@ -1585,7 +1671,7 @@ async function finalizeTurn(state: ChatState, customerId?: string): Promise<Turn
     if (ai && !ai.ok) verdict = ai;
     aiApproved = !!ai?.ok;
   }
-  if (!verdict.ok) return restartAfterReview(verdict.reason);
+  if (!verdict.ok) return keepAfterReview(state, verdict.reason, []);
 
   const loyaltyDiscountPercent = customerId ? await fetchLoyaltyDiscountPercent(customerId) : 0;
   const result = finalize(state.ctx, state.transcript, loyaltyDiscountPercent);
@@ -1596,7 +1682,7 @@ async function finalizeTurn(state: ChatState, customerId?: string): Promise<Turn
   // reached, a job type or some rooms/size on record counts as described.
   const PAINTABLE_WORDS = /\b(windows?|doors?|railings?|rails?|fences?|gates?|shutters?|mailbox|walls?|ceilings?|cabinets?|trim|baseboards?|molding|deck|porch|garage|shed|siding|stairs?|stairway|closets?|room|bedroom|bathroom|kitchen|living room|dining|hallway|basement|furniture|chair|table|dresser|desk|bookcase|fireplace|mantel|pantry|house|apartment|condo)\b/i;
   const describedSomething = userTurns.some((m) => PAINTABLE_WORDS.test(m.text)) || !!(state.ctx.projectType || state.ctx.selectedRooms.length > 0 || state.ctx.squareFeet || state.ctx.bedroomCount || state.ctx.furnitureItems.length > 0 || state.ctx.cabinets !== 'none');
-  if (!hasPaintingScope(result.estimate.lineItems) && !aiApproved && !describedSomething) return restartAfterReview('no_project');
+  if (!hasPaintingScope(result.estimate.lineItems) && !aiApproved && !describedSomething) return keepAfterReview(state, 'no_project', []);
   const s = {
     ...state,
     history: [...state.history, botMessage(result.summary)],

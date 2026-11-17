@@ -26,10 +26,11 @@ export interface ReviewedMessage {
 const STRONG = [
   'fuck', 'fucker', 'fucking', 'fucked', 'fck', 'fuk', 'motherfucker', 'shit', 'shithead', 'bullshit', 'bitch', 'bitches', 'asshole', 'assholes',
   'dumbass', 'jackass', 'cunt', 'dick', 'dickhead', 'prick', 'whore', 'slut', 'bastard', 'retard', 'retarded', 'faggot', 'nigger', 'nigga',
-  'piss', 'pissed', 'wtf', 'stfu', 'gtfo',
+  'piss', 'wtf', 'stfu', 'gtfo',
 ];
 /** Mild words: it takes more than one. */
-const MILD = ['damn', 'dammit', 'goddamn', 'hell', 'crap', 'ass', 'idiot', 'stupid', 'dumb', 'suck', 'sucks', 'moron', 'screw'];
+const MILD = ['damn', 'dammit', 'goddamn', 'hell', 'crap', 'ass', 'idiot', 'stupid', 'dumb', 'suck', 'sucks', 'moron', 'pissed'];
+// ("screw" is not here: "screw holes" are a normal thing to fill before painting.)
 /** Insults aimed at the assistant (or its mother) read as abuse. */
 const INSULT_PHRASES = [/\byour (mom|mother|momma|mama|mum)\b/i, /\byou (suck|are stupid|are dumb|idiot|moron)\b/i, /\b(shut up|go to hell|piss off|screw you|f+u+c+k+ (you|off))\b/i];
 
@@ -70,18 +71,27 @@ export function dismissiveCount(messages: string[]): number {
   return messages.filter((m) => DISMISSIVE.some((re) => re.test(m))).length;
 }
 
+/** One message that is abuse on its own (a strong word, an insult, or several mild words): set aside, never sent on to painters. */
+export function isFlaggedMessage(text: string): boolean {
+  const s = profanityScan(text);
+  return s.strong > 0 || s.insult || s.mild >= 2;
+}
+
 /** Local checks that need no network. */
 export function reviewLocally(messages: ReviewedMessage[]): ReviewResult {
   let strong = 0;
   let mild = 0;
   let insulted = false;
+  let milderInOne = false;
   for (const m of messages) {
     const s = profanityScan(m.text);
     strong += s.strong;
     mild += s.mild;
+    if (s.mild >= 2) milderInOne = true;
     if (s.insult) insulted = true;
   }
-  if (strong > 0 || insulted || mild >= 2) return { ok: false, reason: 'abusive' };
+  // a mild word here and there over a long conversation ("looks like crap", "damn") is just someone talking about their house
+  if (strong > 0 || insulted || milderInOne || mild >= 4) return { ok: false, reason: 'abusive' };
 
   if (dismissiveCount(messages.map((m) => m.text)) >= 2) return { ok: false, reason: 'dismissive' };
 
@@ -115,5 +125,20 @@ export function retryMessage(reason: ReviewReason | undefined): string {
       return "Hmm… I couldn't tell what you'd like painted, so I can't give you a price yet. Can we try that again? What do you need painted?";
     default:
       return "Hmm… that didn't quite add up to a painting project. Can we try that again? What do you need painted?";
+  }
+}
+
+/** What the bot says when a review stops the price but the conversation is kept: nothing the customer told it is lost. */
+export function keepMessage(reason: ReviewReason | undefined, setAside: boolean): string {
+  if (reason === 'abusive' && setAside) return "Hmm… let's keep this friendly. I've set that message aside, and everything else you told me is saved. Anything else to add, or say \"run it\" to get your price?";
+  switch (reason) {
+    case 'abusive':
+      return "Hmm… let's keep this friendly. Everything you told me is saved. Anything else to add, or say \"run it\" to try again?";
+    case 'dismissive':
+      return "Hmm… it sounds like there may not be a painting project right now. Everything you told me is saved. If there is one, tell me a bit more about what needs painting.";
+    case 'no_project':
+      return "Hmm… I couldn't tell what you'd like painted, so I can't give you a price yet. Everything you told me is saved. What needs painting?";
+    default:
+      return "Hmm… that didn't quite add up to a painting project yet. Everything you told me is saved. Tell me a bit more about what needs painting.";
   }
 }

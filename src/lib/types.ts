@@ -32,6 +32,8 @@ export interface EstimatorContext {
   addedSurfaces?: string[];
   /** Exterior questions (ext_*) the customer has answered, so each is asked once and never counted as answered when it wasn't. */
   extAnswered?: string[];
+  /** A fact the customer has given two different ways (24 units, then 4): both are kept here, the first stays in use, and the customer is asked which is right. */
+  conflicts?: { field: 'unitsTotal' | 'stories' | 'buildingCount'; label: string; values: number[]; asked: number }[];
   /** The customer actually said the interior doors are part of the job (interiorDoors alone is also its resting default), so the estimator asks how many. */
   doorsIncluded?: boolean;
   /** The customer has said what the ceiling height is (including "standard"), so it is not asked again. */

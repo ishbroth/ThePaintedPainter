@@ -72,6 +72,19 @@ export function parseArea(text: string, bare = false): number | null {
   return null;
 }
 
+/**
+ * "each one is about 400 sq ft, there are 6 of them" is 2,400 sq ft in all: a size said per item, with how many there are, is the total.
+ * Returns the area as given when no per-item size and count are both there.
+ */
+export function areaWithCount(text: string, area: number | null): number | null {
+  if (area == null) return null;
+  const t = digitize(text).toLowerCase();
+  if (!/\b(?:each|per|apiece|every one|every single one|a piece)\b/.test(t)) return area;
+  const m = t.match(/\b(\d{1,3})\s+(?:of them|of these|total|in total|in all|overhangs?|covers?|decks?|patios?|porches|porch|units?|areas?)\b/) || t.match(/\b(?:there (?:are|is)|i have|we have|got)\s+(\d{1,3})\b/) || t.match(/\b(\d{1,3})\s+(?:\w+\s+){0,2}(?:of them)\b/);
+  const count = m ? parseInt(m[1], 10) : 0;
+  return count >= 2 && count <= 100 ? Math.min(area * count, 100000) : area;
+}
+
 /** Linear feet: "150 feet", "150 ft", "150 linear feet", "150 lf", or (when answering a length question) a plain number. */
 export function parseLinearFeet(text: string, bare = false, min = 3, max = 20000): number | null {
   const t = digitize(text);
@@ -148,8 +161,12 @@ export function parseUnits(text: string, answering: boolean, knownTotal: number 
   if (painted == null && all) { painted = total = parseInt(all[1], 10); }
   if (painted == null && answering && /\b(?:all|every|each|whole|entire)\b/.test(t) && knownTotal) painted = knownTotal;
   if (painted == null && total == null) {
-    const n = t.match(/\b(\d{1,3})[\s-]+(?:\w+[\s-]+){0,2}?(?:units?|apartments?|condos?|town ?homes?|town ?houses?|rental units?)\b/) || t.match(/\b(\d{1,3})[\s-]?plex\b/);
-    if (n && !/\bbed(?:room)?s?\b/.test(n[0])) total = parseInt(n[1], 10);
+    // "4 story apartment complex" is a height, not four apartments: a number followed by story/floor/bedroom words is not a count of units
+    const unitMatches = [...t.matchAll(/\b(\d{1,3})[\s-]+(?:\w+[\s-]+){0,2}?(?:units?|apartments?|condos?|town ?homes?|town ?houses?|rental units?)\b/g)];
+    // ...and a number the customer is denying ("not 4 units", "I never said 4 units") is not a count either
+    const denied = (x: RegExpMatchArray) => /\b(?:not|no|never said|never mentioned|didn'?t say|didn'?t mention|isn'?t|aren'?t)\s*$/.test(t.slice(Math.max(0, (x.index ?? 0) - 16), x.index ?? 0));
+    const n = unitMatches.find((x) => !denied(x) && !/\b(?:stor(?:y|ey|ies)|floors?|levels?|bed(?:room)?s?|bath(?:room)?s?|buildings?)\b/.test(x[0])) || t.match(/\b(\d{1,3})[\s-]?plex\b/);
+    if (n) total = parseInt(n[1], 10);
     else if (/\bduplex/.test(t)) total = 2;
     else if (/\btriplex/.test(t)) total = 3;
     else if (/\b(?:four|quad)[\s-]?plex/.test(t)) total = 4;
@@ -263,7 +280,8 @@ export function extractDetails(text: string, ctx: EstimatorContext, askedId: str
   if (ctx.propertyType === 'multi_unit' || isMultiUnitText(text)) {
     const u = parseUnits(text, askedId === 'unit_count', ctx.unitsTotal);
     if (u.painted != null && (askedId === 'unit_count' || ctx.unitCount == null)) { patch.unitCount = u.painted; acks.push(u.painted + ' unit' + (u.painted === 1 ? '' : 's')); }
-    if (u.total != null && (ctx.unitsTotal == null || askedId === 'unit_count')) patch.unitsTotal = u.total;
+    // (a total that differs from the one already known is passed on too: chatEngine holds the two versions and asks which is right)
+    if (u.total != null && (ctx.unitsTotal == null || askedId === 'unit_count' || u.total !== ctx.unitsTotal)) patch.unitsTotal = u.total;
     if (u.painted == null && u.total != null && ctx.unitsTotal == null) acks.push(u.total + '-unit property');
     if (askedId === 'building_count') {
       const b = parseCount(text, 1, 100);
@@ -535,7 +553,7 @@ export function extractDetails(text: string, ctx: EstimatorContext, askedId: str
         break;
       }
       case 'deck_size': { const a = parseArea(text, true); if (a) { patch.deckSqft = a; acks.push(`${a} sq ft deck`); } break; }
-      case 'overhang_size': { const a = parseArea(text, true); if (a) { patch.overhangSqft = a; acks.push(`${a} sq ft overhang`); } break; }
+      case 'overhang_size': { const a = areaWithCount(text, parseArea(text, true)); if (a) { patch.overhangSqft = a; acks.push(`${a} sq ft overhang`); } break; }
       case 'railing_length': {
         const n = parseLinearFeet(text, true, 3, 500);
         if (n) { patch.stairRailFeet = n; acks.push(`${n} ft of railing`); }

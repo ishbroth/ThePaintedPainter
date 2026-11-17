@@ -357,7 +357,7 @@ const ChatPanel = () => {
       transcript: state.transcript,
       loyaltyDiscountPercent: estimate.loyaltyDiscountPercent ?? 0,
       // every reply the customer typed, in order; it goes to painters with the job
-      userMessages: state.history.filter((m) => m.role === 'user').map((m) => m.text),
+      userMessages: state.history.filter((m) => m.role === 'user' && !m.setAside).map((m) => m.text),
     };
     // Always a fresh hold window here: this whole block only runs for a genuinely NEW completion, never for returning to an
     // already-computed price, so there's no old timer that's actually still valid to reuse.
@@ -381,7 +381,34 @@ const ChatPanel = () => {
   function viewPainters() {
     stopSpeaking();
     pendingNavRef.current = null;
-    if (finalPayloadRef.current) navigate('/quote-results', { state: finalPayloadRef.current });
+    let payload = finalPayloadRef.current;
+    // A chat restored already finished (the tab was left before the price was shown, or it was reloaded) never ran the code that builds
+    // the results page's data, so build it here from the price on screen. Without it the results page had nothing to show and sent the
+    // customer back to the home page, which looked like the button did nothing.
+    const estimate = state.finalEstimate;
+    if (!payload && estimate) {
+      let expiresAt = NaN;
+      try { expiresAt = parseInt(sessionStorage.getItem(QUOTE_EXPIRES_KEY) ?? '', 10); } catch { /* storage unavailable */ }
+      if (!isFinite(expiresAt)) expiresAt = (state.history[state.history.length - 1]?.timestamp ?? Date.now()) + PRICE_HOLD_MINUTES * 60 * 1000;
+      payload = {
+        estimate: estimate.estimate,
+        ctx: estimate.ctx,
+        assumptions: estimate.assumptions,
+        matchedSituations: estimate.matchedSituations,
+        transcript: state.transcript,
+        loyaltyDiscountPercent: estimate.loyaltyDiscountPercent ?? 0,
+        userMessages: state.history.filter((m) => m.role === 'user' && !m.setAside).map((m) => m.text),
+        expiresAt,
+      };
+      try {
+        sessionStorage.setItem(QUOTE_EXPIRES_KEY, String(expiresAt));
+        sessionStorage.setItem(QUOTE_RESULT_KEY, JSON.stringify(payload));
+      } catch {
+        // storage unavailable: the page still gets the price through navigation state
+      }
+      finalPayloadRef.current = payload;
+    }
+    if (payload) navigate('/quote-results', { state: payload });
     else navigate('/quote-results');
   }
 

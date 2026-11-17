@@ -55,11 +55,16 @@ export function extractBathroomCount(text: string): number | null {
   return n;
 }
 
+const STORY_WORDS: Record<string, number> = { single: 1, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12 };
+
+/** How many stories a building has: "two story", "4 story apartment complex", "a 12-storey tower", "5 floors" (only of a building). */
 export function extractStories(text: string): number | null {
-  if (/\b(?:single|one)[\s-]?stor(?:y|ey)\b/i.test(text)) return 1;
-  if (/\b(?:two|2)[\s-]?stor(?:y|ey|ies)\b/i.test(text)) return 2;
-  if (/\b(?:three|3)[\s-]?stor(?:y|ey|ies)\b/i.test(text)) return 3;
-  return null;
+  const t = text.toLowerCase();
+  const m = t.match(/\b(\d{1,2}|single|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)[\s-]*stor(?:y|ey|ies)\b/)
+    || t.match(/\b(\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)[\s-]*floors?[\s-]*(?:building|complex|apartment|tower|house|home|property)\b/);
+  if (!m) return null;
+  const n = /^\d/.test(m[1]) ? parseInt(m[1], 10) : STORY_WORDS[m[1]];
+  return n >= 1 && n <= 40 ? n : null;
 }
 
 export function extractProjectType(text: string): 'interior' | 'exterior' | 'both' | null {
