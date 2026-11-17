@@ -24,7 +24,7 @@ import { extractAll, extractExteriorFeatures, extractCeilingHeight, extractPhoto
 import { getStateFromZip } from '../zipCodeData';
 import { hasScopeLimiter } from './scopeWords';
 import { lookupZipCity } from '../zipLookup';
-import { reviewLocally, reviewWithAI, hasPaintingScope, retryMessage, keepMessage, isFlaggedMessage, profanityScan, type ReviewResult } from './conversationReview';
+import { reviewLocally, reviewWithAI, hasPaintingScope, keepMessage, isFlaggedMessage, profanityScan, type ReviewResult } from './conversationReview';
 import { saysItemsOnly } from './items';
 import { isDenial, denialIsAboutScope, topicLabel, recentRecognized, recapSentence } from './clarify';
 import { readRetraction } from './retractions';
@@ -1638,12 +1638,6 @@ async function fetchLoyaltyDiscountPercent(customerId: string): Promise<number> 
   } catch {
     return 0;
   }
-}
-
-/** A clean start with an explanation: nothing from the blocked conversation is priced or sent to anyone. (Only used when nothing at all is worth keeping.) */
-function restartAfterReview(reason: ReviewResult['reason']): TurnResult {
-  const fresh = makeInitialState();
-  return { state: { ...fresh, history: [{ role: 'bot', text: retryMessage(reason), timestamp: Date.now() }] }, done: null };
 }
 
 /**
