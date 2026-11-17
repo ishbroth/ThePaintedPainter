@@ -147,7 +147,10 @@ export async function rankPainters(
     .eq('verified', true)
     .eq('is_demo', false) // demonstration painters appear on the map, never in a real customer's results
   // accepts_when_booked is a newer column: until it exists in the database, the list simply works without it
-  let { data: rows, error } = await loadRows(baseColumns + ', accepts_when_booked')
+  // (the two outside pricing answers are newer still: same thing, the list works without them until the columns exist)
+  const exteriorColumns = ', price_1500_exterior, price_25_french_windows'
+  let { data: rows, error } = await loadRows(baseColumns + ', accepts_when_booked' + exteriorColumns)
+  if (error && /price_1500_exterior|price_25_french_windows/.test(String(error.message))) ({ data: rows, error } = await loadRows(baseColumns + ', accepts_when_booked'))
   if (error && /accepts_when_booked/.test(String(error.message))) ({ data: rows, error } = await loadRows(baseColumns))
   if (error) throw error
 
@@ -209,6 +212,8 @@ export async function rankPainters(
           baseline: {
             price1BRFull: Number(p.price_1br_full), price3BRWalls: Number(p.price_3br_walls), price3BRTrimDoors: Number(p.price_3br_trim_doors),
             price3BRCeilings: Number(p.price_3br_ceilings), price5BRFull: Number(p.price_5br_full), price5BRCabinets: Number(p.price_5br_cabinets),
+            price1500Exterior: Number(p.price_1500_exterior) > 0 ? Number(p.price_1500_exterior) : undefined,
+            price25FrenchWindows: Number(p.price_25_french_windows) > 0 ? Number(p.price_25_french_windows) : undefined,
           },
         } as never,
         ctx,

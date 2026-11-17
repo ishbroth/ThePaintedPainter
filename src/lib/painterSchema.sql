@@ -49,6 +49,8 @@ CREATE TABLE painters (
   price_3br_ceilings NUMERIC,
   price_5br_full NUMERIC,
   price_5br_cabinets NUMERIC,
+  price_1500_exterior NUMERIC,
+  price_25_french_windows NUMERIC,
 
   -- Status
   status TEXT DEFAULT 'pending',

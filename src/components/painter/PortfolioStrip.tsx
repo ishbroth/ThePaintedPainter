@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../lib/auth';
 import { supabase } from '../../lib/supabase';
 import { fetchPainterDetail } from '../../lib/realPainterMatcher';
+import PaintbrushSilhouette from '../PaintbrushSilhouette';
 
 interface PortfolioImage {
   id: string;
@@ -138,10 +139,8 @@ export default function PortfolioStrip({ companyName, place }: { companyName: st
       >
         {images === null && <div className="shrink-0 w-full h-full flex items-center justify-center text-xs text-white/60">Loading…</div>}
         {images?.length === 0 && (
-          <div className="shrink-0 w-full h-full flex flex-col items-center justify-center gap-1 text-white/45" style={{ background: 'var(--bg-page)' }}>
-            <svg viewBox="0 0 24 24" width="44" height="44" fill="currentColor" aria-hidden="true">
-              <path d="M7 14c-1.66 0-3 1.34-3 3 0 1.31-1.16 2-2 2 .92 1.22 2.49 2 4 2 2.21 0 4-1.79 4-4 0-1.66-1.34-3-3-3zm13.71-9.37l-1.34-1.34a.996.996 0 0 0-1.41 0L9 12.25 11.75 15l8.96-8.96a.996.996 0 0 0 0-1.41z" />
-            </svg>
+          <div className="shrink-0 w-full h-full flex flex-col items-center justify-center gap-1 text-white/45" style={{ background: 'var(--bg-chrome)' }}>
+            <PaintbrushSilhouette background={false} className="h-[46%] w-auto" />
             <span className="text-[11px]">Add photos of finished jobs. They show on your public listing.</span>
           </div>
         )}

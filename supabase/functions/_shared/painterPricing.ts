@@ -14,6 +14,9 @@ export interface PainterBaseline {
   price3BRCeilings: number;   // 3BR home: ceilings only
   price5BRFull: number;       // 5BR 3,500 sqft: walls, ceilings, trim, doors
   price5BRCabinets: number;   // 5BR 3,500 sqft: kitchen cabinets only
+  /** Optional outside answers (painters who signed up before they existed have none): the entire exterior of a 1,500 sq ft house, and 25 French-pane double-hung windows painted both sides. */
+  price1500Exterior?: number;
+  price25FrenchWindows?: number;
 }
 
 export interface PainterProfile {
@@ -227,7 +230,11 @@ function interpolateExteriorPrice(
 
   // Trim adds ~15% on exterior
   const hasTrim = ctx.exteriorTrim === 'yes';
-  const rate = hasTrim ? exteriorBaseRate * 1.15 : exteriorBaseRate;
+  let rate = hasTrim ? exteriorBaseRate * 1.15 : exteriorBaseRate;
+  // A painter who gave their own price for the entire exterior of a 1,500 sq ft house (walls, trim, fascia, eaves, soffits) is priced
+  // from that, not from the guess above. The whole-exterior answer already has the trim in it, so a job without trim is a bit less.
+  const ownExteriorRate = b.price1500Exterior && b.price1500Exterior > 0 ? b.price1500Exterior / REF_SQFT.threeBR : 0;
+  if (ownExteriorRate > 0) rate = hasTrim ? ownExteriorRate : ownExteriorRate * 0.87;
 
   let price = rate * sqft;
 
@@ -243,6 +250,16 @@ function interpolateExteriorPrice(
     ctx.exteriorCondition === 'poor';
   if (needsRepairs) {
     price *= 1.25;
+  }
+
+  // Windows: from the painter's own price for 25 French-pane double-hung windows painted both sides. Outside is about 55% of that work.
+  // Their answer is for divided panes; plain windows are about 2.5 times less work, bay and picture windows in between (the same
+  // relation the estimator uses). Without an answer from the painter, nothing is added here (as before).
+  if (b.price25FrenchWindows && b.price25FrenchWindows > 0 && ctx.exteriorWindows && ctx.exteriorWindows !== 'none') {
+    const count = Number(ctx.exteriorWindowCount) > 0 ? Number(ctx.exteriorWindowCount) : Math.round(sqft / 110);
+    const style = ctx.itemAnswers?.['windows.style'];
+    const styleFactor = style === 'divided' ? 1 : style === 'standard' ? 0.4 : style === 'bay' ? 0.6 : 0.6;
+    price += count * (b.price25FrenchWindows / 25) * 0.55 * styleFactor;
   }
 
   // Extras

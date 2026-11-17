@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import PaintbrushSilhouette from '../PaintbrushSilhouette';
 import { fetchPainterDetail, type ExternalReview, type PainterDetail, type PainterResult } from '../../lib/realPainterMatcher';
 
 const money = (n: number) =>
@@ -42,10 +43,8 @@ function CoverPhoto({ result }: { result: PainterResult }) {
       {cover ? (
         <img src={cover} alt={`${result.companyName} — cover photo`} loading="lazy" className="w-full h-full object-cover" />
       ) : (
-        <div role="img" aria-label={`${result.companyName} has not added photos yet`} className="w-full h-full flex items-center justify-center" style={{ background: 'var(--bg-page)', color: 'var(--border-strong)' }}>
-          <svg viewBox="0 0 24 24" width="40" height="40" fill="currentColor" aria-hidden="true">
-            <path d="M7 14c-1.66 0-3 1.34-3 3 0 1.31-1.16 2-2 2 .92 1.22 2.49 2 4 2 2.21 0 4-1.79 4-4 0-1.66-1.34-3-3-3zm13.71-9.37l-1.34-1.34a.996.996 0 0 0-1.41 0L9 12.25 11.75 15l8.96-8.96a.996.996 0 0 0 0-1.41z" />
-          </svg>
+        <div role="img" aria-label={`${result.companyName} has not added photos yet`} className="w-full h-full flex items-center justify-center" style={{ background: 'var(--bg-chrome)' }}>
+          <PaintbrushSilhouette background={false} className="h-[78%] w-auto" />
         </div>
       )}
       <div className="absolute inset-x-0 top-0 px-3 pt-2 pb-4" style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.72), rgba(0,0,0,0))' }}>

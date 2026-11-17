@@ -39,33 +39,32 @@
   .icon { width: 88px; height: 88px; border-radius: 23px; background: url('../../ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png') center / cover; box-shadow: 0 0 0 3px rgba(255,255,255,.85), 0 0 22px 4px rgba(255,122,47,.7); }
   .brand b { font: 700 27px 'Barlow Condensed', sans-serif; letter-spacing: 8px; color: var(--orange); }
 
-  .book { font: 400 84px/1 'Anton', Impact, sans-serif; letter-spacing: 1px; margin-top: 12px; text-shadow: 0 4px 18px rgba(0,0,0,.55); }
+  .book { font: 400 70px/1 'Anton', Impact, sans-serif; letter-spacing: 1px; margin-top: 10px; white-space: nowrap; text-shadow: 0 4px 18px rgba(0,0,0,.55); }
+  .app { font: 400 62px/1 'Anton', Impact, sans-serif; letter-spacing: 1px; margin-top: 10px; white-space: nowrap; color: var(--orange); text-shadow: 0 0 20px rgba(255,122,47,.55), 0 4px 16px rgba(0,0,0,.6); }
 
-  /* ---------- the wheel ---------- */
-  .spin { position: relative; height: 322px; margin-top: 4px; }
-  .arrow { position: absolute; left: 0; top: 126px; width: 132px; height: 70px; filter: drop-shadow(0 4px 8px rgba(0,0,0,.6)); }
-  .arrow .gold { position: absolute; inset: 0; background: linear-gradient(#ffe38a, #d99a14); clip-path: polygon(0 22%, 56% 22%, 56% 0, 100% 50%, 56% 100%, 56% 78%, 0 78%); }
-  .arrow .red { position: absolute; inset: 6px; background: linear-gradient(#ff4b3a, #b8100c); clip-path: polygon(0 22%, 56% 22%, 56% 0, 100% 50%, 56% 100%, 56% 78%, 0 78%); }
-  .arrow .bulbs { position: absolute; inset: 0; clip-path: polygon(0 22%, 56% 22%, 56% 0, 100% 50%, 56% 100%, 56% 78%, 0 78%); background: radial-gradient(circle, #fff9d6 0 2.4px, transparent 3.2px) 0 0 / 15px 15px; opacity: .85; }
+  .book, .app { margin-left: 76px; width: 360px; text-align: center; }
 
-  .drum { position: absolute; left: 150px; top: 0; width: 520px; height: 322px; }
-  /* gold bulb columns either side, like the stage arches */
-  .rail { position: absolute; top: 0; bottom: 0; width: 26px; border-radius: 8px; background: linear-gradient(90deg, #7a4a07, #e9b43a 40%, #7a4a07); box-shadow: 0 0 14px rgba(246,200,74,.55); z-index: 5; }
-  .rail::after { content: ''; position: absolute; inset: 3px; background: radial-gradient(circle, #fffbe0 0 3.2px, #ffd96a 4px, transparent 5px) 0 0 / 20px 20px; }
-  .rail.l { left: 0; } .rail.r { right: 0; }
-  .view { position: absolute; left: 22px; right: 22px; top: 0; bottom: 0; background: linear-gradient(#050914, #101b3d 50%, #050914); overflow: hidden; border-top: 3px solid #8a5d0c; border-bottom: 3px solid #8a5d0c; }
+  /* ---------- the arrow and the words on the edge of the wheel, under "Book Your:" ---------- */
+  .spin { position: relative; height: 460px; margin-top: 4px; display: flex; align-items: center; gap: 12px; }
+  .arrow { position: relative; flex: none; width: 74px; height: 58px; filter: drop-shadow(0 4px 8px rgba(0,0,0,.6)); }
+  .arrow .gold { position: absolute; inset: 0; background: linear-gradient(#ffe38a, #d99a14); clip-path: polygon(0 22%, 52% 22%, 52% 0, 100% 50%, 52% 100%, 52% 78%, 0 78%); }
+  .arrow .red { position: absolute; inset: 5px; background: linear-gradient(#ff4b3a, #b8100c); clip-path: polygon(0 22%, 52% 22%, 52% 0, 100% 50%, 52% 100%, 52% 78%, 0 78%); }
+  .arrow .bulbs { position: absolute; inset: 0; clip-path: polygon(0 22%, 52% 22%, 52% 0, 100% 50%, 52% 100%, 52% 78%, 0 78%); background: radial-gradient(circle, #fff9d6 0 2.2px, transparent 3px) 0 0 / 14px 14px; opacity: .85; }
+
+  /* just the words, no frame: the one in the middle is front and center, the rest shrink and fade away like the edge of a wheel */
+  .drum { position: relative; flex: none; width: 340px; height: 460px; }
   .roll { position: absolute; left: 0; right: 0; top: 50%; height: 0; }
-  .row { position: absolute; left: 0; right: 0; height: 47px; margin-top: -23.5px; display: flex; align-items: center; justify-content: center; font: 400 34px/1 'Anton', Impact, sans-serif; letter-spacing: 3px; color: #e9eefc;
-    background: linear-gradient(#17254d, #0c1633); border-top: 2px solid #c8921c; border-bottom: 2px solid #c8921c; }
-  .row.hit { color: #fff; background: linear-gradient(#ff9a4d, #e8561a 55%, #c43f0c); border-color: #ffe38a; text-shadow: 0 2px 6px rgba(0,0,0,.45); font-size: 46px; letter-spacing: 5px; }
-  /* shading toward the top and bottom edges of the drum */
-  .shade { position: absolute; inset: 0; z-index: 4; pointer-events: none; background: linear-gradient(rgba(5,9,20,.96) 0, rgba(5,9,20,.55) 22%, rgba(5,9,20,0) 38%, rgba(5,9,20,0) 62%, rgba(5,9,20,.55) 78%, rgba(5,9,20,.96) 100%); }
-  /* a soft white glint across the middle of the drum */
-  .glint { position: absolute; left: 22px; right: 22px; top: 131px; height: 60px; z-index: 6; pointer-events: none; background: linear-gradient(100deg, transparent 20%, rgba(255,255,255,.28) 38%, transparent 52%); }
+  .row { position: absolute; left: 0; right: 0; height: 72px; margin-top: -36px; display: flex; align-items: center; justify-content: center; white-space: nowrap;
+    font: 400 46px/1 'Anton', Impact, sans-serif; letter-spacing: 3px; color: #f4f7ff; text-shadow: 0 2px 10px rgba(0,0,0,.65); }
+  .row.hit { color: #fff; font-size: 84px; letter-spacing: 5px; text-shadow: 0 0 18px rgba(255,122,47,.95), 0 0 38px rgba(255,122,47,.55), 0 3px 10px rgba(0,0,0,.6); }
 
-  .tag { font: 500 27px/1.28 'Barlow', sans-serif; margin-top: 16px; width: 740px; color: #f2f5ff; text-shadow: 0 2px 8px rgba(0,0,0,.6); }
-  .steps { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 16px; width: 760px; }
-  .steps span { font: 700 25px/1 'Barlow Condensed', sans-serif; letter-spacing: 4.5px; text-transform: uppercase; padding: 12px 24px; border: 2.5px solid var(--orange); border-radius: 12px; background: linear-gradient(rgba(70,30,30,.55), rgba(30,16,28,.7)); box-shadow: 0 0 14px rgba(255,122,47,.45); }
+  /* the line under the wheel and the four steps: out from under the wheel, along the bottom of the picture */
+  .bottom { position: absolute; transform-origin: 0 100%; padding: 18px 26px 20px; border-radius: 22px; background: rgba(8,14,34,.74); box-shadow: 0 0 30px rgba(0,0,0,.45); }
+  .wide .bottom { left: 500px; bottom: 44px; }
+  .tall .bottom { left: 640px; bottom: 150px; transform: scale(1.18); }
+  .tag { font: 500 27px/1.28 'Barlow', sans-serif; color: #f2f5ff; white-space: nowrap; text-shadow: 0 2px 8px rgba(0,0,0,.6); }
+  .steps { display: flex; flex-wrap: nowrap; gap: 14px; margin-top: 14px; }
+  .steps span { white-space: nowrap; font: 700 25px/1 'Barlow Condensed', sans-serif; letter-spacing: 4.5px; text-transform: uppercase; padding: 12px 24px; border: 2.5px solid var(--orange); border-radius: 12px; background: linear-gradient(rgba(70,30,30,.55), rgba(30,16,28,.7)); box-shadow: 0 0 14px rgba(255,122,47,.45); }
 </style>
 </head>
 <body>
@@ -75,16 +74,14 @@
   <div class="border"></div>
   <div class="col">
     <div class="brand"><div class="icon"></div><b>THE PAINTED PAINTER</b></div>
-    <div class="book">BOOK YOUR</div>
+    <div class="book">Book Your:</div>
     <div class="spin">
       <div class="arrow"><div class="gold"></div><div class="red"></div><div class="bulbs"></div></div>
-      <div class="drum">
-        <div class="rail l"></div><div class="rail r"></div>
-        <div class="view"><div class="roll" id="roll"></div></div>
-        <div class="shade" style="left:22px;right:22px"></div>
-        <div class="glint"></div>
-      </div>
+      <div class="drum"><div class="roll" id="roll"></div></div>
     </div>
+    <div class="app">With an App!</div>
+  </div>
+  <div class="bottom">
     <div class="tag">The Marketplace Where Qualified Painters Compete for Your Job, at Your Price.</div>
     <div class="steps"><span>Describe the Job</span><span>Pick Your Price</span><span>Pick Your Painter</span><span>Book It</span></div>
   </div>
@@ -93,8 +90,8 @@
   const v = new URLSearchParams(location.search).get('v') === 'tall' ? 'tall' : 'wide';
   document.body.className = v;
   // PAINTER lands in the middle, as if the wheel had just been spun; the other words (in a shuffled, fixed order) trail off either side
-  const words = ['POOL', 'DOGSITTER', 'VACATION', 'RESERVATIONS', 'PAINTER', 'HOTEL', 'TRAILER', 'BABYSITTER', 'CAR'];
-  const STEP = 15, R = 186; // degrees between rows, and the drum radius
+  const words = ['CAR', 'HOTEL', 'DINNER', 'DOGSITTER', 'PAINTER', 'TRAILER', 'VACATION', 'BABYSITTER', 'POOL'];
+  const STEP = 12, R = 255, GAP = 18; // a little extra room each side of the middle word // degrees between rows, and the drum radius
   const roll = document.getElementById('roll');
   words.forEach((w, i) => {
     const el = document.createElement('div');
@@ -102,7 +99,9 @@
     el.textContent = w;
     const a = (i - 4) * STEP;
     const r = a * Math.PI / 180; // a flat take on a drum: rows bunch up and flatten toward the top and bottom, as on a cylinder
-    el.style.transform = `translateY(${(R * Math.sin(r)).toFixed(1)}px) scaleY(${Math.cos(r).toFixed(3)})`;
+    const c = Math.cos(r); // 1 at the middle row, falling toward the top and bottom
+    el.style.transform = `translateY(${(Math.sign(a) * GAP + R * Math.sin(r)).toFixed(1)}px) scale(${(0.5 + 0.5 * c).toFixed(3)}, ${c.toFixed(3)})`;
+    el.style.opacity = String((0.2 + 0.8 * Math.pow(c, 2.4)).toFixed(3));
     roll.appendChild(el);
   });
   document.fonts.ready.then(() => { document.title = 'ready'; });

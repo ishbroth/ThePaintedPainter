@@ -4,6 +4,7 @@ import { supabase, supabaseUrl } from '../lib/supabase';
 import ExternalReviewsFields from '../components/painter/ExternalReviewsFields';
 import { emptyExternalForm, fromExternalForm, validateExternalForm, type ExternalFormValue } from '../lib/externalReviews';
 import { formatPhone } from '../lib/formatPhone';
+import AddressField from '../components/AddressField';
 
 
 // ---------------------------------------------------------------------------
@@ -60,6 +61,8 @@ interface PainterFormData {
   price3BRCeilings: number | null;
   price5BRFull: number | null;
   price5BRCabinets: number | null;
+  price1500Exterior: number | null;
+  price25FrenchWindows: number | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -157,7 +160,7 @@ const STEP_LABELS = [
 const PRICING_SCENARIOS: {
   key: keyof Pick<
     PainterFormData,
-    'price1BRFull' | 'price3BRWalls' | 'price3BRTrimDoors' | 'price3BRCeilings' | 'price5BRFull' | 'price5BRCabinets'
+    'price1BRFull' | 'price3BRWalls' | 'price3BRTrimDoors' | 'price3BRCeilings' | 'price5BRFull' | 'price5BRCabinets' | 'price1500Exterior' | 'price25FrenchWindows'
   >;
   label: string;
   description: string;
@@ -197,6 +200,18 @@ const PRICING_SCENARIOS: {
     label: '5BR Large Home - Kitchen Cabinets Only',
     description:
       'The kitchen cabinets in that same large 5-bedroom, 3,500 sq ft home.',
+  },
+  {
+    key: 'price1500Exterior',
+    label: '1,500 sq ft Home - Entire Exterior',
+    description:
+      'A standard 1,500 sq ft house \u2014 the entire exterior: walls or siding, trim, fascia, eaves and soffits.',
+  },
+  {
+    key: 'price25FrenchWindows',
+    label: '25 French-Pane Double-Hung Windows - Both Sides',
+    description:
+      '25 French-pane (divided-light) double-hung windows \u2014 painted inside and out, both sides.',
   },
 ];
 
@@ -250,6 +265,8 @@ const initialFormData: PainterFormData = {
   price3BRCeilings: null,
   price5BRFull: null,
   price5BRCabinets: null,
+  price1500Exterior: null,
+  price25FrenchWindows: null,
 };
 
 // ---------------------------------------------------------------------------
@@ -593,6 +610,8 @@ const PainterSignup = () => {
         price_3br_ceilings: formData.price3BRCeilings,
         price_5br_full: formData.price5BRFull,
         price_5br_cabinets: formData.price5BRCabinets,
+        price_1500_exterior: formData.price1500Exterior,
+        price_25_french_windows: formData.price25FrenchWindows,
           },
         },
       });
@@ -773,10 +792,25 @@ const PainterSignup = () => {
         })}
       </div>
 
-      {renderInput('streetAddress', 'Street Address', {
-        required: true,
-        placeholder: '123 Main Street',
-      })}
+      {/* Google suggests real addresses as they type; choosing one fills the city, state and ZIP below. Typing without choosing still works. */}
+      <div style={styles.formGroup}>
+        <label style={styles.label}>
+          Street Address<span style={styles.requiredStar}>*</span>
+        </label>
+        <AddressField
+          value={formData.streetAddress}
+          onChange={(t) => updateField('streetAddress', t)}
+          onPick={(p) => {
+            updateField('streetAddress', p.street);
+            if (p.city) updateField('city', p.city);
+            if (p.state) updateField('state', p.state);
+            if (p.zip) updateField('zipCode', p.zip.slice(0, 5));
+          }}
+          placeholder="123 Main Street"
+          style={{ ...styles.input, ...(errors.streetAddress ? styles.inputError : {}) }}
+        />
+        {errors.streetAddress && <p style={styles.errorText}>{errors.streetAddress}</p>}
+      </div>
 
       <div style={styles.grid2}>
         {renderInput('city', 'City', { required: true, placeholder: 'City' })}

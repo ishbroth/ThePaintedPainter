@@ -209,6 +209,8 @@ function painterRow(p: RosterEntry, userId: string, index: number) {
     price_3br_ceilings: Math.round(base * 0.8),
     price_5br_full: Math.round(base * 3.2),
     price_5br_cabinets: Math.round(base * 1.5),
+    price_1500_exterior: Math.round(base * 1.7),
+    price_25_french_windows: Math.round(base * 0.6),
     // availability: a booked-out stretch on the calendar for most of them
     leads_paused: false,
     paused_until: null,

@@ -62,7 +62,7 @@ const PaintersMap = () => {
             Find Painters <span className="text-[var(--accent)]">Nationwide</span>
           </h1>
           <p className="text-lg text-[var(--text-secondary)] max-w-2xl">
-            Browse our network of {painters.length} vetted, professional painters across the
+            Browse our network of vetted, professional painters across the
             country. Filter by location or service to find the right team for
             your project.
           </p>

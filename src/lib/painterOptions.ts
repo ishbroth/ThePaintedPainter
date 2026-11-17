@@ -28,6 +28,8 @@ export const PRICING_SCENARIOS: { column: string; label: string; description: st
   { column: 'price_3br_ceilings', label: '3BR Home - Ceilings Only', description: 'The same standard 3-bedroom home — all ceilings only, no walls, trim, or doors.' },
   { column: 'price_5br_full', label: '5BR Large Home - Full Interior', description: 'A large 5-bedroom, 3,500 sq ft home — walls, ceilings, trim, and doors.' },
   { column: 'price_5br_cabinets', label: '5BR Large Home - Kitchen Cabinets Only', description: 'The kitchen cabinets in that same large 5-bedroom, 3,500 sq ft home.' },
+  { column: 'price_1500_exterior', label: '1,500 sq ft Home - Entire Exterior', description: 'A standard 1,500 sq ft house \u2014 the entire exterior: walls or siding, trim, fascia, eaves and soffits.' },
+  { column: 'price_25_french_windows', label: '25 French-Pane Double-Hung Windows - Both Sides', description: '25 French-pane (divided-light) double-hung windows \u2014 painted inside and out, both sides.' },
 ];
 
 export const CERTIFICATION_OPTIONS = ['EPA Lead-Safe Certified', 'OSHA Certified', 'Master Painter Certified', 'Other'];

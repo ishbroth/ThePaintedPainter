@@ -41,6 +41,7 @@ export const ALLOWED_COLUMNS = [
   'service_types', 'service_area_zips', 'max_project_size', 'projects_per_month',
   'offers_estimates', 'offers_warranty', 'warranty_length',
   'price_1br_full', 'price_3br_walls', 'price_3br_trim_doors', 'price_3br_ceilings', 'price_5br_full', 'price_5br_cabinets',
+  'price_1500_exterior', 'price_25_french_windows',
 ]
 
 serve(async (req: Request) => {

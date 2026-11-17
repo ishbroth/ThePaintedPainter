@@ -339,6 +339,8 @@ ${body}
           ['3BR home, ceilings only', moneyOrEmpty(a.price_3br_ceilings)],
           ['5BR large home, full interior', moneyOrEmpty(a.price_5br_full)],
           ['5BR large home, kitchen cabinets only', moneyOrEmpty(a.price_5br_cabinets)],
+          ['1,500 sq ft home, entire exterior', moneyOrEmpty(a.price_1500_exterior)],
+          ['25 French-pane double-hung windows, both sides', moneyOrEmpty(a.price_25_french_windows)],
         ])}
         <p style="margin:26px 0 4px;font-size:14px;"><strong>Decide:</strong></p>
         ${data.reviewUrl ? approvalButtons(data.reviewUrl) : ''}

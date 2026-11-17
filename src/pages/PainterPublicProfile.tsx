@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { fetchPainterDetail, type PainterDetail } from '../lib/realPainterMatcher';
+import PaintbrushSilhouette from '../components/PaintbrushSilhouette';
 
 // ---------------------------------------------------------------------------
 // Star display helper
@@ -157,6 +158,10 @@ const PainterPublicProfile = () => {
     <div className="text-[var(--text-primary)]">
       <section className="bg-[var(--bg-chrome)] py-16 border-b border-[var(--border)]">
         <div className="container-custom text-center">
+          {/* the business's picture: its first portfolio photo, or the paintbrush silhouette until it has one */}
+          <div className="mx-auto mb-4 w-24 h-24 rounded-full overflow-hidden border border-[var(--border-strong)]">
+            {images[0] ? <img src={images[0]} alt="" className="w-full h-full object-cover" /> : <PaintbrushSilhouette />}
+          </div>
           <h1 className="text-3xl md:text-4xl font-bold mb-3">{painter.companyName}</h1>
           <p className="text-[var(--text-secondary)] text-lg mb-4">{[painter.city, painter.state].filter(Boolean).join(', ')}</p>
 

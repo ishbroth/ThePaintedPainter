@@ -123,6 +123,8 @@ async function main() {
     price_3br_ceilings: Math.round(base * 0.8),
     price_5br_full: Math.round(base * 3.2),
     price_5br_cabinets: Math.round(base * 1.5),
+    price_1500_exterior: Math.round(base * 1.7),
+    price_25_french_windows: Math.round(base * 0.6),
     // paused with no end date: placeholder company, never offered to real customers
     leads_paused: true,
     paused_until: null,

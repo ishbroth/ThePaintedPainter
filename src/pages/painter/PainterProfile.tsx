@@ -11,6 +11,7 @@ import PortfolioStrip from '../../components/painter/PortfolioStrip';
 import BookedPreference from '../../components/painter/BookedPreference';
 import EditRow, { editInput } from '../../components/painter/EditRow';
 import { formatPhone } from '../../lib/formatPhone';
+import AddressField from '../../components/AddressField';
 
 interface PainterRow {
   id: string;
@@ -166,7 +167,16 @@ export default function PainterProfile() {
           onOpen={() => setAddress({ street: row.street_address ?? '', city: row.city ?? '', state: row.state ?? '', zip: row.zip_code ?? '' })}
           editor={(
             <div className="grid grid-cols-6 gap-2">
-              <input className={editInput + ' col-span-6'} placeholder="Street" value={address.street} onChange={(e) => setAddress({ ...address, street: e.target.value })} />
+              {/* Google suggests real addresses as they type; choosing one fills the street, city, state and ZIP */}
+              <div className="col-span-6">
+                <AddressField
+                  value={address.street}
+                  onChange={(t) => setAddress((a) => ({ ...a, street: t }))}
+                  onPick={(p) => setAddress({ street: p.street, city: p.city || address.city, state: p.state || address.state, zip: (p.zip || address.zip).slice(0, 5) })}
+                  placeholder="Street"
+                  className={editInput}
+                />
+              </div>
               <input className={editInput + ' col-span-3'} placeholder="City" value={address.city} onChange={(e) => setAddress({ ...address, city: e.target.value })} />
               <input className={editInput + ' col-span-1'} placeholder="ST" maxLength={2} value={address.state} onChange={(e) => setAddress({ ...address, state: e.target.value })} />
               <input className={editInput + ' col-span-2'} placeholder="ZIP" inputMode="numeric" maxLength={5} value={address.zip} onChange={(e) => setAddress({ ...address, zip: e.target.value })} />
