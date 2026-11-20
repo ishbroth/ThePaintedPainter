@@ -25,6 +25,9 @@ export interface JobForMessaging {
   customer_email: string | null
   accepted_by: string | null
   completed_at?: string | null
+  /** Either side can turn messaging off for this job (see the report_block migration). Missing counts as not blocked. */
+  customer_blocked_messages?: boolean | null
+  painter_blocked_messages?: boolean | null
 }
 
 export interface CallerIdentity {
@@ -42,14 +45,29 @@ export function participantRole(job: JobForMessaging, caller: CallerIdentity, pa
   return null
 }
 
-/** Both parties have confirmed and the job is on the schedule: the only time anyone can send. */
-export function canSendMessages(job: JobForMessaging): boolean {
+/** Both parties have confirmed and the job is on the schedule: the only time a conversation is open. */
+function jobIsOpen(job: JobForMessaging): boolean {
   return job.status === 'confirmed' && !!job.scheduled_date
+}
+
+/** Has either person turned messaging off for this job? */
+export function isBlocked(job: JobForMessaging): boolean {
+  return !!job.customer_blocked_messages || !!job.painter_blocked_messages
+}
+
+/** Did THIS person turn it off? (The other person is never told who did.) */
+export function blockedByRole(job: JobForMessaging, role: MessageRole): boolean {
+  return role === 'customer' ? !!job.customer_blocked_messages : !!job.painter_blocked_messages
+}
+
+/** The job is open and nobody has blocked: the only time anyone can send. */
+export function canSendMessages(job: JobForMessaging): boolean {
+  return jobIsOpen(job) && !isBlocked(job)
 }
 
 /** The thread can be read while the job is confirmed, and for a while after it is completed. */
 export function canReadMessages(job: JobForMessaging, now: Date = new Date()): boolean {
-  if (canSendMessages(job)) return true
+  if (jobIsOpen(job)) return true // a blocked thread stays readable (it is the record of what was said)
   if (job.status === 'completed') {
     if (!job.completed_at) return true
     return now.getTime() - new Date(job.completed_at).getTime() <= READ_AFTER_COMPLETE_DAYS * 86400000
@@ -92,4 +110,47 @@ export function threadLink(recipient: MessageRole, jobId: string): string {
 export function firstName(full: string | null | undefined, fallback: string): string {
   const first = String(full ?? '').trim().split(/\s+/)[0]
   return first || fallback
+}
+
+// ---- report ----
+export const REPORT_REASONS = ['harassment', 'inappropriate', 'spam', 'scam', 'off_platform', 'other'] as const
+export type ReportReason = typeof REPORT_REASONS[number]
+export const REPORT_REASON_LABELS: Record<ReportReason, string> = {
+  harassment: 'Harassment or threats',
+  inappropriate: 'Inappropriate or offensive',
+  spam: 'Spam or unrelated',
+  scam: 'Scam or fraud',
+  off_platform: 'Pushing to pay or work outside the app',
+  other: 'Something else',
+}
+export const MAX_REPORT_DETAILS = 500
+/** At most this many reports from one person on one job in a day (a report emails the owner). */
+export const REPORT_LIMIT_PER_DAY = 5
+/** How many of the latest messages are kept with a report. */
+export const REPORT_SNAPSHOT_MESSAGES = 15
+
+/** Checks the reason and the optional note. Returns the cleaned note (null when empty). */
+export function cleanReport(rawReason: unknown, rawDetails: unknown): { ok: true; reason: ReportReason; details: string | null } | { ok: false; error: string } {
+  if (typeof rawReason !== 'string' || !(REPORT_REASONS as readonly string[]).includes(rawReason)) return { ok: false, error: 'Choose what is wrong.' }
+  let details: string | null = null
+  if (rawDetails !== undefined && rawDetails !== null && rawDetails !== '') {
+    if (typeof rawDetails !== 'string') return { ok: false, error: 'The note could not be read.' }
+    // same plain-text cleaning as a message
+    // eslint-disable-next-line no-control-regex
+    const t = rawDetails.replace(/\r\n?/g, '\n').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '').trim()
+    if (t.length > MAX_REPORT_DETAILS) return { ok: false, error: `Keep the note under ${MAX_REPORT_DETAILS} characters.` }
+    details = t || null
+  }
+  return { ok: true, reason: rawReason as ReportReason, details }
+}
+
+/** Too many reports from this person on this job lately? `recentAt` are the ISO times of their reports. */
+export function isReportLimited(recentAt: string[], now: Date = new Date()): boolean {
+  const since = now.getTime() - 86400000
+  return recentAt.filter((t) => new Date(t).getTime() >= since).length >= REPORT_LIMIT_PER_DAY
+}
+
+/** The messages kept with a report: the latest few, oldest first. */
+export function reportSnapshot(messages: { sender_role: MessageRole; body: string; created_at: string }[]): { from: MessageRole; body: string; at: string }[] {
+  return messages.slice(-REPORT_SNAPSHOT_MESSAGES).map((m) => ({ from: m.sender_role, body: m.body, at: m.created_at }))
 }

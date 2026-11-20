@@ -9,11 +9,20 @@ function participantRole(job, caller, painterRowForCaller) {
   if (!job.customer_id && caller.confirmedEmail && job.customer_email && job.customer_email.trim().toLowerCase() === caller.confirmedEmail.trim().toLowerCase()) return "customer";
   return null;
 }
-function canSendMessages(job) {
+function jobIsOpen(job) {
   return job.status === "confirmed" && !!job.scheduled_date;
 }
+function isBlocked(job) {
+  return !!job.customer_blocked_messages || !!job.painter_blocked_messages;
+}
+function blockedByRole(job, role) {
+  return role === "customer" ? !!job.customer_blocked_messages : !!job.painter_blocked_messages;
+}
+function canSendMessages(job) {
+  return jobIsOpen(job) && !isBlocked(job);
+}
 function canReadMessages(job, now2 = /* @__PURE__ */ new Date()) {
-  if (canSendMessages(job)) return true;
+  if (jobIsOpen(job)) return true;
   if (job.status === "completed") {
     if (!job.completed_at) return true;
     return now2.getTime() - new Date(job.completed_at).getTime() <= READ_AFTER_COMPLETE_DAYS * 864e5;
@@ -41,6 +50,28 @@ function threadLink(recipient, jobId) {
 function firstName(full, fallback) {
   const first = String(full ?? "").trim().split(/\s+/)[0];
   return first || fallback;
+}
+var REPORT_REASONS = ["harassment", "inappropriate", "spam", "scam", "off_platform", "other"];
+var MAX_REPORT_DETAILS = 500;
+var REPORT_LIMIT_PER_DAY = 5;
+var REPORT_SNAPSHOT_MESSAGES = 15;
+function cleanReport(rawReason, rawDetails) {
+  if (typeof rawReason !== "string" || !REPORT_REASONS.includes(rawReason)) return { ok: false, error: "Choose what is wrong." };
+  let details = null;
+  if (rawDetails !== void 0 && rawDetails !== null && rawDetails !== "") {
+    if (typeof rawDetails !== "string") return { ok: false, error: "The note could not be read." };
+    const t = rawDetails.replace(/\r\n?/g, "\n").replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "").trim();
+    if (t.length > MAX_REPORT_DETAILS) return { ok: false, error: `Keep the note under ${MAX_REPORT_DETAILS} characters.` };
+    details = t || null;
+  }
+  return { ok: true, reason: rawReason, details };
+}
+function isReportLimited(recentAt, now2 = /* @__PURE__ */ new Date()) {
+  const since = now2.getTime() - 864e5;
+  return recentAt.filter((t) => new Date(t).getTime() >= since).length >= REPORT_LIMIT_PER_DAY;
+}
+function reportSnapshot(messages) {
+  return messages.slice(-REPORT_SNAPSHOT_MESSAGES).map((m) => ({ from: m.sender_role, body: m.body, at: m.created_at }));
 }
 
 // scripts/jobMessagingChecks.ts
@@ -108,5 +139,45 @@ check("the painter is sent to the painter projects page with the thread open", t
 check("the customer is sent to the customer projects page with the thread open", threadLink("customer", "abc") === "/customer/dashboard/projects?messages=abc");
 check("a job id cannot break out of the link", !threadLink("painter", "a&b=c#x").includes("&b=") && !threadLink("painter", "a&b=c#x").includes("#"));
 check("only a first name goes in a title", firstName("Pat  Lee Smith", "Your client") === "Pat" && firstName("", "Your client") === "Your client" && firstName(null, "x") === "x");
+var blockedByCustomer = { ...JOB, customer_blocked_messages: true };
+var blockedByPainter = { ...JOB, painter_blocked_messages: true };
+check("a job nobody blocked is not blocked (missing flags count as off)", !isBlocked(JOB) && !isBlocked({ ...JOB, customer_blocked_messages: null, painter_blocked_messages: false }));
+check("a block by the customer stops sending", isBlocked(blockedByCustomer) && !canSendMessages(blockedByCustomer));
+check("a block by the painter stops sending", isBlocked(blockedByPainter) && !canSendMessages(blockedByPainter));
+check("a block stops BOTH sides from sending (the sender is the same check)", !canSendMessages(blockedByCustomer) && !canSendMessages(blockedByPainter));
+check("a blocked thread can still be read", canReadMessages(blockedByCustomer) && canReadMessages(blockedByPainter));
+check("a blocked thread that is completed follows the 90-day read window", canReadMessages({ ...blockedByCustomer, status: "completed", completed_at: "2026-12-20T00:00:00Z" }, now) && !canReadMessages({ ...blockedByCustomer, status: "completed", completed_at: "2026-01-01T00:00:00Z" }, now));
+check("a block does not open an unconfirmed job", !canReadMessages({ ...blockedByCustomer, status: "painter_accepted" }));
+check("each side only owns its own block", blockedByRole(blockedByCustomer, "customer") && !blockedByRole(blockedByCustomer, "painter") && blockedByRole(blockedByPainter, "painter") && !blockedByRole(blockedByPainter, "customer"));
+check("both sides blocking, then one lifting theirs, is still blocked", (() => {
+  const both = { ...JOB, customer_blocked_messages: true, painter_blocked_messages: true };
+  return isBlocked({ ...both, customer_blocked_messages: false }) && !canSendMessages({ ...both, customer_blocked_messages: false });
+})());
+check("lifting the only block reopens the job", canSendMessages({ ...blockedByCustomer, customer_blocked_messages: false }));
+for (const reason of REPORT_REASONS) check(`reason ${reason} is accepted`, cleanReport(reason, void 0).ok);
+check("an unknown reason is refused", !cleanReport("boring", void 0).ok && !cleanReport(void 0, void 0).ok && !cleanReport(5, void 0).ok);
+check("a prototype name is not a reason", !cleanReport("constructor", void 0).ok && !cleanReport("__proto__", void 0).ok);
+check("the note is optional and empty means none", (() => {
+  const r = cleanReport("spam", "   ");
+  return r.ok && r.details === null;
+})() && (() => {
+  const r = cleanReport("spam", null);
+  return r.ok && r.details === null;
+})());
+check("the note is trimmed and cleaned", (() => {
+  const r = cleanReport("other", "  rude \0 text\r\n  ");
+  return r.ok && r.details === "rude  text";
+})());
+check("a note at the limit is accepted and one over is refused", cleanReport("other", "x".repeat(MAX_REPORT_DETAILS)).ok && !cleanReport("other", "x".repeat(MAX_REPORT_DETAILS + 1)).ok);
+check("a note that is not text is refused", !cleanReport("other", { a: 1 }).ok);
+var reportsNow = /* @__PURE__ */ new Date("2026-12-01T12:00:00Z");
+var manyReports = Array.from({ length: REPORT_LIMIT_PER_DAY }, (_, i) => new Date(reportsNow.getTime() - i * 6e4).toISOString());
+check("the report limit is reached at the cap", isReportLimited(manyReports, reportsNow));
+check("one under the report cap is fine", !isReportLimited(manyReports.slice(1), reportsNow));
+check("reports from over a day ago do not count", !isReportLimited(manyReports.map(() => new Date(reportsNow.getTime() - 9e7).toISOString()), reportsNow));
+var thread = Array.from({ length: 40 }, (_, i) => ({ sender_role: i % 2 ? "painter" : "customer", body: `m${i}`, created_at: `2026-12-01T00:${String(i).padStart(2, "0")}:00Z` }));
+var snap = reportSnapshot(thread);
+check("the snapshot keeps only the latest messages, oldest first", snap.length === REPORT_SNAPSHOT_MESSAGES && snap[snap.length - 1].body === "m39" && snap[0].body === `m${40 - REPORT_SNAPSHOT_MESSAGES}`);
+check("the snapshot of a short thread is the whole thread", reportSnapshot(thread.slice(0, 3)).length === 3 && reportSnapshot([]).length === 0);
 console.log(`${passed} checks passed${failures ? `, ${failures} FAILED` : ""}`);
 process.exit(failures ? 1 : 0);

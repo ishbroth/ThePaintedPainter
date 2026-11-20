@@ -14,6 +14,10 @@
 //   list    { jobId }          the thread (oldest first); messages from the other person are marked read
 //   send    { jobId, body }    add a message; the other person gets a notification (in-app feed + push)
 //   unread  {}                 how many unread messages the caller has on each of their jobs: { unread: { [jobId]: n } }
+//   report  { jobId, reason, details?, messageId?, alsoBlock? }
+//                              report the other person: the owner is emailed, and a snapshot of the recent thread is kept in message_reports
+//   block   { jobId }          turn messaging off for this job (the job itself carries on); the other side is not told who did it
+//   unblock { jobId }          turn it back on (undoes only the caller's own block)
 //
 // No email is sent for messages (the app's notification feed and push carry them); emails stay for the events that already send them.
 //
@@ -23,8 +27,10 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
 import { notify } from '../_shared/notify.ts'
+import { ADMIN_EMAIL } from '../_shared/adminLink.ts'
 import {
-  canReadMessages, canSendMessages, cleanMessageBody, firstName, isRateLimited, participantRole, snippet, threadLink,
+  blockedByRole, canReadMessages, canSendMessages, cleanMessageBody, cleanReport, firstName, isBlocked, isRateLimited, isReportLimited, participantRole,
+  REPORT_REASON_LABELS, reportSnapshot, snippet, threadLink,
   RATE_LIMIT_COUNT, RATE_LIMIT_WINDOW_MS, type CallerIdentity, type JobForMessaging, type MessageRole,
 } from '../_shared/jobMessages.ts'
 
@@ -36,7 +42,7 @@ const corsHeaders = {
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
 const notFound = () => json({ error: 'That conversation was not found.' }, 404)
 
-const JOB_COLUMNS = 'id, status, scheduled_date, completed_at, customer_id, customer_email, customer_name, accepted_by'
+const JOB_COLUMNS = 'id, status, scheduled_date, completed_at, customer_id, customer_email, customer_name, accepted_by, customer_blocked_messages, painter_blocked_messages'
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 serve(async (req: Request) => {
@@ -89,7 +95,7 @@ serve(async (req: Request) => {
       return json({ unread })
     }
 
-    if (action !== 'list' && action !== 'send') return json({ error: 'Unknown action' }, 400)
+    if (!['list', 'send', 'report', 'block', 'unblock'].includes(action)) return json({ error: 'Unknown action' }, 400)
     const jobId = String(input.jobId ?? '')
     if (!UUID.test(jobId)) return notFound()
 
@@ -115,12 +121,80 @@ serve(async (req: Request) => {
       return json({
         role,
         canSend: canSendMessages(job as JobForMessaging),
+        // messaging turned off by either side: the other person only learns that it is off, never who did it
+        blocked: isBlocked(job as JobForMessaging),
+        blockedByMe: blockedByRole(job as JobForMessaging, role),
         otherName: role === 'painter' ? firstName(job.customer_name, 'Your client') : await painterName(supabase, job.accepted_by),
         messages: messages.map((m) => ({ id: m.id, from: m.sender_role === role ? 'me' : 'them', body: m.body, createdAt: m.created_at, read: !!m.read_at || m.sender_role === otherRole })),
       })
     }
 
+    // ---- block / unblock: this job only, and only the caller's own side ----
+    if (action === 'block' || action === 'unblock') {
+      if (!canReadMessages(job as JobForMessaging)) return json({ error: 'There is nothing to turn off yet.', locked: true }, 403)
+      const column = role === 'painter' ? 'painter_blocked_messages' : 'customer_blocked_messages'
+      const { error: updateError } = await supabase.from('quote_selections').update({ [column]: action === 'block' }).eq('id', jobId)
+      if (updateError) throw updateError
+      return json({ success: true, blockedByMe: action === 'block' })
+    }
+
+    // ---- report ----
+    if (action === 'report') {
+      if (!canReadMessages(job as JobForMessaging)) return json({ error: 'There is nothing to report on this job.', locked: true }, 403)
+      const cleanedReport = cleanReport(input.reason, input.details)
+      if (!cleanedReport.ok) return json({ error: cleanedReport.error }, 400)
+
+      const sinceDay = new Date(Date.now() - 86400000).toISOString()
+      const { data: mine } = await supabase.from('message_reports').select('created_at').eq('job_id', jobId).eq('reporter_user_id', user.id).gte('created_at', sinceDay).limit(10)
+      if (isReportLimited(((mine ?? []) as { created_at: string }[]).map((r) => r.created_at))) {
+        return json({ error: 'You have already sent several reports about this job today. We have them and will look into it.' }, 429)
+      }
+
+      const { data: thread } = await supabase
+        .from('job_messages').select('id, sender_role, body, created_at').eq('job_id', jobId).order('created_at', { ascending: true }).limit(500)
+      const all = (thread ?? []) as { id: string; sender_role: MessageRole; body: string; created_at: string }[]
+      // a report can point at one message, but only one the OTHER person wrote on this job
+      const messageId = typeof input.messageId === 'string' && UUID.test(input.messageId) ? input.messageId : null
+      const pointedAt = messageId ? all.find((m) => m.id === messageId && m.sender_role === otherRole) ?? null : null
+      const alsoBlock = input.alsoBlock === true
+
+      const { error: reportError } = await supabase.from('message_reports').insert({
+        job_id: jobId, reporter_user_id: user.id, reporter_role: role, reported_role: otherRole, message_id: pointedAt?.id ?? null,
+        reason: cleanedReport.reason, details: cleanedReport.details, snapshot: reportSnapshot(all), also_blocked: alsoBlock,
+      })
+      if (reportError) throw reportError
+      if (alsoBlock) {
+        const column = role === 'painter' ? 'painter_blocked_messages' : 'customer_blocked_messages'
+        await supabase.from('quote_selections').update({ [column]: true }).eq('id', jobId)
+      }
+
+      // tell the owner who is who and what was said (this email goes to the owner only; nothing reaches the other person)
+      const customerLabel = job.customer_name ? `${job.customer_name}${job.customer_email ? ` (${job.customer_email})` : ''}` : (job.customer_email ?? 'the customer')
+      const painterLabel = await painterName(supabase, job.accepted_by)
+      const lines = [
+        `${role === 'painter' ? 'The painter' : 'The customer'} reported ${role === 'painter' ? 'the customer' : 'the painter'}.`,
+        `Reason: ${REPORT_REASON_LABELS[cleanedReport.reason]}`,
+        cleanedReport.details ? `Their note: ${cleanedReport.details}` : null,
+        pointedAt ? `Message reported: "${pointedAt.body.slice(0, 300)}"` : null,
+        `Customer: ${customerLabel}.  Painter: ${painterLabel}.`,
+        `Messaging also turned off by the reporter: ${alsoBlock ? 'yes' : 'no'}.  Job id: ${jobId}`,
+        `Last messages: ${reportSnapshot(all).slice(-5).map((m) => `[${m.from}] ${snippet(m.body, 140)}`).join(' | ') || '(none)'}`,
+      ].filter(Boolean)
+      await fetch(`${supabaseUrl}/functions/v1/send-email`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${serviceRoleKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: ADMIN_EMAIL(), type: 'new_notification',
+          data: { title: `Message report: ${REPORT_REASON_LABELS[cleanedReport.reason]}`, body: lines.join('   ·   '), link: Deno.env.get('FRONTEND_URL') ?? 'https://thepaintedpainter.com' },
+        }),
+      }).catch((e) => console.error('report email failed', e))
+      return json({ success: true, blocked: alsoBlock })
+    }
+
     // ---- send ----
+    if (isBlocked(job as JobForMessaging) && canReadMessages(job as JobForMessaging)) {
+      return json({ error: 'Messaging has been turned off for this job.', locked: true, blocked: true }, 403)
+    }
     if (!canSendMessages(job as JobForMessaging)) {
       return json({ error: 'Messaging opens once you and your ' + (role === 'painter' ? 'client' : 'painter') + ' have both confirmed and the job is scheduled.', locked: true }, 403)
     }

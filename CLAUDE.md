@@ -36,3 +36,7 @@ reserved `.invalid` domain; `send-email` skips those addresses.
   back only once the area has nobody else left. A company that signs up or unsubscribes leaves the rotation. A round also goes out when every
   painter offered a Mystery Painter job declines (`decline-job`), and a newly approved painter can still take that job (`_shared/openJobs.ts`).
   Each invitation is a one-time invitation for that one job. `outreach-painters` with `{"dryRunZip":"<zip>"}` (service role) shows the rotation for a ZIP without contacting anyone.
+- Customer-painter messages (`job-messages`) can be reported and blocked. A block turns messaging off for ONE job, per side
+  (`customer_blocked_messages` / `painter_blocked_messages` on `quote_selections`; the job itself carries on, and the other person is never told who
+  blocked). A report is stored in `message_reports` (server-only, with a snapshot of the recent thread) and emailed to the owner. The rules live in
+  `_shared/jobMessages.ts` (`canSendMessages`, `cleanReport`); `npm run check:messaging` covers them.

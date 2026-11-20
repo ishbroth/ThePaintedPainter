@@ -4,8 +4,9 @@
 //   npm run check:messaging
 
 import {
-  MAX_MESSAGE_LENGTH, RATE_LIMIT_COUNT, RATE_LIMIT_WINDOW_MS, canReadMessages, canSendMessages, cleanMessageBody, firstName, isRateLimited,
-  participantRole, snippet, threadLink, type CallerIdentity, type JobForMessaging,
+  MAX_MESSAGE_LENGTH, MAX_REPORT_DETAILS, RATE_LIMIT_COUNT, RATE_LIMIT_WINDOW_MS, REPORT_LIMIT_PER_DAY, REPORT_REASONS, REPORT_SNAPSHOT_MESSAGES,
+  blockedByRole, canReadMessages, canSendMessages, cleanMessageBody, cleanReport, firstName, isBlocked, isRateLimited, isReportLimited,
+  participantRole, reportSnapshot, snippet, threadLink, type CallerIdentity, type JobForMessaging,
 } from '../supabase/functions/_shared/jobMessages.ts';
 
 let failures = 0;
@@ -71,6 +72,38 @@ check('the painter is sent to the painter projects page with the thread open', t
 check('the customer is sent to the customer projects page with the thread open', threadLink('customer', 'abc') === '/customer/dashboard/projects?messages=abc');
 check('a job id cannot break out of the link', !threadLink('painter', 'a&b=c#x').includes('&b=') && !threadLink('painter', 'a&b=c#x').includes('#'));
 check('only a first name goes in a title', firstName('Pat  Lee Smith', 'Your client') === 'Pat' && firstName('', 'Your client') === 'Your client' && firstName(null, 'x') === 'x');
+
+// ---- block ----
+const blockedByCustomer = { ...JOB, customer_blocked_messages: true };
+const blockedByPainter = { ...JOB, painter_blocked_messages: true };
+check('a job nobody blocked is not blocked (missing flags count as off)', !isBlocked(JOB) && !isBlocked({ ...JOB, customer_blocked_messages: null, painter_blocked_messages: false }));
+check('a block by the customer stops sending', isBlocked(blockedByCustomer) && !canSendMessages(blockedByCustomer));
+check('a block by the painter stops sending', isBlocked(blockedByPainter) && !canSendMessages(blockedByPainter));
+check('a block stops BOTH sides from sending (the sender is the same check)', !canSendMessages(blockedByCustomer) && !canSendMessages(blockedByPainter));
+check('a blocked thread can still be read', canReadMessages(blockedByCustomer) && canReadMessages(blockedByPainter));
+check('a blocked thread that is completed follows the 90-day read window', canReadMessages({ ...blockedByCustomer, status: 'completed', completed_at: '2026-12-20T00:00:00Z' }, now) && !canReadMessages({ ...blockedByCustomer, status: 'completed', completed_at: '2026-01-01T00:00:00Z' }, now));
+check('a block does not open an unconfirmed job', !canReadMessages({ ...blockedByCustomer, status: 'painter_accepted' }));
+check('each side only owns its own block', blockedByRole(blockedByCustomer, 'customer') && !blockedByRole(blockedByCustomer, 'painter') && blockedByRole(blockedByPainter, 'painter') && !blockedByRole(blockedByPainter, 'customer'));
+check('both sides blocking, then one lifting theirs, is still blocked', (() => { const both = { ...JOB, customer_blocked_messages: true, painter_blocked_messages: true }; return isBlocked({ ...both, customer_blocked_messages: false }) && !canSendMessages({ ...both, customer_blocked_messages: false }); })());
+check('lifting the only block reopens the job', canSendMessages({ ...blockedByCustomer, customer_blocked_messages: false }));
+
+// ---- report ----
+for (const reason of REPORT_REASONS) check(`reason ${reason} is accepted`, cleanReport(reason, undefined).ok);
+check('an unknown reason is refused', !cleanReport('boring', undefined).ok && !cleanReport(undefined, undefined).ok && !cleanReport(5, undefined).ok);
+check('a prototype name is not a reason', !cleanReport('constructor', undefined).ok && !cleanReport('__proto__', undefined).ok);
+check('the note is optional and empty means none', (() => { const r = cleanReport('spam', '   '); return r.ok && r.details === null; })() && (() => { const r = cleanReport('spam', null); return r.ok && r.details === null; })());
+check('the note is trimmed and cleaned', (() => { const r = cleanReport('other', '  rude \u0000 text\r\n  '); return r.ok && r.details === 'rude  text'; })());
+check('a note at the limit is accepted and one over is refused', cleanReport('other', 'x'.repeat(MAX_REPORT_DETAILS)).ok && !cleanReport('other', 'x'.repeat(MAX_REPORT_DETAILS + 1)).ok);
+check('a note that is not text is refused', !cleanReport('other', { a: 1 }).ok);
+const reportsNow = new Date('2026-12-01T12:00:00Z');
+const manyReports = Array.from({ length: REPORT_LIMIT_PER_DAY }, (_, i) => new Date(reportsNow.getTime() - i * 60000).toISOString());
+check('the report limit is reached at the cap', isReportLimited(manyReports, reportsNow));
+check('one under the report cap is fine', !isReportLimited(manyReports.slice(1), reportsNow));
+check('reports from over a day ago do not count', !isReportLimited(manyReports.map(() => new Date(reportsNow.getTime() - 90000000).toISOString()), reportsNow));
+const thread = Array.from({ length: 40 }, (_, i) => ({ sender_role: (i % 2 ? 'painter' : 'customer') as 'painter' | 'customer', body: `m${i}`, created_at: `2026-12-01T00:${String(i).padStart(2, '0')}:00Z` }));
+const snap = reportSnapshot(thread);
+check('the snapshot keeps only the latest messages, oldest first', snap.length === REPORT_SNAPSHOT_MESSAGES && snap[snap.length - 1].body === 'm39' && snap[0].body === `m${40 - REPORT_SNAPSHOT_MESSAGES}`);
+check('the snapshot of a short thread is the whole thread', reportSnapshot(thread.slice(0, 3)).length === 3 && reportSnapshot([]).length === 0);
 
 console.log(`${passed} checks passed${failures ? `, ${failures} FAILED` : ''}`);
 process.exit(failures ? 1 : 0);

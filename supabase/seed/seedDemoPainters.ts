@@ -515,8 +515,15 @@ async function seedMessages(painterUserId: string, jobRows: Record<string, unkno
   if (confirmed[1]) {
     say(confirmed[1], 'customer', 'Hello! Could you confirm you will be using low-VOC paint? We have a baby in the house.', 5, false);
   }
+  // the third confirmed job: a thread the painter turned messaging off on (shows the "turned off" state and the way back on)
+  if (confirmed[2]) {
+    say(confirmed[2], 'customer', 'Can you do it for cash and skip the app? I will pay you directly.', 52, true);
+    say(confirmed[2], 'painter', 'Sorry, everything has to go through the app so the price and deposit are protected.', 51, true);
+    say(confirmed[2], 'customer', 'Come on, just text me at this number instead and we will sort it out.', 50, true);
+  }
   if (!rows.length) return;
   must(await supabase.from('job_messages').insert(rows).select('id'), 'insert demo messages');
+  if (confirmed[2]) must(await supabase.from('quote_selections').update({ painter_blocked_messages: true }).eq('id', confirmed[2].id).select('id'), 'block the demo thread');
   const waiting = rows.filter((r) => r.sender_role === 'customer' && r.read_at === null);
   if (waiting.length) {
     must(
