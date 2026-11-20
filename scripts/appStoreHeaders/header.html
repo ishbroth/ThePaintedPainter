@@ -17,14 +17,16 @@
   .tall .frame { height: 1125px; }
 
   /* the picture: Superman with the lettering on his chest */
-  .art { position: absolute; background: url('../../public/hero-superman.jpg') 0 0 / 100% 100% no-repeat; }
-  .wide .art { left: 258px; top: 0; width: 1742px; height: 861px; }
-  .tall .art { left: 477px; top: 185px; width: 1550px; height: 766px;
-    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 14%, #000 100%), linear-gradient(to bottom, transparent 0, #000 12%, #000 88%, transparent 100%);
+  /* the picture: Superman flying with the roller on the left and the brush on the right (4:3); its bottom edge, with the credit line, is cropped off or faded out */
+  .art { position: absolute; background: url('superman-flying-shades.jpg') 0 0 / 100% 100% no-repeat;
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 16%, #000 100%); mask-image: linear-gradient(to right, transparent 0, #000 16%, #000 100%); }
+  .wide .art { left: 800px; top: 44px; width: 1200px; height: 900px;
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 16%, #000 100%), linear-gradient(to bottom, transparent 0, #000 8%, #000 100%);
     -webkit-mask-composite: source-in; mask-composite: intersect; }
-  /* the left of the picture fades into the navy so the text sits on a dark ground */
-  .fade { position: absolute; inset: 0; background: linear-gradient(to right, rgba(11,21,48,.97) 0%, rgba(11,21,48,.93) 30%, rgba(11,21,48,.55) 46%, rgba(11,21,48,0) 60%); }
-  .wide .fade { background: linear-gradient(to right, rgba(11,21,48,.98) 0%, rgba(11,21,48,.94) 32%, rgba(11,21,48,.6) 47%, rgba(11,21,48,0) 62%); }
+  .tall .art { left: 760px; top: 150px; width: 1240px; height: 930px;
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 16%, #000 100%), linear-gradient(to bottom, transparent 0, #000 24%, #000 66%, transparent 90%);
+    -webkit-mask-composite: source-in; mask-composite: intersect; }
+  .fade { display: none; }
 
   .border { position: absolute; border: 3px solid var(--orange); border-radius: 40px; box-shadow: 0 0 22px rgba(255,122,47,.55), inset 0 0 22px rgba(255,122,47,.35); }
   .wide .border { inset: 14px 14px 14px 14px; }
@@ -61,10 +63,11 @@
   /* the line under the wheel and the four steps: out from under the wheel, along the bottom of the picture */
   .bottom { position: absolute; transform-origin: 0 100%; padding: 18px 26px 20px; border-radius: 22px; background: rgba(8,14,34,.74); box-shadow: 0 0 30px rgba(0,0,0,.45); }
   .wide .bottom { left: 500px; bottom: 44px; }
-  .tall .bottom { left: 640px; bottom: 150px; transform: scale(1.18); }
-  .tag { font: 500 27px/1.28 'Barlow', sans-serif; color: #f2f5ff; white-space: nowrap; text-shadow: 0 2px 8px rgba(0,0,0,.6); }
-  .steps { display: flex; flex-wrap: nowrap; gap: 14px; margin-top: 14px; }
-  .steps span { white-space: nowrap; font: 700 25px/1 'Barlow Condensed', sans-serif; letter-spacing: 4.5px; text-transform: uppercase; padding: 12px 24px; border: 2.5px solid var(--orange); border-radius: 12px; background: linear-gradient(rgba(70,30,30,.55), rgba(30,16,28,.7)); box-shadow: 0 0 14px rgba(255,122,47,.45); }
+  .tall .bottom { left: 600px; bottom: 70px; transform: scale(1.06); }
+  .tag .lead { font-size: 1.22em; font-weight: 700; line-height: 1.25; }
+  .tag { font: 600 38px/1.22 'Barlow', sans-serif; color: #f2f5ff; width: 1130px; text-shadow: 0 2px 8px rgba(0,0,0,.6); }
+  .steps { display: flex; flex-wrap: nowrap; gap: 14px; margin-top: 18px; }
+  .steps span { white-space: nowrap; font: 700 34px/1 'Barlow Condensed', sans-serif; letter-spacing: 3px; text-transform: uppercase; padding: 14px 24px; border: 2.5px solid var(--orange); border-radius: 12px; background: linear-gradient(rgba(70,30,30,.55), rgba(30,16,28,.7)); box-shadow: 0 0 14px rgba(255,122,47,.45); }
 </style>
 </head>
 <body>
@@ -82,7 +85,7 @@
     <div class="app">With an App!</div>
   </div>
   <div class="bottom">
-    <div class="tag">The Marketplace Where Qualified Painters Compete for Your Job, at Your Price.</div>
+    <div class="tag"><span class="lead">As Easy as Booking a Hotel.</span><br>The marketplace where painters compete for the price you set.</div>
     <div class="steps"><span>Describe the Job</span><span>Pick Your Price</span><span>Pick Your Painter</span><span>Book It</span></div>
   </div>
 </div>

@@ -1,0 +1,69 @@
+<!doctype html>
+<!-- App Store header art for The Painted Painter, simple version (no wheel): big headline, the tagline and four short tags. Built to stay readable small, on a phone.
+     Rendered by render.mjs at both sizes: ?v=wide (3840x1646) and ?v=tall (5244x2950). Laid out on a 2000-px-wide canvas; the renderer scales it up. -->
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Barlow:wght@500;600;700&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  :root { --navy: #0b1530; --orange: #ff7a2f; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 2000px; background: var(--navy); overflow: hidden; }
+  body { font-family: 'Barlow', 'Segoe UI', sans-serif; color: #fff; }
+
+  .frame { position: relative; width: 2000px; overflow: hidden; background: radial-gradient(120% 120% at 70% 40%, #12214a 0%, var(--navy) 60%, #070d20 100%); }
+  .wide .frame { height: 857px; }
+  .tall .frame { height: 1125px; }
+
+  /* the picture: Superman flying with the roller on the left and the brush on the right (4:3); its bottom edge, with the credit line, is cropped off or faded out */
+  .art { position: absolute; background: url('superman-flying-shades.jpg') 0 0 / 100% 100% no-repeat;
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 16%, #000 100%); mask-image: linear-gradient(to right, transparent 0, #000 16%, #000 100%); }
+  .wide .art { left: 800px; top: 44px; width: 1200px; height: 900px;
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 16%, #000 100%), linear-gradient(to bottom, transparent 0, #000 8%, #000 100%);
+    -webkit-mask-composite: source-in; mask-composite: intersect; }
+  .tall .art { left: 760px; top: 150px; width: 1240px; height: 930px;
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 16%, #000 100%), linear-gradient(to bottom, transparent 0, #000 24%, #000 66%, transparent 90%);
+    -webkit-mask-composite: source-in; mask-composite: intersect; }
+  .fade { display: none; }
+
+  .border { position: absolute; border: 3px solid var(--orange); border-radius: 40px; box-shadow: 0 0 22px rgba(255,122,47,.55), inset 0 0 22px rgba(255,122,47,.35); }
+  .wide .border { inset: 14px; }
+  .tall .border { inset: 20px; }
+
+  .col { position: absolute; left: 64px; width: 780px; transform-origin: 0 0; }
+  .wide .col { top: 48px; }
+  .tall .col { top: 190px; }
+
+  .brand { display: flex; align-items: center; gap: 22px; }
+  .icon { width: 96px; height: 96px; border-radius: 25px; background: url('../../ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png') center / cover; box-shadow: 0 0 0 3px rgba(255,255,255,.85), 0 0 22px 4px rgba(255,122,47,.7); }
+  .brand b { font: 700 36px 'Barlow Condensed', sans-serif; letter-spacing: 8px; color: var(--orange); }
+
+  .head { font: 400 108px/1.06 'Anton', Impact, sans-serif; letter-spacing: 2px; margin-top: 34px; text-transform: uppercase; text-shadow: 0 4px 18px rgba(0,0,0,.55); white-space: nowrap; }
+  .head span { display: block; }
+  .head .o { color: var(--orange); text-shadow: 0 0 24px rgba(255,122,47,.55), 0 4px 16px rgba(0,0,0,.6); }
+
+  .tag .lead { font-size: 1.22em; font-weight: 700; line-height: 1.25; }
+  .tag { font: 600 36px/1.22 'Barlow', sans-serif; color: #f2f5ff; width: 740px; margin-top: 28px; text-shadow: 0 2px 8px rgba(0,0,0,.6); }
+  .chips { display: grid; grid-template-columns: auto auto; gap: 16px; justify-content: start; margin-top: 26px; }
+  .chips span { white-space: nowrap; text-align: center; font: 700 32px/1 'Barlow Condensed', sans-serif; letter-spacing: 2.5px; text-transform: uppercase; padding: 14px 20px; border: 3px solid var(--orange); border-radius: 14px; background: linear-gradient(rgba(70,30,30,.6), rgba(30,16,28,.75)); box-shadow: 0 0 14px rgba(255,122,47,.45); }
+</style>
+</head>
+<body>
+<div class="frame" id="frame">
+  <div class="art"></div>
+  <div class="fade"></div>
+  <div class="border"></div>
+  <div class="col">
+    <div class="brand"><div class="icon"></div><b>THE PAINTED PAINTER</b></div>
+    <div class="head"><span>Pick Your Price,</span><span class="o">Pick Your Painter</span></div>
+    <div class="tag"><span class="lead">As Easy as Booking a Hotel.</span><br>The marketplace where painters compete for the price you set.</div>
+    <div class="chips"><span>AI-Powered Chat</span><span>Lock Your Price</span><span>Booked Fully Online</span><span>Vetted Quality Painters</span></div>
+  </div>
+</div>
+<script>
+  document.body.className = new URLSearchParams(location.search).get('v') === 'tall' ? 'tall' : 'wide';
+  document.fonts.ready.then(() => { document.title = 'ready'; });
+</script>
+</body>
+</html>
