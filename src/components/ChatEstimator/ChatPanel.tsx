@@ -10,6 +10,7 @@ import {
   serializeChatState,
   deserializeChatState,
   type ChatState,
+  type ChatMessage,
 } from '../../lib/chatEstimator/chatEngine';
 import { hapticLight } from '../../lib/haptics';
 import { CHAT_STATE_KEY, QUOTE_EXPIRES_KEY, QUOTE_RESULT_KEY, PRICE_HOLD_MINUTES, startedFromHomeReload, clearEstimatorSession, isExpiredFinishedChat, readWorkWithAgain, clearWorkWithAgain } from '../../lib/chatEstimator/persistence';
@@ -139,14 +140,20 @@ const ChatPanel = () => {
   // once in an effect (the IntersectionObserver) always see the current
   // function rather than a stale closure from mount.
   function playIntroIfFresh() {
-    if (hasAutoPlayedRef.current || !isFreshRef.current) return;
-    if (!readAloudRef.current || !ttsSupported) return;
+    // Whenever the conversation is brand new (the greeting and nothing else), the first tap or key into it speaks the greeting and
+    // opens the mic. This is judged live, not once per page load, so coming back to the page or tapping Start Over greets again.
+    const greeting = state.history[0];
+    if (!greeting || state.history.length !== 1 || state.finalEstimate || greetedRef.current === greeting) return;
+    if (!ttsSupported || (!readAloudRef.current && !voiceInputSupported)) return;
+    greetedRef.current = greeting;
     hasAutoPlayedRef.current = true;
-    speak(state.history[0].text);
+    speak(greeting.text);
     // The moment the greeting is actually spoken, hands-free mode starts listening on its own — runVoiceLoop() waits
     // for that speech to finish before it opens the mic, so this doesn't talk over "Hello, citizen...".
     if (voiceInputSupported && !voiceModeRef.current) toggleVoiceMode();
   }
+  // The greeting message already spoken for (a new conversation has a new greeting object, so Start Over greets again).
+  const greetedRef = useRef<ChatMessage | null>(null);
   const playIntroIfFreshRef = useRef(playIntroIfFresh);
   playIntroIfFreshRef.current = playIntroIfFresh;
 
@@ -217,8 +224,9 @@ const ChatPanel = () => {
         window.setTimeout(() => card.classList.remove('chat-puff'), 1200);
       }
       // The greeting plays once: if scrolling or typing already played it, tapping the link doesn't say it again.
-      const introAlreadyPlayed = hasAutoPlayedRef.current && isFreshRef.current;
+      const introAlreadyPlayed = greetedRef.current !== null && greetedRef.current === state.history[0] && state.history.length === 1;
       hasAutoPlayedRef.current = true;
+      if (state.history.length === 1) greetedRef.current = state.history[0];
       if (!introAlreadyPlayed && readAloudRef.current && ttsSupported) {
         const lastBotMessage = [...state.history].reverse().find((m) => m.role === 'bot');
         if (lastBotMessage) speak(lastBotMessage.text);
@@ -414,6 +422,12 @@ const ChatPanel = () => {
 
   function startNewEstimate() {
     stopSpeaking();
+    // a new conversation starts silent and idle: the next tap into it speaks the greeting and opens the mic again
+    voiceModeRef.current = false;
+    setVoiceMode(false);
+    setVoiceListening(false);
+    void stopVoiceTurn();
+    greetedRef.current = null;
     pendingNavRef.current = null;
     finalPayloadRef.current = null;
     restoredAlreadyFinishedRef.current = false;

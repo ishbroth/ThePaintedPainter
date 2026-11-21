@@ -174,6 +174,7 @@ export async function speakNeural(text: string, onStart?: () => void): Promise<b
     onStart?.();
     el.play().catch(() => {
       if (token === playToken) playing = false;
+      unlocked = false; // refused (no tap behind it): the next tap unlocks the audio again
       resolve(false);
     });
   });

@@ -204,12 +204,24 @@ export function speak(text: string): Promise<void> {
   lastSpeakAt = Date.now();
   // Phones and tablets get the natural server voice when it is set up (their built-in voices sound robotic); otherwise the built-in one.
   if (isPhoneLike() && neuralVoiceAvailable()) {
+    // This runs inside the tap that asked for speech: unlock the audio element right here (a no-op once unlocked), so the
+    // server voice is allowed to play even when its audio arrives after the tap is over. Without this the FIRST line (whose
+    // audio is the one still being fetched) was refused and handed to the phone's own, much older voice.
+    unlockNeuralAudio();
     if (isTTSSupported() && (window.speechSynthesis.speaking || window.speechSynthesis.pending)) window.speechSynthesis.cancel();
     const myRun = ++speakRun;
     const spoken = naturalizeForSpeech(forVoice(text).replace(/\.{3,}|\u2026/g, '. '));
-    void speakNeural(spoken).then((played) => {
-      if (!played && myRun === speakRun) speakWeb(text); // not set up or not reachable: the phone's own voice
-    });
+    void (async () => {
+      // A failed fetch or refused play is tried again (the audio is fetched fresh) before the phone's own voice is ever used,
+      // so one slow or dropped request can't make a single line sound like a different speaker.
+      for (let attempt = 0; attempt < 3; attempt++) {
+        if (myRun !== speakRun) return; // something newer started, or speech was stopped
+        if (await speakNeural(spoken)) return;
+        if (!neuralVoiceAvailable()) break; // the server says the voice isn't set up: nothing to retry
+        await new Promise((r) => window.setTimeout(r, 400 * (attempt + 1)));
+      }
+      if (myRun === speakRun) speakWeb(text); // not set up or not reachable: the phone's own voice
+    })();
     return Promise.resolve();
   }
   speakWeb(text);
