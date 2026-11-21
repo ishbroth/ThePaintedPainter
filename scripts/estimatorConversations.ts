@@ -790,6 +790,69 @@ async function dismissAt(setup: string[], topicWords: RegExp, dismissal = 'doesn
   check('gutters: masking costs less than painting them, but more than nothing', gutterLine(left)!.amount > 0 && gutterLine(left)!.amount < gutterLine(painted)!.amount && left.total > gone.total, JSON.stringify([gutterLine(left)?.amount, gutterLine(painted)?.amount, left.total, gone.total]));
 }
 
+// ---------------------------------------------------------------------------------------------------------------------------------
+// Paint line, made-up scope, side items, door counts
+// ---------------------------------------------------------------------------------------------------------------------------------
+{
+  const interior = ['I want to paint the inside of my 4 bed 3 bath 2000 sq ft house', '2 stories', 'yes', 'just the walls'];
+  // "painter's choice" to whichever paint question comes first settles brand, grade and finish
+  for (const [name, reply] of [["painter's choice", "painters choice"], ['up to the painter', 'its up to the painter'], ['painters choose', 'the painters choose']] as const) {
+    const a = await dismissAt(interior, /paint brand|brand in mind|brand you prefer|brand of paint/i, reply);
+    check('paint: "' + name + '" to the brand question skips the grade and finish questions', a.reached && !/mid-grade|premium|finish|sheen|eggshell|satin/i.test(a.reply) && a.after.paintBrand === 'painter_choice', a.reply);
+  }
+  {
+    // a brand is named, so the grade question comes next on its own; "painters choice" there must also end the finish question
+    const reach = async (words: RegExp, answers: string[]) => {
+      let state = (await play(interior)).state; let asking = state.history[state.history.length - 1].text;
+      for (let i = 0; i < 30 && !/brand/i.test(asking); i++) { state = (await play(['no'], [], state)).state; asking = state.history[state.history.length - 1].text; }
+      for (const ans of answers) { state = (await play([ans], [], state)).state; asking = state.history[state.history.length - 1].text; }
+      return { state, asking, reached: words.test(asking) };
+    };
+    const g = await reach(/mid-grade|premium|deluxe/i, ['Behr']);
+    const gr = await play(['painters choice'], [], g.state);
+    check('paint: "painters choice" to the GRADE question settles the finish too', g.reached && gr.state.ctx.paintFinish === 'painter_choice' && !/finish|sheen|eggshell|satin/i.test(gr.last.split(' || ').slice(-1)[0]), g.asking + ' => ' + gr.last);
+    const f = await reach(/finish|sheen/i, ['Behr', 'standard']);
+    const fr = await play(['up to the painter'], [], f.state);
+    check('paint: "up to the painter" to the FINISH question settles it and moves on', f.reached && fr.state.ctx.paintFinish === 'painter_choice' && !/finish|sheen/i.test(fr.last.split(' || ').slice(-1)[0]), f.asking + ' => ' + fr.last);
+  }
+
+  // the AI reader tacked closets onto "walls only" (nobody said closets): the closet question must still be asked
+  const closetsReading: Reading = { patch: { projectType: 'interior', surfacesAddressed: true, interiorScope: 'whole_house', interiorWalls: 'yes', interiorCeilings: 'no', interiorTrim: 'no', closets: 'standard' }, intents: ['provide_info'], acknowledgements: [] };
+  {
+    const a = await play(['I need the inside of my house painted, 4 bed 3 bath 2000 sq ft, walls only'], [closetsReading]);
+    check('made-up closets from the AI reader are dropped', a.state.ctx.closets === 'none', String(a.state.ctx.closets));
+    let state = a.state; let sawClosets = /closet/i.test(a.last);
+    for (let i = 0; i < 8 && !sawClosets; i++) { const r = await play(['no'], [], state); state = r.state; sawClosets = /closet/i.test(r.last); }
+    check('...and the closet question is asked', sawClosets);
+  }
+  {
+    // said outright, it is kept
+    const a = await play(['I need the inside of my house painted, 4 bed 3 bath 2000 sq ft, walls and the closets'], [closetsReading]);
+    check('closets the customer really named are kept', a.state.ctx.closets !== 'none', String(a.state.ctx.closets));
+  }
+
+  // a side item named in the middle of an answer is noted and acknowledged, and the questions carry on
+  {
+    const a = await play([...interior, 'no', 'no but i have one shelf in the kitchen i need painted']);
+    check('side item: "one shelf in the kitchen" is noted for the painters', /one shelf in the kitchen/i.test(a.state.ctx.additionalDetails), a.state.ctx.additionalDetails);
+    check('side item: it is acknowledged and a question follows', /one shelf in the kitchen/i.test(a.last) && /\?\s*$/.test(a.last), a.last);
+    const ruled = await play([...interior, 'no radiators or shelves please']);
+    check('side item: a ruled-out item is not noted', !/radiator|shel/i.test(ruled.state.ctx.additionalDetails), ruled.state.ctx.additionalDetails);
+  }
+
+  // "3 of the doors" is a count of three, not everything
+  {
+    const a = await play(['I want to paint the inside of my 5 bedroom 3 bath 2500 sq ft house', '2 stories', 'everything', 'no i dont need every door painted but 3 of the doors need it']);
+    check('doors: "3 of the doors" sets a door count of 3', a.state.ctx.doorCount === 3, String(a.state.ctx.doorCount));
+  }
+
+  // a bare "no" to "standard ceiling height, or taller?" is not priced as tall
+  {
+    const a = await dismissAt(interior, /ceilings standard height|standard ceiling height/i, 'no');
+    check('ceiling height: a bare "no" is not read as 10-foot ceilings', a.reached && a.after.ceilingHeight === 'standard', String(a.after.ceilingHeight));
+  }
+}
+
 setLLMReaderForTests(undefined);
 console.log(failures ? `\n${failures} FAILED` : '\nall conversation checks passed');
 process.exit(failures ? 1 : 0);

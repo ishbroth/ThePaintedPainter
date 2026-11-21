@@ -44,6 +44,7 @@ import { extractWithLLM } from './llmClient';
 import { highestPriceAssumption, sanitizeLlmPatch } from './dismissive';
 import { makeInitialContext } from './defaultContext';
 import { extractDetails, DETAIL_TOPIC_IDS } from './details';
+import { detectExtras } from './extras';
 import { readDeckDetails, isDeckTalk } from './deckDetails';
 import { readItemAnswers } from './itemInterviews';
 import { detectFriction, type FrictionEvent } from './selfCheck';
@@ -764,6 +765,14 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
       ctxWithExplicit.additionalDetails = `${ctxWithExplicit.additionalDetails ? ctxWithExplicit.additionalDetails + '; ' : ''}customer note: ${trimmed.replace(/\s+/g, ' ').slice(0, 400)}`;
     }
   }
+  // Small items named in passing ("no, but I have one shelf in the kitchen I need painted"): written into the notes the painters see and
+  // acknowledged, whatever question is pending. This never changes which question comes next.
+  for (const extra of detectExtras(trimmed)) {
+    const current = ctxWithExplicit.additionalDetails ?? state.ctx.additionalDetails ?? '';
+    if (current.toLowerCase().includes(extra.toLowerCase())) continue;
+    ctxWithExplicit.additionalDetails = `${current ? current + '; ' : ''}also to paint: ${extra}`;
+    if (!acknowledgements.includes(extra)) acknowledgements.push(extra);
+  }
   // The "anything else?" at the end of an outside job (fences, overhangs, chimneys, decks, shutters): on an outside job these words
   // mean the outside ones, even without saying "exterior".
   if (state.wrapupAsked && (state.ctx.projectType === 'exterior' || state.ctx.projectType === 'both')) {
@@ -819,6 +828,16 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
       const finish = low.match(/\b(flat|matte|eggshell|satin|semi[- ]?gloss|high[- ]?gloss|gloss|velvet)\b/);
       if (finish) ctxWithExplicit.paintFinish = finish[1].replace(/\s+/g, ' ');
       else if (asked === 'paint_finish' && (painterChoice || /\b(?:no|none|nope)\b/.test(low))) ctxWithExplicit.paintFinish = 'painter_choice';
+    }
+    // "Painter's choice" (or "up to the painter") to ANY paint question settles the whole paint line: brand, grade and finish. Nothing more is
+    // asked about the paint, whichever of the three was asked first. Said unprompted ("painter can pick the paint and sheen") it counts too.
+    const PAINT_TOPICS = ['paint_brand', 'paint_grade', 'paint_finish'];
+    const painterPicksPaint = /\b(?:painter'?s?\s+(?:choice|call|pick|picks|decision|discretion|preference)|(?:up to|left to|leave (?:it|that|the (?:paint|brand|sheen|finish)) (?:up )?to)\s+(?:the\s+)?(?:painters?|you|them|pros?|contractors?)|(?:the\s+)?painters?\s+(?:can |could |may |should |will |to |gets? to )?(?:pick|picks|choose|chooses|decide|decides|select|go with)|you\s+(?:pick|choose|decide)|let\s+(?:them|him|her|the painters?|you)\s+(?:pick|choose|decide)|whatever\s+(?:the\s+painters?|they|you)\s+(?:recommend|suggest|prefer|use|like|think)|(?:their|your)\s+(?:choice|call|pick)|no (?:brand )?preference|don'?t (?:have|got) (?:a |any )?(?:preference|brand)|(?:any|whatever)\s+(?:brand|sheen|finish)\s+(?:is |works|will do)?)/.test(low);
+    if (((asked && PAINT_TOPICS.includes(asked) && (painterChoice || painterPicksPaint)) || (painterPicksPaint && /\b(?:paint|brand|sheen|finish|gloss)\b/.test(low)))) {
+      if (!state.ctx.paintBrand) ctxWithExplicit.paintBrand = 'painter_choice';
+      if (!state.ctx.paintFinish) ctxWithExplicit.paintFinish = 'painter_choice';
+      if (!state.ctx.paintGrade) ctxWithExplicit.paintGrade = 'standard';
+      ctxWithExplicit.extAnswered = [...new Set([...(ctxWithExplicit.extAnswered ?? state.ctx.extAnswered ?? []), ...PAINT_TOPICS])];
     }
     if (asked && (asked === 'paint_brand' || asked === 'paint_grade' || asked === 'paint_finish') && !trimmed.endsWith('?')) {
       ctxWithExplicit.extAnswered = [...new Set([...(ctxWithExplicit.extAnswered ?? state.ctx.extAnswered ?? []), asked])];

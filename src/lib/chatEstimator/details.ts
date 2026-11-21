@@ -344,7 +344,7 @@ export function extractDetails(text: string, ctx: EstimatorContext, askedId: str
       patch.ceilingHeightKnown = true;
       if (askedId === 'ceiling_height') acks.push('standard ceiling height');
     } else if (askedId === 'ceiling_height' && !/\?\s*$/.test(text.trim())) {
-      if (/\b(?:high|tall|taller|higher|lofty|vaulted|cathedral|soaring)\b/i.test(text) || /^\W*(?:no|nope|nah|not standard|not really)\b/i.test(text)) {
+      if (/\b(?:high|tall|taller|higher|lofty|vaulted|cathedral|soaring)\b/i.test(text) || /^\W*(?:not standard|not really|not normal|not regular)\b/i.test(text)) { // a bare "no" to "standard, or taller?" is no answer: it is asked again later, never priced as tall
         // taller than usual, no height given: priced as 10 ft (the dearer reading), editable after the price
         patch.ceilingHeight = 'ten_plus';
         patch.ceilingHeightKnown = true;
@@ -354,9 +354,14 @@ export function extractDetails(text: string, ctx: EstimatorContext, askedId: str
   }
 
   // measurements said along the way
+  const NUMBER_WORDS: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12, fifteen: 15, twenty: 20 };
   const pluralCount = (word: RegExp) => {
-    const m = t.match(new RegExp('\\b(\\d{1,3})\\s+(?:(?:interior|bedroom|closet|wood(?:en)?|french|old|new|paneled|panel|solid|hollow|sliding|bi-?fold|pocket|double|single|small|big|large|bathroom|kitchen|exterior)\\s+){0,2}' + word.source + '\\b'));
-    return m ? parseInt(m[1], 10) : null;
+    // "12 doors", "three doors", and "3 of the doors" / "just two of the bedroom doors" (a number said with a word or two in between)
+    const adj = '(?:(?:interior|bedroom|closet|wood(?:en)?|french|old|new|paneled|panel|solid|hollow|sliding|bi-?fold|pocket|double|single|small|big|large|bathroom|kitchen|exterior)\\s+){0,2}';
+    const num = '(\\d{1,3}|' + Object.keys(NUMBER_WORDS).join('|') + ')';
+    const m = t.match(new RegExp('\\b' + num + '\\s+(?:of\\s+(?:the|my|our|these|those)\\s+)?' + adj + word.source + '\\b'));
+    if (!m) return null;
+    return /^\d/.test(m[1]) ? parseInt(m[1], 10) : NUMBER_WORDS[m[1]];
   };
   const doors = pluralCount(/doors/);
   if (doors && doors >= 1 && doors <= 80 && ctx.doorCount == null && !/\bgarage\s+doors/.test(t) && askedId !== 'door_count') {

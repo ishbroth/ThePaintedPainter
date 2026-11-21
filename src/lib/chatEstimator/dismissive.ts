@@ -221,6 +221,50 @@ export function sanitizeLlmPatch(
   lastTopicId: string | null,
   patch: Partial<EstimatorContext>,
 ): Partial<EstimatorContext> {
+  return dropUnsaidScope(text, ctx, lastTopicId, dropUnsaidProjectType(text, ctx, lastTopicId, patch));
+}
+
+// ---------------------------------------------------------------------------
+// Scope facts the AI reader made up
+// ---------------------------------------------------------------------------
+// The AI reader sometimes "helpfully" fills in what a customer never said ("walls only" came back with closets filled in, so the closet
+// question was silently skipped, and near-identical conversations priced $3,500 one time and $7,000 the next). A scope fact that adds work
+// (ceilings, baseboards, doors, closets, cabinets, crown, wainscot...) is kept only when the message names it (or says "everything"), or
+// when the question just asked was about it. Otherwise it is dropped and the question gets asked like any other.
+const EVERYTHING = /\b(?:everything|all of it|all surfaces|the works|top to bottom|whole (?:house|place|inside|interior)|entire (?:house|place|inside|interior)|full (?:interior|house|repaint)|complete(?:ly)?)\b/i;
+const SCOPE_GUARDS: { key: keyof EstimatorContext; words: RegExp; topics: RegExp; adds: (v: unknown) => boolean }[] = [
+  { key: 'interiorCeilings', words: /\bceilings?\b/i, topics: /^(?:surfaces|upsell_ceilings|ceiling_)/, adds: (v) => v === 'yes' },
+  { key: 'interiorTrim', words: /\b(?:trim|base ?boards?|mou?ldings?|casings?|crown|chair rail|wainscot\w*)\b/i, topics: /^(?:surfaces|upsell_|trim_|detail_)/, adds: (v) => v === 'yes' },
+  { key: 'interiorDoors', words: /\bdoors?\b/i, topics: /^(?:surfaces|upsell_doors|door_|trim_door)/, adds: (v) => v === 'all' || v === 'some' },
+  { key: 'closets', words: /\bclosets?\b|\bwardrobes?\b|\bpantry\b/i, topics: /^(?:surfaces|closet)/, adds: (v) => v !== 'none' },
+  { key: 'closetShelving', words: /\b(?:closets?|shel(?:f|ves|ving)|rods?)\b/i, topics: /^(?:surfaces|closet)/, adds: (v) => v !== 'none' },
+  { key: 'cabinets', words: /\b(?:cabinets?|cabinetry|vanit(?:y|ies))\b/i, topics: /^(?:surfaces|upsell_cabinets|cabinet_)/, adds: (v) => v !== 'none' },
+  { key: 'crownMolding', words: /\bcrown\b|\bmou?ldings?\b/i, topics: /^(?:upsell_special_trim|detail_|trim_)/, adds: (v) => v === 'yes' },
+  { key: 'chairRail', words: /\bchair[\s-]*rails?\b|\bmou?ldings?\b/i, topics: /^(?:upsell_special_trim|detail_|trim_)/, adds: (v) => v === 'yes' },
+  { key: 'wainscoting', words: /\bwainscot\w*\b|\bpaneling\b|\bbeadboard\b/i, topics: /^(?:upsell_special_trim|detail_|trim_)/, adds: (v) => v === 'yes' },
+  { key: 'stairways', words: /\bstair\w*\b|\bbanister\b|\bstaircase\b/i, topics: /^(?:stair|surfaces)/, adds: (v) => v === 'yes' },
+];
+
+export function dropUnsaidScope(text: string, ctx: EstimatorContext, lastTopicId: string | null, patch: Partial<EstimatorContext>): Partial<EstimatorContext> {
+  if (ctx.projectType === 'exterior') return patch;
+  const said = EVERYTHING.test(text);
+  let cleaned: Partial<EstimatorContext> | null = null;
+  for (const g of SCOPE_GUARDS) {
+    const value = patch[g.key];
+    if (value === undefined || !g.adds(value) || JSON.stringify(value) === JSON.stringify(ctx[g.key])) continue;
+    if (said || g.words.test(text) || (lastTopicId && g.topics.test(lastTopicId))) continue;
+    cleaned = cleaned ?? { ...patch };
+    delete cleaned[g.key];
+  }
+  return cleaned ?? patch;
+}
+
+function dropUnsaidProjectType(
+  text: string,
+  ctx: EstimatorContext,
+  lastTopicId: string | null,
+  patch: Partial<EstimatorContext>,
+): Partial<EstimatorContext> {
   if (!patch.projectType || ctx.projectType) return patch;
   if (lastTopicId === 'project_type') return patch;
 

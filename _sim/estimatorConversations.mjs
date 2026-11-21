@@ -18659,16 +18659,20 @@ function extractDetails(text, ctx, askedId) {
       patch.ceilingHeightKnown = true;
       if (askedId === "ceiling_height") acks.push("standard ceiling height");
     } else if (askedId === "ceiling_height" && !/\?\s*$/.test(text.trim())) {
-      if (/\b(?:high|tall|taller|higher|lofty|vaulted|cathedral|soaring)\b/i.test(text) || /^\W*(?:no|nope|nah|not standard|not really)\b/i.test(text)) {
+      if (/\b(?:high|tall|taller|higher|lofty|vaulted|cathedral|soaring)\b/i.test(text) || /^\W*(?:not standard|not really|not normal|not regular)\b/i.test(text)) {
         patch.ceilingHeight = "ten_plus";
         patch.ceilingHeightKnown = true;
         acks.push("taller ceilings");
       }
     }
   }
+  const NUMBER_WORDS3 = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12, fifteen: 15, twenty: 20 };
   const pluralCount = (word) => {
-    const m2 = t2.match(new RegExp("\\b(\\d{1,3})\\s+(?:(?:interior|bedroom|closet|wood(?:en)?|french|old|new|paneled|panel|solid|hollow|sliding|bi-?fold|pocket|double|single|small|big|large|bathroom|kitchen|exterior)\\s+){0,2}" + word.source + "\\b"));
-    return m2 ? parseInt(m2[1], 10) : null;
+    const adj = "(?:(?:interior|bedroom|closet|wood(?:en)?|french|old|new|paneled|panel|solid|hollow|sliding|bi-?fold|pocket|double|single|small|big|large|bathroom|kitchen|exterior)\\s+){0,2}";
+    const num2 = "(\\d{1,3}|" + Object.keys(NUMBER_WORDS3).join("|") + ")";
+    const m2 = t2.match(new RegExp("\\b" + num2 + "\\s+(?:of\\s+(?:the|my|our|these|those)\\s+)?" + adj + word.source + "\\b"));
+    if (!m2) return null;
+    return /^\d/.test(m2[1]) ? parseInt(m2[1], 10) : NUMBER_WORDS3[m2[1]];
   };
   const doors = pluralCount(/doors/);
   if (doors && doors >= 1 && doors <= 80 && ctx.doorCount == null && !/\bgarage\s+doors/.test(t2) && askedId !== "door_count") {
@@ -22832,9 +22836,9 @@ var TOPICS = [
     priority: 30.2,
     relevant: (c2) => (c2.projectType === "interior" || c2.projectType === "both") && c2.surfacesAddressed && (c2.interiorWalls !== "no" || c2.interiorCeilings !== "no" || c2.crownMolding === "yes") && !c2.ceilingHeightKnown,
     alreadyAnswered: (c2) => !!c2.ceilingHeightKnown || c2.ceilingHeight !== "standard" || extDone(c2, "ceiling_height"),
-    ask: (c2) => c2.propertyType === "multi_unit" && c2.unitCount != null ? "In a typical unit, is it standard ceiling height (around 8 feet)? If not, about how tall are they: 9 ft, 10 ft, 12 ft or more, or vaulted?" : pick2(
+    ask: (c2) => c2.propertyType === "multi_unit" && c2.unitCount != null ? "In a typical unit, are the ceilings standard height (around 8 feet), or taller? If taller, about how tall: 9 ft, 10 ft, 12 ft or more, or vaulted?" : pick2(
       [
-        "Is it standard ceiling height, around 8 feet? If not, about how tall are they (9 ft, 10 ft, 12 ft or more, or vaulted)?",
+        "Are the ceilings standard height, around 8 feet, or taller? If taller, about how tall (9 ft, 10 ft, 12 ft or more, or vaulted)?",
         "Are the ceilings standard height (about 8 feet), or higher? If higher, roughly how tall: 9 ft, 10 ft, 12 ft or more, or vaulted?"
       ],
       seed(c2)
@@ -24729,6 +24733,35 @@ function highestPriceAssumption(topicId, ctx) {
   }
 }
 function sanitizeLlmPatch(text, ctx, lastTopicId, patch) {
+  return dropUnsaidScope(text, ctx, lastTopicId, dropUnsaidProjectType(text, ctx, lastTopicId, patch));
+}
+var EVERYTHING = /\b(?:everything|all of it|all surfaces|the works|top to bottom|whole (?:house|place|inside|interior)|entire (?:house|place|inside|interior)|full (?:interior|house|repaint)|complete(?:ly)?)\b/i;
+var SCOPE_GUARDS = [
+  { key: "interiorCeilings", words: /\bceilings?\b/i, topics: /^(?:surfaces|upsell_ceilings|ceiling_)/, adds: (v) => v === "yes" },
+  { key: "interiorTrim", words: /\b(?:trim|base ?boards?|mou?ldings?|casings?|crown|chair rail|wainscot\w*)\b/i, topics: /^(?:surfaces|upsell_|trim_|detail_)/, adds: (v) => v === "yes" },
+  { key: "interiorDoors", words: /\bdoors?\b/i, topics: /^(?:surfaces|upsell_doors|door_|trim_door)/, adds: (v) => v === "all" || v === "some" },
+  { key: "closets", words: /\bclosets?\b|\bwardrobes?\b|\bpantry\b/i, topics: /^(?:surfaces|closet)/, adds: (v) => v !== "none" },
+  { key: "closetShelving", words: /\b(?:closets?|shel(?:f|ves|ving)|rods?)\b/i, topics: /^(?:surfaces|closet)/, adds: (v) => v !== "none" },
+  { key: "cabinets", words: /\b(?:cabinets?|cabinetry|vanit(?:y|ies))\b/i, topics: /^(?:surfaces|upsell_cabinets|cabinet_)/, adds: (v) => v !== "none" },
+  { key: "crownMolding", words: /\bcrown\b|\bmou?ldings?\b/i, topics: /^(?:upsell_special_trim|detail_|trim_)/, adds: (v) => v === "yes" },
+  { key: "chairRail", words: /\bchair[\s-]*rails?\b|\bmou?ldings?\b/i, topics: /^(?:upsell_special_trim|detail_|trim_)/, adds: (v) => v === "yes" },
+  { key: "wainscoting", words: /\bwainscot\w*\b|\bpaneling\b|\bbeadboard\b/i, topics: /^(?:upsell_special_trim|detail_|trim_)/, adds: (v) => v === "yes" },
+  { key: "stairways", words: /\bstair\w*\b|\bbanister\b|\bstaircase\b/i, topics: /^(?:stair|surfaces)/, adds: (v) => v === "yes" }
+];
+function dropUnsaidScope(text, ctx, lastTopicId, patch) {
+  if (ctx.projectType === "exterior") return patch;
+  const said = EVERYTHING.test(text);
+  let cleaned = null;
+  for (const g of SCOPE_GUARDS) {
+    const value = patch[g.key];
+    if (value === void 0 || !g.adds(value) || JSON.stringify(value) === JSON.stringify(ctx[g.key])) continue;
+    if (said || g.words.test(text) || lastTopicId && g.topics.test(lastTopicId)) continue;
+    cleaned = cleaned ?? { ...patch };
+    delete cleaned[g.key];
+  }
+  return cleaned ?? patch;
+}
+function dropUnsaidProjectType(text, ctx, lastTopicId, patch) {
   if (!patch.projectType || ctx.projectType) return patch;
   if (lastTopicId === "project_type") return patch;
   const local = extractAll(text, ctx, lastTopicId).patch;
@@ -24741,6 +24774,57 @@ function sanitizeLlmPatch(text, ctx, lastTopicId, patch) {
     if (local[key] === void 0) delete cleaned[key];
   }
   return cleaned;
+}
+
+// src/lib/chatEstimator/extras.ts
+init_define_import_meta_env();
+var EXTRA_KINDS = [
+  { key: "shelf", re: /\b(?:floating |wall |wood |wooden |corner |open |kitchen |pantry )?shel(?:f|ves)\b(?! (?:in|inside|of) (?:the |my |our )?closets?)/, label: "shelf" },
+  { key: "radiator", re: /\bradiators?\b/, label: "radiator" },
+  { key: "pipes", re: /\b(?:exposed )?pipes?\b|\bductwork\b|\bducts?\b/, label: "pipes or ductwork" },
+  { key: "vent", re: /\bvents?\b|\bregisters?\b|\bgrilles?\b/, label: "vent or register" },
+  { key: "fan", re: /\bceiling fans?\b/, label: "ceiling fan" },
+  { key: "banister", re: /\bbanisters?\b|\bnewel posts?\b|\bbalusters?\b|\bspindles?\b/, label: "banister" },
+  { key: "stair_risers", re: /\b(?:stair )?risers?\b|\bstair treads?\b/, label: "stair risers or treads" },
+  { key: "door_frame", re: /\bdoor ?frames?\b|\bdoor casings?\b/, label: "door frames" },
+  { key: "window_sill", re: /\b(?:window )?sills?\b|\bwindow (?:frames?|casings?|trim)\b/, label: "window sills or frames" },
+  { key: "mailbox", re: /\bmail ?box(?:es)?\b/, label: "mailbox" },
+  { key: "trellis", re: /\btrell(?:is|ises)\b|\bpergolas?\b|\barbors?\b/, label: "trellis or pergola" },
+  { key: "mirror_frame", re: /\bmirror frames?\b/, label: "mirror frame" },
+  { key: "headboard", re: /\bhead ?boards?\b/, label: "headboard" },
+  { key: "bar_top", re: /\bbar tops?\b|\bcounter ?tops?\b|\bbutcher blocks?\b/, label: "bar or counter top" },
+  { key: "beams", re: /\bbeams?\b|\brafters?\b/, label: "beams" },
+  { key: "wall_art", re: /\b(?:accent|feature|stripe[sd]?|mural|chalkboard)\b/, label: "accent or feature wall" },
+  { key: "garage", re: /\bgarage (?:walls?|interior|inside)\b/, label: "garage walls" },
+  { key: "basement", re: /\bbasement\b|\bcrawl ?space\b/, label: "basement" },
+  { key: "attic", re: /\battic\b/, label: "attic" },
+  { key: "laundry", re: /\blaundry\b/, label: "laundry room" }
+];
+var NUM_WORDS = { a: 1, an: 1, one: 1, single: 1, two: 2, couple: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
+var PLACE = /\b(?:in|on|by|near|next to|inside|along|under|above)\s+(?:the\s+|my\s+|our\s+|a\s+)?((?:[a-z]+\s+){0,2}(?:kitchen|bathroom|bedroom|living room|dining room|hallway|hall|entry|foyer|office|garage|basement|attic|laundry(?: room)?|stairs?|staircase|closet|pantry|den|nursery|porch|patio|deck))\b/;
+var RULED_OUT = /\b(?:no|not|without|skip|never|nothing|don'?t (?:need|want|have)|except)\b/i;
+function ruledOut(before) {
+  const clause = before.split(/\bbut\b|[.;!?]/).pop() ?? "";
+  return RULED_OUT.test(clause);
+}
+function detectExtras(text) {
+  const low = text.toLowerCase();
+  const found = [];
+  for (const kind of EXTRA_KINDS) {
+    const m2 = kind.re.exec(low);
+    if (!m2) continue;
+    if (ruledOut(low.slice(0, m2.index))) continue;
+    const before = low.slice(Math.max(0, m2.index - 24), m2.index);
+    const n = /(?:^|\s)(a|an|one|single|two|couple|three|four|five|six|seven|eight|nine|ten|\d{1,2})(?:\s+(?:of\s+(?:the|my|our)\s+)?(?:[a-z-]+\s+){0,2})?$/.exec(before);
+    const count = n ? NUM_WORDS[n[1]] ?? parseInt(n[1], 10) : null;
+    const place = PLACE.exec(low.slice(m2.index));
+    const where = place ? ` in the ${place[1]}` : "";
+    if (kind.key === "wall_art" && !/\bwall\b/.test(low)) continue;
+    if (["vent", "pipes", "beams", "radiator", "fan", "laundry", "basement", "attic", "garage"].includes(kind.key) && !/\b(?:paint|painted|painting|need|needs|want|include|also|plus|too)\b/.test(low)) continue;
+    const label = count && count > 1 && !kind.label.endsWith("s") ? kind.label === "shelf" ? "shelves" : kind.label + "s" : kind.label;
+    found.push(`${count ? (count === 1 ? "one" : String(count)) + " " : ""}${label}${where}`);
+  }
+  return found;
 }
 
 // src/lib/chatEstimator/deckDetails.ts
@@ -25243,21 +25327,21 @@ async function processMessage(state, trimmed, customerId) {
   }
   {
     const low = trimmed.toLowerCase();
-    const ruledOut = new Set(state.ctx.excludedSurfaces ?? []);
+    const ruledOut2 = new Set(state.ctx.excludedSurfaces ?? []);
     const added = new Set(state.ctx.addedSurfaces ?? []);
     const surfaceWord = "(?:the\\s+|any\\s+|our\\s+)?(?:walls?|ceilings?|trim|baseboards?|doors?|closets?|cabinets?|cabinetry)";
     const re = new RegExp("\\b(?:no|not|without|skip|except|excluding|leave out|don'?t (?:paint|do|need|want))\\s+" + surfaceWord + "(?:\\s*(?:,|or|and|&|nor)\\s*" + surfaceWord + ")*", "g");
     if (/\b(?:just|only)\s+(?:the\s+|our\s+)?(?:\w+\s+)?walls?\b|\bwalls?\s+only\b/.test(low) && !/\b(?:and|plus|also|with)\s+(?:the\s+)?(?:ceilings?|trim|baseboards?|doors?)\b/.test(low)) {
-      ruledOut.add("ceilings");
-      ruledOut.add("trim");
-      ruledOut.add("doors");
+      ruledOut2.add("ceilings");
+      ruledOut2.add("trim");
+      ruledOut2.add("doors");
     }
     let m2;
     const ruledOutNow = /* @__PURE__ */ new Set();
     while (m2 = re.exec(low)) {
       for (const w2 of m2[0].match(/walls?|ceilings?|trim|baseboards?|doors?|closets?|cabinets?|cabinetry/g) ?? []) {
         const key = w2.startsWith("wall") ? "walls" : w2.startsWith("ceiling") ? "ceilings" : w2.startsWith("door") ? "doors" : w2.startsWith("closet") ? "closets" : w2.startsWith("cabinet") ? "cabinets" : "trim";
-        ruledOut.add(key);
+        ruledOut2.add(key);
         ruledOutNow.add(key);
       }
     }
@@ -25282,11 +25366,11 @@ async function processMessage(state, trimmed, customerId) {
         ctxWithExplicit.cabinets = ctxWithExplicit.cabinets === "none" ? "kitchen" : ctxWithExplicit.cabinets;
       }]
     };
-    for (const key of [...ruledOut]) {
+    for (const key of [...ruledOut2]) {
       if (ruledOutNow.has(key) || !(state.ctx.excludedSurfaces ?? []).includes(key)) continue;
       const w2 = wordFor[key][0].source;
       if (new RegExp("\\b(?:add|include|including|also|plus|and|yes|do|paint|want)\\b[^.,;!?]{0,25}\\b" + w2 + "\\b|\\b" + w2 + "\\s+(?:too|as well)\\b").test(low)) {
-        ruledOut.delete(key);
+        ruledOut2.delete(key);
         added.add(key);
         wordFor[key][1]();
       }
@@ -25309,20 +25393,20 @@ async function processMessage(state, trimmed, customerId) {
         if (asked.field === "interiorTrim") ctxWithExplicit.trimScopeAddressed = true;
       } else if (no || exclusiveWithoutIt) {
         target[asked.field] = state.ctx[asked.field];
-        ruledOut.add(asked.key);
+        ruledOut2.add(asked.key);
       }
     }
     if (asked && !/^\s*(?:no|nope|nah)\b/.test(low)) {
       for (const o2 of Object.values(offer)) {
-        if (o2.word.test(low) && !ruledOut.has(o2.key)) {
+        if (o2.word.test(low) && !ruledOut2.has(o2.key)) {
           ctxWithExplicit[o2.field] = o2.on;
           added.add(o2.key);
           if (o2.field === "interiorTrim") ctxWithExplicit.trimScopeAddressed = true;
         }
       }
     }
-    if (ruledOut.size > 0 || (state.ctx.excludedSurfaces ?? []).length > 0) ctxWithExplicit.excludedSurfaces = [...ruledOut];
-    for (const key of ruledOut) added.delete(key);
+    if (ruledOut2.size > 0 || (state.ctx.excludedSurfaces ?? []).length > 0) ctxWithExplicit.excludedSurfaces = [...ruledOut2];
+    for (const key of ruledOut2) added.delete(key);
     if (added.size > 0) ctxWithExplicit.addedSurfaces = [...added];
   }
   if (state.wrapupAsked && !state.photosAsked) {
@@ -25330,6 +25414,12 @@ async function processMessage(state, trimmed, customerId) {
     if (!plain && trimmed.length > 1) {
       ctxWithExplicit.additionalDetails = `${ctxWithExplicit.additionalDetails ? ctxWithExplicit.additionalDetails + "; " : ""}customer note: ${trimmed.replace(/\s+/g, " ").slice(0, 400)}`;
     }
+  }
+  for (const extra of detectExtras(trimmed)) {
+    const current = ctxWithExplicit.additionalDetails ?? state.ctx.additionalDetails ?? "";
+    if (current.toLowerCase().includes(extra.toLowerCase())) continue;
+    ctxWithExplicit.additionalDetails = `${current ? current + "; " : ""}also to paint: ${extra}`;
+    if (!acknowledgements.includes(extra)) acknowledgements.push(extra);
   }
   if (state.wrapupAsked && (state.ctx.projectType === "exterior" || state.ctx.projectType === "both")) {
     const low = trimmed.toLowerCase();
@@ -25381,6 +25471,14 @@ async function processMessage(state, trimmed, customerId) {
       const finish = low.match(/\b(flat|matte|eggshell|satin|semi[- ]?gloss|high[- ]?gloss|gloss|velvet)\b/);
       if (finish) ctxWithExplicit.paintFinish = finish[1].replace(/\s+/g, " ");
       else if (asked === "paint_finish" && (painterChoice || /\b(?:no|none|nope)\b/.test(low))) ctxWithExplicit.paintFinish = "painter_choice";
+    }
+    const PAINT_TOPICS = ["paint_brand", "paint_grade", "paint_finish"];
+    const painterPicksPaint = /\b(?:painter'?s?\s+(?:choice|call|pick|picks|decision|discretion|preference)|(?:up to|left to|leave (?:it|that|the (?:paint|brand|sheen|finish)) (?:up )?to)\s+(?:the\s+)?(?:painters?|you|them|pros?|contractors?)|(?:the\s+)?painters?\s+(?:can |could |may |should |will |to |gets? to )?(?:pick|picks|choose|chooses|decide|decides|select|go with)|you\s+(?:pick|choose|decide)|let\s+(?:them|him|her|the painters?|you)\s+(?:pick|choose|decide)|whatever\s+(?:the\s+painters?|they|you)\s+(?:recommend|suggest|prefer|use|like|think)|(?:their|your)\s+(?:choice|call|pick)|no (?:brand )?preference|don'?t (?:have|got) (?:a |any )?(?:preference|brand)|(?:any|whatever)\s+(?:brand|sheen|finish)\s+(?:is |works|will do)?)/.test(low);
+    if (asked && PAINT_TOPICS.includes(asked) && (painterChoice || painterPicksPaint) || painterPicksPaint && /\b(?:paint|brand|sheen|finish|gloss)\b/.test(low)) {
+      if (!state.ctx.paintBrand) ctxWithExplicit.paintBrand = "painter_choice";
+      if (!state.ctx.paintFinish) ctxWithExplicit.paintFinish = "painter_choice";
+      if (!state.ctx.paintGrade) ctxWithExplicit.paintGrade = "standard";
+      ctxWithExplicit.extAnswered = [.../* @__PURE__ */ new Set([...ctxWithExplicit.extAnswered ?? state.ctx.extAnswered ?? [], ...PAINT_TOPICS])];
     }
     if (asked && (asked === "paint_brand" || asked === "paint_grade" || asked === "paint_finish") && !trimmed.endsWith("?")) {
       ctxWithExplicit.extAnswered = [.../* @__PURE__ */ new Set([...ctxWithExplicit.extAnswered ?? state.ctx.extAnswered ?? [], asked])];
@@ -26907,6 +27005,66 @@ async function dismissAt(setup, topicWords, dismissal = "doesnt matter just want
   check("gutters painted: a gutters line (paint and labor)", /Gutters & Downspouts/.test(gutterLine(painted)?.description ?? ""), String(gutterLine(painted)?.description));
   check("gutters not painted: no gutter painting, but a masking line for the labor around them", /Masking and painting around gutters/.test(gutterLine(left)?.description ?? "") && !/^Gutters & Downspouts$/.test(gutterLine(left)?.description ?? ""), String(gutterLine(left)?.description));
   check("gutters: masking costs less than painting them, but more than nothing", gutterLine(left).amount > 0 && gutterLine(left).amount < gutterLine(painted).amount && left.total > gone.total, JSON.stringify([gutterLine(left)?.amount, gutterLine(painted)?.amount, left.total, gone.total]));
+}
+{
+  const interior = ["I want to paint the inside of my 4 bed 3 bath 2000 sq ft house", "2 stories", "yes", "just the walls"];
+  for (const [name, reply] of [["painter's choice", "painters choice"], ["up to the painter", "its up to the painter"], ["painters choose", "the painters choose"]]) {
+    const a = await dismissAt(interior, /paint brand|brand in mind|brand you prefer|brand of paint/i, reply);
+    check('paint: "' + name + '" to the brand question skips the grade and finish questions', a.reached && !/mid-grade|premium|finish|sheen|eggshell|satin/i.test(a.reply) && a.after.paintBrand === "painter_choice", a.reply);
+  }
+  {
+    const reach = async (words, answers) => {
+      let state = (await play(interior)).state;
+      let asking = state.history[state.history.length - 1].text;
+      for (let i2 = 0; i2 < 30 && !/brand/i.test(asking); i2++) {
+        state = (await play(["no"], [], state)).state;
+        asking = state.history[state.history.length - 1].text;
+      }
+      for (const ans of answers) {
+        state = (await play([ans], [], state)).state;
+        asking = state.history[state.history.length - 1].text;
+      }
+      return { state, asking, reached: words.test(asking) };
+    };
+    const g = await reach(/mid-grade|premium|deluxe/i, ["Behr"]);
+    const gr = await play(["painters choice"], [], g.state);
+    check('paint: "painters choice" to the GRADE question settles the finish too', g.reached && gr.state.ctx.paintFinish === "painter_choice" && !/finish|sheen|eggshell|satin/i.test(gr.last.split(" || ").slice(-1)[0]), g.asking + " => " + gr.last);
+    const f = await reach(/finish|sheen/i, ["Behr", "standard"]);
+    const fr = await play(["up to the painter"], [], f.state);
+    check('paint: "up to the painter" to the FINISH question settles it and moves on', f.reached && fr.state.ctx.paintFinish === "painter_choice" && !/finish|sheen/i.test(fr.last.split(" || ").slice(-1)[0]), f.asking + " => " + fr.last);
+  }
+  const closetsReading = { patch: { projectType: "interior", surfacesAddressed: true, interiorScope: "whole_house", interiorWalls: "yes", interiorCeilings: "no", interiorTrim: "no", closets: "standard" }, intents: ["provide_info"], acknowledgements: [] };
+  {
+    const a = await play(["I need the inside of my house painted, 4 bed 3 bath 2000 sq ft, walls only"], [closetsReading]);
+    check("made-up closets from the AI reader are dropped", a.state.ctx.closets === "none", String(a.state.ctx.closets));
+    let state = a.state;
+    let sawClosets = /closet/i.test(a.last);
+    for (let i2 = 0; i2 < 8 && !sawClosets; i2++) {
+      const r = await play(["no"], [], state);
+      state = r.state;
+      sawClosets = /closet/i.test(r.last);
+    }
+    check("...and the closet question is asked", sawClosets);
+  }
+  {
+    const a = await play(["I need the inside of my house painted, 4 bed 3 bath 2000 sq ft, walls and the closets"], [closetsReading]);
+    check("closets the customer really named are kept", a.state.ctx.closets !== "none", String(a.state.ctx.closets));
+  }
+  {
+    const a = await play([...interior, "no", "no but i have one shelf in the kitchen i need painted"]);
+    check('side item: "one shelf in the kitchen" is noted for the painters', /one shelf in the kitchen/i.test(a.state.ctx.additionalDetails), a.state.ctx.additionalDetails);
+    check("side item: it is acknowledged and a question follows", /one shelf in the kitchen/i.test(a.last) && /\?\s*$/.test(a.last), a.last);
+    const ruled = await play([...interior, "no radiators or shelves please"]);
+    check("side item: a ruled-out item is not noted", !/radiator|shel/i.test(ruled.state.ctx.additionalDetails), ruled.state.ctx.additionalDetails);
+  }
+  {
+    const a = await play(["I want to paint the inside of my 5 bedroom 3 bath 2500 sq ft house", "2 stories", "everything", "no i dont need every door painted but 3 of the doors need it"]);
+    check('doors: "3 of the doors" sets a door count of 3', a.state.ctx.doorCount === 3, String(a.state.ctx.doorCount));
+  }
+  {
+    const a = await dismissAt(interior, /ceilings standard height|standard ceiling height/i, "no");
+    check('ceiling height: a bare "no" is not read as 10-foot ceilings', a.reached && a.after.ceilingHeight === "standard", String(a.after.ceilingHeight));
+  }
 }
 setLLMReaderForTests(void 0);
 console.log(failures ? `

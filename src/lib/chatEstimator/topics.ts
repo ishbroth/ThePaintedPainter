@@ -204,10 +204,10 @@ export const TOPICS: Topic[] = [
     alreadyAnswered: (c) => !!c.ceilingHeightKnown || c.ceilingHeight !== 'standard' || extDone(c, 'ceiling_height'),
     ask: (c) =>
       c.propertyType === 'multi_unit' && c.unitCount != null
-        ? "In a typical unit, is it standard ceiling height (around 8 feet)? If not, about how tall are they: 9 ft, 10 ft, 12 ft or more, or vaulted?"
+        ? "In a typical unit, are the ceilings standard height (around 8 feet), or taller? If taller, about how tall: 9 ft, 10 ft, 12 ft or more, or vaulted?"
         : pick(
           [
-            "Is it standard ceiling height, around 8 feet? If not, about how tall are they (9 ft, 10 ft, 12 ft or more, or vaulted)?",
+            "Are the ceilings standard height, around 8 feet, or taller? If taller, about how tall (9 ft, 10 ft, 12 ft or more, or vaulted)?",
             "Are the ceilings standard height (about 8 feet), or higher? If higher, roughly how tall: 9 ft, 10 ft, 12 ft or more, or vaulted?",
           ],
           seed(c),
