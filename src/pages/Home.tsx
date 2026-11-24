@@ -38,19 +38,19 @@ const carousel4Triplets = [
 
 const reviews = [
   {
-    image: '/thumbnail_IMG_8022.jpg',
+    image: '/thumbnail_IMG_3308.jpg',
     text: '"The Painted Painter was awesome! He painted our airbnb rental and it was from drab to published..."',
     link: 'https://www.yelp.com/biz/the-painted-painter-san-diego',
     source: 'From Yelp',
   },
   {
-    image: '/thumbnail_IMG_8544.jpg',
+    image: '/thumbnail_IMG_3006.jpg',
     text: '"The paint job looks amazing. The Painted Painter is fast and efficient, his pricing can\'t be beat."',
     link: '#',
     source: 'From Google',
   },
   {
-    image: '/thumbnail_IMG_8560.jpg',
+    image: '/thumbnail_IMG_3205.jpg',
     text: '"I hired The Painted Painter when I did move-in... loved them! Great..."',
     link: '#',
     source: 'From NextDoor',
