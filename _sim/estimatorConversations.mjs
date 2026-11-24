@@ -24053,6 +24053,7 @@ var metaBank = {
   booking_question: () => "After I give you the price, just tap the painter you want (or tap Guaranteed Price) and you'll lock it in. Small deposit at booking, balance due when the job's done.",
   color_question: () => "Color's on you for this part \u2014 it doesn't change the price (same-color repaint is a little cheaper, any new color is about the same). If you want color advice, the painter you book can do a free consult.",
   recommend_question: () => "Honestly? Tell me a bit about what you want painted and I'll give you a real price. Once you see the number, pick whichever painter fits your budget \u2014 or go with the guaranteed price if you want the best rate.",
+  off_topic_brief: () => "Ha, let's stick to your paint job for now.",
   off_topic: () => "Ha \u2014 let's stick to your paint job for now. What do you need painted?",
   deflection_ballpark: () => "I can give you a tighter number than a ballpark in about 60 more seconds. Just tell me the ZIP and roughly what we're painting.",
   deflection_email: () => "Happy to email it at the end. Quickest way is to finish the few quick questions and then I'll take your email.",
@@ -24776,6 +24777,10 @@ function dropUnsaidProjectType(text, ctx, lastTopicId, patch) {
   return cleaned;
 }
 
+// src/lib/greeting.ts
+init_define_import_meta_env();
+var GREETING_TEXT = "Hello, citizen. What do you need painted?";
+
 // src/lib/chatEstimator/extras.ts
 init_define_import_meta_env();
 var EXTRA_KINDS = [
@@ -25032,7 +25037,7 @@ function makeInitialState() {
     history: [
       {
         role: "bot",
-        text: "Hello, citizen. What do you need painted?",
+        text: GREETING_TEXT,
         timestamp: Date.now()
       }
     ],
@@ -25802,7 +25807,7 @@ ${trimmed}`.trim();
     const metaReply = metaAnswer(intent.intents, s.lastBotTopic, s, Object.keys(patch).length > 0);
     if (metaReply) {
       s = { ...s, history: [...s.history, botMessage(metaReply)] };
-      if (s.lastBotTopic) {
+      if (s.lastBotTopic && !metaReply.trim().endsWith("?")) {
         const refocus = "Anyway \u2014 " + s.lastBotTopic.ask(s.ctx).charAt(0).toLowerCase() + s.lastBotTopic.ask(s.ctx).slice(1);
         s = { ...s, history: [...s.history, botMessage(refocus)] };
       }
@@ -25972,7 +25977,7 @@ function metaAnswer(intents, lastTopic, state, hasSubstantiveInfo) {
   if (intents.includes("booking_question")) return metaBank.booking_question();
   if (intents.includes("color_question")) return metaBank.color_question();
   if (intents.includes("recommend_question")) return metaBank.recommend_question();
-  if (intents.includes("off_topic")) return metaBank.off_topic();
+  if (intents.includes("off_topic")) return state.lastBotTopic ? metaBank.off_topic_brief() : metaBank.off_topic();
   if (!hasSubstantiveInfo) {
     if (intents.includes("ask_clarification")) {
       if (lastTopic) return lastTopic.clarify(state.ctx);
@@ -27064,6 +27069,13 @@ async function dismissAt(setup, topicWords, dismissal = "doesnt matter just want
   {
     const a = await dismissAt(interior, /ceilings standard height|standard ceiling height/i, "no");
     check('ceiling height: a bare "no" is not read as 10-foot ceilings', a.reached && a.after.ceilingHeight === "standard", String(a.after.ceilingHeight));
+  }
+}
+{
+  for (const remark of ["the weather has been so nice lately", "how is your day going", "what time is it"]) {
+    const a = await play(["I need the inside of my house painted", "blah my cousin visited last weekend", remark]);
+    const questions = (a.last.match(/\?/g) ?? []).length;
+    check('off-topic "' + remark + '": never two questions in a row', questions <= 1 && !/what do you need painted/i.test(a.last), a.last);
   }
 }
 setLLMReaderForTests(void 0);

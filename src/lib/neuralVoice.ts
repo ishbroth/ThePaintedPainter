@@ -143,6 +143,16 @@ export function prefetchNeural(text: string): Promise<string | null> {
   return request;
 }
 
+/**
+ * Puts audio that is already on hand (a recorded line shipped with the app) into the cache, so playing that text needs no fetch at all.
+ * The greeting is the one line this is used for: its audio is made with the same server voice (the "tts" function) and saved as
+ * public/voice/greeting.mp3. To remake it after changing the greeting or the voice: POST the greeting text to the tts function and
+ * save the base64 "audio" field of the answer as that file.
+ */
+export function seedNeural(text: string, url: string): void {
+  cache.set(text.trim(), Promise.resolve(url));
+}
+
 /** Whether prefetchNeural has been attempted yet this session — only the very first attempt gets a retry. */
 let hasAttempted = false;
 

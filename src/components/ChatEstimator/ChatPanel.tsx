@@ -476,10 +476,8 @@ const ChatPanel = () => {
       if (ttsSupported) await waitForSpeechEnd();
       if (!voiceModeRef.current) break;
 
-      // The system keyboard has no reason to be up during a hands-free turn (nothing is being typed), and leaving it up is
-      // what let it clip the Talk/Mute row underneath it and jam the layout as the conversation grew — a tap that focused
-      // the composer (to start the greeting, or a prior typed reply) can easily still have it open at this point.
-      composerRef.current?.blur();
+      // The keypad is left as it is: a tap into the typing line opens it, and it stays up while the app talks and listens (the window is
+      // sized to sit above it, see the keypad layout effect), so it never vanishes in the middle of the conversation.
       setVoiceListening(true);
       const heard = await startVoiceTurn((partial) => {
         if (composerRef.current) composerRef.current.textContent = partial;
@@ -515,7 +513,6 @@ const ChatPanel = () => {
       return;
     }
     if (!readAloudRef.current) toggleReadAloud(); // a hands-free conversation has to talk back
-    composerRef.current?.blur(); // dismiss the keyboard right away — this is now a spoken conversation, not a typed one
     voiceModeRef.current = true;
     setVoiceMode(true);
     void runVoiceLoop();
@@ -660,7 +657,10 @@ const ChatPanel = () => {
         others += (child as HTMLElement).offsetHeight;
         ro.observe(child);
       }
-      const h = Math.max(80, Math.floor(visible - others));
+      // the section keeps a strip under the status bar (its top padding) out of the same visible height: leaving it out made the card
+      // that much too tall, which pushed the Talk/Mute row down behind the keypad
+      const topStrip = parseFloat(getComputedStyle(section).paddingTop) || 0;
+      const h = Math.max(80, Math.floor(visible - others - topStrip - 6));
       box.style.flex = 'none';
       box.style.height = `${h}px`;
       box.style.maxHeight = `${h}px`;

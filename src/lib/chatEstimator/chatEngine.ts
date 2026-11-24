@@ -44,6 +44,7 @@ import { extractWithLLM } from './llmClient';
 import { highestPriceAssumption, sanitizeLlmPatch } from './dismissive';
 import { makeInitialContext } from './defaultContext';
 import { extractDetails, DETAIL_TOPIC_IDS } from './details';
+import { GREETING_TEXT } from '../greeting';
 import { detectExtras } from './extras';
 import { readDeckDetails, isDeckTalk } from './deckDetails';
 import { readItemAnswers } from './itemInterviews';
@@ -158,7 +159,7 @@ export function makeInitialState(): ChatState {
     history: [
       {
         role: 'bot',
-        text: "Hello, citizen. What do you need painted?",
+        text: GREETING_TEXT,
         timestamp: Date.now(),
       },
     ],
@@ -1254,7 +1255,8 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
       s = { ...s, history: [...s.history, botMessage(metaReply)] };
       // After answering a meta question, re-ask the topic we were on (if any)
       // so the user can continue where they left off.
-      if (s.lastBotTopic) {
+      // (a reply that already ends in its own question is the question: adding the pending one after it made two in a row)
+      if (s.lastBotTopic && !metaReply.trim().endsWith('?')) {
         const refocus =
           "Anyway — " + s.lastBotTopic.ask(s.ctx).charAt(0).toLowerCase() +
           s.lastBotTopic.ask(s.ctx).slice(1);
@@ -1550,7 +1552,9 @@ function metaAnswer(
   if (intents.includes('booking_question')) return metaBank.booking_question();
   if (intents.includes('color_question')) return metaBank.color_question();
   if (intents.includes('recommend_question')) return metaBank.recommend_question();
-  if (intents.includes('off_topic')) return metaBank.off_topic();
+  // With a question already on the table, the pointer back to it is added by the caller: this line must not ask one of its own
+  // (it used to end in "What do you need painted?", so an off-topic remark got two questions in a row).
+  if (intents.includes('off_topic')) return state.lastBotTopic ? metaBank.off_topic_brief() : metaBank.off_topic();
 
   // A message that actually extracted real job facts (e.g. "4000 square
   // feet") is not a confused user asking for clarification or an example,

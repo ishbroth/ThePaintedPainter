@@ -16,7 +16,8 @@
 //      speaking the link text, so only the surrounding sentence is heard.
 
 import { splitPrompt } from './promptHints';
-import { neuralVoiceAvailable, speakNeural, stopNeural, unlockNeuralAudio, isNeuralBusy, prefetchNeural } from './neuralVoice';
+import { neuralVoiceAvailable, speakNeural, stopNeural, unlockNeuralAudio, isNeuralBusy, prefetchNeural, seedNeural } from './neuralVoice';
+import { GREETING_TEXT } from './greeting';
 
 export function isTTSSupported(): boolean {
   return typeof window !== 'undefined' && 'speechSynthesis' in window;
@@ -231,6 +232,11 @@ export function speak(text: string): Promise<void> {
 /** What is said aloud: a question is trimmed to just the question (its options go in the typing box); anything else is read in full. */
 function forVoice(text: string): string {
   return text.includes('?') ? splitPrompt(text).spoken : text;
+}
+
+// The opening line is recorded (same server voice) and shipped with the app, so it plays at once inside the tap on a phone.
+if (typeof window !== 'undefined') {
+  seedNeural(naturalizeForSpeech(forVoice(GREETING_TEXT).replace(/.{3,}|…/g, '. ')), `${import.meta.env.BASE_URL}voice/greeting.mp3`);
 }
 
 /** Phones and tablets (a touch screen as the main pointer). */

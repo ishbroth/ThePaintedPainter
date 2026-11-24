@@ -853,6 +853,15 @@ async function dismissAt(setup: string[], topicWords: RegExp, dismissal = 'doesn
   }
 }
 
+// An off-topic remark gets one short line and then the pending question: never two questions in a row
+{
+  for (const remark of ['the weather has been so nice lately', 'how is your day going', 'what time is it']) {
+    const a = await play(['I need the inside of my house painted', 'blah my cousin visited last weekend', remark]);
+    const questions = (a.last.match(/\?/g) ?? []).length;
+    check('off-topic "' + remark + '": never two questions in a row', questions <= 1 && !/what do you need painted/i.test(a.last), a.last);
+  }
+}
+
 setLLMReaderForTests(undefined);
 console.log(failures ? `\n${failures} FAILED` : '\nall conversation checks passed');
 process.exit(failures ? 1 : 0);

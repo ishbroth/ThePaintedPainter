@@ -1616,6 +1616,8 @@ export const metaBank = {
   recommend_question: () =>
     "Honestly? Tell me a bit about what you want painted and I'll give you a real price. Once you see the number, pick whichever painter fits your budget — or go with the guaranteed price if you want the best rate.",
 
+  off_topic_brief: () => "Ha, let's stick to your paint job for now.",
+
   off_topic: () =>
     "Ha — let's stick to your paint job for now. What do you need painted?",
 

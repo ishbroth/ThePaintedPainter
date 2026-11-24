@@ -138,7 +138,13 @@ public class LocalSpeechPlugin: CAPPlugin, CAPBridgedPlugin {
         task?.cancel()
         task = nil
         request = nil
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        // Listening switched the phone's audio to record-only, and that stays in force after the microphone is closed: with nothing
+        // set back, the app's own spoken replies (played right after a turn) came out silent. Put it back to playback so the voice
+        // is heard again, then the next turn switches to recording itself.
+        let session = AVAudioSession.sharedInstance()
+        try? session.setActive(false, options: .notifyOthersOnDeactivation)
+        try? session.setCategory(.playback, mode: .default, options: [])
+        try? session.setActive(true)
 
         if let call = activeCall {
             activeCall = nil
