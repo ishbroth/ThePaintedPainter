@@ -104,7 +104,7 @@ export function componentKind(c: EstimatorContext): '' | 'cabinets' | 'builtins'
 
 /** The job is only a few trim details or some furniture, and the customer said so: no "add the ceilings?" suggestions. */
 const skipUpsells = (c: EstimatorContext) =>
-  c.itemsOnly || componentKind(c) !== '' || isIsolatedDetailJob(c) || ((c.specialtyServices.includes('fireplace') || c.specialtyServices.includes('epoxy')) && c.interiorWalls === 'no' && c.surfacesAddressed) || (c.interiorWalls === 'no' && c.interiorCeilings === 'no' && c.surfacesAddressed && (c.furnitureItems.length > 0 || c.closets !== 'none'));
+  c.itemsOnly || !!c.touchUpOnly || componentKind(c) !== '' || isIsolatedDetailJob(c) || ((c.specialtyServices.includes('fireplace') || c.specialtyServices.includes('epoxy')) && c.interiorWalls === 'no' && c.surfacesAddressed) || (c.interiorWalls === 'no' && c.interiorCeilings === 'no' && c.surfacesAddressed && (c.furnitureItems.length > 0 || c.closets !== 'none'));
 
 const isCommercialLike = (c: EstimatorContext) => c.propertyType === 'commercial' || c.propertyType === 'multi_unit';
 
@@ -445,9 +445,15 @@ export const TOPICS: Topic[] = [
     alreadyAnswered: (c) => c.roomAssumptionAddressed,
     ask: (c) => {
       const sqft = c.squareFeet || 0;
-      const rooms = sqft >= 2500
+      const common = sqft >= 2500
         ? 'a living room, dining room, kitchen, hallway, laundry room, and a family/bonus room or office'
+        : sqft < 1000
+        ? 'a living room, kitchen and hallway'
         : 'a living room, dining area, kitchen, hallway and laundry room';
+      const beds = c.bedroomCount ? `${c.bedroomCount} bedroom${c.bedroomCount === 1 ? '' : 's'}` : '';
+      const baths = c.bathroomCount ? `${c.bathroomCount} bathroom${c.bathroomCount === 1 ? '' : 's'}` : '';
+      const given = [beds, baths].filter(Boolean).join(' and ');
+      const rooms = given ? `your ${given}, plus ${common}` : common;
       return `For ${sqft.toLocaleString()} sq ft, I'm assuming ${rooms} — sound right, or is something different (missing, or not actually part of this)?`;
     },
     clarify: () => "Just the general room mix, not a full list — flag anything that's off from that (a room it's missing, or one that isn't actually there).",
@@ -566,26 +572,26 @@ export const TOPICS: Topic[] = [
   // ——————————————————————————————————————————
   {
     id: 'paint_brand',
-    priority: 37,
+    priority: 49.5,
     relevant: (c) => paintingJob(c),
     alreadyAnswered: (c) => !!c.paintBrand || extDone(c, 'paint_brand'),
     ask: (c) =>
       pick(
         [
-          'Do you have a paint brand in mind, or should the painter choose?',
-          'Is there a paint brand you prefer, or is it up to the painter?',
+          'Any preference on the paint itself, like a brand, standard or premium quality, or a finish? Or just leave all of that to the painter?',
+          'Do you have a paint in mind (a brand, standard or premium, a finish like eggshell or satin), or should the painter choose?',
           ...(Object.values(c.itemAnswers ?? {}).some((v) => /stain|restain|strip/.test(v)) ? ['Is there a paint or stain brand you prefer, or is it up to the painter?'] : []),
         ],
         seed(c),
       ),
-    clarify: () => "Some customers love a particular brand, like Sherwin-Williams, Benjamin Moore or Behr. If you don't have a preference, the painter picks a good one.",
-    example: () => "Just say a brand like 'Benjamin Moore', or 'painter's choice'.",
+    clarify: () => "Some customers love a particular brand, like Sherwin-Williams, Benjamin Moore or Behr, or want premium paint or a certain finish (flat, eggshell, satin, gloss). If you don't have a preference, the painter picks a good one for each surface.",
+    example: () => "Just say 'painter's choice', or something like 'premium Benjamin Moore, satin'.",
   },
   {
     id: 'paint_grade',
-    priority: 38,
+    priority: 49.6,
     relevant: (c) => paintingJob(c),
-    alreadyAnswered: (c) => !!c.paintGrade || extDone(c, 'paint_grade') || c.paintBrand === 'painter_choice' || c.paintBrand === 'customer_provided', // "the painter can choose" (or the customer buying the paint) covers the grade too (a grade they volunteer is still noted)
+    alreadyAnswered: (c) => !!c.paintGrade || extDone(c, 'paint_grade') || extDone(c, 'paint_brand') || c.paintBrand === 'painter_choice' || c.paintBrand === 'customer_provided', // "the painter can choose" (or the customer buying the paint) covers the grade too (a grade they volunteer is still noted)
     ask: (c) =>
       pick(
         [
@@ -599,9 +605,9 @@ export const TOPICS: Topic[] = [
   },
   {
     id: 'paint_finish',
-    priority: 39,
+    priority: 49.7,
     relevant: (c) => paintingJob(c),
-    alreadyAnswered: (c) => !!c.paintFinish || extDone(c, 'paint_finish') || c.paintBrand === 'painter_choice' || c.paintBrand === 'customer_provided', // ...and the finish
+    alreadyAnswered: (c) => !!c.paintFinish || extDone(c, 'paint_finish') || extDone(c, 'paint_brand') || !!c.paintBrand || c.paintBrand === 'painter_choice' || c.paintBrand === 'customer_provided', // ...and the finish
     ask: (c) =>
       pick(
         [
@@ -710,7 +716,7 @@ export const TOPICS: Topic[] = [
     id: 'closets_included',
     priority: 29.6,
     relevant: (c) =>
-      (c.projectType === 'interior' || c.projectType === 'both') && c.surfacesAddressed && c.closets === 'none' && !skipUpsells(c) &&
+      (c.projectType === 'interior' || c.projectType === 'both') && c.surfacesAddressed && c.closets === 'none' && !skipUpsells(c) && !isCommercialLike(c) &&
       !(c.excludedSurfaces ?? []).includes('closets') &&
       (c.interiorScope === 'whole_house' || c.selectedRooms.some((r) => /bedroom|hallway|entryway/.test(r))),
     alreadyAnswered: (c) => c.closets !== 'none' || extDone(c, 'closets_included'),
@@ -1630,7 +1636,7 @@ export const metaBank = {
   frustration: () =>
     "Sorry about that — nothing you've told me so far is lost, let's keep going.",
 
-  uncertainty: (lastTopic: string | null) => {
+  uncertainty: (lastTopic: string | null, ctx?: { bedroomCount?: number | null }) => {
     switch (lastTopic) {
       case 'location':
         return "No problem — I can still give a ballpark without it. What city are you in?";
@@ -1651,9 +1657,11 @@ export const metaBank = {
       case 'ext_trim_material':
         return "No problem — wood's the most common for trim. I'll default to that unless it's clearly aluminum, vinyl, or stucco pop-outs.";
       case 'house_size':
-        return "No problem — I'll estimate the size from the bedroom count you gave me.";
+        return ctx?.bedroomCount
+          ? "No problem — I'll estimate the size from the bedroom count you gave me."
+          : "No problem — I'll use a typical size for a place like this, and you can correct it when you see the price.";
       default:
-        return "No worries — just tell me what you do know and we'll work with it.";
+        return "No problem — I'll go with the usual assumption for that, and the painter can confirm it when they see the place.";
     }
   },
 

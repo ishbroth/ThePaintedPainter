@@ -36,6 +36,8 @@ export interface EstimatorContext {
   conflicts?: { field: 'unitsTotal' | 'stories' | 'buildingCount'; label: string; values: number[]; asked: number }[];
   /** The customer actually said the interior doors are part of the job (interiorDoors alone is also its resting default), so the estimator asks how many. */
   doorsIncluded?: boolean;
+  /** A move-out or deposit touch-up ("touch up my rental before I move out"): no suggestions to add ceilings, baseboards or doors. */
+  touchUpOnly?: boolean;
   /** The customer has said what the ceiling height is (including "standard"), so it is not asked again. */
   ceilingHeightKnown?: boolean;
   /** The paint: a brand the customer wants (or 'painter_choice'), how nice it is (economy, standard, premium) and the finish. */

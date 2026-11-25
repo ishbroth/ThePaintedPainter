@@ -195,3 +195,14 @@ export function timelineFromStart(startDate: string, now: Date = new Date()): 'a
   if (days <= 45) return 'this_month';
   return 'no_rush';
 }
+
+/** "2026-12-01" as "December 1" (with the year only when it isn't this year or next): what the bot says back, never the raw date. */
+export function friendlyDate(iso: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if (!m) return iso;
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  if (Number.isNaN(d.getTime())) return iso;
+  const thisYear = new Date().getFullYear();
+  const text = d.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+  return d.getFullYear() > thisYear + 1 || d.getFullYear() < thisYear ? text + ', ' + d.getFullYear() : text;
+}

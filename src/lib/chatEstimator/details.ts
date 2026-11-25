@@ -367,12 +367,12 @@ export function extractDetails(text: string, ctx: EstimatorContext, askedId: str
   if (doors && doors >= 1 && doors <= 80 && ctx.doorCount == null && !/\bgarage\s+doors/.test(t) && askedId !== 'door_count') {
     patch.doorCount = doors;
     if (ctx.interiorDoors === 'none') patch.interiorDoors = 'some';
-    acks.push(`${doors} doors`);
+    acks.push(doors === 1 ? '1 door' : `${doors} doors`);
   }
   const windows = pluralCount(/windows/);
   if (windows && windows >= 1 && windows <= 100 && interiorish && ctx.windowCount == null && ctx.projectType !== 'exterior' && askedId !== 'window_count' && askedId !== 'ext_window_count' && (ctx.interiorWindows !== 'none' || patch.interiorWindows)) {
     patch.windowCount = windows;
-    acks.push(`${windows} windows`);
+    acks.push(windows === 1 ? '1 window' : `${windows} windows`);
   }
   const shutters = pluralCount(/shutters/);
   if (shutters && shutters >= 1 && shutters <= 60) {
@@ -458,8 +458,8 @@ export function extractDetails(text: string, ctx: EstimatorContext, askedId: str
   // the answer to the follow-up question just asked
   if (askedId && !/\?\s*$/.test(text.trim())) {
     switch (askedId) {
-      case 'door_count': { const n = parseCount(text, 1, 80); if (n) { patch.doorCount = n; acks.push(`${n} doors`); } break; }
-      case 'window_count': { const n = parseCount(text, 1, 100); if (n) { patch.windowCount = n; acks.push(`${n} windows`); } break; }
+      case 'door_count': { const n = parseCount(text, 1, 80); if (n) { patch.doorCount = n; acks.push(n === 1 ? '1 door' : `${n} doors`); } break; }
+      case 'window_count': { const n = parseCount(text, 1, 100); if (n) { patch.windowCount = n; acks.push(n === 1 ? '1 window' : `${n} windows`); } break; }
       case 'chair_count': {
         // "3", "a couple", "just the one", or "2 chairs and a table": a lone number counts the one kind of piece
         if (patch.furnitureItems) break; // the counted pieces were read above
@@ -539,11 +539,11 @@ export function extractDetails(text: string, ctx: EstimatorContext, askedId: str
         if (n) {
           if (ctx.exteriorShutters === 'yes') patch.exteriorShutterCount = n;
           else patch.interiorShutterCount = n;
-          acks.push(`${n} shutters`);
+          acks.push(n === 1 ? '1 shutter' : `${n} shutters`);
         }
         break;
       }
-      case 'closet_count': { const n = parseCount(text, 1, 40); if (n) { patch.closetCount = n; acks.push(`${n} closets`); } break; }
+      case 'closet_count': { const n = parseCount(text, 1, 40); if (n) { patch.closetCount = n; acks.push(n === 1 ? '1 closet' : `${n} closets`); } break; }
       case 'ext_garage_count': break;
       case 'fence_size': {
         const f = parseFenceAnswer(text);

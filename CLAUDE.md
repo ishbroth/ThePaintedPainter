@@ -40,3 +40,7 @@ reserved `.invalid` domain; `send-email` skips those addresses.
   (`customer_blocked_messages` / `painter_blocked_messages` on `quote_selections`; the job itself carries on, and the other person is never told who
   blocked). A report is stored in `message_reports` (server-only, with a snapshot of the recent thread) and emailed to the owner. The rules live in
   `_shared/jobMessages.ts` (`canSendMessages`, `cleanReport`); `npm run check:messaging` covers them.
+- The chat estimator is tested two ways: `npm run check:estimator` (scripted conversations, must pass) and `npm run sim:estimator -- <count> <seed>` (simulated customers
+  with side questions, tangents and vague answers; it flags ignored questions, paint questions before scope, plural bugs, dead ends). Customer questions (paint supply,
+  duration, licensing, furniture, warranty, cost) are answered in `chatEstimator/faq.ts` and then the pending question is repeated. The paint line is ONE
+  question (`paint_brand`, asked after the job itself) that settles brand, grade and finish; a customer who names a brand first is not asked again.

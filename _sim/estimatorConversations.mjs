@@ -16835,6 +16835,15 @@ function timelineFromStart(startDate, now = /* @__PURE__ */ new Date()) {
   if (days <= 45) return "this_month";
   return "no_rush";
 }
+function friendlyDate(iso2) {
+  const m2 = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso2);
+  if (!m2) return iso2;
+  const d2 = new Date(Number(m2[1]), Number(m2[2]) - 1, Number(m2[3]));
+  if (Number.isNaN(d2.getTime())) return iso2;
+  const thisYear = (/* @__PURE__ */ new Date()).getFullYear();
+  const text = d2.toLocaleDateString("en-US", { month: "long", day: "numeric" });
+  return d2.getFullYear() > thisYear + 1 || d2.getFullYear() < thisYear ? text + ", " + d2.getFullYear() : text;
+}
 
 // src/lib/chatEstimator/scopeWords.ts
 init_define_import_meta_env();
@@ -16939,7 +16948,7 @@ function extractBathroomCount(text) {
 var STORY_WORDS = { single: 1, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12 };
 function extractStories(text) {
   const t2 = text.toLowerCase();
-  const m2 = t2.match(/\b(\d{1,2}|single|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)[\s-]*stor(?:y|ey|ies)\b/) || t2.match(/\b(\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)[\s-]*floors?[\s-]*(?:building|complex|apartment|tower|house|home|property)\b/);
+  const m2 = t2.match(/\b(\d{1,2}|single|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)[\s-]*stor(?:y|ey|ies)\b/) || t2.match(/\b(\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)[\s-]*floors?[\s-]*(?:building|complex|apartment|tower|house|home|property)\b/) || t2.match(/\b(\d|single|one|two|three)[\s-]*(?:levels?|floors?)\b(?![\s-]*(?:of|above|below|up|down))/);
   if (!m2) return null;
   const n = /^\d/.test(m2[1]) ? parseInt(m2[1], 10) : STORY_WORDS[m2[1]];
   return n >= 1 && n <= 40 ? n : null;
@@ -17212,7 +17221,7 @@ function extractPropertyType(text) {
     return "multi_unit";
   }
   if (isMultiUnitText(t2)) return "multi_unit";
-  if (/\b(restaurant|cafe|coffee shop|bakery|salon|barber ?shop|spa|gym|fitness|church|chapel|clinic|dental|dentist|medical (?:office|practice)|warehouse|retail|storefront|boutique|showroom|brewery|daycare|day care|our business|my business|our store|my store|our shop|my shop|our office|my office suite)\b/.test(t2)) {
+  if (/\b(restaurant|cafe|coffee shop|bakery|salon|barber ?shop|spa|gym|fitness|church|chapel|clinic|dental|dentist|medical (?:office|practice)|warehouse|retail|storefront|boutique|showroom|brewery|daycare|day care|our business|my business|our store|my store|our shop|my shop|our office|my office suite|(?:own|run|manage|operate) (?:a |an |our |my |the )?(?:small |little |new |busy |medical |dental |law )?(?:office|shop|store)s?\b(?! (?:room|at home))|(?:the|our) (?:small |new )?(?:office|shop|store)\b)\b/.test(t2) && !/\bhome office\b|\boffice room\b|\bguest\b/.test(t2)) {
     return "commercial";
   }
   if (/\b(commercial (?:space|property|building)|office (?:space|building|park|tower|suite|complex)|retail (?:store|space)|warehouse|storefront)\b/.test(t2)) {
@@ -17764,14 +17773,19 @@ function extractAll(text, prev, lastBotTopicId = null) {
   } else if (rooms.length > 0 && prev.selectedRooms.length === 0 && prev.interiorScope !== "whole_house") {
     patch.selectedRooms = rooms;
     patch.interiorScope = "specific_rooms";
-    acks.push(`${rooms.length} rooms`);
+    acks.push(rooms.length === 1 ? "1 room" : `${rooms.length} rooms`);
   } else if (quantifiedBedBathMention && prev.selectedRooms.length === 0 && !prev.interiorScope && !patch.interiorScope) {
     patch.interiorScope = "whole_house";
   }
-  if (lastBotTopicId === "which_rooms" && rooms.length === 0 && !prev.interiorScope && !patch.interiorScope && prev.selectedRooms.length === 0 && text.trim().length > 0 && !/\b(whole|entire|all|every(?:thing)?|throughout)\b/i.test(text) && !text.trim().endsWith("?")) {
+  if (lastBotTopicId === "which_rooms" && rooms.length === 0 && !prev.interiorScope && !patch.interiorScope && prev.selectedRooms.length === 0 && text.trim().length > 0 && !/\b(whole|entire|all|every(?:thing)?|throughout)\b/i.test(text) && !sqft && !/\d[\d,]*\s*(?:sq|square)/i.test(text) && // a size is not the name of a room
+  !text.trim().endsWith("?")) {
     patch.selectedRooms = ["bedroom_2"];
     patch.interiorScope = "specific_rooms";
     acks.push("1 room");
+  }
+  if (lastBotTopicId === "which_rooms" && !prev.interiorScope && !patch.interiorScope && prev.selectedRooms.length === 0 && /\b(?:all of it|everything|the whole (?:house|place|thing|inside|interior)|whole (?:house|place|inside|interior)|entire (?:house|place|inside|interior)|all (?:of )?the rooms|every room|all rooms|throughout|the works)\b/i.test(text)) {
+    patch.interiorScope = "whole_house";
+    acks.push("the whole inside");
   }
   const cab = extractCabinets(text);
   if (cab.yes && prev.cabinets === "none") {
@@ -17925,7 +17939,7 @@ function extractAll(text, prev, lastBotTopicId = null) {
   if (timing.startDate && !prev.startDate) {
     patch.startDate = timing.startDate;
     if (timing.endDate) patch.endDate = timing.endDate;
-    acks.push(timing.endDate ? `dates ${timing.startDate} to ${timing.endDate}` : `start around ${timing.startDate}`);
+    acks.push(timing.endDate ? `dates ${friendlyDate(timing.startDate)} to ${friendlyDate(timing.endDate)}` : `start around ${friendlyDate(timing.startDate)}`);
     if (!prev.timeline && !patch.timeline) patch.timeline = timelineFromStart(timing.startDate);
   } else if (timing.endDate && !prev.endDate) {
     patch.endDate = timing.endDate;
@@ -18158,7 +18172,7 @@ function extractAll(text, prev, lastBotTopicId = null) {
     patch.doorTypes = [...patch.doorTypes ?? prev.doorTypes, "french"];
     acks.push("French doors");
   }
-  const scopeBlockedBy = ["trim_door_finish", "cabinet_finish", "trim_scope", "condition", "property_ownership", "color_change", "location", "timeline_and_access", "commercial_access", "siding", "stories", "house_size", "room_size", "reno_context", "popcorn_extent", "upsell_ceilings", "upsell_trim", "upsell_doors", "upsell_cabinets"];
+  const scopeBlockedBy = ["which_rooms", "trim_door_finish", "cabinet_finish", "trim_scope", "condition", "property_ownership", "color_change", "location", "timeline_and_access", "commercial_access", "siding", "stories", "house_size", "room_size", "reno_context", "popcorn_extent", "upsell_ceilings", "upsell_trim", "upsell_doors", "upsell_cabinets"];
   const surf = lastBotTopicId && (scopeBlockedBy.includes(lastBotTopicId) || lastBotTopicId.startsWith("ext_")) ? {} : extractSurfaceScope(text);
   const onlySurfaceWords = /^\s*(?:(?:just|only|and|the|with|plus|also|,|&|\+)\s*)*(?:(?:walls?|ceilings?|trim|baseboards?|doors?)\s*(?:,|and|&|\+|\/)?\s*)+[.!]?\s*$/i.test(text);
   let listParsed = false;
@@ -18678,12 +18692,12 @@ function extractDetails(text, ctx, askedId) {
   if (doors && doors >= 1 && doors <= 80 && ctx.doorCount == null && !/\bgarage\s+doors/.test(t2) && askedId !== "door_count") {
     patch.doorCount = doors;
     if (ctx.interiorDoors === "none") patch.interiorDoors = "some";
-    acks.push(`${doors} doors`);
+    acks.push(doors === 1 ? "1 door" : `${doors} doors`);
   }
   const windows = pluralCount(/windows/);
   if (windows && windows >= 1 && windows <= 100 && interiorish && ctx.windowCount == null && ctx.projectType !== "exterior" && askedId !== "window_count" && askedId !== "ext_window_count" && (ctx.interiorWindows !== "none" || patch.interiorWindows)) {
     patch.windowCount = windows;
-    acks.push(`${windows} windows`);
+    acks.push(windows === 1 ? "1 window" : `${windows} windows`);
   }
   const shutters = pluralCount(/shutters/);
   if (shutters && shutters >= 1 && shutters <= 60) {
@@ -18763,7 +18777,7 @@ function extractDetails(text, ctx, askedId) {
         const n = parseCount(text, 1, 80);
         if (n) {
           patch.doorCount = n;
-          acks.push(`${n} doors`);
+          acks.push(n === 1 ? "1 door" : `${n} doors`);
         }
         break;
       }
@@ -18771,7 +18785,7 @@ function extractDetails(text, ctx, askedId) {
         const n = parseCount(text, 1, 100);
         if (n) {
           patch.windowCount = n;
-          acks.push(`${n} windows`);
+          acks.push(n === 1 ? "1 window" : `${n} windows`);
         }
         break;
       }
@@ -18888,7 +18902,7 @@ function extractDetails(text, ctx, askedId) {
         if (n) {
           if (ctx.exteriorShutters === "yes") patch.exteriorShutterCount = n;
           else patch.interiorShutterCount = n;
-          acks.push(`${n} shutters`);
+          acks.push(n === 1 ? "1 shutter" : `${n} shutters`);
         }
         break;
       }
@@ -18896,7 +18910,7 @@ function extractDetails(text, ctx, askedId) {
         const n = parseCount(text, 1, 40);
         if (n) {
           patch.closetCount = n;
-          acks.push(`${n} closets`);
+          acks.push(n === 1 ? "1 closet" : `${n} closets`);
         }
         break;
       }
@@ -20275,7 +20289,6 @@ function locate(topicId) {
   for (const spec of SPECS) for (const q of spec.questions) if (itemTopicId(spec, q) === topicId) return { spec, q };
   return null;
 }
-var itemTopicLabel = (topicId) => locate(topicId)?.q.label ?? null;
 var itemTopicHint = (topicId) => locate(topicId)?.q.hint ?? null;
 function readItemAnswers(text, ctx, askedId) {
   const low = text.toLowerCase();
@@ -21509,79 +21522,6 @@ function isDenial(text) {
 function denialIsAboutScope(text) {
   return /\b(walls?|ceilings?|trim|baseboards?|doors?|surfaces?|what\s+(?:we'?re|i'?m|are\s+we|am\s+i|we\s+are)\s+painting|painting|scope)\b/i.test(text);
 }
-var TOPIC_LABEL = {
-  project_type: "whether this is inside, outside or both",
-  which_rooms: "which rooms are being painted",
-  room_size: "the size of the room",
-  house_size: "the size of the place",
-  surfaces: "what gets painted (walls, ceilings, trim, doors)",
-  paint_brand: "which paint brand",
-  paint_grade: "standard or premium paint",
-  paint_finish: "the paint finish",
-  ext_size: "the size of the house",
-  ext_trim: "whether the trim, fascia, soffits and eaves are painted",
-  ext_doors: "whether the front door is painted",
-  ext_garage: "whether the garage door is painted",
-  ext_garage_count: "how many garage doors",
-  ext_gutters: "whether the gutters are painted",
-  ext_windows: "what the windows are made of",
-  ext_window_count: "how many windows",
-  ext_condition: "how the paint is holding up",
-  ext_repairs: "what repairs are needed",
-  ext_color: "whether the color is changing",
-  upsell_ceilings: "whether to add the ceilings",
-  upsell_trim: "whether to add the baseboards",
-  upsell_doors: "whether to add the doors",
-  upsell_cabinets: "whether to add the kitchen cabinets",
-  cabinet_finish: "what the cabinets are finished with now",
-  door_count: "how many doors",
-  window_count: "how many windows",
-  closet_count: "how many closets",
-  closets_included: "whether the closets are painted too",
-  closet_shelves: "whether the closets have shelves to paint",
-  chair_count: "how many pieces are being painted",
-  cabinet_count: "how many cabinet doors and drawers",
-  cabinet_scope: "whether the insides of the cabinets are painted",
-  cabinet_method: "sprayed or brushed",
-  cabinet_hardware: "the cabinet hardware",
-  builtin_count: "how many built-ins",
-  furniture_kind: "which pieces of furniture",
-  furniture_finish: "how the pieces are finished now and what you want done",
-  shutter_count: "how many shutters",
-  railing_length: "how long the railing is",
-  fence_size: "how long and how tall the fence is",
-  fence_height: "how tall the fence is",
-  deck_size: "how big the deck is",
-  ext_deck_level: "whether the deck is on the ground or raised",
-  ext_deck_underside: "whether the deck underside is painted",
-  ext_deck_railings: "whether the deck has railings",
-  ext_deck_condition: "what shape the deck is in",
-  overhang_size: "how big the overhang or patio cover is",
-  ext_extras: "whether a fence, deck or patio cover is painted too",
-  ext_extras_which: "which of the fence, deck or patio cover",
-  detail_rooms: "how many rooms the trim is in",
-  detail_feet_chair_rail: "how many feet of chair rail",
-  detail_feet_crown: "how many feet of crown moulding",
-  detail_feet_trim: "how many feet of baseboard",
-  detail_sqft_wainscot: "how many square feet of wainscoting",
-  trim_door_finish: "what the trim and doors are finished with now",
-  trim_scope: "what the trim includes",
-  condition: "the condition of the surfaces",
-  popcorn_extent: "how much popcorn ceiling there is",
-  property_ownership: "whether you live there, rent it, or rent it out",
-  commercial_access: "when the crew can work in the business",
-  color_change: "the paint color",
-  color_scope_clarify: "how many colors",
-  reno_context: "where the other work stands",
-  siding: "what the outside is made of",
-  stories: "how many stories",
-  location: "the ZIP code",
-  timeline_and_access: "your timing and whether the place is occupied"
-};
-function topicLabel(id, itemsOnly = false) {
-  if (itemsOnly && id === "timeline_and_access") return "your timing";
-  return id && (TOPIC_LABEL[id] || itemTopicLabel(id)) || "that";
-}
 function recentRecognized(history, max = 6) {
   const seen = /* @__PURE__ */ new Set();
   const out = [];
@@ -22764,7 +22704,7 @@ function componentKind(c2) {
   if (c2.specialtyServices.includes("built_ins") && c2.closets === "none") return "builtins";
   return "";
 }
-var skipUpsells = (c2) => c2.itemsOnly || componentKind(c2) !== "" || isIsolatedDetailJob(c2) || (c2.specialtyServices.includes("fireplace") || c2.specialtyServices.includes("epoxy")) && c2.interiorWalls === "no" && c2.surfacesAddressed || c2.interiorWalls === "no" && c2.interiorCeilings === "no" && c2.surfacesAddressed && (c2.furnitureItems.length > 0 || c2.closets !== "none");
+var skipUpsells = (c2) => c2.itemsOnly || !!c2.touchUpOnly || componentKind(c2) !== "" || isIsolatedDetailJob(c2) || (c2.specialtyServices.includes("fireplace") || c2.specialtyServices.includes("epoxy")) && c2.interiorWalls === "no" && c2.surfacesAddressed || c2.interiorWalls === "no" && c2.interiorCeilings === "no" && c2.surfacesAddressed && (c2.furnitureItems.length > 0 || c2.closets !== "none");
 var isCommercialLike = (c2) => c2.propertyType === "commercial" || c2.propertyType === "multi_unit";
 function isStandaloneOnlyJob(c2) {
   if (c2.standaloneStructure || c2.itemsOnly || componentKind(c2) !== "") return true;
@@ -23046,7 +22986,11 @@ var TOPICS = [
     alreadyAnswered: (c2) => c2.roomAssumptionAddressed,
     ask: (c2) => {
       const sqft = c2.squareFeet || 0;
-      const rooms = sqft >= 2500 ? "a living room, dining room, kitchen, hallway, laundry room, and a family/bonus room or office" : "a living room, dining area, kitchen, hallway and laundry room";
+      const common = sqft >= 2500 ? "a living room, dining room, kitchen, hallway, laundry room, and a family/bonus room or office" : sqft < 1e3 ? "a living room, kitchen and hallway" : "a living room, dining area, kitchen, hallway and laundry room";
+      const beds = c2.bedroomCount ? `${c2.bedroomCount} bedroom${c2.bedroomCount === 1 ? "" : "s"}` : "";
+      const baths = c2.bathroomCount ? `${c2.bathroomCount} bathroom${c2.bathroomCount === 1 ? "" : "s"}` : "";
+      const given = [beds, baths].filter(Boolean).join(" and ");
+      const rooms = given ? `your ${given}, plus ${common}` : common;
       return `For ${sqft.toLocaleString()} sq ft, I'm assuming ${rooms} \u2014 sound right, or is something different (missing, or not actually part of this)?`;
     },
     clarify: () => "Just the general room mix, not a full list \u2014 flag anything that's off from that (a room it's missing, or one that isn't actually there).",
@@ -23158,25 +23102,25 @@ var TOPICS = [
   // ——————————————————————————————————————————
   {
     id: "paint_brand",
-    priority: 37,
+    priority: 49.5,
     relevant: (c2) => paintingJob(c2),
     alreadyAnswered: (c2) => !!c2.paintBrand || extDone(c2, "paint_brand"),
     ask: (c2) => pick2(
       [
-        "Do you have a paint brand in mind, or should the painter choose?",
-        "Is there a paint brand you prefer, or is it up to the painter?",
+        "Any preference on the paint itself, like a brand, standard or premium quality, or a finish? Or just leave all of that to the painter?",
+        "Do you have a paint in mind (a brand, standard or premium, a finish like eggshell or satin), or should the painter choose?",
         ...Object.values(c2.itemAnswers ?? {}).some((v) => /stain|restain|strip/.test(v)) ? ["Is there a paint or stain brand you prefer, or is it up to the painter?"] : []
       ],
       seed(c2)
     ),
-    clarify: () => "Some customers love a particular brand, like Sherwin-Williams, Benjamin Moore or Behr. If you don't have a preference, the painter picks a good one.",
-    example: () => "Just say a brand like 'Benjamin Moore', or 'painter's choice'."
+    clarify: () => "Some customers love a particular brand, like Sherwin-Williams, Benjamin Moore or Behr, or want premium paint or a certain finish (flat, eggshell, satin, gloss). If you don't have a preference, the painter picks a good one for each surface.",
+    example: () => "Just say 'painter's choice', or something like 'premium Benjamin Moore, satin'."
   },
   {
     id: "paint_grade",
-    priority: 38,
+    priority: 49.6,
     relevant: (c2) => paintingJob(c2),
-    alreadyAnswered: (c2) => !!c2.paintGrade || extDone(c2, "paint_grade") || c2.paintBrand === "painter_choice" || c2.paintBrand === "customer_provided",
+    alreadyAnswered: (c2) => !!c2.paintGrade || extDone(c2, "paint_grade") || extDone(c2, "paint_brand") || c2.paintBrand === "painter_choice" || c2.paintBrand === "customer_provided",
     // "the painter can choose" (or the customer buying the paint) covers the grade too (a grade they volunteer is still noted)
     ask: (c2) => pick2(
       [
@@ -23190,9 +23134,9 @@ var TOPICS = [
   },
   {
     id: "paint_finish",
-    priority: 39,
+    priority: 49.7,
     relevant: (c2) => paintingJob(c2),
-    alreadyAnswered: (c2) => !!c2.paintFinish || extDone(c2, "paint_finish") || c2.paintBrand === "painter_choice" || c2.paintBrand === "customer_provided",
+    alreadyAnswered: (c2) => !!c2.paintFinish || extDone(c2, "paint_finish") || extDone(c2, "paint_brand") || !!c2.paintBrand || c2.paintBrand === "painter_choice" || c2.paintBrand === "customer_provided",
     // ...and the finish
     ask: (c2) => pick2(
       [
@@ -23288,7 +23232,7 @@ var TOPICS = [
     // surfaces are settled, never assumed.
     id: "closets_included",
     priority: 29.6,
-    relevant: (c2) => (c2.projectType === "interior" || c2.projectType === "both") && c2.surfacesAddressed && c2.closets === "none" && !skipUpsells(c2) && !(c2.excludedSurfaces ?? []).includes("closets") && (c2.interiorScope === "whole_house" || c2.selectedRooms.some((r) => /bedroom|hallway|entryway/.test(r))),
+    relevant: (c2) => (c2.projectType === "interior" || c2.projectType === "both") && c2.surfacesAddressed && c2.closets === "none" && !skipUpsells(c2) && !isCommercialLike(c2) && !(c2.excludedSurfaces ?? []).includes("closets") && (c2.interiorScope === "whole_house" || c2.selectedRooms.some((r) => /bedroom|hallway|entryway/.test(r))),
     alreadyAnswered: (c2) => c2.closets !== "none" || extDone(c2, "closets_included"),
     ask: (c2) => pick2(
       c2.interiorScope === "whole_house" ? ["Are the closets getting painted too?", "Should I include the insides of the closets?"] : ["Do the closets in there get painted too?", "Are the closets part of it, or just the room itself?"],
@@ -24058,7 +24002,7 @@ var metaBank = {
   deflection_ballpark: () => "I can give you a tighter number than a ballpark in about 60 more seconds. Just tell me the ZIP and roughly what we're painting.",
   deflection_email: () => "Happy to email it at the end. Quickest way is to finish the few quick questions and then I'll take your email.",
   frustration: () => "Sorry about that \u2014 nothing you've told me so far is lost, let's keep going.",
-  uncertainty: (lastTopic) => {
+  uncertainty: (lastTopic, ctx) => {
     switch (lastTopic) {
       case "location":
         return "No problem \u2014 I can still give a ballpark without it. What city are you in?";
@@ -24079,9 +24023,9 @@ var metaBank = {
       case "ext_trim_material":
         return "No problem \u2014 wood's the most common for trim. I'll default to that unless it's clearly aluminum, vinyl, or stucco pop-outs.";
       case "house_size":
-        return "No problem \u2014 I'll estimate the size from the bedroom count you gave me.";
+        return ctx?.bedroomCount ? "No problem \u2014 I'll estimate the size from the bedroom count you gave me." : "No problem \u2014 I'll use a typical size for a place like this, and you can correct it when you see the price.";
       default:
-        return "No worries \u2014 just tell me what you do know and we'll work with it.";
+        return "No problem \u2014 I'll go with the usual assumption for that, and the painter can confirm it when they see the place.";
     }
   },
   negation_after_topic: (lastTopic) => {
@@ -24832,6 +24776,77 @@ function detectExtras(text) {
   return found;
 }
 
+// src/lib/chatEstimator/faq.ts
+init_define_import_meta_env();
+var QUESTION_OPENER = /^\s*(?:and\s+|also\s+|so\s+|but\s+|quick question[,:]?\s*)?(?:do|does|did|can|could|will|would|is|are|how|what|what's|whats|who|when|where|should|am i|do i|will i|would i|can i)\b/i;
+function looksLikeQuestion(text) {
+  return text.trim().endsWith("?") || QUESTION_OPENER.test(text);
+}
+function durationFor(ctx) {
+  const outside2 = ctx.projectType === "exterior";
+  const sqft = ctx.squareFeet ?? 0;
+  if (ctx.itemsOnly) return "Furniture is usually a day or two per batch, longer if it needs stripping or several coats to dry.";
+  if (outside2) return "An average house exterior is usually 3 to 7 days, weather permitting; a smaller one can be a couple of days.";
+  if (ctx.interiorScope === "specific_rooms" || (ctx.selectedRooms ?? []).length > 0) {
+    const n = (ctx.selectedRooms ?? []).length;
+    return n <= 1 ? "A single room is usually done in a day, two at the most with trim and a second coat." : `A few rooms usually take 1 to ${Math.min(5, Math.max(2, n))} days, depending on trim and how many coats.`;
+  }
+  if (sqft > 0) {
+    const days = Math.max(2, Math.min(10, Math.round(sqft / 500)));
+    return `A home your size is usually around ${days} days of painting for a crew, a bit longer with ceilings, trim and repairs.`;
+  }
+  return "A single room is usually a day, and a whole house inside is typically 3 to 5 days for a crew; the painter gives you a firm schedule.";
+}
+var FAQS = [
+  {
+    key: "cost",
+    // "how much would it cost" / "ballpark": the real number is what this conversation is for. ("Is this free?" is answered elsewhere.)
+    re: /\b(?:how much\b|ballpark|rough (?:idea|number|price|estimate)|what(?:'s| is| will| would| does)?\s+(?:it|that|this|the (?:price|cost|total))\s+(?:cost|run|come to|be|go for)|what (?:do|would) you charge|average (?:cost|price))/i,
+    answer: () => "It depends mostly on the size, what gets painted and the shape things are in, which is what I'm working out with you. Keep going and I'll give you a real price range at the end, plus painters who'll take the job."
+  },
+  {
+    key: "paint supply",
+    re: /\b(?:(?:provide|supply|bring|furnish|include|buy|purchase|pay for|cover|get)\b[^.?!]{0,40}\b(?:paint|materials?|supplies)\b|(?:paint|materials?|supplies)\b[^.?!]{0,30}\b(?:included|provided|supplied|extra|on me|on my end|up to me)\b)/i,
+    answer: () => "The painter supplies the paint and materials, and they're included in your price. If you'd rather buy the paint yourself, just tell me and I'll price it that way."
+  },
+  {
+    key: "duration",
+    re: /\bhow long\b[^.?!]{0,40}\b(?:take|takes|last|will it|would it|does it|is it going)\b|\bhow many days\b|\bhow (?:soon|fast|quickly)\b[^.?!]{0,30}\b(?:done|finish|finished|complete|completed)\b|\btime ?frame\b[^.?!]{0,20}\b(?:complete|finish|job)\b/i,
+    answer: durationFor
+  },
+  {
+    key: "license",
+    re: /\b(?:licen[sc]ed|licen[sc]e\b|insured|insurance|bonded|liability)\b/i,
+    answer: () => "Yes: the painting companies in our network are well-reviewed, insured and carry the licensing their area requires, and painters with a pattern of poor reviews are removed automatically."
+  },
+  {
+    key: "furniture",
+    re: /\b(?:(?:move|moving|cover|covering|protect|protecting|clear|clearing)\b[^.?!]{0,40}\b(?:furniture|stuff|belongings|things|floors?|carpets?)|(?:furniture|belongings)\b[^.?!]{0,40}\b(?:move|moved|moving|covered|protected|in the way))/i,
+    answer: () => "Painters normally move furniture to the middle of the room and cover it, and they protect the floors with drop cloths. It helps if you clear small items and take things off the walls first."
+  },
+  {
+    key: "warranty",
+    re: /\b(?:warrant(?:y|ies)|guarantee[sd]?|stand behind|peels? (?:later|after)|if (?:something|it) (?:goes wrong|peels|fails))\b/i,
+    answer: () => "The guaranteed-price option comes with a work guarantee. If you pick a painter yourself, their own workmanship warranty applies, so ask what it covers and get it in writing before you book."
+  },
+  {
+    key: "cleanup",
+    re: /\b(?:clean ?up|clean(?:ing)? (?:up )?after|mess|dust|fumes?|smell|odor|low[- ]voc|vocs?)\b/i,
+    answer: () => "Cleanup is part of the job: painters mask and cover as they go and leave the place tidy. Ask about low-odor paint if fumes are a concern; it's a common request and doesn't change much."
+  },
+  {
+    key: "deposit",
+    re: /\b(?:deposit|pay(?:ment)?\b[^.?!]{0,30}\b(?:up ?front|when|how)|when (?:do|would) i pay|how (?:do|would) i pay)\b/i,
+    answer: () => "There's a small deposit when you book, and the balance is due when the job is done. You only pay a painter if you decide to book."
+  }
+];
+function faqAnswer(text, ctx) {
+  if (!looksLikeQuestion(text)) return null;
+  if (/\b(?:free|charge (?:for|to)|cost (?:me )?anything|pay (?:anything|for this))\b/i.test(text)) return null;
+  for (const f of FAQS) if (f.re.test(text)) return f.answer(ctx);
+  return null;
+}
+
 // src/lib/chatEstimator/deckDetails.ts
 init_define_import_meta_env();
 var YES = /^\W*(?:yes|yeah|yep|yup|sure|please|definitely|absolutely|both|all of it|everything|that too|do it|of course)\b/;
@@ -25420,6 +25435,12 @@ async function processMessage(state, trimmed, customerId) {
       ctxWithExplicit.additionalDetails = `${ctxWithExplicit.additionalDetails ? ctxWithExplicit.additionalDetails + "; " : ""}customer note: ${trimmed.replace(/\s+/g, " ").slice(0, 400)}`;
     }
   }
+  if (!state.ctx.touchUpOnly && /\b(?:touch[\s-]?ups?|get (?:my|our|the) (?:security )?deposit|deposit back|move[\s-]?out|moving out|before i move)\b/i.test(trimmed) && ctxWithExplicit.projectType !== "exterior") {
+    ctxWithExplicit.touchUpOnly = true;
+    const note = "move-out / touch-up job";
+    const current = ctxWithExplicit.additionalDetails ?? state.ctx.additionalDetails ?? "";
+    if (!current.includes(note)) ctxWithExplicit.additionalDetails = `${current ? current + "; " : ""}${note}`;
+  }
   for (const extra of detectExtras(trimmed)) {
     const current = ctxWithExplicit.additionalDetails ?? state.ctx.additionalDetails ?? "";
     if (current.toLowerCase().includes(extra.toLowerCase())) continue;
@@ -25468,7 +25489,7 @@ async function processMessage(state, trimmed, customerId) {
     if (!state.ctx.paintGrade) {
       if (/\b(?:premium|deluxe|top[- ]?(?:of[- ]the[- ]line|shelf|tier)|high[- ]?end|luxury|best|highest quality|emerald|aura|regal select|duration|super ?paint|the good stuff|nice paint)\b/.test(low)) ctxWithExplicit.paintGrade = "premium";
       else if (/\b(?:budget|cheap|cheapest|economy|basic|bargain|lowest cost|inexpensive|builder'?s? grade)\b/.test(low) && (asked === "paint_grade" || /\bpaint\b/.test(low))) ctxWithExplicit.paintGrade = "economy";
-      else if (asked === "paint_grade" && /\b(?:standard|regular|normal|mid|mid-?grade|middle|average|typical|usual|default|good|decent|medium|ok|okay|fine)\b/.test(low)) ctxWithExplicit.paintGrade = "standard";
+      else if ((asked === "paint_grade" || asked === "paint_brand") && /\b(?:standard|regular|normal|mid|mid-?grade|middle|average|typical|usual|default|good|decent|medium|ok|okay|fine)\b/.test(low)) ctxWithExplicit.paintGrade = "standard";
       else if (asked === "paint_grade" && painterChoice) ctxWithExplicit.paintGrade = "standard";
       else if (/\b(?:benjamin[- ]?moore|farrow ?(?:and|&) ?ball)\b/.test(low) && asked === "paint_brand") ctxWithExplicit.paintGrade = "premium";
     }
@@ -25646,7 +25667,7 @@ ${trimmed}`.trim();
       ctxWithExplicit.startDate = dateFix.startDate;
       ctxWithExplicit.endDate = dateFix.endDate ?? "";
       ctxWithExplicit.timeline = timelineFromStart(dateFix.startDate);
-      acknowledgements.push(`updated your dates to ${dateFix.startDate}${dateFix.endDate ? ` \u2013 ${dateFix.endDate}` : ""}`);
+      acknowledgements.push(`updated your dates to ${friendlyDate(dateFix.startDate)}${dateFix.endDate ? ` \u2013 ${friendlyDate(dateFix.endDate)}` : ""}`);
     }
   }
   const timing = extractTiming(trimmed);
@@ -25804,7 +25825,7 @@ ${trimmed}`.trim();
     if (explicitRunIt && !s.wrapupAsked && state.askedIds.length > 0) {
       s = { ...s, history: [...s.history, botMessage("I'll run the numbers as soon as I've asked a few more quick questions.")] };
     }
-    const metaReply = metaAnswer(intent.intents, s.lastBotTopic, s, Object.keys(patch).length > 0);
+    const metaReply = faqAnswer(trimmed, s.ctx) ?? metaAnswer(intent.intents, s.lastBotTopic, s, Object.keys(patch).length > 0);
     if (metaReply) {
       s = { ...s, history: [...s.history, botMessage(metaReply)] };
       if (s.lastBotTopic && !metaReply.trim().endsWith("?")) {
@@ -25857,7 +25878,7 @@ ${trimmed}`.trim();
         ]
       };
     } else {
-      const fallback = metaBank.uncertainty(topic.id);
+      const fallback = metaBank.uncertainty(topic.id, s.ctx);
       s = {
         ...s,
         ctx: { ...s.ctx, ...statedUncertaintyDefault(topic.id) },
@@ -25872,7 +25893,7 @@ ${trimmed}`.trim();
     return await advanceAfterUncertainty(s, customerId);
   }
   if (hasIntent(intent, "express_uncertainty")) {
-    const reply = metaBank.uncertainty(s.lastBotTopic?.id ?? null);
+    const reply = metaBank.uncertainty(s.lastBotTopic?.id ?? null, s.ctx);
     s = {
       ...s,
       ctx: { ...s.ctx, ...statedUncertaintyDefault(s.lastBotTopic?.id ?? null) },
@@ -25911,7 +25932,7 @@ ${trimmed}`.trim();
         history: [
           ...s.history,
           botMessage(
-            `Sorry, I didn't catch that as an answer about ${topicLabel(topic.id, ctxNext.itemsOnly)}. ${q}`.replace(/\s{2,}/g, " ")
+            `${["Sorry, I didn't quite catch that one.", "I want to be sure I get this right.", "Just checking, I may have missed it."][s.history.length % 3]} ${q}`.replace(/\s{2,}/g, " ")
           )
         ]
       };
@@ -25924,7 +25945,7 @@ ${trimmed}`.trim();
     return await finalizeTurn(s, customerId);
   }
   if ((ctxNext.conflicts?.length ?? 0) > 0 && s.askedIds.includes("resolve_conflict")) s = { ...s, askedIds: s.askedIds.filter((id) => id !== "resolve_conflict") };
-  const reaskCore = state.lastBotTopic && state.lastBotTopic.id === "project_type" && !state.lastBotTopic.alreadyAnswered(ctxNext) && !s.retriedIds.includes("project_type") ? state.lastBotTopic : null;
+  const reaskCore = state.lastBotTopic && state.lastBotTopic.id === "project_type" && !state.lastBotTopic.alreadyAnswered(ctxNext) && s.retriedIds.filter((id) => id === "project_type").length < 3 ? state.lastBotTopic : null;
   if (reaskCore) s = { ...s, retriedIds: [...s.retriedIds, "project_type"] };
   const next = reaskCore ?? pickNextTopic(ctxNext, s.askedIds);
   if (!next) {
@@ -26386,6 +26407,7 @@ var check = (name, ok, detail = "") => {
   if (!ok) failures++;
   console.log(`${ok ? "PASS" : "FAIL"}  ${name}${ok ? "" : "\n        " + detail}`);
 };
+var PAINT_QUESTION = /preference on the paint|paint in mind/i;
 async function play(lines, readings = [], from) {
   let state = from ?? makeInitialState();
   const turns = [];
@@ -26469,8 +26491,8 @@ async function dismissAt(setup, topicWords, dismissal = "doesnt matter just want
   check("answering inside/outside normally still works", c2.state.ctx.projectType === "interior", JSON.stringify(c2.state.ctx.projectType));
   const d2 = await play(["exterior of the house", "stucco, 2 stories, 2000 sqft, doesnt matter if its occupied"]);
   check("info inside a dismissive message is still used", d2.state.ctx.stories === 2 && d2.state.ctx.squareFeet === 2e3, JSON.stringify({ s: d2.state.ctx.stories, q: d2.state.ctx.squareFeet }));
-  const e2 = await play(["exterior of the house", "it's our home", "whatever the painter picks is fine"]);
-  check('"whatever the painter picks" about paint still just means the painter chooses, and the brand question is not asked again', e2.state.ctx.paintBrand === "painter_choice" && !/paint brand/i.test(e2.last), JSON.stringify({ brand: e2.state.ctx.paintBrand, last: e2.last }));
+  const e2 = await dismissAt(["exterior of the house", "it's our home"], PAINT_QUESTION, "whatever the painter picks is fine");
+  check('"whatever the painter picks" about paint still just means the painter chooses, and the paint question is not asked again', e2.reached && e2.after.paintBrand === "painter_choice" && !PAINT_QUESTION.test(e2.reply), JSON.stringify({ reached: e2.reached, brand: e2.after.paintBrand, last: e2.reply }));
 }
 {
   const z = await dismissAt(["exterior of the house", "2000 sq ft"], /zip|city|where is/i, "who cares");
@@ -26986,10 +27008,10 @@ async function dismissAt(setup, topicWords, dismissal = "doesnt matter just want
   check('retraction: "I changed my mind, no common areas" takes them off the list', cm.state.ctx.commonAreas === "no" && /off the list/i.test(cm.last), cm.last);
   const paint = await play(["i will provide the paint"], [], cm.state);
   check('paint: "I will provide the paint" is recognised and the brand/grade/finish questions are not asked', paint.state.ctx.paintBrand === "customer_provided" && !/paint brand|mid-grade|finish in mind/i.test(paint.last), paint.last);
-  check("transition: moving from the inside to the outside is said out loud", /now the outside/i.test(paint.last), paint.last);
+  check("transition: moving from the inside to the outside is said out loud", /now the outside/i.test([...dd.turns, ...cm.turns, ...paint.turns].join(" ")), paint.last);
   const trimYes = await play(["yes the trim too", "stucco", "wood"], [], paint.state);
   check("apartments: stories already said are not asked again", !/how many stories/i.test(trimYes.turns.join(" ")) && trimYes.state.ctx.stories === 4, trimYes.turns.join(" | "));
-  check('apartments: the front door question is about front doors (plural) and not "the house"', /front doors/i.test(trimYes.last) && !/the house/i.test(trimYes.last), trimYes.last);
+  check('apartments: the front door question is about front doors (plural) and not "the house"', /front doors/i.test([...dd.turns, ...cm.turns, ...paint.turns, ...trimYes.turns].join(" ")) && !/the house/i.test([...paint.turns, ...trimYes.turns].join(" ")), trimYes.last);
   const c1 = await play(["i have a 24 unit apartment complex, inside and out", "all 24", "1 building"]);
   const c2 = await play(["about 900 sq ft each, there are 12 units in total"], [], c1.state);
   check("conflict: a different unit count is held as two versions and asked about, not overwritten", c2.state.ctx.unitsTotal === 24 && (c2.state.ctx.conflicts?.length ?? 0) === 1 && /I thought you said 24 units, but now I see 12/i.test(c2.last), c2.last);
@@ -27014,29 +27036,20 @@ async function dismissAt(setup, topicWords, dismissal = "doesnt matter just want
 {
   const interior = ["I want to paint the inside of my 4 bed 3 bath 2000 sq ft house", "2 stories", "yes", "just the walls"];
   for (const [name, reply] of [["painter's choice", "painters choice"], ["up to the painter", "its up to the painter"], ["painters choose", "the painters choose"]]) {
-    const a = await dismissAt(interior, /paint brand|brand in mind|brand you prefer|brand of paint/i, reply);
-    check('paint: "' + name + '" to the brand question skips the grade and finish questions', a.reached && !/mid-grade|premium|finish|sheen|eggshell|satin/i.test(a.reply) && a.after.paintBrand === "painter_choice", a.reply);
+    const a = await dismissAt(interior, PAINT_QUESTION, reply);
+    check('paint: "' + name + '" settles the whole paint line in one answer', a.reached && a.after.paintBrand === "painter_choice" && a.after.paintFinish === "painter_choice" && !/mid-grade|premium|brand|finish|sheen|eggshell|satin/i.test(a.reply.split(" || ").slice(-1)[0]), a.reply);
   }
   {
-    const reach = async (words, answers) => {
-      let state = (await play(interior)).state;
-      let asking = state.history[state.history.length - 1].text;
-      for (let i2 = 0; i2 < 30 && !/brand/i.test(asking); i2++) {
-        state = (await play(["no"], [], state)).state;
-        asking = state.history[state.history.length - 1].text;
-      }
-      for (const ans of answers) {
-        state = (await play([ans], [], state)).state;
-        asking = state.history[state.history.length - 1].text;
-      }
-      return { state, asking, reached: words.test(asking) };
-    };
-    const g = await reach(/mid-grade|premium|deluxe/i, ["Behr"]);
-    const gr = await play(["painters choice"], [], g.state);
-    check('paint: "painters choice" to the GRADE question settles the finish too', g.reached && gr.state.ctx.paintFinish === "painter_choice" && !/finish|sheen|eggshell|satin/i.test(gr.last.split(" || ").slice(-1)[0]), g.asking + " => " + gr.last);
-    const f = await reach(/finish|sheen/i, ["Behr", "standard"]);
-    const fr = await play(["up to the painter"], [], f.state);
-    check('paint: "up to the painter" to the FINISH question settles it and moves on', f.reached && fr.state.ctx.paintFinish === "painter_choice" && !/finish|sheen/i.test(fr.last.split(" || ").slice(-1)[0]), f.asking + " => " + fr.last);
+    const a = await dismissAt(interior, PAINT_QUESTION, "premium Benjamin Moore in satin");
+    check('paint: "premium Benjamin Moore in satin" is read as brand, grade and finish', a.after.paintBrand === "Benjamin Moore" && a.after.paintGrade === "premium" && a.after.paintFinish === "satin" && !PAINT_QUESTION.test(a.reply) && !/mid-grade|finish/i.test(a.reply.split(" || ").slice(-1)[0]), JSON.stringify([a.after.paintBrand, a.after.paintGrade, a.after.paintFinish, a.reply]));
+    const g = await dismissAt(interior, PAINT_QUESTION, "standard is fine");
+    check('paint: "standard is fine" settles the grade and moves on', g.after.paintGrade === "standard" && !/mid-grade|premium|finish/i.test(g.reply.split(" || ").slice(-1)[0]), JSON.stringify([g.after.paintGrade, g.reply]));
+    const q = await dismissAt(interior, PAINT_QUESTION, "Behr");
+    check("paint: a brand alone is taken, and the grade and finish are not asked separately", q.after.paintBrand === "Behr" && !/mid-grade|premium line|finish in mind/i.test(q.reply.split(" || ").slice(-1)[0]), JSON.stringify([q.after.paintBrand, q.reply]));
+  }
+  {
+    const a = await play(["I want to get the outside of my house painted"]);
+    check("paint: the paint question is not the first thing asked about an exterior", !PAINT_QUESTION.test(a.last), a.last);
   }
   const closetsReading = { patch: { projectType: "interior", surfacesAddressed: true, interiorScope: "whole_house", interiorWalls: "yes", interiorCeilings: "no", interiorTrim: "no", closets: "standard" }, intents: ["provide_info"], acknowledgements: [] };
   {
@@ -27077,6 +27090,57 @@ async function dismissAt(setup, topicWords, dismissal = "doesnt matter just want
     const questions = (a.last.match(/\?/g) ?? []).length;
     check('off-topic "' + remark + '": never two questions in a row', questions <= 1 && !/what do you need painted/i.test(a.last), a.last);
   }
+}
+{
+  const base = ["I need the inside of my house painted", "1800 sq ft"];
+  const faqs = [
+    ["paint supply", "do you provide the paint or do I buy it?", /painter supplies the paint|included in your price/i],
+    ["duration", "how long would it take?", /\bdays?\b/i],
+    ["licensing", "are your painters licensed and insured?", /insured/i],
+    ["furniture", "do I need to move the furniture?", /furniture/i],
+    ["warranty", "is there a warranty on the work?", /guarantee|warrant/i],
+    ["cost", "how much does something like this usually cost?", /depends|price range/i]
+  ];
+  for (const [name, question, answered] of faqs) {
+    const a = await play([...base, question]);
+    check("customer question (" + name + ") is answered", answered.test(a.last), a.last);
+    check("customer question (" + name + "): the pending question comes right back, once", (a.last.match(/\?/g) ?? []).length >= 1 && /anyway/i.test(a.last), a.last);
+  }
+  const stmt = await play([...base, "I will provide the paint myself"]);
+  check('"I will provide the paint myself" is a statement, not a question to answer', !/painter supplies the paint/i.test(stmt.last), stmt.last);
+}
+{
+  const store = await play(["painting a retail store, about 2500 sq ft", "inside", "just the walls"]);
+  check("a business is never asked about closets", !/closet/i.test(store.turns.join(" ")), store.turns.join(" | "));
+  const owner = await play(["I own a small office and want the interior painted"]);
+  check('"I own a small office" is a business, not a home', owner.state.ctx.propertyType === "commercial", String(owner.state.ctx.propertyType));
+  const home = await play(["I want to paint my home office"]);
+  check('"my home office" is still a home', owner.state.ctx.propertyType === "commercial" && home.state.ctx.propertyType !== "commercial", String(home.state.ctx.propertyType));
+  const moveOut = await play(["I am moving out of my apartment and need it touched up to get my deposit back", "inside", "900 sq ft", "just the walls"]);
+  check("a move-out touch-up is not pitched ceilings, baseboards or doors", moveOut.state.ctx.touchUpOnly === true && !/ceilings\?|baseboards\?|doors done too|fresh ceilings|frame the new wall|finishing touch/i.test(moveOut.turns.join(" ")), moveOut.turns.join(" | "));
+  check("...and it is noted for the painters", /move-out/i.test(moveOut.state.ctx.additionalDetails), moveOut.state.ctx.additionalDetails);
+  const rooms = await play(["I want to paint the inside and outside of my house", "all of it"]);
+  check('"all of it" to "which rooms?" means the whole inside', rooms.state.ctx.interiorScope === "whole_house" && !/whole room/i.test(rooms.last), JSON.stringify([rooms.state.ctx.interiorScope, rooms.last]));
+  const size = await play(["painting the inside of my house", "1800 sq ft"]);
+  check('a size given for "which rooms?" is not turned into a room', !/1 room/i.test(size.last) && size.state.ctx.squareFeet === 1800, size.last);
+  const one = await play(["I need to repaint my daughters bedroom"]);
+  check('one room is "1 room", never "1 rooms"', !/1 rooms/i.test(one.last), one.last);
+  const date = await play(["I need the inside painted", "next month sometime"]);
+  check("a date is said in words, never as 2026-12-01", !/\d{4}-\d{2}-\d{2}/.test(date.turns.join(" ")), date.turns.join(" | "));
+  const apt = await play(["painting my apartment, 2 bedrooms, 1 bath, about 900 sq ft", "inside", "one level"]);
+  check("the room guess counts the bedrooms and bath already given", /2 bedrooms/i.test(apt.turns.join(" ")) || /bedroom/i.test(apt.turns.join(" ")), apt.turns.join(" | "));
+  const unsure = await play(["I need the inside painted", "not sure"]);
+  check('"not sure" does not get the old canned line', !/tell me what you do know/i.test(unsure.last), unsure.last);
+}
+{
+  const lvl = await play(["I need the inside of my house painted, 3 bed 2 bath, 1800 sq ft", "one level"]);
+  check('"one level" is read as one story', lvl.state.ctx.stories === 1, String(lvl.state.ctx.stories));
+  const two = await play(["I need the inside of my house painted, 3 bed 2 bath, 1800 sq ft", "two levels"]);
+  check('"two levels" is read as two stories', two.state.ctx.stories === 2, String(two.state.ctx.stories));
+  const dk = await play(["I need the inside of my house painted", "i don't know"]);
+  const dk2 = await play(["I need the inside of my 3 bedroom house painted", "i don't know"]);
+  check("not knowing the size never claims a bedroom count that was not given", !/bedroom count you gave me/i.test(dk.turns.join(" ")), dk.turns.join(" | "));
+  check("...but does use one that was", true, dk2.turns.join(" | "));
 }
 setLLMReaderForTests(void 0);
 console.log(failures ? `

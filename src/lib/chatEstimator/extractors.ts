@@ -61,7 +61,9 @@ const STORY_WORDS: Record<string, number> = { single: 1, one: 1, two: 2, three: 
 export function extractStories(text: string): number | null {
   const t = text.toLowerCase();
   const m = t.match(/\b(\d{1,2}|single|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)[\s-]*stor(?:y|ey|ies)\b/)
-    || t.match(/\b(\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)[\s-]*floors?[\s-]*(?:building|complex|apartment|tower|house|home|property)\b/);
+    || t.match(/\b(\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)[\s-]*floors?[\s-]*(?:building|complex|apartment|tower|house|home|property)\b/)
+    // "one level", "two levels", "single floor": what a customer says to "one story or two?"
+    || t.match(/\b(\d|single|one|two|three)[\s-]*(?:levels?|floors?)\b(?![\s-]*(?:of|above|below|up|down))/);
   if (!m) return null;
   const n = /^\d/.test(m[1]) ? parseInt(m[1], 10) : STORY_WORDS[m[1]];
   return n >= 1 && n <= 40 ? n : null;
@@ -451,7 +453,7 @@ export function extractPropertyType(text: string): 'residential' | 'rental' | 'm
     return 'multi_unit';
   }
   if (isMultiUnitText(t)) return 'multi_unit';
-  if (/\b(restaurant|cafe|coffee shop|bakery|salon|barber ?shop|spa|gym|fitness|church|chapel|clinic|dental|dentist|medical (?:office|practice)|warehouse|retail|storefront|boutique|showroom|brewery|daycare|day care|our business|my business|our store|my store|our shop|my shop|our office|my office suite)\b/.test(t)) {
+  if (/\b(restaurant|cafe|coffee shop|bakery|salon|barber ?shop|spa|gym|fitness|church|chapel|clinic|dental|dentist|medical (?:office|practice)|warehouse|retail|storefront|boutique|showroom|brewery|daycare|day care|our business|my business|our store|my store|our shop|my shop|our office|my office suite|(?:own|run|manage|operate) (?:a |an |our |my |the )?(?:small |little |new |busy |medical |dental |law )?(?:office|shop|store)s?\b(?! (?:room|at home))|(?:the|our) (?:small |new )?(?:office|shop|store)\b)\b/.test(t) && !/\bhome office\b|\boffice room\b|\bguest\b/.test(t)) {
     return 'commercial';
   }
   if (/\b(commercial (?:space|property|building)|office (?:space|building|park|tower|suite|complex)|retail (?:store|space)|warehouse|storefront)\b/.test(t)) {
@@ -474,7 +476,7 @@ export function extractPropertyType(text: string): 'residential' | 'rental' | 'm
   return null;
 }
 
-import { extractTiming, timelineFromStart } from './dateParsing';
+import { extractTiming, timelineFromStart, friendlyDate } from './dateParsing';
 import { hasScopeLimiter } from './scopeWords';
 
 /** Timeline urgency — rush jobs command a scheduling premium. */
@@ -1304,7 +1306,7 @@ export function extractAll(text: string, prev: EstimatorContext, lastBotTopicId:
     // just that room — that silently collapses the whole quote.
     patch.selectedRooms = rooms;
     patch.interiorScope = 'specific_rooms';
-    acks.push(`${rooms.length} rooms`);
+    acks.push(rooms.length === 1 ? '1 room' : `${rooms.length} rooms`);
   } else if (
     quantifiedBedBathMention &&
     prev.selectedRooms.length === 0 &&
@@ -1323,12 +1325,22 @@ export function extractAll(text: string, prev: EstimatorContext, lastBotTopicId:
     prev.selectedRooms.length === 0 &&
     text.trim().length > 0 &&
     !/\b(whole|entire|all|every(?:thing)?|throughout)\b/i.test(text) &&
+    !sqft && !/\d[\d,]*\s*(?:sq|square)/i.test(text) && // a size is not the name of a room
     !text.trim().endsWith('?')
   ) {
     // a room we don't have a template for ("the studio", "sewing room"): price it as one ordinary room and say so
     patch.selectedRooms = ['bedroom_2'];
     patch.interiorScope = 'specific_rooms';
     acks.push('1 room');
+  }
+
+  // "all of it", "everything", "the whole place" to "which rooms?" means every room (the whole inside), not the surfaces
+  if (
+    lastBotTopicId === 'which_rooms' && !prev.interiorScope && !patch.interiorScope && prev.selectedRooms.length === 0 &&
+    /\b(?:all of it|everything|the whole (?:house|place|thing|inside|interior)|whole (?:house|place|inside|interior)|entire (?:house|place|inside|interior)|all (?:of )?the rooms|every room|all rooms|throughout|the works)\b/i.test(text)
+  ) {
+    patch.interiorScope = 'whole_house';
+    acks.push('the whole inside');
   }
 
   const cab = extractCabinets(text);
@@ -1525,7 +1537,7 @@ export function extractAll(text: string, prev: EstimatorContext, lastBotTopicId:
   if (timing.startDate && !prev.startDate) {
     patch.startDate = timing.startDate;
     if (timing.endDate) patch.endDate = timing.endDate;
-    acks.push(timing.endDate ? `dates ${timing.startDate} to ${timing.endDate}` : `start around ${timing.startDate}`);
+    acks.push(timing.endDate ? `dates ${friendlyDate(timing.startDate)} to ${friendlyDate(timing.endDate)}` : `start around ${friendlyDate(timing.startDate)}`);
     // A concrete date also answers the old "how urgent?" question.
     if (!prev.timeline && !patch.timeline) patch.timeline = timelineFromStart(timing.startDate);
   } else if (timing.endDate && !prev.endDate) {
@@ -1789,7 +1801,7 @@ export function extractAll(text: string, prev: EstimatorContext, lastBotTopicId:
   // question, so a reply naming one thing in passing ("just doors and door casings", answering the baseboards upsell) must not
   // be read as the customer re-declaring the whole job's scope — that would silently drop surfaces already established earlier
   // (the same class of bug as a backyard fence silently erasing an already-established whole-house exterior job).
-  const scopeBlockedBy = ['trim_door_finish', 'cabinet_finish', 'trim_scope', 'condition', 'property_ownership', 'color_change', 'location', 'timeline_and_access', 'commercial_access', 'siding', 'stories', 'house_size', 'room_size', 'reno_context', 'popcorn_extent', 'upsell_ceilings', 'upsell_trim', 'upsell_doors', 'upsell_cabinets'];
+  const scopeBlockedBy = ['which_rooms', 'trim_door_finish', 'cabinet_finish', 'trim_scope', 'condition', 'property_ownership', 'color_change', 'location', 'timeline_and_access', 'commercial_access', 'siding', 'stories', 'house_size', 'room_size', 'reno_context', 'popcorn_extent', 'upsell_ceilings', 'upsell_trim', 'upsell_doors', 'upsell_cabinets'];
   const surf = lastBotTopicId && (scopeBlockedBy.includes(lastBotTopicId) || lastBotTopicId.startsWith('ext_')) ? ({} as ReturnType<typeof extractSurfaceScope>) : extractSurfaceScope(text);
   // A plain list as the answer to "which surfaces?" ("walls", "walls and ceilings", "walls ceilings trim") means exactly those.
   const onlySurfaceWords = /^\s*(?:(?:just|only|and|the|with|plus|also|,|&|\+)\s*)*(?:(?:walls?|ceilings?|trim|baseboards?|doors?)\s*(?:,|and|&|\+|\/)?\s*)+[.!]?\s*$/i.test(text);

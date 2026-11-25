@@ -26,7 +26,7 @@ import { hasScopeLimiter } from './scopeWords';
 import { lookupZipCity } from '../zipLookup';
 import { reviewLocally, reviewWithAI, hasPaintingScope, keepMessage, isFlaggedMessage, profanityScan, type ReviewResult } from './conversationReview';
 import { saysItemsOnly } from './items';
-import { isDenial, denialIsAboutScope, topicLabel, recentRecognized, recapSentence } from './clarify';
+import { isDenial, denialIsAboutScope, recentRecognized, recapSentence } from './clarify';
 import { readRetraction } from './retractions';
 import { holdConflicts, settleConflicts } from './conflicts';
 import { extractTiming, timelineFromStart } from './dateParsing';
@@ -46,6 +46,8 @@ import { makeInitialContext } from './defaultContext';
 import { extractDetails, DETAIL_TOPIC_IDS } from './details';
 import { GREETING_TEXT } from '../greeting';
 import { detectExtras } from './extras';
+import { faqAnswer } from './faq';
+import { friendlyDate } from './dateParsing';
 import { readDeckDetails, isDeckTalk } from './deckDetails';
 import { readItemAnswers } from './itemInterviews';
 import { detectFriction, type FrictionEvent } from './selfCheck';
@@ -766,6 +768,12 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
       ctxWithExplicit.additionalDetails = `${ctxWithExplicit.additionalDetails ? ctxWithExplicit.additionalDetails + '; ' : ''}customer note: ${trimmed.replace(/\s+/g, ' ').slice(0, 400)}`;
     }
   }
+  if (!state.ctx.touchUpOnly && /\b(?:touch[\s-]?ups?|get (?:my|our|the) (?:security )?deposit|deposit back|move[\s-]?out|moving out|before i move)\b/i.test(trimmed) && ctxWithExplicit.projectType !== 'exterior') {
+    ctxWithExplicit.touchUpOnly = true;
+    const note = 'move-out / touch-up job';
+    const current = ctxWithExplicit.additionalDetails ?? state.ctx.additionalDetails ?? '';
+    if (!current.includes(note)) ctxWithExplicit.additionalDetails = `${current ? current + '; ' : ''}${note}`;
+  }
   // Small items named in passing ("no, but I have one shelf in the kitchen I need painted"): written into the notes the painters see and
   // acknowledged, whatever question is pending. This never changes which question comes next.
   for (const extra of detectExtras(trimmed)) {
@@ -821,7 +829,7 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
     if (!state.ctx.paintGrade) {
       if (/\b(?:premium|deluxe|top[- ]?(?:of[- ]the[- ]line|shelf|tier)|high[- ]?end|luxury|best|highest quality|emerald|aura|regal select|duration|super ?paint|the good stuff|nice paint)\b/.test(low)) ctxWithExplicit.paintGrade = 'premium';
       else if (/\b(?:budget|cheap|cheapest|economy|basic|bargain|lowest cost|inexpensive|builder'?s? grade)\b/.test(low) && (asked === 'paint_grade' || /\bpaint\b/.test(low))) ctxWithExplicit.paintGrade = 'economy';
-      else if (asked === 'paint_grade' && /\b(?:standard|regular|normal|mid|mid-?grade|middle|average|typical|usual|default|good|decent|medium|ok|okay|fine)\b/.test(low)) ctxWithExplicit.paintGrade = 'standard';
+      else if ((asked === 'paint_grade' || asked === 'paint_brand') && /\b(?:standard|regular|normal|mid|mid-?grade|middle|average|typical|usual|default|good|decent|medium|ok|okay|fine)\b/.test(low)) ctxWithExplicit.paintGrade = 'standard';
       else if (asked === 'paint_grade' && painterChoice) ctxWithExplicit.paintGrade = 'standard';
       else if (/\b(?:benjamin[- ]?moore|farrow ?(?:and|&) ?ball)\b/.test(low) && asked === 'paint_brand') ctxWithExplicit.paintGrade = 'premium'; // these brands are premium lines by default
     }
@@ -1018,7 +1026,7 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
       ctxWithExplicit.startDate = dateFix.startDate;
       ctxWithExplicit.endDate = dateFix.endDate ?? '';
       ctxWithExplicit.timeline = timelineFromStart(dateFix.startDate);
-      acknowledgements.push(`updated your dates to ${dateFix.startDate}${dateFix.endDate ? ` – ${dateFix.endDate}` : ''}`);
+      acknowledgements.push(`updated your dates to ${friendlyDate(dateFix.startDate)}${dateFix.endDate ? ` – ${friendlyDate(dateFix.endDate)}` : ''}`);
     }
   }
 
@@ -1250,7 +1258,7 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
       s = { ...s, history: [...s.history, botMessage("I'll run the numbers as soon as I've asked a few more quick questions.")] };
     }
     // 3. Handle meta questions / clarifications before advancing topics
-    const metaReply = metaAnswer(intent.intents, s.lastBotTopic, s, Object.keys(patch).length > 0);
+    const metaReply = faqAnswer(trimmed, s.ctx) ?? metaAnswer(intent.intents, s.lastBotTopic, s, Object.keys(patch).length > 0);
     if (metaReply) {
       s = { ...s, history: [...s.history, botMessage(metaReply)] };
       // After answering a meta question, re-ask the topic we were on (if any)
@@ -1352,7 +1360,7 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
         ],
       };
     } else {
-      const fallback = metaBank.uncertainty(topic.id);
+      const fallback = metaBank.uncertainty(topic.id, s.ctx);
       s = {
         ...s,
         ctx: { ...s.ctx, ...statedUncertaintyDefault(topic.id) },
@@ -1367,7 +1375,7 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
     return await advanceAfterUncertainty(s, customerId);
   }
   if (hasIntent(intent, 'express_uncertainty')) {
-    const reply = metaBank.uncertainty(s.lastBotTopic?.id ?? null);
+    const reply = metaBank.uncertainty(s.lastBotTopic?.id ?? null, s.ctx);
     s = {
       ...s,
       ctx: { ...s.ctx, ...statedUncertaintyDefault(s.lastBotTopic?.id ?? null) },
@@ -1439,7 +1447,7 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
         history: [
           ...s.history,
           botMessage(
-            `Sorry, I didn't catch that as an answer about ${topicLabel(topic.id, ctxNext.itemsOnly)}. ${q}`.replace(/\s{2,}/g, ' '),
+            `${['Sorry, I didn\'t quite catch that one.', 'I want to be sure I get this right.', 'Just checking, I may have missed it.'][s.history.length % 3]} ${q}`.replace(/\s{2,}/g, ' '),
           ),
         ],
       };
@@ -1461,7 +1469,7 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
   // Inside or outside is what everything else hangs on: when a reply gave other facts but not this one, it is asked again right away (once),
   // not skipped to the next question.
   if ((ctxNext.conflicts?.length ?? 0) > 0 && s.askedIds.includes('resolve_conflict')) s = { ...s, askedIds: s.askedIds.filter((id) => id !== 'resolve_conflict') };
-  const reaskCore = state.lastBotTopic && state.lastBotTopic.id === 'project_type' && !state.lastBotTopic.alreadyAnswered(ctxNext) && !s.retriedIds.includes('project_type') ? state.lastBotTopic : null;
+  const reaskCore = state.lastBotTopic && state.lastBotTopic.id === 'project_type' && !state.lastBotTopic.alreadyAnswered(ctxNext) && s.retriedIds.filter((id) => id === 'project_type').length < 3 ? state.lastBotTopic : null;
   if (reaskCore) s = { ...s, retriedIds: [...s.retriedIds, 'project_type'] };
   const next = reaskCore ?? pickNextTopic(ctxNext, s.askedIds);
   if (!next) {

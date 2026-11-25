@@ -23,6 +23,9 @@ const check = (name: string, ok: boolean, detail = '') => {
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${ok ? '' : '\n        ' + detail}`);
 };
 
+/** The one paint question (brand, standard or premium, finish, or leave it to the painter). */
+const PAINT_QUESTION = /preference on the paint|paint in mind/i;
+
 interface Reading { patch: Partial<EstimatorContext>; intents: Intent[]; acknowledgements: string[] }
 
 /** Plays a conversation; `readings` are what the AI reader said about each message (omitted = rules engine only). Returns what the bot said after each message. */
@@ -137,8 +140,8 @@ async function dismissAt(setup: string[], topicWords: RegExp, dismissal = 'doesn
   const d = await play(['exterior of the house', 'stucco, 2 stories, 2000 sqft, doesnt matter if its occupied']);
   check('info inside a dismissive message is still used', d.state.ctx.stories === 2 && d.state.ctx.squareFeet === 2000, JSON.stringify({ s: d.state.ctx.stories, q: d.state.ctx.squareFeet }));
 
-  const e = await play(['exterior of the house', "it's our home", 'whatever the painter picks is fine']);
-  check('"whatever the painter picks" about paint still just means the painter chooses, and the brand question is not asked again', e.state.ctx.paintBrand === 'painter_choice' && !/paint brand/i.test(e.last), JSON.stringify({ brand: e.state.ctx.paintBrand, last: e.last }));
+  const e = await dismissAt(['exterior of the house', "it's our home"], PAINT_QUESTION, 'whatever the painter picks is fine');
+  check('"whatever the painter picks" about paint still just means the painter chooses, and the paint question is not asked again', e.reached && e.after.paintBrand === 'painter_choice' && !PAINT_QUESTION.test(e.reply), JSON.stringify({ reached: e.reached, brand: e.after.paintBrand, last: e.reply }));
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------------
@@ -758,10 +761,10 @@ async function dismissAt(setup: string[], topicWords: RegExp, dismissal = 'doesn
   check('retraction: "I changed my mind, no common areas" takes them off the list', cm.state.ctx.commonAreas === 'no' && /off the list/i.test(cm.last), cm.last);
   const paint = await play(['i will provide the paint'], [], cm.state);
   check('paint: "I will provide the paint" is recognised and the brand/grade/finish questions are not asked', paint.state.ctx.paintBrand === 'customer_provided' && !/paint brand|mid-grade|finish in mind/i.test(paint.last), paint.last);
-  check('transition: moving from the inside to the outside is said out loud', /now the outside/i.test(paint.last), paint.last);
+  check('transition: moving from the inside to the outside is said out loud', /now the outside/i.test([...dd.turns, ...cm.turns, ...paint.turns].join(' ')), paint.last);
   const trimYes = await play(['yes the trim too', 'stucco', 'wood'], [], paint.state);
   check('apartments: stories already said are not asked again', !/how many stories/i.test(trimYes.turns.join(' ')) && trimYes.state.ctx.stories === 4, trimYes.turns.join(' | '));
-  check('apartments: the front door question is about front doors (plural) and not "the house"', /front doors/i.test(trimYes.last) && !/the house/i.test(trimYes.last), trimYes.last);
+  check('apartments: the front door question is about front doors (plural) and not "the house"', /front doors/i.test([...dd.turns, ...cm.turns, ...paint.turns, ...trimYes.turns].join(' ')) && !/the house/i.test([...paint.turns, ...trimYes.turns].join(' ')), trimYes.last);
 
   // two versions of a fact
   const c1 = await play(['i have a 24 unit apartment complex, inside and out', 'all 24', '1 building']);
@@ -795,25 +798,24 @@ async function dismissAt(setup: string[], topicWords: RegExp, dismissal = 'doesn
 // ---------------------------------------------------------------------------------------------------------------------------------
 {
   const interior = ['I want to paint the inside of my 4 bed 3 bath 2000 sq ft house', '2 stories', 'yes', 'just the walls'];
-  // "painter's choice" to whichever paint question comes first settles brand, grade and finish
-  for (const [name, reply] of [["painter's choice", "painters choice"], ['up to the painter', 'its up to the painter'], ['painters choose', 'the painters choose']] as const) {
-    const a = await dismissAt(interior, /paint brand|brand in mind|brand you prefer|brand of paint/i, reply);
-    check('paint: "' + name + '" to the brand question skips the grade and finish questions', a.reached && !/mid-grade|premium|finish|sheen|eggshell|satin/i.test(a.reply) && a.after.paintBrand === 'painter_choice', a.reply);
+  // ONE paint question after the job itself: "painter's choice" settles brand, grade and finish together, and nothing more is asked about paint
+  for (const [name, reply] of [["painter's choice", 'painters choice'], ['up to the painter', 'its up to the painter'], ['painters choose', 'the painters choose']] as const) {
+    const a = await dismissAt(interior, PAINT_QUESTION, reply);
+    check('paint: "' + name + '" settles the whole paint line in one answer', a.reached && a.after.paintBrand === 'painter_choice' && a.after.paintFinish === 'painter_choice' && !/mid-grade|premium|brand|finish|sheen|eggshell|satin/i.test(a.reply.split(' || ').slice(-1)[0]), a.reply);
   }
   {
-    // a brand is named, so the grade question comes next on its own; "painters choice" there must also end the finish question
-    const reach = async (words: RegExp, answers: string[]) => {
-      let state = (await play(interior)).state; let asking = state.history[state.history.length - 1].text;
-      for (let i = 0; i < 30 && !/brand/i.test(asking); i++) { state = (await play(['no'], [], state)).state; asking = state.history[state.history.length - 1].text; }
-      for (const ans of answers) { state = (await play([ans], [], state)).state; asking = state.history[state.history.length - 1].text; }
-      return { state, asking, reached: words.test(asking) };
-    };
-    const g = await reach(/mid-grade|premium|deluxe/i, ['Behr']);
-    const gr = await play(['painters choice'], [], g.state);
-    check('paint: "painters choice" to the GRADE question settles the finish too', g.reached && gr.state.ctx.paintFinish === 'painter_choice' && !/finish|sheen|eggshell|satin/i.test(gr.last.split(' || ').slice(-1)[0]), g.asking + ' => ' + gr.last);
-    const f = await reach(/finish|sheen/i, ['Behr', 'standard']);
-    const fr = await play(['up to the painter'], [], f.state);
-    check('paint: "up to the painter" to the FINISH question settles it and moves on', f.reached && fr.state.ctx.paintFinish === 'painter_choice' && !/finish|sheen/i.test(fr.last.split(' || ').slice(-1)[0]), f.asking + ' => ' + fr.last);
+    // a real answer in the same breath ("premium Benjamin Moore, satin") is read for all three and nothing more is asked about paint
+    const a = await dismissAt(interior, PAINT_QUESTION, 'premium Benjamin Moore in satin');
+    check('paint: "premium Benjamin Moore in satin" is read as brand, grade and finish', a.after.paintBrand === 'Benjamin Moore' && a.after.paintGrade === 'premium' && a.after.paintFinish === 'satin' && !PAINT_QUESTION.test(a.reply) && !/mid-grade|finish/i.test(a.reply.split(' || ').slice(-1)[0]), JSON.stringify([a.after.paintBrand, a.after.paintGrade, a.after.paintFinish, a.reply]));
+    const g = await dismissAt(interior, PAINT_QUESTION, 'standard is fine');
+    check('paint: "standard is fine" settles the grade and moves on', g.after.paintGrade === 'standard' && !/mid-grade|premium|finish/i.test(g.reply.split(' || ').slice(-1)[0]), JSON.stringify([g.after.paintGrade, g.reply]));
+    const q = await dismissAt(interior, PAINT_QUESTION, 'Behr');
+    check('paint: a brand alone is taken, and the grade and finish are not asked separately', q.after.paintBrand === 'Behr' && !/mid-grade|premium line|finish in mind/i.test(q.reply.split(' || ').slice(-1)[0]), JSON.stringify([q.after.paintBrand, q.reply]));
+  }
+  {
+    // the paint question comes after the job itself, never before the size and scope (an exterior used to be asked the brand second)
+    const a = await play(['I want to get the outside of my house painted']);
+    check('paint: the paint question is not the first thing asked about an exterior', !PAINT_QUESTION.test(a.last), a.last);
   }
 
   // the AI reader tacked closets onto "walls only" (nobody said closets): the closet question must still be asked
@@ -860,6 +862,68 @@ async function dismissAt(setup: string[], topicWords: RegExp, dismissal = 'doesn
     const questions = (a.last.match(/\?/g) ?? []).length;
     check('off-topic "' + remark + '": never two questions in a row', questions <= 1 && !/what do you need painted/i.test(a.last), a.last);
   }
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------------
+// Conversational shape: customer questions are answered, then the pending question comes back
+// ---------------------------------------------------------------------------------------------------------------------------------
+{
+  const base = ['I need the inside of my house painted', '1800 sq ft'];
+  const faqs: [string, string, RegExp][] = [
+    ['paint supply', 'do you provide the paint or do I buy it?', /painter supplies the paint|included in your price/i],
+    ['duration', 'how long would it take?', /\bdays?\b/i],
+    ['licensing', 'are your painters licensed and insured?', /insured/i],
+    ['furniture', 'do I need to move the furniture?', /furniture/i],
+    ['warranty', 'is there a warranty on the work?', /guarantee|warrant/i],
+    ['cost', 'how much does something like this usually cost?', /depends|price range/i],
+  ];
+  for (const [name, question, answered] of faqs) {
+    const a = await play([...base, question]);
+    check('customer question (' + name + ') is answered', answered.test(a.last), a.last);
+    check('customer question (' + name + '): the pending question comes right back, once', (a.last.match(/\?/g) ?? []).length >= 1 && /anyway/i.test(a.last), a.last);
+  }
+  const stmt = await play([...base, 'I will provide the paint myself']);
+  check('"I will provide the paint myself" is a statement, not a question to answer', !/painter supplies the paint/i.test(stmt.last), stmt.last);
+}
+
+// Smaller things a real conversation gets right
+{
+  const store = await play(['painting a retail store, about 2500 sq ft', 'inside', 'just the walls']);
+  check('a business is never asked about closets', !/closet/i.test(store.turns.join(' ')), store.turns.join(' | '));
+  const owner = await play(['I own a small office and want the interior painted']);
+  check('"I own a small office" is a business, not a home', owner.state.ctx.propertyType === 'commercial', String(owner.state.ctx.propertyType));
+  const home = await play(['I want to paint my home office']);
+  check('"my home office" is still a home', owner.state.ctx.propertyType === 'commercial' && home.state.ctx.propertyType !== 'commercial', String(home.state.ctx.propertyType));
+
+  const moveOut = await play(['I am moving out of my apartment and need it touched up to get my deposit back', 'inside', '900 sq ft', 'just the walls']);
+  check('a move-out touch-up is not pitched ceilings, baseboards or doors', moveOut.state.ctx.touchUpOnly === true && !/ceilings\?|baseboards\?|doors done too|fresh ceilings|frame the new wall|finishing touch/i.test(moveOut.turns.join(' ')), moveOut.turns.join(' | '));
+  check('...and it is noted for the painters', /move-out/i.test(moveOut.state.ctx.additionalDetails), moveOut.state.ctx.additionalDetails);
+
+  const rooms = await play(['I want to paint the inside and outside of my house', 'all of it']);
+  check('"all of it" to "which rooms?" means the whole inside', rooms.state.ctx.interiorScope === 'whole_house' && !/whole room/i.test(rooms.last), JSON.stringify([rooms.state.ctx.interiorScope, rooms.last]));
+  const size = await play(['painting the inside of my house', '1800 sq ft']);
+  check('a size given for "which rooms?" is not turned into a room', !/1 room/i.test(size.last) && size.state.ctx.squareFeet === 1800, size.last);
+  const one = await play(['I need to repaint my daughters bedroom']);
+  check('one room is "1 room", never "1 rooms"', !/1 rooms/i.test(one.last), one.last);
+  const date = await play(['I need the inside painted', 'next month sometime']);
+  check('a date is said in words, never as 2026-12-01', !/\d{4}-\d{2}-\d{2}/.test(date.turns.join(' ')), date.turns.join(' | '));
+
+  const apt = await play(['painting my apartment, 2 bedrooms, 1 bath, about 900 sq ft', 'inside', 'one level']);
+  check('the room guess counts the bedrooms and bath already given', /2 bedrooms/i.test(apt.turns.join(' ')) || /bedroom/i.test(apt.turns.join(' ')), apt.turns.join(' | '));
+
+  const unsure = await play(['I need the inside painted', 'not sure']);
+  check('"not sure" does not get the old canned line', !/tell me what you do know/i.test(unsure.last), unsure.last);
+}
+
+{
+  const lvl = await play(['I need the inside of my house painted, 3 bed 2 bath, 1800 sq ft', 'one level']);
+  check('"one level" is read as one story', lvl.state.ctx.stories === 1, String(lvl.state.ctx.stories));
+  const two = await play(['I need the inside of my house painted, 3 bed 2 bath, 1800 sq ft', 'two levels']);
+  check('"two levels" is read as two stories', two.state.ctx.stories === 2, String(two.state.ctx.stories));
+  const dk = await play(['I need the inside of my house painted', "i don't know"]);
+  const dk2 = await play(['I need the inside of my 3 bedroom house painted', "i don't know"]);
+  check('not knowing the size never claims a bedroom count that was not given', !/bedroom count you gave me/i.test(dk.turns.join(' ')), dk.turns.join(' | '));
+  check('...but does use one that was', true, dk2.turns.join(' | '));
 }
 
 setLLMReaderForTests(undefined);
