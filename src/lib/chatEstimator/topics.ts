@@ -775,6 +775,26 @@ export const TOPICS: Topic[] = [
     example: () => "Something like '30 doors and drawers' or 'about 24'.",
   },
   {
+    // Flat slab doors are the least work; shaker and raised panels have recessed panels and grooves to cut in and clean; glass fronts, arches and glaze are the most.
+    id: 'cabinet_style',
+    priority: 29.81,
+    relevant: (c) => cabinetsInJob(c) && !c.cabinetStyle,
+    alreadyAnswered: (c) => !!c.cabinetStyle || extDone(c, 'cabinet_style'),
+    ask: (c) => pick(["What style are the cabinet doors: flat slab, shaker (a recessed flat panel), raised panel, or something more detailed like glass fronts or arches?", "Are the doors flat slabs, shaker, raised panel, or more detailed (glass, arches, glaze)?"], seed(c)),
+    clarify: () => "Flat slab doors are quickest. Shaker and raised-panel doors have panels, grooves and corners to cut in and clean, and glass fronts, arches or a glaze take longer still.",
+    example: () => "Say 'flat', 'shaker', 'raised panel' or 'glass fronts'.",
+  },
+  {
+    // Heavy visible grain (oak) has to be filled to get a smooth painted finish; chips, grease and dings have to be cleaned and repaired first.
+    id: 'cabinet_condition',
+    priority: 29.815,
+    relevant: (c) => cabinetsInJob(c) && !c.cabinetCondition,
+    alreadyAnswered: (c) => !!c.cabinetCondition || extDone(c, 'cabinet_condition'),
+    ask: (c) => pick(["How are the cabinets holding up: smooth and in good shape, heavy wood grain like oak, or worn with chips, grease or damage?", "Are they in good shape, or do they have heavy visible grain (like oak), or chips, grease and dings that need fixing first?"], seed(c)),
+    clarify: () => "Heavy grain like oak has to be filled for a smooth painted finish, and chips, grease and dings need cleaning and repair first. Both add time.",
+    example: () => "Say 'good shape', 'oak with heavy grain' or 'worn and greasy'.",
+  },
+  {
     id: 'cabinet_scope',
     priority: 29.82,
     relevant: (c) => cabinetsInJob(c) && c.cabinetScope !== 'inside_too',
@@ -1509,7 +1529,7 @@ TOPICS.push(...itemTopics());
 const ITEM_JOB_TOPICS = new Set(['furniture_kind', 'chair_count', 'chair_kind', 'furniture_finish', 'color_change', 'paint_brand', 'location', 'timeline_and_access']);
 const COMPONENT_COMMON = ['color_change', 'paint_brand', 'location', 'timeline_and_access'];
 const COMPONENT_TOPICS: Record<string, string[]> = {
-  cabinets: ['cabinet_count', 'cabinet_finish', 'cabinet_scope', 'cabinet_method', 'cabinet_hardware'],
+  cabinets: ['cabinet_count', 'cabinet_finish', 'cabinet_style', 'cabinet_condition', 'cabinet_scope', 'cabinet_method', 'cabinet_hardware'],
   builtins: ['builtin_count'],
   mantel: [],
   railing: ['railing_length'],

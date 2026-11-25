@@ -8,7 +8,7 @@
 
 import type { EstimatorContext } from '../types';
 import { extractCeilingHeight } from './extractors';
-import { detectItems, itemsPhrase, mentionsGenericFurniture, parseChairKind, parseFurnitureFinish, saysItemsOnly, CHAIR_KIND_LABEL } from './items';
+import { detectItems, itemsPhrase, mentionsGenericFurniture, parseCabinetCondition, parseCabinetStyle, parseChairKind, parseFurnitureFinish, saysItemsOnly, CABINET_CONDITION_LABEL, CABINET_STYLE_LABEL, CHAIR_KIND_LABEL } from './items';
 
 const NUMBER_WORDS: Record<string, number> = {
   a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12,
@@ -418,6 +418,17 @@ export function extractDetails(text: string, ctx: EstimatorContext, askedId: str
     const kind = parseChairKind(text, askedId === 'chair_kind');
     if (kind) { patch.chairKind = kind; acks.push(CHAIR_KIND_LABEL[kind]); }
   }
+  // the cabinet doors' style and how the cabinets are holding up: said anywhere, or in answer to the question
+  if (ctx.cabinets !== 'none' || /\bcabinet|\bvanit/.test(t)) {
+    if (!ctx.cabinetStyle) {
+      const k = parseCabinetStyle(text, askedId === 'cabinet_style');
+      if (k) { patch.cabinetStyle = k; acks.push(CABINET_STYLE_LABEL[k]); }
+    }
+    if (!ctx.cabinetCondition) {
+      const k = parseCabinetCondition(text, askedId === 'cabinet_condition');
+      if (k) { patch.cabinetCondition = k; acks.push(CABINET_CONDITION_LABEL[k]); }
+    }
+  }
   // sprayed or brushed cabinets, said in passing
   if (!ctx.cabinetMethod && (ctx.cabinets !== 'none' || /\bcabinet|\bvanit/.test(t))) {
     if (/\bspray(?:ed|ing)?\b/.test(t)) patch.cabinetMethod = 'sprayed';
@@ -610,6 +621,6 @@ export function extractDetails(text: string, ctx: EstimatorContext, askedId: str
 /** Topic ids of the follow-up questions in this file (their answers are recorded so they are never asked twice). */
 export const DETAIL_TOPIC_IDS = new Set([
   'unit_count', 'building_count', 'ceiling_height', 'common_areas', 'balcony_count', 'ext_mu_access',
-  'closets_included', 'closet_shelves', 'door_count', 'window_count', 'chair_count', 'chair_kind', 'furniture_kind', 'furniture_finish', 'cabinet_count', 'cabinet_scope', 'cabinet_method', 'cabinet_hardware', 'builtin_count', 'shutter_count', 'closet_count', 'fence_size', 'fence_height', 'deck_size', 'overhang_size', 'railing_length',
+  'closets_included', 'closet_shelves', 'door_count', 'window_count', 'chair_count', 'chair_kind', 'cabinet_style', 'cabinet_condition', 'furniture_kind', 'furniture_finish', 'cabinet_count', 'cabinet_scope', 'cabinet_method', 'cabinet_hardware', 'builtin_count', 'shutter_count', 'closet_count', 'fence_size', 'fence_height', 'deck_size', 'overhang_size', 'railing_length',
   'detail_rooms', 'detail_feet_crown', 'detail_feet_chair_rail', 'detail_feet_trim', 'detail_sqft_wainscot', 'ext_style',
 ]);

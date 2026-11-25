@@ -56,6 +56,23 @@ export const TOUCH_UP_FACTOR = 0.7;
  * only that multi-slat and complex joinery cost more.)
  */
 export const CHAIR_KIND_FACTOR: Record<string, number> = { dining: 1, arm: 1.3, stool: 0.85, rocker: 1.4, upholstered: 1.15 };
+/**
+ * Cabinets. The door style, the condition and a color change all change the work (published guides name them as price drivers but give no percentages, so
+ * these are estimates): shaker and raised panels have recessed panels and grooves to cut in and clean; heavy grain (oak) needs filling; chips, grease and dings need
+ * repair first; going to a new color (or dark to light) needs extra coats.
+ */
+export const CABINET_STYLE_FACTOR: Record<string, number> = { slab: 1, shaker: 1.06, raised: 1.12, detailed: 1.18 };
+export const CABINET_CONDITION_FACTOR: Record<string, number> = { good: 1, grain: 1.1, worn: 1.15 };
+
+/**
+ * Doors. A painter doing one door is paid for the trip and the set-up; doing a dozen in a house they are already painting is far cheaper per door. So: a
+ * door-only job pays the full per-door rate (and the minimum job charge covers one or two), more doors earn a count discount, and doors that ride along with
+ * other main work (walls, ceilings, cabinets, a house exterior) are cheaper again because the crew is already there.
+ */
+export function doorCountFactor(n: number): number {
+  return n <= 2 ? 1 : n <= 5 ? 0.92 : n <= 10 ? 0.85 : n <= 20 ? 0.78 : 0.72;
+}
+export const DOOR_ON_SITE_FACTOR = 0.88;
 const TIER_FACTOR = { full: 1, one_coat: ONE_COAT_FACTOR, touch_up: TOUCH_UP_FACTOR } as const;
 
 /**
@@ -266,6 +283,8 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
       const materialFactor = ctx.doorMaterial === 'metal' || ctx.doorMaterial === 'fiberglass' ? 0.85
         : ctx.doorMaterial === 'mixed' ? 0.92
         : 1.0;
+      // (the job has other main work: walls, ceilings or cabinets: the crew is already there)
+      const doorsRideAlong = ctx.interiorWalls !== 'no' || ctx.interiorCeilings === 'yes' || ctx.cabinets !== 'none';
       let doorTotal = 0;
 
       for (const type of doorTypes) {
@@ -277,7 +296,8 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
       lineItems.push({
         category: 'Interior',
         description: `Interior Doors (${doorCount})${WOOD_FINISH_NOTE[ctx.doorFinish] ? ` (${WOOD_FINISH_NOTE[ctx.doorFinish]})` : ''}`,
-        amount: doorTotal * materialFactor * regionalMult * conditionMultiplier * volEff * woodFinishFactor(ctx.doorFinish, ctx),
+        // (no wall-area volume discount here: doors have their own, by count and by whether the crew is already on site)
+        amount: doorTotal * materialFactor * regionalMult * conditionMultiplier * doorCountFactor(doorCount) * (doorsRideAlong ? DOOR_ON_SITE_FACTOR : 1) * woodFinishFactor(ctx.doorFinish, ctx),
         key: 'doors',
       });
 
@@ -327,6 +347,8 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
       const finishNote = CABINET_FINISH_NOTE[ctx.cabinetFinish] ?? '';
       // Painting inside cabinets adds 40-60% (more surfaces, tighter access, more coats)
       const scopeMultiplier = ctx.cabinetScope === 'inside_too' ? 1.50 : 1.0;
+      const cabinetDetailFactor = (CABINET_STYLE_FACTOR[ctx.cabinetStyle ?? ''] ?? 1) * (CABINET_CONDITION_FACTOR[ctx.cabinetCondition ?? ''] ?? 1) * (ctx.interiorColorChange === 'dramatic' ? 1.2 : ctx.interiorColorChange === 'different' ? 1.1 : 1);
+      const detailNote = [ctx.cabinetStyle && ctx.cabinetStyle !== 'slab' ? ctx.cabinetStyle + ' doors' : '', ctx.cabinetCondition === 'grain' ? 'grain filling' : ctx.cabinetCondition === 'worn' ? 'repairs first' : '', ctx.interiorColorChange === 'dramatic' ? 'dark to light, extra coats' : ctx.interiorColorChange === 'different' ? 'new color, extra coat' : ''].filter(Boolean).join(', ');
       for (const loc of locations) {
         // a customer-given door/drawer count prices the kitchen by the piece ($70-125 a door, drawer fronts about
         // half) plus the fixed removal, degloss and masking time; otherwise by kitchen size
@@ -338,9 +360,9 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
           : `${capitalize(loc)} Cabinets${finishNote ? ` (${finishNote.replace(/^, /, '')})` : ''}`;
         lineItems.push({
           category: 'Interior',
-          description: desc,
+          description: detailNote ? `${desc} (${detailNote})` : desc,
           // spraying (masking, set-up, a smooth factory-like finish) costs more than brushing and rolling
-          amount: rate * scopeMultiplier * regionalMult * cabinetComplexity * (ctx.cabinetMethod === 'sprayed' ? 1.2 : 1),
+          amount: rate * scopeMultiplier * regionalMult * cabinetComplexity * (ctx.cabinetMethod === 'sprayed' ? 1.2 : 1) * cabinetDetailFactor,
           key: `cabinets:${loc}`,
         });
       }
@@ -681,18 +703,20 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
       });
     }
 
+    // Garage and entry doors ride along with a house exterior the crew is already painting: cheaper than a trip just for the door (see DOOR_ON_SITE_FACTOR)
+    const extDoorFactor = bodyPainted ? DOOR_ON_SITE_FACTOR : 1;
     // Garage door
     if (off('garage_door')) {
       // taken off the price
     } else if (ctx.garageDoor === 'single') {
-      lineItems.push({ category: 'Exterior', description: 'Garage Door (Single)', amount: BASE_RATES.doors.garage_single * regionalMult, key: 'garage_door' });
+      lineItems.push({ category: 'Exterior', description: 'Garage Door (Single)', amount: BASE_RATES.doors.garage_single * regionalMult * extDoorFactor, key: 'garage_door' });
     } else if (ctx.garageDoor === 'double') {
-      lineItems.push({ category: 'Exterior', description: 'Garage Door (Double)', amount: BASE_RATES.doors.garage_double * regionalMult, key: 'garage_door' });
+      lineItems.push({ category: 'Exterior', description: 'Garage Door (Double)', amount: BASE_RATES.doors.garage_double * regionalMult * extDoorFactor, key: 'garage_door' });
     }
 
     // Entry door
     if (ctx.entryDoor === 'yes' && !off('entry_door')) {
-      lineItems.push({ category: 'Exterior', description: 'Entry Door', amount: BASE_RATES.doors.entry_door * regionalMult, key: 'entry_door' });
+      lineItems.push({ category: 'Exterior', description: 'Entry Door', amount: BASE_RATES.doors.entry_door * regionalMult * extDoorFactor, key: 'entry_door' });
     }
 
     // Railings — material drives prep (metal needs rust treatment + primer)

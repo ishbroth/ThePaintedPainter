@@ -51,6 +51,8 @@ const TOPIC_PROMPTS: Record<string, string> = {
   closet_count: 'How many closets?',
   chair_count: 'How many chairs?',
   chair_kind: 'Dining, arms, stools, rockers?',
+  cabinet_style: 'Flat, shaker, raised panel?',
+  cabinet_condition: 'Good shape, oak grain, worn?',
   shutter_count: 'How many shutters?',
   railing_length: 'About how many feet of railing?',
   fence_size: 'How long (linear feet) and how tall is the fence?',

@@ -18407,6 +18407,24 @@ function parseChairKind(text, answering) {
   if (answering && /^\s*(?:regular|normal|standard|plain|just|the usual|basic|simple|wood(?:en)?)\b/.test(t2)) return "dining";
   return null;
 }
+var CABINET_STYLE_LABEL = { slab: "flat slab doors", shaker: "shaker doors", raised: "raised-panel doors", detailed: "detailed doors (glass, arches or glaze)" };
+var CABINET_CONDITION_LABEL = { good: "cabinets in good shape", grain: "heavy wood grain to fill", worn: "worn cabinets needing repair" };
+function parseCabinetStyle(text, answering) {
+  const t2 = text.toLowerCase();
+  if (/\b(?:glass[\s-]?front|glass (?:doors?|panels?|inserts?)|beadboard|ornate|carved|arched|glazed|glaze|distressed|mullion|fancy|very detailed)\b/.test(t2)) return "detailed";
+  if (/\braised[\s-]?panels?\b|\bcathedral\b/.test(t2)) return "raised";
+  if (/\bshaker\b|\brecessed[\s-]?panels?\b|\bflat[\s-]?panels?\b|\bfive[\s-]?piece\b/.test(t2)) return "shaker";
+  if (/\bslab\b|\bflat[\s-]?(?:front|door|cabinet)s?\b|\bplain flat\b|\bmodern flat\b|\bsmooth flat\b/.test(t2)) return "slab";
+  if (answering && /^\s*(?:flat|plain|smooth|simple|modern)\b/.test(t2)) return "slab";
+  return null;
+}
+function parseCabinetCondition(text, answering) {
+  const t2 = text.toLowerCase();
+  if (/\b(?:chipped|chipping|peeling|worn|damaged|damage|dings?|dented|scratch\w*|greasy|grease|grimy|sticky|water damage|warped|beat up|beaten|rough shape|needs? repairs?|falling apart|cracked)\b/.test(t2)) return "worn";
+  if (/\b(?:oak|open[\s-]?grain|heavy grain|visible grain|deep grain|wood grain|grainy|knotty)\b/.test(t2)) return "grain";
+  if (answering && /\b(?:good (?:shape|condition)|great (?:shape|condition)|fine|smooth|no (?:damage|issues?|problems?|chips?)|pretty good|decent|like new|clean|nothing)\b/.test(t2)) return "good";
+  return null;
+}
 
 // src/lib/chatEstimator/details.ts
 var NUMBER_WORDS2 = {
@@ -18766,6 +18784,22 @@ function extractDetails(text, ctx, askedId) {
       acks.push(CHAIR_KIND_LABEL[kind]);
     }
   }
+  if (ctx.cabinets !== "none" || /\bcabinet|\bvanit/.test(t2)) {
+    if (!ctx.cabinetStyle) {
+      const k = parseCabinetStyle(text, askedId === "cabinet_style");
+      if (k) {
+        patch.cabinetStyle = k;
+        acks.push(CABINET_STYLE_LABEL[k]);
+      }
+    }
+    if (!ctx.cabinetCondition) {
+      const k = parseCabinetCondition(text, askedId === "cabinet_condition");
+      if (k) {
+        patch.cabinetCondition = k;
+        acks.push(CABINET_CONDITION_LABEL[k]);
+      }
+    }
+  }
   if (!ctx.cabinetMethod && (ctx.cabinets !== "none" || /\bcabinet|\bvanit/.test(t2))) {
     if (/\bspray(?:ed|ing)?\b/.test(t2)) patch.cabinetMethod = "sprayed";
     else if (/\b(?:brushed|brush and roll|brushed and rolled)\b/.test(t2)) patch.cabinetMethod = "brushed";
@@ -19082,6 +19116,8 @@ var DETAIL_TOPIC_IDS = /* @__PURE__ */ new Set([
   "window_count",
   "chair_count",
   "chair_kind",
+  "cabinet_style",
+  "cabinet_condition",
   "furniture_kind",
   "furniture_finish",
   "cabinet_count",
@@ -20413,6 +20449,12 @@ function repeatUnitFactor(units) {
 var ONE_COAT_FACTOR = 0.85;
 var TOUCH_UP_FACTOR = 0.7;
 var CHAIR_KIND_FACTOR = { dining: 1, arm: 1.3, stool: 0.85, rocker: 1.4, upholstered: 1.15 };
+var CABINET_STYLE_FACTOR = { slab: 1, shaker: 1.06, raised: 1.12, detailed: 1.18 };
+var CABINET_CONDITION_FACTOR = { good: 1, grain: 1.1, worn: 1.15 };
+function doorCountFactor(n) {
+  return n <= 2 ? 1 : n <= 5 ? 0.92 : n <= 10 ? 0.85 : n <= 20 ? 0.78 : 0.72;
+}
+var DOOR_ON_SITE_FACTOR = 0.88;
 var TIER_FACTOR = { full: 1, one_coat: ONE_COAT_FACTOR, touch_up: TOUCH_UP_FACTOR };
 function interiorTreatmentBlend(ctx, rooms, surface) {
   const turnover = ctx.propertyType === "rental" && ctx.occupancy === "vacant";
@@ -20565,6 +20607,7 @@ function calculateEstimate(ctx) {
       const doorCount = ctx.doorCount || Math.round(layout.totalDoors * roomFraction);
       const doorTypes = ctx.doorTypes.length > 0 ? ctx.doorTypes : ["standard"];
       const materialFactor = ctx.doorMaterial === "metal" || ctx.doorMaterial === "fiberglass" ? 0.85 : ctx.doorMaterial === "mixed" ? 0.92 : 1;
+      const doorsRideAlong = ctx.interiorWalls !== "no" || ctx.interiorCeilings === "yes" || ctx.cabinets !== "none";
       let doorTotal = 0;
       for (const type of doorTypes) {
         const countForType = Math.ceil(doorCount / doorTypes.length);
@@ -20574,7 +20617,8 @@ function calculateEstimate(ctx) {
       lineItems.push({
         category: "Interior",
         description: `Interior Doors (${doorCount})${WOOD_FINISH_NOTE[ctx.doorFinish] ? ` (${WOOD_FINISH_NOTE[ctx.doorFinish]})` : ""}`,
-        amount: doorTotal * materialFactor * regionalMult * conditionMultiplier * volEff * woodFinishFactor(ctx.doorFinish, ctx),
+        // (no wall-area volume discount here: doors have their own, by count and by whether the crew is already on site)
+        amount: doorTotal * materialFactor * regionalMult * conditionMultiplier * doorCountFactor(doorCount) * (doorsRideAlong ? DOOR_ON_SITE_FACTOR : 1) * woodFinishFactor(ctx.doorFinish, ctx),
         key: "doors"
       });
       if (ctx.doorFrames === "yes") {
@@ -20611,14 +20655,16 @@ function calculateEstimate(ctx) {
       const cabinetComplexity = finishMultiplier ?? (ctx.hasStainedWood === "yes" ? LABOR_COMPLEXITY.cabinet_refinish : 1);
       const finishNote = CABINET_FINISH_NOTE[ctx.cabinetFinish] ?? "";
       const scopeMultiplier = ctx.cabinetScope === "inside_too" ? 1.5 : 1;
+      const cabinetDetailFactor = (CABINET_STYLE_FACTOR[ctx.cabinetStyle ?? ""] ?? 1) * (CABINET_CONDITION_FACTOR[ctx.cabinetCondition ?? ""] ?? 1) * (ctx.interiorColorChange === "dramatic" ? 1.2 : ctx.interiorColorChange === "different" ? 1.1 : 1);
+      const detailNote = [ctx.cabinetStyle && ctx.cabinetStyle !== "slab" ? ctx.cabinetStyle + " doors" : "", ctx.cabinetCondition === "grain" ? "grain filling" : ctx.cabinetCondition === "worn" ? "repairs first" : "", ctx.interiorColorChange === "dramatic" ? "dark to light, extra coats" : ctx.interiorColorChange === "different" ? "new color, extra coat" : ""].filter(Boolean).join(", ");
       for (const loc of locations) {
         const rate = loc === "kitchen" && ctx.cabinetDoorCount ? ctx.cabinetDoorCount * RESOLVED_BASE_RATES.cabinets.per_door + RESOLVED_BASE_RATES.cabinets.kitchen_setup : getCabinetRate(loc, sqft);
         const desc = ctx.cabinetScope === "inside_too" ? `${capitalize(loc)} Cabinets (inside + out${finishNote})` : `${capitalize(loc)} Cabinets${finishNote ? ` (${finishNote.replace(/^, /, "")})` : ""}`;
         lineItems.push({
           category: "Interior",
-          description: desc,
+          description: detailNote ? `${desc} (${detailNote})` : desc,
           // spraying (masking, set-up, a smooth factory-like finish) costs more than brushing and rolling
-          amount: rate * scopeMultiplier * regionalMult * cabinetComplexity * (ctx.cabinetMethod === "sprayed" ? 1.2 : 1),
+          amount: rate * scopeMultiplier * regionalMult * cabinetComplexity * (ctx.cabinetMethod === "sprayed" ? 1.2 : 1) * cabinetDetailFactor,
           key: `cabinets:${loc}`
         });
       }
@@ -20875,14 +20921,15 @@ function calculateEstimate(ctx) {
         key: "ext_shutters"
       });
     }
+    const extDoorFactor = bodyPainted ? DOOR_ON_SITE_FACTOR : 1;
     if (off("garage_door")) {
     } else if (ctx.garageDoor === "single") {
-      lineItems.push({ category: "Exterior", description: "Garage Door (Single)", amount: RESOLVED_BASE_RATES.doors.garage_single * regionalMult, key: "garage_door" });
+      lineItems.push({ category: "Exterior", description: "Garage Door (Single)", amount: RESOLVED_BASE_RATES.doors.garage_single * regionalMult * extDoorFactor, key: "garage_door" });
     } else if (ctx.garageDoor === "double") {
-      lineItems.push({ category: "Exterior", description: "Garage Door (Double)", amount: RESOLVED_BASE_RATES.doors.garage_double * regionalMult, key: "garage_door" });
+      lineItems.push({ category: "Exterior", description: "Garage Door (Double)", amount: RESOLVED_BASE_RATES.doors.garage_double * regionalMult * extDoorFactor, key: "garage_door" });
     }
     if (ctx.entryDoor === "yes" && !off("entry_door")) {
-      lineItems.push({ category: "Exterior", description: "Entry Door", amount: RESOLVED_BASE_RATES.doors.entry_door * regionalMult, key: "entry_door" });
+      lineItems.push({ category: "Exterior", description: "Entry Door", amount: RESOLVED_BASE_RATES.doors.entry_door * regionalMult * extDoorFactor, key: "entry_door" });
     }
     if (ctx.railings === "yes" && !off("railings")) {
       const railingFt = ctx.stairRailFeet || Math.round(Math.sqrt(sqft / (ctx.stories || 1)) * 0.3) || 20;
@@ -23363,6 +23410,26 @@ var TOPICS = [
     example: () => "Something like '30 doors and drawers' or 'about 24'."
   },
   {
+    // Flat slab doors are the least work; shaker and raised panels have recessed panels and grooves to cut in and clean; glass fronts, arches and glaze are the most.
+    id: "cabinet_style",
+    priority: 29.81,
+    relevant: (c2) => cabinetsInJob(c2) && !c2.cabinetStyle,
+    alreadyAnswered: (c2) => !!c2.cabinetStyle || extDone(c2, "cabinet_style"),
+    ask: (c2) => pick2(["What style are the cabinet doors: flat slab, shaker (a recessed flat panel), raised panel, or something more detailed like glass fronts or arches?", "Are the doors flat slabs, shaker, raised panel, or more detailed (glass, arches, glaze)?"], seed(c2)),
+    clarify: () => "Flat slab doors are quickest. Shaker and raised-panel doors have panels, grooves and corners to cut in and clean, and glass fronts, arches or a glaze take longer still.",
+    example: () => "Say 'flat', 'shaker', 'raised panel' or 'glass fronts'."
+  },
+  {
+    // Heavy visible grain (oak) has to be filled to get a smooth painted finish; chips, grease and dings have to be cleaned and repaired first.
+    id: "cabinet_condition",
+    priority: 29.815,
+    relevant: (c2) => cabinetsInJob(c2) && !c2.cabinetCondition,
+    alreadyAnswered: (c2) => !!c2.cabinetCondition || extDone(c2, "cabinet_condition"),
+    ask: (c2) => pick2(["How are the cabinets holding up: smooth and in good shape, heavy wood grain like oak, or worn with chips, grease or damage?", "Are they in good shape, or do they have heavy visible grain (like oak), or chips, grease and dings that need fixing first?"], seed(c2)),
+    clarify: () => "Heavy grain like oak has to be filled for a smooth painted finish, and chips, grease and dings need cleaning and repair first. Both add time.",
+    example: () => "Say 'good shape', 'oak with heavy grain' or 'worn and greasy'."
+  },
+  {
     id: "cabinet_scope",
     priority: 29.82,
     relevant: (c2) => cabinetsInJob(c2) && c2.cabinetScope !== "inside_too",
@@ -24011,7 +24078,7 @@ TOPICS.push(...itemTopics());
 var ITEM_JOB_TOPICS = /* @__PURE__ */ new Set(["furniture_kind", "chair_count", "chair_kind", "furniture_finish", "color_change", "paint_brand", "location", "timeline_and_access"]);
 var COMPONENT_COMMON = ["color_change", "paint_brand", "location", "timeline_and_access"];
 var COMPONENT_TOPICS = {
-  cabinets: ["cabinet_count", "cabinet_finish", "cabinet_scope", "cabinet_method", "cabinet_hardware"],
+  cabinets: ["cabinet_count", "cabinet_finish", "cabinet_style", "cabinet_condition", "cabinet_scope", "cabinet_method", "cabinet_hardware"],
   builtins: ["builtin_count"],
   mantel: [],
   railing: ["railing_length"]
@@ -24762,6 +24829,10 @@ function highestPriceAssumption(topicId, ctx) {
       return { patch: { extAnswered: withExt(ctx, topicId) }, say: "No problem, I'll estimate that from the usual size, and you can change the number when you see the price." };
     case "chair_kind":
       return { patch: { chairKind: "arm", extAnswered: withExt(ctx, topicId) }, say: higher("armchairs") };
+    case "cabinet_style":
+      return { patch: { cabinetStyle: "raised", extAnswered: withExt(ctx, topicId) }, say: higher("raised-panel doors") };
+    case "cabinet_condition":
+      return { patch: { cabinetCondition: "grain", extAnswered: withExt(ctx, topicId) }, say: higher("cabinets with some grain to fill") };
     case "location":
       return {
         patch: {},
@@ -26735,6 +26806,8 @@ var TOPIC_PROMPTS = {
   closet_count: "How many closets?",
   chair_count: "How many chairs?",
   chair_kind: "Dining, arms, stools, rockers?",
+  cabinet_style: "Flat, shaker, raised panel?",
+  cabinet_condition: "Good shape, oak grain, worn?",
   shutter_count: "How many shutters?",
   railing_length: "About how many feet of railing?",
   fence_size: "How long (linear feet) and how tall is the fence?",
@@ -27271,12 +27344,13 @@ async function dismissAt(setup, topicWords, dismissal = "doesnt matter just want
   check("a room job that mentions a table or chair rail is still a room job", !r2.state.ctx.itemsOnly, JSON.stringify({ only: r2.state.ctx.itemsOnly, items: r2.state.ctx.furnitureItems }));
 }
 {
-  const noDoorsAndDrawers = (t2) => t2.replace(/\[\[[^\]]*\]\]/g, "").replace(/doors,? (?:and )?drawer(?: fronts)?|doors and frames|drawer fronts and frames/gi, "");
+  const noDoorsAndDrawers = (t2) => t2.replace(/\[\[[^\]]*\]\]/g, "").replace(/doors,? (?:and )?drawer(?: fronts)?|doors and frames|drawer fronts and frames|(?:cabinet|the) doors(?= (?:are|flat|shaker|raised))|cabinet doors|(?:shaker|raised-panel|flat slab|detailed|slab) doors|are the doors flat slabs, shaker[^?]*/gi, "");
   const ROOM_Q = /ceilings?|\bwalls?\b|baseboards?|\btrim\b|\bdoors?\b|ceiling height|how tall|standard ceiling|rental|living (?:here|there)|anyone (?:be |living )|occupied|which rooms|what rooms|how (?:big|large) is (?:that|the)|inside, (?:the )?outside|interior, exterior|painted before|prep concerns|what kind of shape|good shape/i;
   const roomQs = (turns) => turns.map(noDoorsAndDrawers).filter((t2) => ROOM_Q.test(t2));
   const cab = await play([
     "I want my kitchen cabinets painted white",
     "about 30 cabinet doors and drawers, they are oak",
+    "shaker",
     "yes the inside of the boxes too",
     "sprayed",
     "keep the hardware",
@@ -27672,6 +27746,37 @@ async function dismissAt(setup, topicWords, dismissal = "doesnt matter just want
   check('chairs: "bar stools" said up front is read, and the kind is not asked again', said.state.ctx.chairKind === "stool" && !/what kind of chairs/i.test(said.turns.join(" ")), String(said.state.ctx.chairKind) + " " + said.last);
   const ans = await play(["dining chairs with padded seats"], [], kindAsked.state);
   check('chairs: "dining chairs with padded seats" is read as upholstered', ans.state.ctx.chairKind === "upholstered" || ans.state.ctx.chairKind === "dining", String(ans.state.ctx.chairKind));
+}
+{
+  const cabBase = { ...makeInitialState().ctx, projectType: "interior", interiorScope: "specific_rooms", selectedRooms: [], interiorWalls: "no", interiorCeilings: "no", interiorTrim: "no", interiorDoors: "none", cabinets: "kitchen", cabinetDoorCount: 25, cabinetFinish: "painted", zipCode: "64101", surfacesAddressed: true };
+  const cabPrice = (o2) => calculateEstimate({ ...cabBase, ...o2 }).lineItems.filter((l) => /^cabinets/.test(l.key ?? "")).reduce((t2, l) => t2 + l.amount, 0);
+  const plain = cabPrice({});
+  check("cabinets: shaker and raised panels cost more than flat slab, detailed the most", cabPrice({ cabinetStyle: "shaker" }) > cabPrice({ cabinetStyle: "slab" }) && cabPrice({ cabinetStyle: "raised" }) > cabPrice({ cabinetStyle: "shaker" }) && cabPrice({ cabinetStyle: "detailed" }) > cabPrice({ cabinetStyle: "raised" }));
+  check("cabinets: heavy grain and worn cabinets cost more than good ones", cabPrice({ cabinetCondition: "grain" }) > plain && cabPrice({ cabinetCondition: "worn" }) > cabPrice({ cabinetCondition: "grain" }));
+  check("cabinets: a new color (and dark to light) means extra coats", cabPrice({ interiorColorChange: "different" }) > plain && cabPrice({ interiorColorChange: "dramatic" }) > cabPrice({ interiorColorChange: "different" }));
+  const w2 = await play(["I want my kitchen cabinets painted, they are shaker style and they are chipped and greasy"]);
+  check('cabinets: "shaker" and "chipped and greasy" said up front are read', w2.state.ctx.cabinetStyle === "shaker" && w2.state.ctx.cabinetCondition === "worn", JSON.stringify([w2.state.ctx.cabinetStyle, w2.state.ctx.cabinetCondition]));
+  check("cabinets: ...and neither is asked again", !/what style are the cabinet doors|are the doors flat slabs|how are the cabinets holding up|in good shape, or do they have heavy/i.test(w2.turns.join(" ")), w2.turns.join(" | "));
+  const ask = await play(["I want my kitchen cabinets painted"]);
+  let cst = ask.state;
+  let ctxt = cst.history[cst.history.length - 1].text;
+  for (let i2 = 0; i2 < 10 && !/what style are the cabinet doors|are the doors flat slabs/i.test(ctxt); i2++) {
+    cst = (await play(["about 25 doors and drawers", "painted white"][Math.min(i2, 1)] ? [["about 25 doors and drawers", "painted white"][Math.min(i2, 1)]] : ["no"], [], cst)).state;
+    ctxt = cst.history[cst.history.length - 1].text;
+  }
+  check("cabinets: the bot asks what style the doors are", /what style are the cabinet doors|are the doors flat slabs/i.test(ctxt), ctxt);
+  const doorJob = (o2) => calculateEstimate({ ...makeInitialState().ctx, surfacesAddressed: true, zipCode: "64101", ...o2 });
+  const perDoor = (e2) => {
+    const l = e2.lineItems.find((x) => x.key === "doors");
+    return l.amount / Number(/\((\d+)\)/.exec(l.description)[1]);
+  };
+  const only = { projectType: "interior", interiorWalls: "no", interiorCeilings: "no", interiorTrim: "no", interiorDoors: "some", doorsIncluded: true };
+  check("doors: ten doors on their own cost less per door than two", perDoor(doorJob({ ...only, doorCount: 10 })) < perDoor(doorJob({ ...only, doorCount: 2 })));
+  const house = { projectType: "interior", interiorScope: "whole_house", interiorWalls: "yes", interiorCeilings: "yes", interiorTrim: "yes", interiorDoors: "some", doorsIncluded: true, squareFeet: 2e3, bedroomCount: 3, bathroomCount: 2, stories: 1 };
+  check("doors: the same doors cost less per door inside a whole-house job (the crew is already there)", perDoor(doorJob({ ...house, doorCount: 10 })) < perDoor(doorJob({ ...only, doorCount: 10 })));
+  check("doors: one door as the whole job still pays the minimum job charge", doorJob({ ...only, doorCount: 1 }).lineItems.some((l) => /Minimum service charge/.test(l.description)));
+  const extDoors = (body) => doorJob({ projectType: "exterior", exteriorBody: body, sidingType: "stucco", stories: 1, squareFeet: 1800, entryDoor: "yes", garageDoor: "single" }).lineItems.filter((l) => l.key === "entry_door" || l.key === "garage_door").reduce((t2, l) => t2 + l.amount, 0);
+  check("doors: entry and garage doors are cheaper when the whole house exterior is being painted", extDoors("yes") < extDoors("no"));
 }
 setLLMReaderForTests(void 0);
 console.log(failures ? `

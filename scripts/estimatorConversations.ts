@@ -577,7 +577,7 @@ async function dismissAt(setup: string[], topicWords: RegExp, dismissal = 'doesn
 // Cabinets as the whole job, and surfaces the customer ruled out. (Two flaws seen in the live chat: "kitchen cabinets" got "Want me to add the
 // ceilings too?", and "the ceilings too, but not the trim" was followed by "Have the trim and doors been painted before?".)
 {
-  const noDoorsAndDrawers = (t: string) => t.replace(/\[\[[^\]]*\]\]/g, '').replace(/doors,? (?:and )?drawer(?: fronts)?|doors and frames|drawer fronts and frames/gi, '');
+  const noDoorsAndDrawers = (t: string) => t.replace(/\[\[[^\]]*\]\]/g, '').replace(/doors,? (?:and )?drawer(?: fronts)?|doors and frames|drawer fronts and frames|(?:cabinet|the) doors(?= (?:are|flat|shaker|raised))|cabinet doors|(?:shaker|raised-panel|flat slab|detailed|slab) doors|are the doors flat slabs, shaker[^?]*/gi, '');
   const ROOM_Q = /ceilings?|\bwalls?\b|baseboards?|\btrim\b|\bdoors?\b|ceiling height|how tall|standard ceiling|rental|living (?:here|there)|anyone (?:be |living )|occupied|which rooms|what rooms|how (?:big|large) is (?:that|the)|inside, (?:the )?outside|interior, exterior|painted before|prep concerns|what kind of shape|good shape/i;
   const roomQs = (turns: string[]) => turns.map(noDoorsAndDrawers).filter((t) => ROOM_Q.test(t));
 
@@ -585,6 +585,7 @@ async function dismissAt(setup: string[], topicWords: RegExp, dismissal = 'doesn
   const cab = await play([
     'I want my kitchen cabinets painted white',
     'about 30 cabinet doors and drawers, they are oak',
+    'shaker',
     'yes the inside of the boxes too',
     'sprayed',
     'keep the hardware',
@@ -1074,6 +1075,34 @@ async function dismissAt(setup: string[], topicWords: RegExp, dismissal = 'doesn
   check('chairs: "bar stools" said up front is read, and the kind is not asked again', said.state.ctx.chairKind === 'stool' && !/what kind of chairs/i.test(said.turns.join(' ')), String(said.state.ctx.chairKind) + ' ' + said.last);
   const ans = await play(['dining chairs with padded seats'], [], kindAsked.state);
   check('chairs: "dining chairs with padded seats" is read as upholstered', ans.state.ctx.chairKind === 'upholstered' || ans.state.ctx.chairKind === 'dining', String(ans.state.ctx.chairKind));
+}
+
+// Cabinets: style, condition and a color change; doors: cheaper by count and when the crew is already there
+{
+  const cabBase = { ...makeInitialState().ctx, projectType: 'interior', interiorScope: 'specific_rooms', selectedRooms: [], interiorWalls: 'no', interiorCeilings: 'no', interiorTrim: 'no', interiorDoors: 'none', cabinets: 'kitchen', cabinetDoorCount: 25, cabinetFinish: 'painted', zipCode: '64101', surfacesAddressed: true } as EstimatorContext;
+  const cabPrice = (o: Partial<EstimatorContext>) => calculateEstimate({ ...cabBase, ...o } as EstimatorContext).lineItems.filter((l) => /^cabinets/.test(l.key ?? '')).reduce((t, l) => t + l.amount, 0);
+  const plain = cabPrice({});
+  check('cabinets: shaker and raised panels cost more than flat slab, detailed the most', cabPrice({ cabinetStyle: 'shaker' }) > cabPrice({ cabinetStyle: 'slab' }) && cabPrice({ cabinetStyle: 'raised' }) > cabPrice({ cabinetStyle: 'shaker' }) && cabPrice({ cabinetStyle: 'detailed' }) > cabPrice({ cabinetStyle: 'raised' }));
+  check('cabinets: heavy grain and worn cabinets cost more than good ones', cabPrice({ cabinetCondition: 'grain' }) > plain && cabPrice({ cabinetCondition: 'worn' }) > cabPrice({ cabinetCondition: 'grain' }));
+  check('cabinets: a new color (and dark to light) means extra coats', cabPrice({ interiorColorChange: 'different' }) > plain && cabPrice({ interiorColorChange: 'dramatic' }) > cabPrice({ interiorColorChange: 'different' }));
+  const w = await play(['I want my kitchen cabinets painted, they are shaker style and they are chipped and greasy']);
+  check('cabinets: "shaker" and "chipped and greasy" said up front are read', w.state.ctx.cabinetStyle === 'shaker' && w.state.ctx.cabinetCondition === 'worn', JSON.stringify([w.state.ctx.cabinetStyle, w.state.ctx.cabinetCondition]));
+  check('cabinets: ...and neither is asked again', !/what style are the cabinet doors|are the doors flat slabs|how are the cabinets holding up|in good shape, or do they have heavy/i.test(w.turns.join(' ')), w.turns.join(' | '));
+  const ask = await play(['I want my kitchen cabinets painted']);
+  let cst = ask.state;
+  let ctxt = cst.history[cst.history.length - 1].text;
+  for (let i = 0; i < 10 && !/what style are the cabinet doors|are the doors flat slabs/i.test(ctxt); i++) { cst = (await play(['about 25 doors and drawers', 'painted white'][Math.min(i, 1)] ? [['about 25 doors and drawers', 'painted white'][Math.min(i, 1)]] : ['no'], [], cst)).state; ctxt = cst.history[cst.history.length - 1].text; }
+  check('cabinets: the bot asks what style the doors are', /what style are the cabinet doors|are the doors flat slabs/i.test(ctxt), ctxt);
+
+  const doorJob = (o: Partial<EstimatorContext>) => calculateEstimate({ ...makeInitialState().ctx, surfacesAddressed: true, zipCode: '64101', ...o } as EstimatorContext);
+  const perDoor = (e: ReturnType<typeof calculateEstimate>) => { const l = e.lineItems.find((x) => x.key === 'doors')!; return l.amount / Number(/\((\d+)\)/.exec(l.description)![1]); };
+  const only = { projectType: 'interior', interiorWalls: 'no', interiorCeilings: 'no', interiorTrim: 'no', interiorDoors: 'some', doorsIncluded: true };
+  check('doors: ten doors on their own cost less per door than two', perDoor(doorJob({ ...only, doorCount: 10 })) < perDoor(doorJob({ ...only, doorCount: 2 })));
+  const house = { projectType: 'interior', interiorScope: 'whole_house', interiorWalls: 'yes', interiorCeilings: 'yes', interiorTrim: 'yes', interiorDoors: 'some', doorsIncluded: true, squareFeet: 2000, bedroomCount: 3, bathroomCount: 2, stories: 1 };
+  check('doors: the same doors cost less per door inside a whole-house job (the crew is already there)', perDoor(doorJob({ ...house, doorCount: 10 })) < perDoor(doorJob({ ...only, doorCount: 10 })));
+  check('doors: one door as the whole job still pays the minimum job charge', doorJob({ ...only, doorCount: 1 }).lineItems.some((l) => /Minimum service charge/.test(l.description)));
+  const extDoors = (body: 'yes' | 'no') => doorJob({ projectType: 'exterior', exteriorBody: body, sidingType: 'stucco', stories: 1, squareFeet: 1800, entryDoor: 'yes', garageDoor: 'single' }).lineItems.filter((l) => l.key === 'entry_door' || l.key === 'garage_door').reduce((t, l) => t + l.amount, 0);
+  check('doors: entry and garage doors are cheaper when the whole house exterior is being painted', extDoors('yes') < extDoors('no'));
 }
 
 setLLMReaderForTests(undefined);

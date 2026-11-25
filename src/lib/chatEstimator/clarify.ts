@@ -47,6 +47,8 @@ const TOPIC_LABEL: Record<string, string> = {
   upsell_doors: 'whether to add the doors',
   upsell_cabinets: 'whether to add the kitchen cabinets',
   cabinet_finish: 'what the cabinets are finished with now',
+  cabinet_style: 'the style of the cabinet doors',
+  cabinet_condition: 'how the cabinets are holding up',
   door_count: 'how many doors',
   window_count: 'how many windows',
   closet_count: 'how many closets',

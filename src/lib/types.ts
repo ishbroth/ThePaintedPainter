@@ -122,6 +122,10 @@ export interface EstimatorContext {
   chairCount: number | null;
   /** What kind of chairs (a dining chair is the base price): arms, a bar stool, a rocker and a seat with upholstery each change the work. */
   chairKind?: 'dining' | 'arm' | 'stool' | 'rocker' | 'upholstered';
+  /** The cabinet doors: flat slab, shaker (recessed panel), raised panel, or detailed (glass fronts, arches, glaze): more profile means more prep and cutting in. */
+  cabinetStyle?: 'slab' | 'shaker' | 'raised' | 'detailed';
+  /** How the cabinets are holding up: good, heavy visible grain (oak) that needs filling, or worn (chips, grease, dings) that needs repair and cleaning first. */
+  cabinetCondition?: 'good' | 'grain' | 'worn';
   /** Chair rail (the horizontal moulding halfway up a wall): no, yes. */
   chairRail: string;
   chairRailLinearFeet: number | null;

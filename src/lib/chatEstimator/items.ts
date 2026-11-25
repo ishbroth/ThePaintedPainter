@@ -126,3 +126,26 @@ export function parseChairKind(text: string, answering: boolean): 'dining' | 'ar
   if (answering && /^\s*(?:regular|normal|standard|plain|just|the usual|basic|simple|wood(?:en)?)\b/.test(t)) return 'dining';
   return null;
 }
+
+export const CABINET_STYLE_LABEL: Record<string, string> = { slab: 'flat slab doors', shaker: 'shaker doors', raised: 'raised-panel doors', detailed: 'detailed doors (glass, arches or glaze)' };
+export const CABINET_CONDITION_LABEL: Record<string, string> = { good: 'cabinets in good shape', grain: 'heavy wood grain to fill', worn: 'worn cabinets needing repair' };
+
+/** The style of the cabinet doors, said anywhere ("shaker", "raised panel") or in answer to the question. */
+export function parseCabinetStyle(text: string, answering: boolean): 'slab' | 'shaker' | 'raised' | 'detailed' | null {
+  const t = text.toLowerCase();
+  if (/\b(?:glass[\s-]?front|glass (?:doors?|panels?|inserts?)|beadboard|ornate|carved|arched|glazed|glaze|distressed|mullion|fancy|very detailed)\b/.test(t)) return 'detailed';
+  if (/\braised[\s-]?panels?\b|\bcathedral\b/.test(t)) return 'raised';
+  if (/\bshaker\b|\brecessed[\s-]?panels?\b|\bflat[\s-]?panels?\b|\bfive[\s-]?piece\b/.test(t)) return 'shaker';
+  if (/\bslab\b|\bflat[\s-]?(?:front|door|cabinet)s?\b|\bplain flat\b|\bmodern flat\b|\bsmooth flat\b/.test(t)) return 'slab';
+  if (answering && /^\s*(?:flat|plain|smooth|simple|modern)\b/.test(t)) return 'slab';
+  return null;
+}
+
+/** How the cabinets are holding up: worn (chips, grease, damage) beats heavy grain (oak) beats good. */
+export function parseCabinetCondition(text: string, answering: boolean): 'good' | 'grain' | 'worn' | null {
+  const t = text.toLowerCase();
+  if (/\b(?:chipped|chipping|peeling|worn|damaged|damage|dings?|dented|scratch\w*|greasy|grease|grimy|sticky|water damage|warped|beat up|beaten|rough shape|needs? repairs?|falling apart|cracked)\b/.test(t)) return 'worn';
+  if (/\b(?:oak|open[\s-]?grain|heavy grain|visible grain|deep grain|wood grain|grainy|knotty)\b/.test(t)) return 'grain';
+  if (answering && /\b(?:good (?:shape|condition)|great (?:shape|condition)|fine|smooth|no (?:damage|issues?|problems?|chips?)|pretty good|decent|like new|clean|nothing)\b/.test(t)) return 'good';
+  return null;
+}

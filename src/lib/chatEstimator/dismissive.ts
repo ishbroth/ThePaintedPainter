@@ -198,6 +198,10 @@ export function highestPriceAssumption(topicId: string, ctx: EstimatorContext): 
       return { patch: { extAnswered: withExt(ctx, topicId) }, say: "No problem, I'll estimate that from the usual size, and you can change the number when you see the price." };
     case 'chair_kind':
       return { patch: { chairKind: 'arm', extAnswered: withExt(ctx, topicId) }, say: higher('armchairs') };
+    case 'cabinet_style':
+      return { patch: { cabinetStyle: 'raised', extAnswered: withExt(ctx, topicId) }, say: higher('raised-panel doors') };
+    case 'cabinet_condition':
+      return { patch: { cabinetCondition: 'grain', extAnswered: withExt(ctx, topicId) }, say: higher('cabinets with some grain to fill') };
     case 'location':
       return {
         patch: {},
