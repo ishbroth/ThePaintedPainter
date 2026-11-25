@@ -501,6 +501,7 @@ async function dismissAt(setup: string[], topicWords: RegExp, dismissal = 'doesn
   const f = await play([
     'i need some chairs painted',
     '1 chair to paint',
+    'dining chair',
     'the furniture needs sanded',
     'solid wood',
     'plain',
@@ -543,6 +544,7 @@ async function dismissAt(setup: string[], topicWords: RegExp, dismissal = 'doesn
     'the furniture needs sanded',
     'what does this have to do with anything',
     '1 chair to paint',
+    'dining chair',
     'solid wood',
     'plain',
     'inside',
@@ -1053,6 +1055,25 @@ async function dismissAt(setup: string[], topicWords: RegExp, dismissal = 'doesn
   check('a bare "no" in the old conversation is never taken as an answer to something', !answeredEarlier(trimTopic, ctx, 'no\nno\nyes\nok'));
   const known = { ...ctx, trimFinish: 'stained', doorFinish: 'stained' } as EstimatorContext;
   check('something already known is never overwritten by an older line', Object.keys(fillFromTranscript(known, said)).every((k) => k !== 'trimFinish' && k !== 'doorFinish'), JSON.stringify(fillFromTranscript(known, said)));
+}
+
+// Furniture: priced from published figures, and the KIND of chair matters
+{
+  const furn = (items: string[], extra: Partial<EstimatorContext> = {}) => calculateEstimate({ ...makeInitialState().ctx, projectType: '', itemsOnly: true, specialtyServices: ['furniture'], furnitureItems: items, zipCode: '64101', surfacesAddressed: true, ...extra } as EstimatorContext).lineItems.find((l) => l.key === 'furniture')!.amount;
+  check('furniture: a dresser repaint is at least $300 (published pro prices start there)', furn(['dresser']) >= 300, String(furn(['dresser'])));
+  check('furniture: a dining chair is at least $120 where the regional rate is lowest', furn(['chair']) >= 120, String(furn(['chair'])));
+  check('furniture: armchairs cost more than dining chairs, bar stools less', furn(['chair', 'chair'], { chairKind: 'arm' }) > furn(['chair', 'chair'], { chairKind: 'dining' }) && furn(['chair', 'chair'], { chairKind: 'stool' }) < furn(['chair', 'chair'], { chairKind: 'dining' }));
+  check('furniture: a rocker is the most work of the chairs', furn(['chair'], { chairKind: 'rocker' }) > furn(['chair'], { chairKind: 'arm' }));
+  const asked = await play(['I need 4 chairs painted']);
+  let kst = asked.state;
+  let ktxt = kst.history[kst.history.length - 1].text;
+  for (let i = 0; i < 12 && !/what kind of chairs|plain dining chairs|arms, or are they bar stools/i.test(ktxt); i++) { kst = (await play(['4'], [], kst)).state; ktxt = kst.history[kst.history.length - 1].text; }
+  const kindAsked = { state: kst, asked: ktxt, reached: /what kind of chairs|plain dining chairs|arms, or are they bar stools/i.test(ktxt) };
+  check('chairs: the bot asks what KIND of chairs they are', kindAsked.reached, kindAsked.asked);
+  const said = await play(['I need 4 bar stools painted']);
+  check('chairs: "bar stools" said up front is read, and the kind is not asked again', said.state.ctx.chairKind === 'stool' && !/what kind of chairs/i.test(said.turns.join(' ')), String(said.state.ctx.chairKind) + ' ' + said.last);
+  const ans = await play(['dining chairs with padded seats'], [], kindAsked.state);
+  check('chairs: "dining chairs with padded seats" is read as upholstered', ans.state.ctx.chairKind === 'upholstered' || ans.state.ctx.chairKind === 'dining', String(ans.state.ctx.chairKind));
 }
 
 setLLMReaderForTests(undefined);

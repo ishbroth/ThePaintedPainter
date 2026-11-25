@@ -59,6 +59,8 @@ export function highestPriceAssumption(topicId: string, ctx: EstimatorContext): 
         return { patch: { furnitureTreatment: 'strip_refinish', furnitureSanding: true }, say: higher('stripping and refinishing the pieces') };
       case 'color_change':
         return { patch: { interiorColorChange: 'different' }, say: higher('a new color') };
+      case 'chair_kind':
+        return { patch: { chairKind: 'arm', extAnswered: withExt(ctx, topicId) }, say: higher('armchairs') };
       case 'chair_count':
       case 'furniture_kind':
         return { patch: { furnitureCountKnown: true, extAnswered: withExt(ctx, topicId) }, say: "No problem, I'll estimate that from the usual number, and you can change it when you see the price." };
@@ -194,6 +196,8 @@ export function highestPriceAssumption(topicId: string, ctx: EstimatorContext): 
     case 'detail_sqft_wainscot':
       // no number given: the usual size for the house is used, and the price notes it as an estimate that can be edited
       return { patch: { extAnswered: withExt(ctx, topicId) }, say: "No problem, I'll estimate that from the usual size, and you can change the number when you see the price." };
+    case 'chair_kind':
+      return { patch: { chairKind: 'arm', extAnswered: withExt(ctx, topicId) }, say: higher('armchairs') };
     case 'location':
       return {
         patch: {},

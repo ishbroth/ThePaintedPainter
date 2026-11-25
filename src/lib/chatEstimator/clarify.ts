@@ -53,6 +53,7 @@ const TOPIC_LABEL: Record<string, string> = {
   closets_included: 'whether the closets are painted too',
   closet_shelves: 'whether the closets have shelves to paint',
   chair_count: 'how many pieces are being painted',
+  chair_kind: 'what kind of chairs',
   cabinet_count: 'how many cabinet doors and drawers',
   cabinet_scope: 'whether the insides of the cabinets are painted',
   cabinet_method: 'sprayed or brushed',

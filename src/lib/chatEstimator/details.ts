@@ -8,7 +8,7 @@
 
 import type { EstimatorContext } from '../types';
 import { extractCeilingHeight } from './extractors';
-import { detectItems, itemsPhrase, mentionsGenericFurniture, parseFurnitureFinish, saysItemsOnly } from './items';
+import { detectItems, itemsPhrase, mentionsGenericFurniture, parseChairKind, parseFurnitureFinish, saysItemsOnly, CHAIR_KIND_LABEL } from './items';
 
 const NUMBER_WORDS: Record<string, number> = {
   a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12,
@@ -413,6 +413,11 @@ export function extractDetails(text: string, ctx: EstimatorContext, askedId: str
     if (!ctx.furnitureUnspecified) patch.furnitureUnspecified = true;
     if (!ctx.specialtyServices.includes('furniture')) patch.specialtyServices = [...ctx.specialtyServices, 'furniture'];
   }
+  // what kind of chairs: said anywhere ("bar stools", "a rocking chair"), or in answer to the question
+  if (!ctx.chairKind && (ctx.furnitureItems.includes('chair') || (patch.furnitureItems ?? []).includes('chair'))) {
+    const kind = parseChairKind(text, askedId === 'chair_kind');
+    if (kind) { patch.chairKind = kind; acks.push(CHAIR_KIND_LABEL[kind]); }
+  }
   // sprayed or brushed cabinets, said in passing
   if (!ctx.cabinetMethod && (ctx.cabinets !== 'none' || /\bcabinet|\bvanit/.test(t))) {
     if (/\bspray(?:ed|ing)?\b/.test(t)) patch.cabinetMethod = 'sprayed';
@@ -605,6 +610,6 @@ export function extractDetails(text: string, ctx: EstimatorContext, askedId: str
 /** Topic ids of the follow-up questions in this file (their answers are recorded so they are never asked twice). */
 export const DETAIL_TOPIC_IDS = new Set([
   'unit_count', 'building_count', 'ceiling_height', 'common_areas', 'balcony_count', 'ext_mu_access',
-  'closets_included', 'closet_shelves', 'door_count', 'window_count', 'chair_count', 'furniture_kind', 'furniture_finish', 'cabinet_count', 'cabinet_scope', 'cabinet_method', 'cabinet_hardware', 'builtin_count', 'shutter_count', 'closet_count', 'fence_size', 'fence_height', 'deck_size', 'overhang_size', 'railing_length',
+  'closets_included', 'closet_shelves', 'door_count', 'window_count', 'chair_count', 'chair_kind', 'furniture_kind', 'furniture_finish', 'cabinet_count', 'cabinet_scope', 'cabinet_method', 'cabinet_hardware', 'builtin_count', 'shutter_count', 'closet_count', 'fence_size', 'fence_height', 'deck_size', 'overhang_size', 'railing_length',
   'detail_rooms', 'detail_feet_crown', 'detail_feet_chair_rail', 'detail_feet_trim', 'detail_sqft_wainscot', 'ext_style',
 ]);

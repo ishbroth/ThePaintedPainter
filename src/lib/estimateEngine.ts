@@ -50,6 +50,12 @@ export function repeatUnitFactor(units: number): number {
  */
 export const ONE_COAT_FACTOR = 0.85;
 export const TOUCH_UP_FACTOR = 0.7;
+/**
+ * What kind of chair changes the work: a dining chair is the base; arms add surfaces and cutting-in, a rocker has the most spindles and curves, a bar stool
+ * is simpler legs but still rungs, and an upholstered seat has to be masked or removed. (Estimates: published guides price "a chair" as one figure and say
+ * only that multi-slat and complex joinery cost more.)
+ */
+export const CHAIR_KIND_FACTOR: Record<string, number> = { dining: 1, arm: 1.3, stool: 0.85, rocker: 1.4, upholstered: 1.15 };
 const TIER_FACTOR = { full: 1, one_coat: ONE_COAT_FACTOR, touch_up: TOUCH_UP_FACTOR } as const;
 
 /**
@@ -553,7 +559,8 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
     for (const item of furnitureList) {
       const key = `furniture_${item}` as keyof typeof BASE_RATES.specialty;
       const rate = BASE_RATES.specialty[key] || BASE_RATES.specialty.furniture_cabinet;
-      furnitureTotal += typeof rate === 'number' ? rate : 175;
+      const kindFactor = item === 'chair' ? CHAIR_KIND_FACTOR[ctx.chairKind ?? 'dining'] ?? 1 : 1;
+      furnitureTotal += (typeof rate === 'number' ? rate : 375) * kindFactor;
     }
     // What is done to the pieces: refreshing a stain needs sanding, stain and clear coats; stripping back to bare wood is the most work;
     // sanding on top of a repaint, and metal (rust treatment, bonding primer), each add to it. A plain repaint is the base rate.

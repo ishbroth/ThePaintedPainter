@@ -866,6 +866,16 @@ export const TOPICS: Topic[] = [
     example: () => "Something like '3 closets' or 'just one'.",
   },
   {
+    // A dining chair, an armchair, a bar stool and a rocker are different amounts of work (arms, spindles, rungs): asked once the chairs are counted.
+    id: 'chair_kind',
+    priority: 29.942,
+    relevant: (c) => c.furnitureItems.includes('chair') && !c.chairKind,
+    alreadyAnswered: (c) => !!c.chairKind || extDone(c, 'chair_kind'),
+    ask: (c) => pick(["What kind of chairs are they: dining chairs, armchairs (with arms), bar stools, or rockers?", "Are the chairs plain dining chairs, or do they have arms, or are they bar stools or rockers?"], seed(c)),
+    clarify: () => "Arms, lots of spindles and rungs, and a rocker's curves all take more time to paint than a plain dining chair, and a padded seat has to be masked.",
+    example: () => "Say 'dining chairs', 'armchairs', 'bar stools', 'rockers', or 'dining chairs with padded seats'.",
+  },
+  {
     id: 'chair_count',
     priority: 29.94,
     relevant: (c) => (c.itemsOnly && c.furnitureItems.length > 0 && !c.furnitureCountKnown) || (c.furnitureItems.includes('chair') && c.chairCount == null && !c.furnitureCountKnown),
@@ -1496,7 +1506,7 @@ TOPICS.push(...itemTopics());
  * A job that is only movable pieces (chairs, a table, a dresser): these are the only questions that make sense. Every room, wall,
  * ceiling, trim, door, size-of-house, who-lives-there and paint-grade question is skipped, whatever the list says, and never circled back to.
  */
-const ITEM_JOB_TOPICS = new Set(['furniture_kind', 'chair_count', 'furniture_finish', 'color_change', 'paint_brand', 'location', 'timeline_and_access']);
+const ITEM_JOB_TOPICS = new Set(['furniture_kind', 'chair_count', 'chair_kind', 'furniture_finish', 'color_change', 'paint_brand', 'location', 'timeline_and_access']);
 const COMPONENT_COMMON = ['color_change', 'paint_brand', 'location', 'timeline_and_access'];
 const COMPONENT_TOPICS: Record<string, string[]> = {
   cabinets: ['cabinet_count', 'cabinet_finish', 'cabinet_scope', 'cabinet_method', 'cabinet_hardware'],

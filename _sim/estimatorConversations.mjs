@@ -14833,16 +14833,21 @@ var BASE_RATES = {
     // basic solid color
     stain_concrete_per_sqft: 3.5,
     // Furniture
-    furniture_dresser: 275,
-    furniture_table_dining: 225,
-    furniture_table_end: 95,
-    furniture_chair: 125,
-    furniture_lounger: 140,
-    furniture_bench: 120,
-    furniture_bookcase: 250,
-    furniture_nightstand: 95,
-    furniture_desk: 225,
-    furniture_cabinet: 175,
+    // Per piece, for a REPAINT (the cheapest finish), already at the 10%-below-market basis of this file. Set from published pro prices: a dining chair
+    // runs about $100-400 to refinish (Fixr, Angi, HomeAdvisor), a dresser $300-2,000 to refinish and "rarely over $600" to paint, a standard table about
+    // $600 to refinish; stripping, restaining and detail are the multipliers in estimateEngine. (Earlier values sat at or under the bottom of those ranges.)
+    furniture_dresser: 400,
+    furniture_table_dining: 400,
+    furniture_table_end: 140,
+    furniture_chair: 160,
+    // a dining chair; the kind of chair (arms, stool, rocker...) scales it, see CHAIR_KIND_FACTOR
+    furniture_lounger: 175,
+    furniture_bench: 150,
+    furniture_bookcase: 325,
+    furniture_nightstand: 170,
+    furniture_desk: 375,
+    furniture_cabinet: 375,
+    // china cabinet, hutch, credenza, armoire; also the rate for a piece we have no name for
     furniture_per_sqft: 7.5,
     // custom sizing
     // Shutters
@@ -18391,6 +18396,17 @@ function parseFurnitureFinish(text) {
   else if (/\b(?:plastic|resin|wicker|rattan|vinyl|laminate)\b/.test(t2)) out.material = "other";
   return out;
 }
+var CHAIR_KIND_LABEL = { dining: "dining chairs", arm: "armchairs", stool: "bar stools", rocker: "rocking chairs", upholstered: "chairs with upholstered seats" };
+function parseChairKind(text, answering) {
+  const t2 = text.toLowerCase();
+  if (/\brock(?:er|ers|ing)\b/.test(t2)) return "rocker";
+  if (/\b(?:bar|counter)[\s-]?stools?\b|\bstools?\b/.test(t2)) return "stool";
+  if (/\barm[\s-]?chairs?\b|\bchairs? with arms\b|\bcaptain'?s?[\s-]chairs?\b|\bwing[\s-]?backs?\b|\bclub chairs?\b|\brecliners?\b|\bwith arms\b/.test(t2)) return "arm";
+  if (/\b(?:upholster\w*|cushion\w*|padded|fabric|leather) (?:seats?|chairs?)\b|\b(?:seats?|chairs?) (?:are|is|have|has) (?:upholster\w*|cushion\w*|padded)\b/.test(t2)) return "upholstered";
+  if (/\b(?:dining|kitchen|desk|folding|side|ladder[\s-]?back|windsor|spindle|slat)[\s-]?chairs?\b|\bdining\b/.test(t2)) return "dining";
+  if (answering && /^\s*(?:regular|normal|standard|plain|just|the usual|basic|simple|wood(?:en)?)\b/.test(t2)) return "dining";
+  return null;
+}
 
 // src/lib/chatEstimator/details.ts
 var NUMBER_WORDS2 = {
@@ -18743,6 +18759,13 @@ function extractDetails(text, ctx, askedId) {
     if (!ctx.furnitureUnspecified) patch.furnitureUnspecified = true;
     if (!ctx.specialtyServices.includes("furniture")) patch.specialtyServices = [...ctx.specialtyServices, "furniture"];
   }
+  if (!ctx.chairKind && (ctx.furnitureItems.includes("chair") || (patch.furnitureItems ?? []).includes("chair"))) {
+    const kind = parseChairKind(text, askedId === "chair_kind");
+    if (kind) {
+      patch.chairKind = kind;
+      acks.push(CHAIR_KIND_LABEL[kind]);
+    }
+  }
   if (!ctx.cabinetMethod && (ctx.cabinets !== "none" || /\bcabinet|\bvanit/.test(t2))) {
     if (/\bspray(?:ed|ing)?\b/.test(t2)) patch.cabinetMethod = "sprayed";
     else if (/\b(?:brushed|brush and roll|brushed and rolled)\b/.test(t2)) patch.cabinetMethod = "brushed";
@@ -19058,6 +19081,7 @@ var DETAIL_TOPIC_IDS = /* @__PURE__ */ new Set([
   "door_count",
   "window_count",
   "chair_count",
+  "chair_kind",
   "furniture_kind",
   "furniture_finish",
   "cabinet_count",
@@ -20388,6 +20412,7 @@ function repeatUnitFactor(units) {
 }
 var ONE_COAT_FACTOR = 0.85;
 var TOUCH_UP_FACTOR = 0.7;
+var CHAIR_KIND_FACTOR = { dining: 1, arm: 1.3, stool: 0.85, rocker: 1.4, upholstered: 1.15 };
 var TIER_FACTOR = { full: 1, one_coat: ONE_COAT_FACTOR, touch_up: TOUCH_UP_FACTOR };
 function interiorTreatmentBlend(ctx, rooms, surface) {
   const turnover = ctx.propertyType === "rental" && ctx.occupancy === "vacant";
@@ -20758,7 +20783,8 @@ function calculateEstimate(ctx) {
     for (const item of furnitureList) {
       const key = `furniture_${item}`;
       const rate = RESOLVED_BASE_RATES.specialty[key] || RESOLVED_BASE_RATES.specialty.furniture_cabinet;
-      furnitureTotal += typeof rate === "number" ? rate : 175;
+      const kindFactor = item === "chair" ? CHAIR_KIND_FACTOR[ctx.chairKind ?? "dining"] ?? 1 : 1;
+      furnitureTotal += (typeof rate === "number" ? rate : 375) * kindFactor;
     }
     const treatmentFactor = ctx.furnitureTreatment === "strip_refinish" ? 1.6 : ctx.furnitureTreatment === "restain" ? 1.25 : 1;
     const sandingFactor = ctx.furnitureSanding && ctx.furnitureTreatment !== "strip_refinish" ? 1.15 : 1;
@@ -23425,6 +23451,16 @@ var TOPICS = [
     example: () => "Something like '3 closets' or 'just one'."
   },
   {
+    // A dining chair, an armchair, a bar stool and a rocker are different amounts of work (arms, spindles, rungs): asked once the chairs are counted.
+    id: "chair_kind",
+    priority: 29.942,
+    relevant: (c2) => c2.furnitureItems.includes("chair") && !c2.chairKind,
+    alreadyAnswered: (c2) => !!c2.chairKind || extDone(c2, "chair_kind"),
+    ask: (c2) => pick2(["What kind of chairs are they: dining chairs, armchairs (with arms), bar stools, or rockers?", "Are the chairs plain dining chairs, or do they have arms, or are they bar stools or rockers?"], seed(c2)),
+    clarify: () => "Arms, lots of spindles and rungs, and a rocker's curves all take more time to paint than a plain dining chair, and a padded seat has to be masked.",
+    example: () => "Say 'dining chairs', 'armchairs', 'bar stools', 'rockers', or 'dining chairs with padded seats'."
+  },
+  {
     id: "chair_count",
     priority: 29.94,
     relevant: (c2) => c2.itemsOnly && c2.furnitureItems.length > 0 && !c2.furnitureCountKnown || c2.furnitureItems.includes("chair") && c2.chairCount == null && !c2.furnitureCountKnown,
@@ -23972,7 +24008,7 @@ var TOPICS = [
   }
 ];
 TOPICS.push(...itemTopics());
-var ITEM_JOB_TOPICS = /* @__PURE__ */ new Set(["furniture_kind", "chair_count", "furniture_finish", "color_change", "paint_brand", "location", "timeline_and_access"]);
+var ITEM_JOB_TOPICS = /* @__PURE__ */ new Set(["furniture_kind", "chair_count", "chair_kind", "furniture_finish", "color_change", "paint_brand", "location", "timeline_and_access"]);
 var COMPONENT_COMMON = ["color_change", "paint_brand", "location", "timeline_and_access"];
 var COMPONENT_TOPICS = {
   cabinets: ["cabinet_count", "cabinet_finish", "cabinet_scope", "cabinet_method", "cabinet_hardware"],
@@ -24594,6 +24630,8 @@ function highestPriceAssumption(topicId, ctx) {
         return { patch: { furnitureTreatment: "strip_refinish", furnitureSanding: true }, say: higher("stripping and refinishing the pieces") };
       case "color_change":
         return { patch: { interiorColorChange: "different" }, say: higher("a new color") };
+      case "chair_kind":
+        return { patch: { chairKind: "arm", extAnswered: withExt(ctx, topicId) }, say: higher("armchairs") };
       case "chair_count":
       case "furniture_kind":
         return { patch: { furnitureCountKnown: true, extAnswered: withExt(ctx, topicId) }, say: "No problem, I'll estimate that from the usual number, and you can change it when you see the price." };
@@ -24722,6 +24760,8 @@ function highestPriceAssumption(topicId, ctx) {
     case "detail_feet_trim":
     case "detail_sqft_wainscot":
       return { patch: { extAnswered: withExt(ctx, topicId) }, say: "No problem, I'll estimate that from the usual size, and you can change the number when you see the price." };
+    case "chair_kind":
+      return { patch: { chairKind: "arm", extAnswered: withExt(ctx, topicId) }, say: higher("armchairs") };
     case "location":
       return {
         patch: {},
@@ -26694,6 +26734,7 @@ var TOPIC_PROMPTS = {
   window_count: "About how many windows?",
   closet_count: "How many closets?",
   chair_count: "How many chairs?",
+  chair_kind: "Dining, arms, stools, rockers?",
   shutter_count: "How many shutters?",
   railing_length: "About how many feet of railing?",
   fence_size: "How long (linear feet) and how tall is the fence?",
@@ -27162,6 +27203,7 @@ async function dismissAt(setup, topicWords, dismissal = "doesnt matter just want
   const f = await play([
     "i need some chairs painted",
     "1 chair to paint",
+    "dining chair",
     "the furniture needs sanded",
     "solid wood",
     "plain",
@@ -27202,6 +27244,7 @@ async function dismissAt(setup, topicWords, dismissal = "doesnt matter just want
     "the furniture needs sanded",
     "what does this have to do with anything",
     "1 chair to paint",
+    "dining chair",
     "solid wood",
     "plain",
     "inside",
@@ -27609,6 +27652,26 @@ async function dismissAt(setup, topicWords, dismissal = "doesnt matter just want
   check('a bare "no" in the old conversation is never taken as an answer to something', !answeredEarlier(trimTopic, ctx, "no\nno\nyes\nok"));
   const known = { ...ctx, trimFinish: "stained", doorFinish: "stained" };
   check("something already known is never overwritten by an older line", Object.keys(fillFromTranscript(known, said)).every((k) => k !== "trimFinish" && k !== "doorFinish"), JSON.stringify(fillFromTranscript(known, said)));
+}
+{
+  const furn = (items, extra = {}) => calculateEstimate({ ...makeInitialState().ctx, projectType: "", itemsOnly: true, specialtyServices: ["furniture"], furnitureItems: items, zipCode: "64101", surfacesAddressed: true, ...extra }).lineItems.find((l) => l.key === "furniture").amount;
+  check("furniture: a dresser repaint is at least $300 (published pro prices start there)", furn(["dresser"]) >= 300, String(furn(["dresser"])));
+  check("furniture: a dining chair is at least $120 where the regional rate is lowest", furn(["chair"]) >= 120, String(furn(["chair"])));
+  check("furniture: armchairs cost more than dining chairs, bar stools less", furn(["chair", "chair"], { chairKind: "arm" }) > furn(["chair", "chair"], { chairKind: "dining" }) && furn(["chair", "chair"], { chairKind: "stool" }) < furn(["chair", "chair"], { chairKind: "dining" }));
+  check("furniture: a rocker is the most work of the chairs", furn(["chair"], { chairKind: "rocker" }) > furn(["chair"], { chairKind: "arm" }));
+  const asked = await play(["I need 4 chairs painted"]);
+  let kst = asked.state;
+  let ktxt = kst.history[kst.history.length - 1].text;
+  for (let i2 = 0; i2 < 12 && !/what kind of chairs|plain dining chairs|arms, or are they bar stools/i.test(ktxt); i2++) {
+    kst = (await play(["4"], [], kst)).state;
+    ktxt = kst.history[kst.history.length - 1].text;
+  }
+  const kindAsked = { state: kst, asked: ktxt, reached: /what kind of chairs|plain dining chairs|arms, or are they bar stools/i.test(ktxt) };
+  check("chairs: the bot asks what KIND of chairs they are", kindAsked.reached, kindAsked.asked);
+  const said = await play(["I need 4 bar stools painted"]);
+  check('chairs: "bar stools" said up front is read, and the kind is not asked again', said.state.ctx.chairKind === "stool" && !/what kind of chairs/i.test(said.turns.join(" ")), String(said.state.ctx.chairKind) + " " + said.last);
+  const ans = await play(["dining chairs with padded seats"], [], kindAsked.state);
+  check('chairs: "dining chairs with padded seats" is read as upholstered', ans.state.ctx.chairKind === "upholstered" || ans.state.ctx.chairKind === "dining", String(ans.state.ctx.chairKind));
 }
 setLLMReaderForTests(void 0);
 console.log(failures ? `

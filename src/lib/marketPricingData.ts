@@ -114,16 +114,19 @@ export const BASE_RATES = {
     stain_concrete_per_sqft: 3.50,
 
     // Furniture
-    furniture_dresser: 275,
-    furniture_table_dining: 225,
-    furniture_table_end: 95,
-    furniture_chair: 125,
-    furniture_lounger: 140,
-    furniture_bench: 120,
-    furniture_bookcase: 250,
-    furniture_nightstand: 95,
-    furniture_desk: 225,
-    furniture_cabinet: 175,
+    // Per piece, for a REPAINT (the cheapest finish), already at the 10%-below-market basis of this file. Set from published pro prices: a dining chair
+    // runs about $100-400 to refinish (Fixr, Angi, HomeAdvisor), a dresser $300-2,000 to refinish and "rarely over $600" to paint, a standard table about
+    // $600 to refinish; stripping, restaining and detail are the multipliers in estimateEngine. (Earlier values sat at or under the bottom of those ranges.)
+    furniture_dresser: 400,
+    furniture_table_dining: 400,
+    furniture_table_end: 140,
+    furniture_chair: 160,          // a dining chair; the kind of chair (arms, stool, rocker...) scales it, see CHAIR_KIND_FACTOR
+    furniture_lounger: 175,
+    furniture_bench: 150,
+    furniture_bookcase: 325,
+    furniture_nightstand: 170,
+    furniture_desk: 375,
+    furniture_cabinet: 375,        // china cabinet, hutch, credenza, armoire; also the rate for a piece we have no name for
     furniture_per_sqft: 7.50,      // custom sizing
 
     // Shutters

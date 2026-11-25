@@ -120,6 +120,8 @@ export interface EstimatorContext {
   fenceHeightFt: number | null;
   /** Chairs to paint (dining, patio...), when the customer said how many. */
   chairCount: number | null;
+  /** What kind of chairs (a dining chair is the base price): arms, a bar stool, a rocker and a seat with upholstery each change the work. */
+  chairKind?: 'dining' | 'arm' | 'stool' | 'rocker' | 'upholstered';
   /** Chair rail (the horizontal moulding halfway up a wall): no, yes. */
   chairRail: string;
   chairRailLinearFeet: number | null;

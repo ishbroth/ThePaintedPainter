@@ -112,3 +112,17 @@ export function parseFurnitureFinish(text: string): { treatment?: string; materi
 
 /** The job is only movable pieces. */
 export const isItemsOnly = (c: EstimatorContext): boolean => c.itemsOnly === true;
+
+export const CHAIR_KIND_LABEL: Record<string, string> = { dining: 'dining chairs', arm: 'armchairs', stool: 'bar stools', rocker: 'rocking chairs', upholstered: 'chairs with upholstered seats' };
+
+/** What kind of chairs: said anywhere ("bar stools", "a rocking chair", "chairs with arms") or, when answering, in plain words ("regular dining chairs"). */
+export function parseChairKind(text: string, answering: boolean): 'dining' | 'arm' | 'stool' | 'rocker' | 'upholstered' | null {
+  const t = text.toLowerCase();
+  if (/\brock(?:er|ers|ing)\b/.test(t)) return 'rocker';
+  if (/\b(?:bar|counter)[\s-]?stools?\b|\bstools?\b/.test(t)) return 'stool';
+  if (/\barm[\s-]?chairs?\b|\bchairs? with arms\b|\bcaptain'?s?[\s-]chairs?\b|\bwing[\s-]?backs?\b|\bclub chairs?\b|\brecliners?\b|\bwith arms\b/.test(t)) return 'arm';
+  if (/\b(?:upholster\w*|cushion\w*|padded|fabric|leather) (?:seats?|chairs?)\b|\b(?:seats?|chairs?) (?:are|is|have|has) (?:upholster\w*|cushion\w*|padded)\b/.test(t)) return 'upholstered';
+  if (/\b(?:dining|kitchen|desk|folding|side|ladder[\s-]?back|windsor|spindle|slat)[\s-]?chairs?\b|\bdining\b/.test(t)) return 'dining';
+  if (answering && /^\s*(?:regular|normal|standard|plain|just|the usual|basic|simple|wood(?:en)?)\b/.test(t)) return 'dining';
+  return null;
+}
