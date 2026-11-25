@@ -128,6 +128,10 @@ export interface EstimatorContext {
   cabinetCondition?: 'good' | 'grain' | 'worn';
   /** How many closets of each kind: standard bedroom reach-ins, small coat/linen/pantry closets, walk-ins, large walk-ins or dressing rooms. */
   closetKinds?: { reach?: number; small?: number; walkin?: number; large?: number };
+  /** The floor area of the rooms being painted, all together ("the bedrooms together are 600 sq ft"), when only some rooms are in the job: sizes those rooms instead of the template ones. */
+  selectedRoomsSqft?: number;
+  /** Rooms with ceilings that differ from the rest ("vaulted in one bedroom, standard in the other"): the room's key to what is different about it. */
+  roomTraits?: Record<string, { vaulted?: boolean }>;
   /** Chair rail (the horizontal moulding halfway up a wall): no, yes. */
   chairRail: string;
   chairRailLinearFeet: number | null;

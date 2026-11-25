@@ -286,13 +286,18 @@ export const TOPICS: Topic[] = [
     relevant: (c) =>
       c.projectType !== 'exterior' &&
       c.interiorScope === 'specific_rooms' &&
-      c.selectedRooms.length === 1 &&
-      !c.squareFeet,
+      c.selectedRooms.length >= 1 &&
+      !c.squareFeet && !c.selectedRoomsSqft,
     alreadyAnswered: (c) => {
       const d = c.additionalDetails.toLowerCase();
-      return !!(c.squareFeet || /\b(small|medium|large|\d+x\d+|\d+\s*sq)/.test(d));
+      return !!(c.squareFeet || c.selectedRoomsSqft || /\b(small|medium|large|\d+x\d+|\d+\s*sq)/.test(d));
     },
     ask: (c) => {
+      if (c.selectedRooms.length > 1) {
+        const beds = c.selectedRooms.filter((r) => /bedroom/.test(r)).length;
+        const what = beds === c.selectedRooms.length ? `${beds} bedrooms` : 'those rooms';
+        return pick([`About how big are the ${what}: roughly how many square feet together (or each)? A rough guess, or small, medium or large, is fine.`, `How big are the ${what}? Total square feet for all of them, or each one's size, whichever you know.`], seed(c));
+      }
       const label = roomLabel(c.selectedRooms[0]);
       return pick(
         [
@@ -1262,7 +1267,9 @@ export const TOPICS: Topic[] = [
         (c.interiorWalls !== 'no' || c.interiorCeilings === 'yes' || c.interiorTrim === 'yes' || c.cabinets !== 'none')),
     alreadyAnswered: (c) => !!c.interiorColorChange,
     ask: (c) =>
-      c.itemsOnly
+      c.interiorScope === 'specific_rooms' && c.selectedRooms.length >= 2 && !c.itemsOnly
+        ? 'For the rooms in the job: the same color in each, or changing any of them? Tell me which stay the same and which are changing.'
+        : c.itemsOnly
         ? pick(
             [
               c.furnitureTreatment === 'restain' ? 'Are we matching the current stain color, or going a different shade?' : 'Are we keeping the current color, or changing it?',

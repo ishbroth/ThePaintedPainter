@@ -50,6 +50,8 @@ import { faqAnswer } from './faq';
 import { extractTreatments, isTouchUpOnly } from './treatments';
 import { reconcileJobParts } from './jobParts';
 import { answeredEarlier } from './transcriptCheck';
+import { isPushback, narrowingPatch, scopeRecap } from './pushback';
+import { readRoomTraits } from './roomTraits';
 import { friendlyDate } from './dateParsing';
 import { readDeckDetails, isDeckTalk } from './deckDetails';
 import { readItemAnswers } from './itemInterviews';
@@ -573,6 +575,22 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
     }
   }
 
+  // The customer is arguing with the line of questions ("why are we talking about kitchen cabinets?", "I only said two bedrooms", "you're not listening"):
+  // stop asking, apply any narrowing in the message ("all I ever wanted was the 2 bedrooms", "no exterior"), say the job as it stands and ask whether that is right.
+  if (state.askedIds.length > 0 && isPushback(trimmed)) {
+    const narrowed = narrowingPatch(trimmed, state.ctx);
+    const ctxBack: EstimatorContext = { ...state.ctx, ...(narrowed ?? {}) };
+    const lastBot = [...state.history].reverse().find((m) => m.role === 'bot')?.text ?? '';
+    const alreadyBacked = /^You're right, let me back up/.test(lastBot);
+    const what = scopeRecap(ctxBack);
+    return asBot(
+      { ctx: ctxBack, lastBotTopic: null },
+      alreadyBacked
+        ? "You're right, and I'm sorry. Tell me in your own words what the job is and what it is not, and I'll only ask about that."
+        : `You're right, let me back up. Here's the job as I have it: ${what}. Is that right? Tell me what's different, or anything that's missing, and I'll only ask about what's in the job.`,
+    );
+  }
+
   // The customer is disputing something the bot did ("I never said trim", "I didn't say walls only"): apologise, say what
   // was actually understood, and ask — never fill in a default. Nothing in the message is applied.
   // (When the same message also gives the right facts, "I never said 4 units, there are 24 units", those are used: the correction is the answer.)
@@ -785,6 +803,22 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
     const current = ctxWithExplicit.additionalDetails ?? state.ctx.additionalDetails ?? '';
     if (!current.includes(note)) ctxWithExplicit.additionalDetails = `${current ? current + '; ' : ''}${note}`;
   }
+  // "all I ever wanted was the 2 bedrooms", "we are only doing the bedrooms", "no exterior": the job is those rooms and only the inside
+  {
+    const narrowed = narrowingPatch(trimmed, { ...state.ctx, ...ctxWithExplicit } as EstimatorContext);
+    if (narrowed) Object.assign(ctxWithExplicit, narrowed);
+  }
+  // the floor area given for the rooms in the job ("the bedrooms together are 600 sq ft", or in answer to how big they are) sizes those rooms
+  {
+    const roomsNow = ctxWithExplicit.selectedRooms ?? state.ctx.selectedRooms ?? [];
+    const sq = ctxWithExplicit.squareFeet;
+    if (ctxWithExplicit.interiorScope === 'specific_rooms' && roomsNow.length >= 1 && sq && sq !== state.ctx.squareFeet && !state.ctx.selectedRoomsSqft) {
+      const aboutRooms = state.lastBotTopic?.id === 'room_size' || /\b(?:rooms?|bedrooms?|together|combined|total|each|apiece|kitchen|bath|hall|living)\b/i.test(trimmed);
+      if (aboutRooms && !/\b(?:whole|entire)\s+(?:house|home)\b|\bthe (?:house|home|place) is\b/i.test(trimmed)) {
+        ctxWithExplicit.selectedRoomsSqft = /\b(?:each|apiece|per room)\b/i.test(trimmed) ? sq * roomsNow.length : sq;
+      }
+    }
+  }
   let mixedPatch: Partial<EstimatorContext> | null = null;
   // A request that names several different kinds of work ("a door, a chair and the soffit on one side of my house") gets one consistent scope: only what was
   // named is priced, whatever kind of job each part would be on its own (see jobParts.ts).
@@ -792,10 +826,15 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
     mixedPatch = reconcileJobParts(trimmed, { ...state.ctx, ...ctxWithExplicit } as EstimatorContext, state.askedIds.length === 0);
     if (mixedPatch) Object.assign(ctxWithExplicit, mixedPatch);
   }
+  // Named rooms are inside the house: "two bedrooms" never needs "inside, outside or both?" asked of it
+  if (!(ctxWithExplicit.projectType ?? state.ctx.projectType) && (ctxWithExplicit.selectedRooms ?? state.ctx.selectedRooms ?? []).length > 0 && ctxWithExplicit.interiorScope === 'specific_rooms') ctxWithExplicit.projectType = 'interior';
   // How much work each part needs, said part by part ("living room going gray, bedroom the same color, a few touch ups in the hall", "the
   // railings only need a refresher"): one coat is about 85% of a repaint, touch ups about 70% (see treatments.ts and the engine's coat factors).
   {
-    const treat = extractTreatments(trimmed, ctxWithExplicit.selectedRooms ?? state.ctx.selectedRooms ?? [], ctxWithExplicit.projectType ?? state.ctx.projectType ?? '');
+    // what is different about one room ("vaulted ceilings in one bedroom, standard in the other") first, since the colors that follow refer to it
+    const traits = readRoomTraits(trimmed, { ...state.ctx, ...ctxWithExplicit } as EstimatorContext);
+    if (traits) Object.assign(ctxWithExplicit, traits);
+    const treat = extractTreatments(trimmed, ctxWithExplicit.selectedRooms ?? state.ctx.selectedRooms ?? [], ctxWithExplicit.projectType ?? state.ctx.projectType ?? '', ctxWithExplicit.roomTraits ?? state.ctx.roomTraits);
     if (treat) {
       if (Object.keys(treat.rooms).length > 0) {
         ctxWithExplicit.roomTreatments = { ...(state.ctx.roomTreatments ?? {}), ...treat.rooms };
@@ -1112,6 +1151,11 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
   // Whatever the customer ruled out stays out, whatever a reading, a default or a later step put back: the questions that depend on it
   // (painted before? bare or stained? how many?) then drop out by themselves, because the thing is no longer in the job.
   Object.assign(ctxNext, enforceExclusions(ctxNext));
+  // doors the customer named as part of the job ("five doors") are not dropped by a later "just the walls" (which is about the rooms' surfaces); only "no doors" removes them
+  if (ctxNext.doorsIncluded && ctxNext.doorCount && !/\b(?:no|not|skip|without|exclud\w*|leave out|don'?t)\b[^.]{0,15}\bdoors?\b/i.test(trimmed)) {
+    if (ctxNext.interiorDoors === 'none') ctxNext.interiorDoors = 'some';
+    ctxNext.excludedSurfaces = (ctxNext.excludedSurfaces ?? []).filter((x) => x !== 'doors');
+  }
   // ...and so does the scope of a request that named several different things (the readings above must not widen it again)
   if (mixedPatch) Object.assign(ctxNext, mixedPatch);
 
@@ -1747,6 +1791,11 @@ async function finalizeTurn(state: ChatState, customerId?: string): Promise<Turn
     if (ai && !ai.ok) verdict = ai;
     aiApproved = !!ai?.ok;
   }
+  // (a customer who described a real job and then answered a long run of questions with "none", "no" and "doesn't matter" is not "dismissive":
+  // those were the right answers to questions that did not apply; only abuse stops a job that was clearly described)
+  const c0 = state.ctx;
+  const clearJob = !!((c0.projectType || c0.selectedRooms.length > 0) && (c0.selectedRooms.length > 0 || c0.squareFeet || c0.bedroomCount || c0.furnitureItems.length > 0 || c0.doorCount || c0.interiorScope === 'whole_house' || c0.exteriorBody === 'yes' || c0.fence === 'yes' || c0.deck === 'yes' || c0.cabinets !== 'none' || c0.stairways === 'yes'));
+  if (!verdict.ok && clearJob && (verdict.reason === 'dismissive' || verdict.reason === 'nonsense' || verdict.reason === 'no_project')) verdict = { ok: true };
   if (!verdict.ok) return keepAfterReview(state, verdict.reason, []);
 
   const loyaltyDiscountPercent = customerId ? await fetchLoyaltyDiscountPercent(customerId) : 0;

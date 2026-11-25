@@ -1047,6 +1047,8 @@ export const ITEM_SPECS: ItemSpec[] = [
     questions: [
       {
         key: 'shelves', label: 'what the closet shelving is', hint: 'Wire, wood, or laminate shelves?',
+        // only when the shelves are being painted ("not the shelves" leaves this out)
+        when: (c) => c.closetShelving !== 'none',
         ask: ["What are the closet shelves: wire, wood, or laminate?", "Wire shelving, wood shelves, or laminate?"],
         clarify: "Wire shelving is slow to paint and often not worth it; wood shelves are normal; laminate needs a bonding primer.",
         example: "Say 'wire', 'wood' or 'laminate'.",
@@ -1058,6 +1060,8 @@ export const ITEM_SPECS: ItemSpec[] = [
       },
       {
         key: 'contents', label: 'whether the closets are empty', hint: 'Empty, or full of stuff?',
+        // with the rooms in the job, the room is emptied or lived in as a whole (the vacancy question answers this); only a closets-only job asks it
+        when: (c) => c.interiorWalls === 'no' && c.selectedRooms.length === 0,
         ask: ["Will the closets be emptied for the painters, or will we work around clothes and shelves?", "Empty closets, or full?"],
         clarify: "A full closet has to be masked and cut in around, which adds a lot of time.",
         example: "Say 'empty' or 'full of stuff'.",

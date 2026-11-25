@@ -418,6 +418,11 @@ export function extractDetails(text: string, ctx: EstimatorContext, askedId: str
     const kind = parseChairKind(text, askedId === 'chair_kind');
     if (kind) { patch.chairKind = kind; acks.push(CHAIR_KIND_LABEL[kind]); }
   }
+  // "not the shelves", "no shelving": the closet shelves are not part of the job, whenever it is said
+  if ((ctx.closets !== 'none' || /\bclosets?\b/.test(t)) && /\b(?:not|no|without|skip|neither|don'?t(?: want| need)?|leave out)\b[^.;]{0,25}\bshel(?:f|ves|ving)\b/.test(t)) {
+    patch.closetShelving = 'none';
+    patch.extAnswered = [...new Set([...(patch.extAnswered ?? ctx.extAnswered ?? []), 'closet_shelves'])];
+  }
   // which kinds of closets, said anywhere ("a walk-in and two coat closets"): standard, small, walk-in and large ones are different amounts of work
   if (!ctx.closetKinds && askedId !== 'closet_count' && (ctx.closets !== 'none' || /\bclosets?\b|\bpantry\b|\bwalk[\s-]?in/.test(t))) {
     const read = parseClosetKinds(text);

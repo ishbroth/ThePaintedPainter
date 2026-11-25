@@ -41,6 +41,21 @@ export function extractSquareFeet(text: string): number | null {
   return isFinite(n) && n > 100 && n < 50000 ? n : null;
 }
 
+/**
+ * "I have two bedrooms and five doors" names two ROOMS to paint, not a two-bedroom home. A count of bedrooms (plural, no home word, no bath count, no "bd/br")
+ * is the rooms; "a 2 bedroom house", "2 bed 1 bath" and "2 bedrooms, 900 sq ft apartment" describe the place.
+ */
+export function bedroomsAsRooms(text: string): number | null {
+  const t = text.toLowerCase();
+  const m = /\b(\d{1,2}|one|two|three|four|five)\s+bedrooms\b/.exec(t);
+  if (!m) return null;
+  if (/\b(?:house|home|apartment|apt|condo|townhouse|townhome|duplex|unit|cottage|bungalow|flat|studio)\b/.test(t)) return null;
+  if (/\b(?:\d+(?:\.\d)?|one|two|three|four|five)\s*(?:-|\s)?\s*(?:full\s+)?(?:bath(?:room)?s?|ba)\b/.test(t)) return null;
+  if (/\b\d+\s*(?:bed|bd|br)\b/.test(t)) return null;
+  const n = parseIntLoose(m[1]);
+  return n && n >= 1 && n <= 5 ? n : null;
+}
+
 export function extractBedroomCount(text: string): number | null {
   const m = text.match(/(\d+|one|two|three|four|five|six|seven)\s*(?:-|\s)?\s*(?:bed(?:room)?s?|br)\b/i);
   if (!m) return null;
@@ -70,9 +85,18 @@ export function extractStories(text: string): number | null {
 }
 
 export function extractProjectType(text: string): 'interior' | 'exterior' | 'both' | null {
-  const t = text.toLowerCase();
+  const lower = text.toLowerCase();
+  // what the customer rules out ("no exterior", "not the outside", "not talking about the siding") is not what they want
+  const NEG = /\b(?:no|not|without|skip|nothing|never|don'?t (?:need|want|do)|isn'?t|aren'?t)\b(?: (?:talking|doing|painting|asking) about)?\s+(?:the\s+|any\s+)?/;
+  const outsideWords = '(?:exteriors?|outside|outdoors?|siding|stucco)';
+  const insideWords = '(?:interiors?|inside|indoors?)';
+  const negatedExterior = new RegExp(NEG.source + outsideWords + '\\b').test(lower);
+  const negatedInterior = new RegExp(NEG.source + insideWords + '\\b').test(lower);
+  const t = lower.replace(new RegExp(NEG.source + outsideWords + '\\b', 'g'), ' ').replace(new RegExp(NEG.source + insideWords + '\\b', 'g'), ' ');
   const hasIn = /\b(interior|inside|indoors?|inside the house|inside the home)\b/.test(t);
   const hasEx = /\b(exterior|outside|outdoors?|outside the house|siding|stucco)\b/.test(t);
+  if (negatedExterior && !hasEx && !hasIn) return 'interior';
+  if (negatedInterior && !hasIn && !hasEx) return 'exterior';
   if (hasIn && hasEx) return 'both';
   if (/\b(?:inside and out|in and out|inside & out|inside\/outside)\b/.test(t)) return 'both';
   if (/\b(both\s+(?:interior|inside)\s+and\s+(?:exterior|outside))\b/.test(t)) return 'both';
@@ -113,7 +137,7 @@ function stripQuantifiedBedBath(text: string): string {
   const keepBaths = !hasBedCount && !homeWords;
   const oneRoomWithDims = new RegExp('\\b(?:one|1)\\s*(?:-|\\s)?\\s*bed(?:room)?\\s+\\d{1,2}\\s*(?:x|by|×)\\s*\\d{1,2}\\b', 'i').test(text) && !homeWords;
   const parts: string[] = [];
-  if (!oneRoomWithDims) parts.push(BED);
+  if (!oneRoomWithDims && !bedroomsAsRooms(text)) parts.push(BED);
   if (!keepBaths) parts.push(BATH);
   if (parts.length === 0) return text;
   return text.replace(new RegExp('\\b' + NUM + '\\s*(?:-|\\s)?\\s*(?:' + parts.join('|') + ')\\b', 'gi'), ' ');
@@ -152,7 +176,10 @@ export function extractRooms(text: string): string[] {
   // prefix) isn't caught by any pattern above — checked last, and only added
   // if no bedroom was already found, so "master bedroom" doesn't also get
   // counted as a second, unqualified bedroom.
-  if (/\bbed(?:room)?s?\b/.test(t) && !found.some((r) => r === 'master_bedroom' || r.startsWith('bedroom'))) {
+  const asRooms = bedroomsAsRooms(text);
+  if (asRooms && !found.some((r) => r === 'master_bedroom' || r.startsWith('bedroom'))) {
+    for (const r of ['master_bedroom', 'bedroom_2', 'bedroom_3', 'bedroom_4', 'bedroom_5'].slice(0, asRooms)) found.push(r);
+  } else if (/\bbed(?:room)?s?\b/.test(t) && !found.some((r) => r === 'master_bedroom' || r.startsWith('bedroom'))) {
     found.push('bedroom_3');
   }
   return found;
@@ -1267,7 +1294,7 @@ export function extractAll(text: string, prev: EstimatorContext, lastBotTopicId:
     }
   }
 
-  const beds = extractBedroomCount(text);
+  const beds = bedroomsAsRooms(text) || (prev.interiorScope === 'specific_rooms' && prev.selectedRooms.length > 0) ? null : extractBedroomCount(text);
   if (beds && !prev.bedroomCount) {
     patch.bedroomCount = beds;
     acks.push(`${beds}-bedroom`);

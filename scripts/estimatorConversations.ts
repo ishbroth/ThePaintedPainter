@@ -1125,6 +1125,75 @@ async function dismissAt(setup: string[], topicWords: RegExp, dismissal = 'doesn
   check('closets: kinds said up front are read (and the count is not asked again)', said.state.ctx.closetKinds?.reach === 2 && said.state.ctx.closetKinds?.walkin === 1 && said.state.ctx.closetCount === 3, JSON.stringify([said.state.ctx.closetKinds, said.state.ctx.closetCount]));
 }
 
+// ---------------------------------------------------------------------------------------------------------------------------------
+// A real customer's conversation: "two bedrooms and five doors". Only those rooms are asked about, one branch at a time, and it ends in a price.
+// ---------------------------------------------------------------------------------------------------------------------------------
+{
+  const answerFor = (bot: string): string => {
+    const b = bot.toLowerCase();
+    if (/how big|square feet|size/.test(b)) return 'the bedrooms together are 600 sq ft';
+    if (/which surfaces/.test(b)) return 'just the walls';
+    if (/ceilings standard height|standard ceiling height/.test(b)) return 'vaulted ceilings in one bedroom, standard in the other';
+    if (/ceilings too|include the ceilings|add the ceilings/.test(b)) return 'no';
+    if (/baseboards|trim/.test(b) && /painted before|bare|stained/.test(b)) return 'no baseboards';
+    if (/baseboards/.test(b)) return 'no';
+    if (/how many closets/.test(b)) return '1 standard';
+    if (/closets/.test(b) && /shelves|shelving/.test(b)) return 'not the shelves, just the walls';
+    if (/closets/.test(b)) return 'yes';
+    if (/how many doors/.test(b)) return '5';
+    if (/doors/.test(b) && /flat|paneled|french/.test(b)) return 'flat';
+    if (/doors/.test(b) && /sides|face/.test(b)) return 'both sides';
+    if (/doors/.test(b) && /painted|stained|bare/.test(b)) return 'painted';
+    if (/same color|different color|color/.test(b)) return 'different color in the room with the vaulted ceilings, same color in the other room';
+    if (/live here|rental|your home/.test(b)) return 'my home';
+    if (/shape|prep|holes/.test(b)) return 'good shape, i need caulking around all baseboards';
+    if (/preference on the paint|paint in mind|brand/.test(b)) return 'leave it to the painter';
+    if (/zip/.test(b)) return '91941';
+    if (/timeline|when would|anyone be/.test(b)) return 'next month';
+    if (/photo|picture|run it/.test(b)) return 'run it';
+    if (/anything else|else i should know/.test(b)) return 'no';
+    return 'yes';
+  };
+  let st = (await play(['i have two bedrooms and five doors'])).state;
+  for (let i = 0; i < 45 && !st.finalEstimate; i++) {
+    const last = st.history[st.history.length - 1].text;
+    st = (await play([answerFor(last)], [], st)).state;
+  }
+  const botText = st.history.filter((m) => m.role === 'bot').map((m) => m.text).join(' || ');
+  const est = st.finalEstimate?.estimate;
+  check('two bedrooms and five doors: it ends in a price', !!est, st.history[st.history.length - 1].text);
+  check('...the job is the two bedrooms, not a two-bedroom home', st.ctx.selectedRooms.length === 2 && st.ctx.interiorScope === 'specific_rooms' && st.ctx.bedroomCount == null, JSON.stringify([st.ctx.selectedRooms, st.ctx.interiorScope, st.ctx.bedroomCount]));
+  check('...no whole-house questions (bathrooms, stories, "assuming a living room, kitchen...")', !/how many bathrooms|one-story|one level, or two|two stories|i'm assuming/i.test(botText), botText.match(/how many bathrooms|one-story|one level, or two|i'm assuming[^.]*/i)?.[0] ?? '');
+  check('...no kitchen cabinets, windows, garage, gutters, siding or front door questions', !/kitchen cabinets|what are the windows|garage door|gutters|what.s the siding|front door|exterior/i.test(botText), botText.match(/kitchen cabinets|what are the windows|garage door|gutters|what.s the siding|front door/i)?.[0] ?? '');
+  check('...no closet shelving or "emptied" questions after "not the shelves"', !/wire shelving|wood shelves|closets be emptied|empty closets, or full/i.test(botText), botText.match(/wire shelving|closets be emptied|empty closets, or full/i)?.[0] ?? '');
+  check('...no question is asked twice', (() => { const qs = st.history.filter((m) => m.role === 'bot').map((m) => (m.text.split(' || ').pop() ?? '').replace(/^.*?([A-Z][^.?!]*\?)\s*$/, '$1')); return new Set(qs).size === qs.length; })(), '');
+  check('...the two ceiling heights are kept apart: tall in one room only', !!st.ctx.roomTraits && Object.values(st.ctx.roomTraits).filter((t) => t.vaulted).length === 1 && (st.ctx.tallCeilingShare ?? 1) < 1, JSON.stringify([st.ctx.roomTraits, st.ctx.tallCeilingShare]));
+  const tr = Object.values(st.ctx.roomTreatments ?? {}).sort().join(',');
+  check('...and the two colors: a repaint in the vaulted room, one coat in the other', tr === 'full,one_coat', tr);
+  check('...priced for the walls, the doors and the closet, and nothing outside', !!est && est.lineItems.some((l) => l.key === 'walls') && est.lineItems.some((l) => l.key === 'doors') && est.lineItems.some((l) => l.key === 'closets') && !est.lineItems.some((l) => /^ext_|garage|entry|gutter|power_wash/.test(l.key ?? '')), est?.lineItems.map((l) => l.key ?? l.description).join(', ') ?? '');
+}
+
+// Pushback: "why are we talking about X?" stops the questions and checks the job; narrowing statements fix a scope that was widened
+{
+  const a = await play(['i have two bedrooms and five doors', 'the bedrooms together are 600 sq ft']);
+  const b = await play(['why are we talking about bathrooms? i only said two bedrooms'], [], a.state);
+  check('pushback: it backs up and says the job as it has it', /let me back up/i.test(b.last) && /2 bedrooms/i.test(b.last) && /5 interior doors/i.test(b.last), b.last);
+  check('pushback: it asks whether that is right, not the next question', /is that right/i.test(b.last), b.last);
+  const widened = await play(['I need the inside of my house painted, 3 bed 2 bath, 1800 sq ft', 'not at all, all i ever wanted was the 2 bedrooms']);
+  check('"all I ever wanted was the 2 bedrooms" narrows a whole-house job to those two rooms', widened.state.ctx.interiorScope === 'specific_rooms' && widened.state.ctx.selectedRooms.length === 2, JSON.stringify([widened.state.ctx.interiorScope, widened.state.ctx.selectedRooms]));
+  const noExt = await play(['i need the doors done', 'does not matter, no exterior']);
+  check('"no exterior" keeps it an inside job', noExt.state.ctx.projectType !== 'exterior' && noExt.state.ctx.projectType !== 'both', String(noExt.state.ctx.projectType));
+  // the review never refuses a job that was clearly described because "none" and "doesn't matter" were the right answers to questions that did not apply
+  let clear = (await play(['two bedrooms, about 600 sq ft', 'walls only'])).state;
+  const shrug = ['none', 'doesnt matter', 'no'];
+  for (let i = 0; i < 45 && !clear.finalEstimate; i++) {
+    const last = clear.history[clear.history.length - 1].text.toLowerCase();
+    const reply = /zip/.test(last) ? '91941' : /timeline|when would|anyone be/.test(last) ? 'next month' : /photo|run it/.test(last) ? 'run it' : shrug[i % 3];
+    clear = (await play([reply], [], clear)).state;
+  }
+  check('a clearly described job answered with "none", "doesn\'t matter" and "no" is still priced', !!clear.finalEstimate, clear.history[clear.history.length - 1].text);
+}
+
 setLLMReaderForTests(undefined);
 console.log(failures ? `\n${failures} FAILED` : '\nall conversation checks passed');
 process.exit(failures ? 1 : 0);

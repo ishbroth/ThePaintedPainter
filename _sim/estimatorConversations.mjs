@@ -16941,6 +16941,16 @@ function extractSquareFeet(text) {
   const n = parseInt(m2[1].replace(/[,.]/g, ""), 10);
   return isFinite(n) && n > 100 && n < 5e4 ? n : null;
 }
+function bedroomsAsRooms(text) {
+  const t2 = text.toLowerCase();
+  const m2 = /\b(\d{1,2}|one|two|three|four|five)\s+bedrooms\b/.exec(t2);
+  if (!m2) return null;
+  if (/\b(?:house|home|apartment|apt|condo|townhouse|townhome|duplex|unit|cottage|bungalow|flat|studio)\b/.test(t2)) return null;
+  if (/\b(?:\d+(?:\.\d)?|one|two|three|four|five)\s*(?:-|\s)?\s*(?:full\s+)?(?:bath(?:room)?s?|ba)\b/.test(t2)) return null;
+  if (/\b\d+\s*(?:bed|bd|br)\b/.test(t2)) return null;
+  const n = parseIntLoose(m2[1]);
+  return n && n >= 1 && n <= 5 ? n : null;
+}
 function extractBedroomCount(text) {
   const m2 = text.match(/(\d+|one|two|three|four|five|six|seven)\s*(?:-|\s)?\s*(?:bed(?:room)?s?|br)\b/i);
   if (!m2) return null;
@@ -16961,9 +16971,17 @@ function extractStories(text) {
   return n >= 1 && n <= 40 ? n : null;
 }
 function extractProjectType(text) {
-  const t2 = text.toLowerCase();
+  const lower = text.toLowerCase();
+  const NEG = /\b(?:no|not|without|skip|nothing|never|don'?t (?:need|want|do)|isn'?t|aren'?t)\b(?: (?:talking|doing|painting|asking) about)?\s+(?:the\s+|any\s+)?/;
+  const outsideWords = "(?:exteriors?|outside|outdoors?|siding|stucco)";
+  const insideWords = "(?:interiors?|inside|indoors?)";
+  const negatedExterior = new RegExp(NEG.source + outsideWords + "\\b").test(lower);
+  const negatedInterior = new RegExp(NEG.source + insideWords + "\\b").test(lower);
+  const t2 = lower.replace(new RegExp(NEG.source + outsideWords + "\\b", "g"), " ").replace(new RegExp(NEG.source + insideWords + "\\b", "g"), " ");
   const hasIn = /\b(interior|inside|indoors?|inside the house|inside the home)\b/.test(t2);
   const hasEx = /\b(exterior|outside|outdoors?|outside the house|siding|stucco)\b/.test(t2);
+  if (negatedExterior && !hasEx && !hasIn) return "interior";
+  if (negatedInterior && !hasIn && !hasEx) return "exterior";
   if (hasIn && hasEx) return "both";
   if (/\b(?:inside and out|in and out|inside & out|inside\/outside)\b/.test(t2)) return "both";
   if (/\b(both\s+(?:interior|inside)\s+and\s+(?:exterior|outside))\b/.test(t2)) return "both";
@@ -16988,7 +17006,7 @@ function stripQuantifiedBedBath(text) {
   const keepBaths = !hasBedCount && !homeWords;
   const oneRoomWithDims = new RegExp("\\b(?:one|1)\\s*(?:-|\\s)?\\s*bed(?:room)?\\s+\\d{1,2}\\s*(?:x|by|\xD7)\\s*\\d{1,2}\\b", "i").test(text) && !homeWords;
   const parts = [];
-  if (!oneRoomWithDims) parts.push(BED);
+  if (!oneRoomWithDims && !bedroomsAsRooms(text)) parts.push(BED);
   if (!keepBaths) parts.push(BATH);
   if (parts.length === 0) return text;
   return text.replace(new RegExp("\\b" + NUM2 + "\\s*(?:-|\\s)?\\s*(?:" + parts.join("|") + ")\\b", "gi"), " ");
@@ -17022,7 +17040,10 @@ function extractRooms(text) {
   for (const [re, key] of map) {
     if (re.test(t2) && !found.includes(key)) found.push(key);
   }
-  if (/\bbed(?:room)?s?\b/.test(t2) && !found.some((r) => r === "master_bedroom" || r.startsWith("bedroom"))) {
+  const asRooms = bedroomsAsRooms(text);
+  if (asRooms && !found.some((r) => r === "master_bedroom" || r.startsWith("bedroom"))) {
+    for (const r of ["master_bedroom", "bedroom_2", "bedroom_3", "bedroom_4", "bedroom_5"].slice(0, asRooms)) found.push(r);
+  } else if (/\bbed(?:room)?s?\b/.test(t2) && !found.some((r) => r === "master_bedroom" || r.startsWith("bedroom"))) {
     found.push("bedroom_3");
   }
   return found;
@@ -17754,7 +17775,7 @@ function extractAll(text, prev, lastBotTopicId = null) {
       acks.push("commercial");
     }
   }
-  const beds = extractBedroomCount(text);
+  const beds = bedroomsAsRooms(text) || prev.interiorScope === "specific_rooms" && prev.selectedRooms.length > 0 ? null : extractBedroomCount(text);
   if (beds && !prev.bedroomCount) {
     patch.bedroomCount = beds;
     acks.push(`${beds}-bedroom`);
@@ -18820,6 +18841,10 @@ function extractDetails(text, ctx, askedId) {
       patch.chairKind = kind;
       acks.push(CHAIR_KIND_LABEL[kind]);
     }
+  }
+  if ((ctx.closets !== "none" || /\bclosets?\b/.test(t2)) && /\b(?:not|no|without|skip|neither|don'?t(?: want| need)?|leave out)\b[^.;]{0,25}\bshel(?:f|ves|ving)\b/.test(t2)) {
+    patch.closetShelving = "none";
+    patch.extAnswered = [.../* @__PURE__ */ new Set([...patch.extAnswered ?? ctx.extAnswered ?? [], "closet_shelves"])];
   }
   if (!ctx.closetKinds && askedId !== "closet_count" && (ctx.closets !== "none" || /\bclosets?\b|\bpantry\b|\bwalk[\s-]?in/.test(t2))) {
     const read = parseClosetKinds(text);
@@ -20362,6 +20387,8 @@ var ITEM_SPECS = [
         key: "shelves",
         label: "what the closet shelving is",
         hint: "Wire, wood, or laminate shelves?",
+        // only when the shelves are being painted ("not the shelves" leaves this out)
+        when: (c2) => c2.closetShelving !== "none",
         ask: ["What are the closet shelves: wire, wood, or laminate?", "Wire shelving, wood shelves, or laminate?"],
         clarify: "Wire shelving is slow to paint and often not worth it; wood shelves are normal; laminate needs a bonding primer.",
         example: "Say 'wire', 'wood' or 'laminate'.",
@@ -20375,6 +20402,8 @@ var ITEM_SPECS = [
         key: "contents",
         label: "whether the closets are empty",
         hint: "Empty, or full of stuff?",
+        // with the rooms in the job, the room is emptied or lived in as a whole (the vacancy question answers this); only a closets-only job asks it
+        when: (c2) => c2.interiorWalls === "no" && c2.selectedRooms.length === 0,
         ask: ["Will the closets be emptied for the painters, or will we work around clothes and shelves?", "Empty closets, or full?"],
         clarify: "A full closet has to be masked and cut in around, which adds a lot of time.",
         example: "Say 'empty' or 'full of stuff'.",
@@ -21363,12 +21392,22 @@ function getLayout(ctx, sqft) {
     const keptRooms = ctx.selectedRooms.filter((r) => !ctx.excludedRooms.includes(r));
     const lone = keptRooms.length === 1 ? STANDARD_ROOMS[keptRooms[0]] : void 0;
     const loneScale = lone && ctx.squareFeet && ctx.squareFeet <= 4e3 && (ctx.squareFeet <= 600 || ["bonus_room", "garage", "living_room"].includes(keptRooms[0])) ? Math.min(4, Math.max(0.5, ctx.squareFeet / (lone.widthFt * lone.lengthFt))) : 1;
+    let wallScale = loneScale;
+    let ceilScale = loneScale;
+    if (ctx.selectedRoomsSqft && ctx.selectedRoomsSqft > 0) {
+      const template = keptRooms.reduce((t2, r) => t2 + (STANDARD_ROOMS[r] ? STANDARD_ROOMS[r].widthFt * STANDARD_ROOMS[r].lengthFt : 0), 0);
+      if (template > 0) {
+        const area = Math.min(4, Math.max(0.4, ctx.selectedRoomsSqft / template));
+        ceilScale = area;
+        wallScale = Math.sqrt(area);
+      }
+    }
     for (const room of keptRooms) {
       const spec = STANDARD_ROOMS[room];
       if (spec) {
-        totalWall += spec.wallSqFt * loneScale;
-        totalCeiling += spec.ceilingSqFt * loneScale;
-        totalTrim += spec.trimLinearFt * loneScale;
+        totalWall += spec.wallSqFt * wallScale;
+        totalCeiling += spec.ceilingSqFt * ceilScale;
+        totalTrim += spec.trimLinearFt * wallScale;
         totalDoors += spec.doors;
         totalWindows += spec.windows;
         totalClosets += spec.closets;
@@ -23044,12 +23083,17 @@ var TOPICS = [
   {
     id: "room_size",
     priority: 20,
-    relevant: (c2) => c2.projectType !== "exterior" && c2.interiorScope === "specific_rooms" && c2.selectedRooms.length === 1 && !c2.squareFeet,
+    relevant: (c2) => c2.projectType !== "exterior" && c2.interiorScope === "specific_rooms" && c2.selectedRooms.length >= 1 && !c2.squareFeet && !c2.selectedRoomsSqft,
     alreadyAnswered: (c2) => {
       const d2 = c2.additionalDetails.toLowerCase();
-      return !!(c2.squareFeet || /\b(small|medium|large|\d+x\d+|\d+\s*sq)/.test(d2));
+      return !!(c2.squareFeet || c2.selectedRoomsSqft || /\b(small|medium|large|\d+x\d+|\d+\s*sq)/.test(d2));
     },
     ask: (c2) => {
+      if (c2.selectedRooms.length > 1) {
+        const beds = c2.selectedRooms.filter((r) => /bedroom/.test(r)).length;
+        const what = beds === c2.selectedRooms.length ? `${beds} bedrooms` : "those rooms";
+        return pick2([`About how big are the ${what}: roughly how many square feet together (or each)? A rough guess, or small, medium or large, is fine.`, `How big are the ${what}? Total square feet for all of them, or each one's size, whichever you know.`], seed(c2));
+      }
       const label = roomLabel(c2.selectedRooms[0]);
       return pick2(
         [
@@ -23922,7 +23966,7 @@ var TOPICS = [
     priority: 35,
     relevant: (c2) => c2.itemsOnly || componentKind(c2) !== "" || (c2.projectType === "interior" || c2.projectType === "both") && (c2.interiorWalls !== "no" || c2.interiorCeilings === "yes" || c2.interiorTrim === "yes" || c2.cabinets !== "none"),
     alreadyAnswered: (c2) => !!c2.interiorColorChange,
-    ask: (c2) => c2.itemsOnly ? pick2(
+    ask: (c2) => c2.interiorScope === "specific_rooms" && c2.selectedRooms.length >= 2 && !c2.itemsOnly ? "For the rooms in the job: the same color in each, or changing any of them? Tell me which stay the same and which are changing." : c2.itemsOnly ? pick2(
       [
         c2.furnitureTreatment === "restain" ? "Are we matching the current stain color, or going a different shade?" : "Are we keeping the current color, or changing it?",
         "Same color as it is now, or something new?"
@@ -25081,6 +25125,59 @@ function faqAnswer(text, ctx) {
 
 // src/lib/chatEstimator/treatments.ts
 init_define_import_meta_env();
+
+// src/lib/chatEstimator/roomTraits.ts
+init_define_import_meta_env();
+var TALL_CEILING = /\b(?:vaul?ted|cathedral|tall|high|raised|9[\s-]?(?:ft|foot|feet)|10[\s-]?(?:ft|foot|feet)|12[\s-]?(?:ft|foot|feet))\s+ceilings?\b/i;
+var STANDARD_CEILING = /\b(?:normal|standard|regular|flat|low|8[\s-]?(?:ft|foot|feet))\s+ceilings?\b/i;
+var WORD_COUNT = { one: 1, "1": 1, two: 2, "2": 2, three: 3, "3": 3 };
+function wallArea(key) {
+  return STANDARD_ROOMS[key]?.wallSqFt ?? 0;
+}
+function readRoomTraits(text, ctx) {
+  const rooms = ctx.selectedRooms ?? [];
+  if (rooms.length === 0) return null;
+  const t2 = text.toLowerCase();
+  const traits = { ...ctx.roomTraits ?? {} };
+  const already = Object.keys(traits).filter((r) => traits[r].vaulted);
+  const mentionsTall = TALL_CEILING.test(t2);
+  const tallClause = t2.split(/[.;?!]|,\s*/).find((c2) => TALL_CEILING.test(c2)) ?? "";
+  const sayingIt = tallClause || t2;
+  const oneRoom = /\b(?:in|for|on)\s+(?:just\s+|only\s+)?(?:one|1)\s+(?:of the\s+)?(?:bed)?rooms?\b|\b(?:just|only)\s+(?:in\s+)?(?:one|1)\s+(?:of them\b|room\b|bedroom\b)|\bone\s+(?:bed)?room\s+(?:has|have|with)\b/.test(sayingIt) || mentionsTall && /\bin the other\b/.test(t2) && /\b(?:one|1)\s+(?:bed)?room\b/.test(sayingIt);
+  const everyRoom = /\b(?:all|every|both)\b[^.;?]{0,15}\b(?:rooms?|bedrooms?)\b|\bthroughout\b/.test(t2);
+  const countWord = /\b(?:in|for)\s+(?:just\s+)?(one|two|1|2|three|3)\s+(?:of the\s+)?(?:bed)?rooms?\b/.exec(t2);
+  const named = extractRooms(t2.replace(/\bgarage\s+doors?\b/g, " ")).filter((r) => rooms.includes(r));
+  const setVaulted = (keys) => {
+    for (const k of keys) traits[k] = { ...traits[k], vaulted: true };
+  };
+  if (mentionsTall && !everyRoom && already.length === 0) {
+    if (named.length > 0 && !oneRoom) setVaulted(named);
+    else if (oneRoom || countWord && WORD_COUNT[countWord[1]] === 1) setVaulted([rooms.find((r) => !traits[r]?.vaulted) ?? rooms[0]]);
+    else if (countWord) setVaulted(rooms.filter((r) => !traits[r]?.vaulted).slice(0, WORD_COUNT[countWord[1]] ?? 1));
+  } else if (!mentionsTall && already.length === 0 && ctx.ceilingHeight && ctx.ceilingHeight !== "standard" && oneRoom) {
+    setVaulted([rooms[0]]);
+  } else if (mentionsTall && everyRoom) {
+    return null;
+  }
+  const vaulted = Object.keys(traits).filter((r) => traits[r].vaulted);
+  if (vaulted.length === 0 || vaulted.length === already.length) return null;
+  const total = rooms.reduce((s, r) => s + wallArea(r), 0);
+  const tall = vaulted.reduce((s, r) => s + wallArea(r), 0);
+  const share = total > 0 ? Math.min(1, tall / total) : vaulted.length / rooms.length;
+  return { roomTraits: traits, tallCeilingShare: share, ceilingHeight: "vaulted_mixed", ceilingHeightKnown: true };
+}
+function roomsByDescriptor(clause, rooms, traits) {
+  const t2 = clause.toLowerCase();
+  const vaulted = rooms.filter((r) => traits?.[r]?.vaulted);
+  const rest = rooms.filter((r) => !traits?.[r]?.vaulted);
+  if (vaulted.length === 0) return [];
+  if (/\b(?:room|bedroom|one)\s+with\s+(?:the\s+)?(?:vaul?ted|cathedral|tall|high)\b|\bthe (?:vaul?ted|tall|high) (?:one|room|bedroom)\b/.test(t2)) return vaulted;
+  if (STANDARD_CEILING.test(t2) && /\b(?:room|bedroom|one)\s+with\b/.test(t2)) return rest;
+  if (/\bthe other (?:one|room|bedroom)\b|\bthe (?:normal|regular|standard) (?:one|room|bedroom)\b/.test(t2)) return rest;
+  return [];
+}
+
+// src/lib/chatEstimator/treatments.ts
 var TOUCH_UP = /\btouch(?:ed|es|ing)?[\s-]?ups?\b|\bspot[\s-]?(?:paint|painting|fix|fixes)\b|\ba few (?:spots|marks|scuffs)\b|\bscuffs? (?:and|&) (?:marks|nail)/i;
 var ONE_COAT = /\b(?:same colou?r|same as (?:it is|now|before|what it is)|(?:keep|keeping|staying|stays?|stay) (?:the )?(?:same|existing|current) colou?r|matching (?:the )?(?:existing|current) colou?r|one[\s-]coat|1[\s-]coat|single[\s-]coat|(?:just |only )?(?:needs?|wants?) (?:a |just a )?(?:quick |little )?(?:refresh(?:er)?|freshening|freshen(?:ing)? up|facelift|pick[\s-]?me[\s-]?up)|(?:a |just a )?(?:quick |little )?(?:refresh(?:er)?|freshen(?:ing)?(?: up)?)|a fresh coat|just a coat)\b/i;
 var NEW_COLOR = /\b(?:new colou?r|different colou?r|changing (?:the )?colou?r|change (?:the )?colou?r|going (?:to|with) (?:a )?(?:\w+ )?(?:gray|grey|white|blue|green|beige|tan|taupe|yellow|red|black|navy|sage|cream|darker|lighter)|going (?:gray|grey|white|blue|green|beige|tan|taupe|yellow|red|black|navy|sage|cream|darker|lighter)|from \w+ to \w+|repaint(?:ed|ing)?|completely|fully)\b/i;
@@ -25120,7 +25217,7 @@ function genericRoomCount(clause) {
   const m2 = /\b(a|an|one|another|two|three|four)\s+(?:other |more |additional |different )?rooms?\b/i.exec(clause);
   return m2 ? COUNT_WORDS[m2[1].toLowerCase()] ?? 1 : 0;
 }
-function extractTreatments(text, usedRooms = [], projectType = "") {
+function extractTreatments(text, usedRooms = [], projectType = "", traits) {
   const clauses = clausesOf(text);
   const out = { rooms: {}, parts: {}, namedRooms: [], untreatedRooms: [], touchUpOnly: false };
   const pool = GENERIC_ROOM_POOL.filter((r) => !usedRooms.includes(r));
@@ -25158,7 +25255,8 @@ function extractTreatments(text, usedRooms = [], projectType = "") {
   for (let ci = 0; ci < clauses.length; ci++) {
     const clause = clauses[ci];
     const forRooms = clause.replace(/\bgarage doors?\b/gi, " ").replace(/\bstair(?:s|case|way)?\s*(?:rail(?:ing)?s?|banisters?)\b/gi, " ");
-    const rooms = extractRooms(forRooms);
+    let rooms = extractRooms(forRooms);
+    if (rooms.length === 0) rooms = roomsByDescriptor(clause, usedRooms, traits);
     const parts = partsIn(clause);
     const generic = rooms.length === 0 ? genericRoomCount(clause) : 0;
     const hasSubject = rooms.length + parts.length + generic > 0;
@@ -25350,6 +25448,84 @@ function answeredEarlier(topic, ctx, customerText) {
   const found = fillFromTranscript(ctx, customerText);
   if (Object.keys(found).length === 0) return null;
   return topic.alreadyAnswered({ ...ctx, ...found }) ? found : null;
+}
+
+// src/lib/chatEstimator/pushback.ts
+init_define_import_meta_env();
+var PUSHBACK = [
+  /\b(?:why|how)\b[^.?!]{0,25}\b(?:are|did|do|does|is|were|was)\s+(?:we|you|it|this)\b[^.?!]{0,30}\b(?:talk\w*|ask\w*|stuck|get|got|go\w*|bring\w*|on)\b/i,
+  /\bhow did we get (?:stuck )?(?:on|to|here)\b/i,
+  /\bi (?:only|just) (?:said|asked for|wanted|mentioned|told you)\b/i,
+  /\ball i (?:ever )?(?:wanted|asked|said|need(?:ed)?|want)\b/i,
+  /\bwe(?:'re| are| r) (?:only|just) (?:doing|painting|talking)\b/i,
+  /\b(?:not|never) talking about\b/i,
+  /\byou(?:'re| are| r) not (?:even )?listening\b/i,
+  /\b(?:stop|quit) (?:asking|going|doing)\b/i,
+  /\b(?:that'?s|thats|this is|this'?s) what i mean\b/i,
+  /\byou (?:have to|need to|should) (?:start )?(?:pick(?:ing)? up|back up|listen)\b/i
+];
+function isPushback(text) {
+  return PUSHBACK.some((re) => re.test(text));
+}
+var ONLY = /\b(?:only|just|all i (?:ever )?(?:wanted|asked for|said|need(?:ed)?|want)(?: was| is)?|we(?:'re| are| r) only (?:doing|painting)|i only said)\b/i;
+var NEG_OUT = /\b(?:no|not|without|skip|nothing|never|don'?t (?:need|want|do))\b(?: (?:talking|doing|painting|asking) about)?\s+(?:the\s+|any\s+)?(?:exteriors?|outside|outdoors?|siding)\b/i;
+var NEG_BATH = /\b(?:no|not|without|skip|nothing)\b\s+(?:the\s+|any\s+)?bath(?:room)?s?\b/i;
+function narrowingPatch(text, ctx) {
+  const patch = {};
+  const onlyAt = ONLY.exec(text);
+  const clause = onlyAt ? text.slice(onlyAt.index).split(/[.?!;,]/)[0] : "";
+  const rooms = extractRooms(clause.replace(/\bgarage\s+doors?\b/gi, " "));
+  if (onlyAt && rooms.length > 0) {
+    patch.selectedRooms = rooms;
+    patch.interiorScope = "specific_rooms";
+    patch.includedExtraRooms = [];
+    patch.projectType = ctx.projectType === "exterior" ? ctx.projectType : "interior";
+    patch.bathroomCount = null;
+    patch.stories = null;
+  }
+  if (NEG_OUT.test(text) && ctx.projectType !== "exterior") {
+    patch.projectType = "interior";
+    patch.exteriorBody = "no";
+  }
+  if (NEG_BATH.test(text) && ctx.interiorScope === "specific_rooms") patch.selectedRooms = (patch.selectedRooms ?? ctx.selectedRooms).filter((r) => !r.startsWith("bathroom"));
+  return Object.keys(patch).length > 0 ? patch : null;
+}
+var roomName = (key) => (STANDARD_ROOMS[key]?.label ?? key.replace(/_/g, " ")).toLowerCase();
+function scopeRecap(c2) {
+  const things = [];
+  const bedrooms = c2.selectedRooms.filter((r) => /bedroom/.test(r));
+  const otherRooms = c2.selectedRooms.filter((r) => !/bedroom/.test(r));
+  if (c2.interiorScope === "whole_house") things.push("the whole inside");
+  else {
+    if (bedrooms.length > 0) things.push(bedrooms.length === 1 ? "1 bedroom" : `${bedrooms.length} bedrooms`);
+    for (const r of otherRooms) things.push("the " + roomName(r));
+  }
+  if (c2.doorCount) things.push(c2.doorCount === 1 ? "1 interior door" : `${c2.doorCount} interior doors`);
+  if (c2.closets !== "none") things.push(c2.closetKinds ? describeClosetKinds(c2.closetKinds) : "the closets");
+  if (c2.cabinets !== "none") things.push("the cabinets");
+  if (c2.stairways === "yes" && c2.stairwayDetails === "railings_only") things.push("the stair railings");
+  if (c2.furnitureItems.length > 0) things.push(itemsPhrase(c2.furnitureItems));
+  const outside2 = c2.projectType === "exterior" || c2.projectType === "both";
+  if (outside2) {
+    if (c2.exteriorBody !== "no") things.push("the outside of the house");
+    if (c2.entryDoor === "yes") things.push("the front door");
+    if (c2.garageDoor !== "none" && c2.garageDoor !== "") things.push("the garage door");
+    if (c2.soffitsEaves === "yes") things.push("the soffits");
+    if (c2.fence === "yes") things.push("a fence");
+    if (c2.deck === "yes") things.push("a deck");
+  }
+  const surfaces = [];
+  if (c2.surfacesAddressed && (c2.projectType === "interior" || c2.projectType === "both") && c2.interiorScope) {
+    if (c2.interiorWalls !== "no") surfaces.push("walls");
+    if (c2.interiorCeilings === "yes") surfaces.push("ceilings");
+    if (c2.interiorTrim === "yes") surfaces.push("baseboards and trim");
+    const skipped = [c2.interiorCeilings !== "yes" ? "ceilings" : "", c2.interiorTrim !== "yes" ? "baseboards" : ""].filter(Boolean);
+    if (surfaces.length > 0) surfaces.push(skipped.length > 0 ? `(no ${skipped.join(" or ")})` : "");
+  }
+  const size = c2.selectedRoomsSqft ? `, about ${c2.selectedRoomsSqft} sq ft in all` : "";
+  const list = things.length === 0 ? "nothing pinned down yet" : things.length === 1 ? things[0] : things.slice(0, -1).join(", ") + " and " + things[things.length - 1];
+  const how = surfaces.filter(Boolean).join(" ");
+  return `${list}${size}${how ? `; painting the ${how}` : ""}`;
 }
 
 // src/lib/chatEstimator/deckDetails.ts
@@ -25756,6 +25932,17 @@ async function processMessage(state, trimmed, customerId) {
       return asBot({}, `Let's keep this friendly. I'm here to get you a price for a painting job. ${again}`);
     }
   }
+  if (state.askedIds.length > 0 && isPushback(trimmed)) {
+    const narrowed = narrowingPatch(trimmed, state.ctx);
+    const ctxBack = { ...state.ctx, ...narrowed ?? {} };
+    const lastBot = [...state.history].reverse().find((m2) => m2.role === "bot")?.text ?? "";
+    const alreadyBacked = /^You're right, let me back up/.test(lastBot);
+    const what = scopeRecap(ctxBack);
+    return asBot(
+      { ctx: ctxBack, lastBotTopic: null },
+      alreadyBacked ? "You're right, and I'm sorry. Tell me in your own words what the job is and what it is not, and I'll only ask about that." : `You're right, let me back up. Here's the job as I have it: ${what}. Is that right? Tell me what's different, or anything that's missing, and I'll only ask about what's in the job.`
+    );
+  }
   const detailsHere = extractDetails(trimmed, state.ctx, state.lastBotTopic?.id ?? null);
   const bringsFacts = acknowledgements.length > 0 || Object.keys(patch).length > 0 || detailsHere.acks.length > 0 || Object.keys(detailsHere.patch).length > 0;
   if (state.askedIds.length > 0 && !bringsFacts && (isDenial(trimmed) || frictionKind === "misunderstood")) {
@@ -25951,13 +26138,30 @@ async function processMessage(state, trimmed, customerId) {
     const current = ctxWithExplicit.additionalDetails ?? state.ctx.additionalDetails ?? "";
     if (!current.includes(note)) ctxWithExplicit.additionalDetails = `${current ? current + "; " : ""}${note}`;
   }
+  {
+    const narrowed = narrowingPatch(trimmed, { ...state.ctx, ...ctxWithExplicit });
+    if (narrowed) Object.assign(ctxWithExplicit, narrowed);
+  }
+  {
+    const roomsNow = ctxWithExplicit.selectedRooms ?? state.ctx.selectedRooms ?? [];
+    const sq = ctxWithExplicit.squareFeet;
+    if (ctxWithExplicit.interiorScope === "specific_rooms" && roomsNow.length >= 1 && sq && sq !== state.ctx.squareFeet && !state.ctx.selectedRoomsSqft) {
+      const aboutRooms = state.lastBotTopic?.id === "room_size" || /\b(?:rooms?|bedrooms?|together|combined|total|each|apiece|kitchen|bath|hall|living)\b/i.test(trimmed);
+      if (aboutRooms && !/\b(?:whole|entire)\s+(?:house|home)\b|\bthe (?:house|home|place) is\b/i.test(trimmed)) {
+        ctxWithExplicit.selectedRoomsSqft = /\b(?:each|apiece|per room)\b/i.test(trimmed) ? sq * roomsNow.length : sq;
+      }
+    }
+  }
   let mixedPatch = null;
   {
     mixedPatch = reconcileJobParts(trimmed, { ...state.ctx, ...ctxWithExplicit }, state.askedIds.length === 0);
     if (mixedPatch) Object.assign(ctxWithExplicit, mixedPatch);
   }
+  if (!(ctxWithExplicit.projectType ?? state.ctx.projectType) && (ctxWithExplicit.selectedRooms ?? state.ctx.selectedRooms ?? []).length > 0 && ctxWithExplicit.interiorScope === "specific_rooms") ctxWithExplicit.projectType = "interior";
   {
-    const treat = extractTreatments(trimmed, ctxWithExplicit.selectedRooms ?? state.ctx.selectedRooms ?? [], ctxWithExplicit.projectType ?? state.ctx.projectType ?? "");
+    const traits = readRoomTraits(trimmed, { ...state.ctx, ...ctxWithExplicit });
+    if (traits) Object.assign(ctxWithExplicit, traits);
+    const treat = extractTreatments(trimmed, ctxWithExplicit.selectedRooms ?? state.ctx.selectedRooms ?? [], ctxWithExplicit.projectType ?? state.ctx.projectType ?? "", ctxWithExplicit.roomTraits ?? state.ctx.roomTraits);
     if (treat) {
       if (Object.keys(treat.rooms).length > 0) {
         ctxWithExplicit.roomTreatments = { ...state.ctx.roomTreatments ?? {}, ...treat.rooms };
@@ -26239,6 +26443,10 @@ ${trimmed}`.trim();
     responseLengths
   };
   Object.assign(ctxNext, enforceExclusions(ctxNext));
+  if (ctxNext.doorsIncluded && ctxNext.doorCount && !/\b(?:no|not|skip|without|exclud\w*|leave out|don'?t)\b[^.]{0,15}\bdoors?\b/i.test(trimmed)) {
+    if (ctxNext.interiorDoors === "none") ctxNext.interiorDoors = "some";
+    ctxNext.excludedSurfaces = (ctxNext.excludedSurfaces ?? []).filter((x) => x !== "doors");
+  }
   if (mixedPatch) Object.assign(ctxNext, mixedPatch);
   if ((ctxNext.projectType === "interior" || ctxNext.projectType === "both") && ctxNext.interiorScope === "whole_house" && ctxNext.stories === 2 && ctxNext.stairways === "none") {
     ctxNext.stairways = "yes";
@@ -26644,6 +26852,9 @@ async function finalizeTurn(state, customerId) {
     if (ai && !ai.ok) verdict = ai;
     aiApproved = !!ai?.ok;
   }
+  const c0 = state.ctx;
+  const clearJob = !!((c0.projectType || c0.selectedRooms.length > 0) && (c0.selectedRooms.length > 0 || c0.squareFeet || c0.bedroomCount || c0.furnitureItems.length > 0 || c0.doorCount || c0.interiorScope === "whole_house" || c0.exteriorBody === "yes" || c0.fence === "yes" || c0.deck === "yes" || c0.cabinets !== "none" || c0.stairways === "yes"));
+  if (!verdict.ok && clearJob && (verdict.reason === "dismissive" || verdict.reason === "nonsense" || verdict.reason === "no_project")) verdict = { ok: true };
   if (!verdict.ok) return keepAfterReview(state, verdict.reason, []);
   const loyaltyDiscountPercent = customerId ? await fetchLoyaltyDiscountPercent(customerId) : 0;
   const result = finalize(state.ctx, state.transcript, loyaltyDiscountPercent);
@@ -27860,6 +28071,71 @@ async function dismissAt(setup, topicWords, dismissal = "doesnt matter just want
   check("closets: a coat closet costs less than a standard one, a walk-in more, a large walk-in the most", closetCost({ small: 2 }) < closetCost({ reach: 2 }) && closetCost({ reach: 2 }) < closetCost({ walkin: 2 }) && closetCost({ walkin: 2 }) < closetCost({ large: 2 }));
   const said = await play(["I need the inside painted, just two bedroom closets and a walk-in"]);
   check("closets: kinds said up front are read (and the count is not asked again)", said.state.ctx.closetKinds?.reach === 2 && said.state.ctx.closetKinds?.walkin === 1 && said.state.ctx.closetCount === 3, JSON.stringify([said.state.ctx.closetKinds, said.state.ctx.closetCount]));
+}
+{
+  const answerFor = (bot) => {
+    const b = bot.toLowerCase();
+    if (/how big|square feet|size/.test(b)) return "the bedrooms together are 600 sq ft";
+    if (/which surfaces/.test(b)) return "just the walls";
+    if (/ceilings standard height|standard ceiling height/.test(b)) return "vaulted ceilings in one bedroom, standard in the other";
+    if (/ceilings too|include the ceilings|add the ceilings/.test(b)) return "no";
+    if (/baseboards|trim/.test(b) && /painted before|bare|stained/.test(b)) return "no baseboards";
+    if (/baseboards/.test(b)) return "no";
+    if (/how many closets/.test(b)) return "1 standard";
+    if (/closets/.test(b) && /shelves|shelving/.test(b)) return "not the shelves, just the walls";
+    if (/closets/.test(b)) return "yes";
+    if (/how many doors/.test(b)) return "5";
+    if (/doors/.test(b) && /flat|paneled|french/.test(b)) return "flat";
+    if (/doors/.test(b) && /sides|face/.test(b)) return "both sides";
+    if (/doors/.test(b) && /painted|stained|bare/.test(b)) return "painted";
+    if (/same color|different color|color/.test(b)) return "different color in the room with the vaulted ceilings, same color in the other room";
+    if (/live here|rental|your home/.test(b)) return "my home";
+    if (/shape|prep|holes/.test(b)) return "good shape, i need caulking around all baseboards";
+    if (/preference on the paint|paint in mind|brand/.test(b)) return "leave it to the painter";
+    if (/zip/.test(b)) return "91941";
+    if (/timeline|when would|anyone be/.test(b)) return "next month";
+    if (/photo|picture|run it/.test(b)) return "run it";
+    if (/anything else|else i should know/.test(b)) return "no";
+    return "yes";
+  };
+  let st2 = (await play(["i have two bedrooms and five doors"])).state;
+  for (let i2 = 0; i2 < 45 && !st2.finalEstimate; i2++) {
+    const last = st2.history[st2.history.length - 1].text;
+    st2 = (await play([answerFor(last)], [], st2)).state;
+  }
+  const botText = st2.history.filter((m2) => m2.role === "bot").map((m2) => m2.text).join(" || ");
+  const est = st2.finalEstimate?.estimate;
+  check("two bedrooms and five doors: it ends in a price", !!est, st2.history[st2.history.length - 1].text);
+  check("...the job is the two bedrooms, not a two-bedroom home", st2.ctx.selectedRooms.length === 2 && st2.ctx.interiorScope === "specific_rooms" && st2.ctx.bedroomCount == null, JSON.stringify([st2.ctx.selectedRooms, st2.ctx.interiorScope, st2.ctx.bedroomCount]));
+  check('...no whole-house questions (bathrooms, stories, "assuming a living room, kitchen...")', !/how many bathrooms|one-story|one level, or two|two stories|i'm assuming/i.test(botText), botText.match(/how many bathrooms|one-story|one level, or two|i'm assuming[^.]*/i)?.[0] ?? "");
+  check("...no kitchen cabinets, windows, garage, gutters, siding or front door questions", !/kitchen cabinets|what are the windows|garage door|gutters|what.s the siding|front door|exterior/i.test(botText), botText.match(/kitchen cabinets|what are the windows|garage door|gutters|what.s the siding|front door/i)?.[0] ?? "");
+  check('...no closet shelving or "emptied" questions after "not the shelves"', !/wire shelving|wood shelves|closets be emptied|empty closets, or full/i.test(botText), botText.match(/wire shelving|closets be emptied|empty closets, or full/i)?.[0] ?? "");
+  check("...no question is asked twice", (() => {
+    const qs = st2.history.filter((m2) => m2.role === "bot").map((m2) => (m2.text.split(" || ").pop() ?? "").replace(/^.*?([A-Z][^.?!]*\?)\s*$/, "$1"));
+    return new Set(qs).size === qs.length;
+  })(), "");
+  check("...the two ceiling heights are kept apart: tall in one room only", !!st2.ctx.roomTraits && Object.values(st2.ctx.roomTraits).filter((t2) => t2.vaulted).length === 1 && (st2.ctx.tallCeilingShare ?? 1) < 1, JSON.stringify([st2.ctx.roomTraits, st2.ctx.tallCeilingShare]));
+  const tr = Object.values(st2.ctx.roomTreatments ?? {}).sort().join(",");
+  check("...and the two colors: a repaint in the vaulted room, one coat in the other", tr === "full,one_coat", tr);
+  check("...priced for the walls, the doors and the closet, and nothing outside", !!est && est.lineItems.some((l) => l.key === "walls") && est.lineItems.some((l) => l.key === "doors") && est.lineItems.some((l) => l.key === "closets") && !est.lineItems.some((l) => /^ext_|garage|entry|gutter|power_wash/.test(l.key ?? "")), est?.lineItems.map((l) => l.key ?? l.description).join(", ") ?? "");
+}
+{
+  const a = await play(["i have two bedrooms and five doors", "the bedrooms together are 600 sq ft"]);
+  const b = await play(["why are we talking about bathrooms? i only said two bedrooms"], [], a.state);
+  check("pushback: it backs up and says the job as it has it", /let me back up/i.test(b.last) && /2 bedrooms/i.test(b.last) && /5 interior doors/i.test(b.last), b.last);
+  check("pushback: it asks whether that is right, not the next question", /is that right/i.test(b.last), b.last);
+  const widened = await play(["I need the inside of my house painted, 3 bed 2 bath, 1800 sq ft", "not at all, all i ever wanted was the 2 bedrooms"]);
+  check('"all I ever wanted was the 2 bedrooms" narrows a whole-house job to those two rooms', widened.state.ctx.interiorScope === "specific_rooms" && widened.state.ctx.selectedRooms.length === 2, JSON.stringify([widened.state.ctx.interiorScope, widened.state.ctx.selectedRooms]));
+  const noExt = await play(["i need the doors done", "does not matter, no exterior"]);
+  check('"no exterior" keeps it an inside job', noExt.state.ctx.projectType !== "exterior" && noExt.state.ctx.projectType !== "both", String(noExt.state.ctx.projectType));
+  let clear = (await play(["two bedrooms, about 600 sq ft", "walls only"])).state;
+  const shrug = ["none", "doesnt matter", "no"];
+  for (let i2 = 0; i2 < 45 && !clear.finalEstimate; i2++) {
+    const last = clear.history[clear.history.length - 1].text.toLowerCase();
+    const reply = /zip/.test(last) ? "91941" : /timeline|when would|anyone be/.test(last) ? "next month" : /photo|run it/.test(last) ? "run it" : shrug[i2 % 3];
+    clear = (await play([reply], [], clear)).state;
+  }
+  check(`a clearly described job answered with "none", "doesn't matter" and "no" is still priced`, !!clear.finalEstimate, clear.history[clear.history.length - 1].text);
 }
 setLLMReaderForTests(void 0);
 console.log(failures ? `

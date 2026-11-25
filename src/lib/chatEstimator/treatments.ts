@@ -11,6 +11,7 @@
 // ============================================================================
 
 import { extractRooms } from './extractors';
+import { roomsByDescriptor } from './roomTraits';
 
 export type Tier = 'full' | 'one_coat' | 'touch_up';
 
@@ -84,7 +85,7 @@ function genericRoomCount(clause: string): number {
   return m ? COUNT_WORDS[m[1].toLowerCase()] ?? 1 : 0;
 }
 
-export function extractTreatments(text: string, usedRooms: string[] = [], projectType = ''): TreatmentReading | null {
+export function extractTreatments(text: string, usedRooms: string[] = [], projectType = '', traits?: Record<string, { vaulted?: boolean }>): TreatmentReading | null {
   const clauses = clausesOf(text);
   const out: TreatmentReading = { rooms: {}, parts: {}, namedRooms: [], untreatedRooms: [], touchUpOnly: false };
   const pool = GENERIC_ROOM_POOL.filter((r) => !usedRooms.includes(r));
@@ -120,7 +121,9 @@ export function extractTreatments(text: string, usedRooms: string[] = [], projec
     const clause = clauses[ci];
     // garage doors are not a room called "garage"
     const forRooms = clause.replace(/\bgarage doors?\b/gi, ' ').replace(/\bstair(?:s|case|way)?\s*(?:rail(?:ing)?s?|banisters?)\b/gi, ' ');
-    const rooms = extractRooms(forRooms);
+    let rooms = extractRooms(forRooms);
+    // "the room with the vaulted ceilings", "the other one": a room named by what is different about it
+    if (rooms.length === 0) rooms = roomsByDescriptor(clause, usedRooms, traits);
     const parts = partsIn(clause);
     const generic = rooms.length === 0 ? genericRoomCount(clause) : 0;
     const hasSubject = rooms.length + parts.length + generic > 0;

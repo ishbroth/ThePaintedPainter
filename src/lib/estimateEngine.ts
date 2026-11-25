@@ -1275,12 +1275,24 @@ function getLayout(ctx: EstimatorContext, sqft: number) {
     const loneScale = lone && ctx.squareFeet && ctx.squareFeet <= 4000 && (ctx.squareFeet <= 600 || ['bonus_room', 'garage', 'living_room'].includes(keptRooms[0]))
       ? Math.min(4, Math.max(0.5, ctx.squareFeet / (lone.widthFt * lone.lengthFt)))
       : 1;
+    // the customer gave the floor area of the rooms together ("the bedrooms together are 600 sq ft"): the rooms are that size, not the template size.
+    // Floor area scales the ceiling directly; wall and trim runs grow with the perimeter, about the square root of the area.
+    let wallScale = loneScale;
+    let ceilScale = loneScale;
+    if (ctx.selectedRoomsSqft && ctx.selectedRoomsSqft > 0) {
+      const template = keptRooms.reduce((t, r) => t + (STANDARD_ROOMS[r] ? STANDARD_ROOMS[r].widthFt * STANDARD_ROOMS[r].lengthFt : 0), 0);
+      if (template > 0) {
+        const area = Math.min(4, Math.max(0.4, ctx.selectedRoomsSqft / template));
+        ceilScale = area;
+        wallScale = Math.sqrt(area);
+      }
+    }
     for (const room of keptRooms) {
       const spec = STANDARD_ROOMS[room];
       if (spec) {
-        totalWall += spec.wallSqFt * loneScale;
-        totalCeiling += spec.ceilingSqFt * loneScale;
-        totalTrim += spec.trimLinearFt * loneScale;
+        totalWall += spec.wallSqFt * wallScale;
+        totalCeiling += spec.ceilingSqFt * ceilScale;
+        totalTrim += spec.trimLinearFt * wallScale;
         totalDoors += spec.doors;
         totalWindows += spec.windows;
         totalClosets += spec.closets;
