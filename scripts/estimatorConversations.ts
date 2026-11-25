@@ -9,6 +9,8 @@ import type { Intent } from '../src/lib/chatEstimator/intents.ts';
 import type { EstimatorContext } from '../src/lib/types.ts';
 import { calculateEstimate } from '../src/lib/estimateEngine.ts';
 import { STANDARD_ROOMS } from '../src/lib/surfaceAreaEngine.ts';
+import { answeredEarlier, fillFromTranscript } from '../src/lib/chatEstimator/transcriptCheck.ts';
+import { findTopic } from '../src/lib/chatEstimator/topics.ts';
 import { parseArea, parseCount, parseDimensionPair, parseFenceAnswer, parseLinearFeet } from '../src/lib/chatEstimator/details.ts';
 import { botRepeats, collectFriction, detectFriction } from '../src/lib/chatEstimator/selfCheck.ts';
 import { buildReport, scrub, setSelfReviewEnabled } from '../src/lib/chatEstimator/selfReview.ts';
@@ -1040,6 +1042,17 @@ async function dismissAt(setup: string[], topicWords: RegExp, dismissal = 'doesn
   check('"a one coat job on the outside" is one coat on the body and trim', one.state.ctx.areaTreatments?.ext_body === 'one_coat' && one.state.ctx.areaTreatments?.ext_trim === 'one_coat', JSON.stringify(one.state.ctx.areaTreatments));
   const trimOnly = await play(['the exterior trim of my house just needs a refresher']);
   check('"the exterior trim just needs a refresher" discounts only the trim', trimOnly.state.ctx.areaTreatments?.ext_trim === 'one_coat' && !trimOnly.state.ctx.areaTreatments?.ext_body, JSON.stringify(trimOnly.state.ctx.areaTreatments));
+}
+
+// Before anything is asked, what the customer already said is checked: an answer given earlier (readable only now) is never asked for again
+{
+  const ctx = { ...makeInitialState().ctx, projectType: 'interior', interiorTrim: 'yes', interiorDoors: 'some', surfacesAddressed: true, doorsIncluded: true } as EstimatorContext;
+  const trimTopic = findTopic('trim_door_finish')!;
+  const said = 'the trim and the doors are already painted';
+  check('trim finish said earlier is found, so the question is skipped', !!answeredEarlier(trimTopic, ctx, said), JSON.stringify(fillFromTranscript(ctx, said)));
+  check('a bare "no" in the old conversation is never taken as an answer to something', !answeredEarlier(trimTopic, ctx, 'no\nno\nyes\nok'));
+  const known = { ...ctx, trimFinish: 'stained', doorFinish: 'stained' } as EstimatorContext;
+  check('something already known is never overwritten by an older line', Object.keys(fillFromTranscript(known, said)).every((k) => k !== 'trimFinish' && k !== 'doorFinish'), JSON.stringify(fillFromTranscript(known, said)));
 }
 
 setLLMReaderForTests(undefined);

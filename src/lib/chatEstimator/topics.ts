@@ -1533,17 +1533,11 @@ export function pickNextTopic(ctx: EstimatorContext, asked: string[]): Topic | n
  * retried once before giving up and falling back to the generic
  * "what's missing" wrap-up prompt.
  */
-const ESSENTIAL_RETRY = new Set(['project_type', 'which_rooms', 'surfaces', 'house_size', 'room_size', 'ext_size', 'location', 'timeline_and_access', 'resolve_conflict']);
-const MAX_MINOR_RETRIES = 3;
-
 export function pickRetryTopic(ctx: EstimatorContext, asked: string[], retried: string[]): Topic | null {
-  // after a few minor circle-backs the rest take their usual defaults instead of an endless run of "circling back" at the end
-  const minorRetried = retried.filter((id) => !ESSENTIAL_RETRY.has(id)).length;
   const candidates = TOPICS.filter(
     (t) =>
       asked.includes(t.id) &&
       !retried.includes(t.id) &&
-      (ESSENTIAL_RETRY.has(t.id) || minorRetried < MAX_MINOR_RETRIES) &&
       askableFor(ctx, t.id) &&
       t.relevant(ctx) &&
       !t.alreadyAnswered(ctx),

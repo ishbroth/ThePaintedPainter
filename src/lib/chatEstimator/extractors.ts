@@ -203,11 +203,20 @@ export function extractTrimDoorFinish(text: string, answering: boolean): { trim:
   const out: { trim: string | null; door: string | null } = { trim: null, door: null };
   const clauses = text.toLowerCase().split(/[,;.]|\bbut\b|\bwhile\b|\bwhereas\b|\band the\b/);
   let general: string | null = null;
+  // "the trim and the doors are already painted": the clause naming the trim has no finish of its own, the next one does, and it covers both
+  let named: { trim: boolean; door: boolean } | null = null;
   for (const c of clauses) {
     const f = woodFinishOf(c);
-    if (!f) continue;
     const trim = /\b(?:base ?boards?|trim|molding|moulding|casings?|crown)\b/.test(c);
     const door = /\bdoors?\b/.test(c);
+    if (!f) { named = trim || door ? { trim, door } : null; continue; }
+    // (only when the words are about how things ARE: "trim, doors and closets painted" is what they want done, not what they have)
+    const aboutNow = f !== 'painted' || /\b(?:already|currently|are|were|is|was|been|before)\b/.test(c);
+    if (named && aboutNow) {
+      if (named.trim && !out.trim) out.trim = f;
+      if (named.door && !out.door) out.door = f;
+      named = null;
+    }
     if (trim) out.trim = f;
     if (door) out.door = f;
     if (!trim && !door && answering) general = f;

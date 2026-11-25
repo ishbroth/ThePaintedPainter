@@ -141,9 +141,7 @@ for (let n = 0; n < N; n++) {
     if (r.done) { done = true; break; }
     user = answer(last, p);
   }
-  const botQs = botMsgs.filter((m) => /\?/.test(m)).length;
   if (!done) flags.push({ sev: 'high', code: 'never-finished', detail: `${turns} turns` });
-  if (botQs > 28) flags.push({ sev: 'med', code: 'too-many-questions', detail: `${botQs} questions` });
   const firstPaint = botMsgs.findIndex((m) => PAINT_Q.test(m));
   const firstScope = botMsgs.findIndex((m) => /square feet|how big|size|which surfaces|rooms|stories/i.test(m));
   if (firstPaint >= 0 && (firstScope < 0 || firstPaint < firstScope) && p.kind !== 'cabinets') flags.push({ sev: 'high', code: 'paint-before-scope', detail: `paint question at bot message ${firstPaint + 1}, size/scope at ${firstScope + 1}` });

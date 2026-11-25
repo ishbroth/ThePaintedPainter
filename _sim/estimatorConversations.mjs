@@ -17050,11 +17050,21 @@ function extractTrimDoorFinish(text, answering) {
   const out = { trim: null, door: null };
   const clauses = text.toLowerCase().split(/[,;.]|\bbut\b|\bwhile\b|\bwhereas\b|\band the\b/);
   let general = null;
+  let named = null;
   for (const c2 of clauses) {
     const f = woodFinishOf(c2);
-    if (!f) continue;
     const trim = /\b(?:base ?boards?|trim|molding|moulding|casings?|crown)\b/.test(c2);
     const door = /\bdoors?\b/.test(c2);
+    if (!f) {
+      named = trim || door ? { trim, door } : null;
+      continue;
+    }
+    const aboutNow = f !== "painted" || /\b(?:already|currently|are|were|is|was|been|before)\b/.test(c2);
+    if (named && aboutNow) {
+      if (named.trim && !out.trim) out.trim = f;
+      if (named.door && !out.door) out.door = f;
+      named = null;
+    }
     if (trim) out.trim = f;
     if (door) out.door = f;
     if (!trim && !door && answering) general = f;
@@ -20276,10 +20286,6 @@ function pick(variants, seedStr) {
   for (let i2 = 0; i2 < seedStr.length; i2++) h = h * 31 + seedStr.charCodeAt(i2) >>> 0;
   return variants[h % variants.length];
 }
-function questionBudget(c2) {
-  const n = SPECS.filter((sp2) => sp2.present(c2)).length;
-  return n >= 3 ? 3 : n === 2 ? 4 : Infinity;
-}
 function itemTopics() {
   const topics = [];
   for (const spec of SPECS) {
@@ -20288,14 +20294,7 @@ function itemTopics() {
       topics.push({
         id,
         priority: spec.priority + i2 * 1e-3,
-        relevant: (c2) => {
-          if (!spec.present(c2) || q.when && !q.when(c2, answersFor(c2, spec.key))) return false;
-          const budget = questionBudget(c2);
-          if (budget === Infinity) return true;
-          const answers = answersFor(c2, spec.key);
-          const askable = spec.questions.filter((x) => !x.when || x.when(c2, answers));
-          return askable.indexOf(q) < budget;
-        },
+        relevant: (c2) => spec.present(c2) && (!q.when || q.when(c2, answersFor(c2, spec.key))),
         alreadyAnswered: (c2) => (c2.itemAnswers ?? {})[`${spec.key}.${q.key}`] != null || (c2.extAnswered ?? []).includes(id),
         ask: (c2) => pick(q.ask, seedOf(c2)),
         clarify: () => q.clarify,
@@ -23995,12 +23994,9 @@ function pickNextTopic(ctx, asked) {
   candidates.sort((a, b) => a.priority - b.priority);
   return candidates[0] ?? null;
 }
-var ESSENTIAL_RETRY = /* @__PURE__ */ new Set(["project_type", "which_rooms", "surfaces", "house_size", "room_size", "ext_size", "location", "timeline_and_access", "resolve_conflict"]);
-var MAX_MINOR_RETRIES = 3;
 function pickRetryTopic(ctx, asked, retried) {
-  const minorRetried = retried.filter((id) => !ESSENTIAL_RETRY.has(id)).length;
   const candidates = TOPICS.filter(
-    (t2) => asked.includes(t2.id) && !retried.includes(t2.id) && (ESSENTIAL_RETRY.has(t2.id) || minorRetried < MAX_MINOR_RETRIES) && askableFor(ctx, t2.id) && t2.relevant(ctx) && !t2.alreadyAnswered(ctx)
+    (t2) => asked.includes(t2.id) && !retried.includes(t2.id) && askableFor(ctx, t2.id) && t2.relevant(ctx) && !t2.alreadyAnswered(ctx)
   );
   candidates.sort((a, b) => a.priority - b.priority);
   return candidates[0] ?? null;
@@ -25150,6 +25146,35 @@ function reconcileJobParts(text, prev, opening) {
   return patch;
 }
 
+// src/lib/chatEstimator/transcriptCheck.ts
+init_define_import_meta_env();
+var isUnset = (v) => v == null || v === "" || Array.isArray(v) && v.length === 0;
+function fillFromTranscript(ctx, customerText) {
+  if (!customerText.trim()) return {};
+  const merged = {
+    ...extractAll(customerText, ctx, null).patch,
+    ...extractDetails(customerText, ctx, null).patch,
+    ...readItemAnswers(customerText, ctx, null).patch
+  };
+  const out = {};
+  for (const [key, value] of Object.entries(merged)) {
+    const current = ctx[key];
+    if (key === "itemAnswers") {
+      const have = current ?? {};
+      const add = Object.fromEntries(Object.entries(value ?? {}).filter(([k]) => have[k] == null));
+      if (Object.keys(add).length > 0) out[key] = { ...have, ...add };
+    } else if (isUnset(current) && !isUnset(value)) {
+      out[key] = value;
+    }
+  }
+  return out;
+}
+function answeredEarlier(topic, ctx, customerText) {
+  const found = fillFromTranscript(ctx, customerText);
+  if (Object.keys(found).length === 0) return null;
+  return topic.alreadyAnswered({ ...ctx, ...found }) ? found : null;
+}
+
 // src/lib/chatEstimator/deckDetails.ts
 init_define_import_meta_env();
 var YES = /^\W*(?:yes|yeah|yep|yup|sure|please|definitely|absolutely|both|all of it|everything|that too|do it|of course)\b/;
@@ -26276,9 +26301,24 @@ ${trimmed}`.trim();
   if ((ctxNext.conflicts?.length ?? 0) > 0 && s.askedIds.includes("resolve_conflict")) s = { ...s, askedIds: s.askedIds.filter((id) => id !== "resolve_conflict") };
   const reaskCore = state.lastBotTopic && state.lastBotTopic.id === "project_type" && !state.lastBotTopic.alreadyAnswered(ctxNext) && s.retriedIds.filter((id) => id === "project_type").length < 3 ? state.lastBotTopic : null;
   if (reaskCore) s = { ...s, retriedIds: [...s.retriedIds, "project_type"] };
-  const next = reaskCore ?? pickNextTopic(ctxNext, s.askedIds);
+  const skipIfKnown = (pick3, record) => {
+    let t2 = pick3();
+    for (let guard = 0; t2 && guard < 60; guard++) {
+      const found = answeredEarlier(t2, ctxNext, newTranscript);
+      if (!found) return t2;
+      Object.assign(ctxNext, found);
+      record(t2);
+      t2 = pick3();
+    }
+    return t2;
+  };
+  const next = reaskCore ?? skipIfKnown(() => pickNextTopic(ctxNext, s.askedIds), (t2) => {
+    s = { ...s, askedIds: [...s.askedIds, t2.id] };
+  });
   if (!next) {
-    const retry = pickRetryTopic(ctxNext, s.askedIds, s.retriedIds);
+    const retry = skipIfKnown(() => pickRetryTopic(ctxNext, s.askedIds, s.retriedIds), (t2) => {
+      s = { ...s, retriedIds: [...s.retriedIds, t2.id] };
+    });
     if (retry) {
       const question = retry.ask(ctxNext);
       const retryPrompt = (acknowledgements.length > 0 ? `${ACK_LEAD_INS[s.askedIds.length % ACK_LEAD_INS.length]} ${acknowledgements.join(", ")}. ` : "") + (photoLinkMarker ? `${photoLinkMarker} ` : "") + // when half of a two-part question was answered, just ask for the missing half instead of claiming it wasn't understood
@@ -27560,6 +27600,15 @@ async function dismissAt(setup, topicWords, dismissal = "doesnt matter just want
   check('"a one coat job on the outside" is one coat on the body and trim', one.state.ctx.areaTreatments?.ext_body === "one_coat" && one.state.ctx.areaTreatments?.ext_trim === "one_coat", JSON.stringify(one.state.ctx.areaTreatments));
   const trimOnly = await play(["the exterior trim of my house just needs a refresher"]);
   check('"the exterior trim just needs a refresher" discounts only the trim', trimOnly.state.ctx.areaTreatments?.ext_trim === "one_coat" && !trimOnly.state.ctx.areaTreatments?.ext_body, JSON.stringify(trimOnly.state.ctx.areaTreatments));
+}
+{
+  const ctx = { ...makeInitialState().ctx, projectType: "interior", interiorTrim: "yes", interiorDoors: "some", surfacesAddressed: true, doorsIncluded: true };
+  const trimTopic = findTopic("trim_door_finish");
+  const said = "the trim and the doors are already painted";
+  check("trim finish said earlier is found, so the question is skipped", !!answeredEarlier(trimTopic, ctx, said), JSON.stringify(fillFromTranscript(ctx, said)));
+  check('a bare "no" in the old conversation is never taken as an answer to something', !answeredEarlier(trimTopic, ctx, "no\nno\nyes\nok"));
+  const known = { ...ctx, trimFinish: "stained", doorFinish: "stained" };
+  check("something already known is never overwritten by an older line", Object.keys(fillFromTranscript(known, said)).every((k) => k !== "trimFinish" && k !== "doorFinish"), JSON.stringify(fillFromTranscript(known, said)));
 }
 setLLMReaderForTests(void 0);
 console.log(failures ? `

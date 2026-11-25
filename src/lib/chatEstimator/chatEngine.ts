@@ -49,6 +49,7 @@ import { detectExtras } from './extras';
 import { faqAnswer } from './faq';
 import { extractTreatments, isTouchUpOnly } from './treatments';
 import { reconcileJobParts } from './jobParts';
+import { answeredEarlier } from './transcriptCheck';
 import { friendlyDate } from './dateParsing';
 import { readDeckDetails, isDeckTalk } from './deckDetails';
 import { readItemAnswers } from './itemInterviews';
@@ -1508,9 +1509,22 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
   if ((ctxNext.conflicts?.length ?? 0) > 0 && s.askedIds.includes('resolve_conflict')) s = { ...s, askedIds: s.askedIds.filter((id) => id !== 'resolve_conflict') };
   const reaskCore = state.lastBotTopic && state.lastBotTopic.id === 'project_type' && !state.lastBotTopic.alreadyAnswered(ctxNext) && s.retriedIds.filter((id) => id === 'project_type').length < 3 ? state.lastBotTopic : null;
   if (reaskCore) s = { ...s, retriedIds: [...s.retriedIds, 'project_type'] };
-  const next = reaskCore ?? pickNextTopic(ctxNext, s.askedIds);
+  // Before anything is asked, everything the customer has said is checked for the answer: a question whose answer was already given (dropped into a
+  // reply to something else, readable only now) is skipped, not asked and not circled back to later (see transcriptCheck.ts).
+  const skipIfKnown = (pick: () => Topic | null, record: (t: Topic) => void): Topic | null => {
+    let t = pick();
+    for (let guard = 0; t && guard < 60; guard++) {
+      const found = answeredEarlier(t, ctxNext, newTranscript);
+      if (!found) return t;
+      Object.assign(ctxNext, found);
+      record(t);
+      t = pick();
+    }
+    return t;
+  };
+  const next = reaskCore ?? skipIfKnown(() => pickNextTopic(ctxNext, s.askedIds), (t) => { s = { ...s, askedIds: [...s.askedIds, t.id] }; });
   if (!next) {
-    const retry = pickRetryTopic(ctxNext, s.askedIds, s.retriedIds);
+    const retry = skipIfKnown(() => pickRetryTopic(ctxNext, s.askedIds, s.retriedIds), (t) => { s = { ...s, retriedIds: [...s.retriedIds, t.id] }; });
     if (retry) {
       const question = retry.ask(ctxNext);
       const retryPrompt =

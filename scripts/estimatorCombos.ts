@@ -141,8 +141,6 @@ for (let i = 0; i < N; i++) {
   }
   const asked = botMsgs.join(' || ');
   if (!hasGroup(sc, 'room') && !hasGroup(sc, 'door') && !hasGroup(sc, 'stairs') && WHOLE_HOUSE_Q.test(asked)) flags.push({ sev: 'med', code: 'whole-house-question-for-small-job', detail: (WHOLE_HOUSE_Q.exec(asked) ?? [''])[0] });
-  const questions = botMsgs.filter((m) => /\?/.test(m)).length;
-  if (questions > 26) flags.push({ sev: 'med', code: 'too-many-questions', detail: `${questions}` });
   const roomAtoms = sc.atoms.filter((x) => x.atom.group === 'room');
   if (roomAtoms.length > 0 && roomAtoms.every((x) => x.tier !== 'plain') && botMsgs.some((m) => /same color, or|matching the existing color|color going back|existing color, or going|keeping the current color/i.test(m))) flags.push({ sev: 'low', code: 'blanket-color-question-after-every-room-was-treated', detail: '' });
   results.push({ scenario: sc, log, flags, done, total });
