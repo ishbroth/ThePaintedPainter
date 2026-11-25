@@ -149,3 +149,50 @@ export function parseCabinetCondition(text: string, answering: boolean): 'good' 
   if (answering && /\b(?:good (?:shape|condition)|great (?:shape|condition)|fine|smooth|no (?:damage|issues?|problems?|chips?)|pretty good|decent|like new|clean|nothing)\b/.test(t)) return 'good';
   return null;
 }
+
+export interface ClosetKindsReading { kinds: { reach?: number; small?: number; walkin?: number; large?: number }; typed: boolean }
+
+const CLOSET_N = '(\\d{1,2}|an?|one|two|three|four|five|six|seven|eight|nine|ten|a couple of|couple of|couple)';
+const CLOSET_NUM: Record<string, number> = { a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, couple: 2, 'couple of': 2, 'a couple of': 2 };
+
+/**
+ * How many closets of each kind, from a reply like "3 bedroom closets, a walk-in and a coat closet": standard bedroom reach-ins, small coat / linen / pantry
+ * closets, walk-ins, and large walk-ins or dressing rooms. A bare number ("3 closets") is standard ones. `typed` says a kind was actually named.
+ */
+export function parseClosetKinds(text: string): ClosetKindsReading | null {
+  let t = text.toLowerCase();
+  const kinds: ClosetKindsReading['kinds'] = {};
+  let typed = false;
+  const take = (key: 'reach' | 'small' | 'walkin' | 'large', re: RegExp, isTyped: boolean) => {
+    t = t.replace(re, (_m, n: string | undefined) => {
+      const count = n ? (/^\d/.test(n) ? parseInt(n, 10) : CLOSET_NUM[n] ?? 1) : 1;
+      kinds[key] = (kinds[key] ?? 0) + count;
+      if (isTyped) typed = true;
+      return ' ';
+    });
+  };
+  take('large', new RegExp('(?:\\b' + CLOSET_N + '\\s+)?(?:(?:large|big|huge|oversized|giant|master)\\s+walk[\\s-]?ins?(?:\\s+closets?)?|dressing[\\s-]?rooms?)', 'g'), true);
+  take('walkin', new RegExp('(?:\\b' + CLOSET_N + '\\s+)?walk[\\s-]?ins?(?:\\s+closets?)?', 'g'), true);
+  take('small', new RegExp('(?:\\b' + CLOSET_N + '\\s+)?(?:(?:coat|linen|pantry|broom|utility|hall(?:way)?|small|tiny|little|shallow|storage|entry)\\s+closets?|pantr(?:y|ies))', 'g'), true);
+  take('reach', new RegExp('(?:\\b' + CLOSET_N + '\\s+)?(?:standard|regular|normal|average|bedroom|reach[\\s-]?in|typical|ordinary)\\s+closets?', 'g'), true);
+  take('reach', new RegExp('\\b' + CLOSET_N + '\\s+closets?\\b', 'g'), false);
+  return Object.keys(kinds).length > 0 ? { kinds, typed } : null;
+}
+
+export const closetKindsTotal = (k: { reach?: number; small?: number; walkin?: number; large?: number }): number => (k.reach ?? 0) + (k.small ?? 0) + (k.walkin ?? 0) + (k.large ?? 0);
+
+/** The single `closets` value the rest of the estimator reads: standard, walkin, or both. */
+export function closetTypeOf(k: { reach?: number; small?: number; walkin?: number; large?: number }): 'standard' | 'walkin' | 'both' {
+  const bigOnes = (k.walkin ?? 0) + (k.large ?? 0) > 0;
+  const littleOnes = (k.reach ?? 0) + (k.small ?? 0) > 0;
+  return bigOnes && littleOnes ? 'both' : bigOnes ? 'walkin' : 'standard';
+}
+
+export function describeClosetKinds(k: { reach?: number; small?: number; walkin?: number; large?: number }): string {
+  const bits: string[] = [];
+  if (k.reach) bits.push(k.reach + ' standard');
+  if (k.small) bits.push(k.small + ' small (coat, linen or pantry)');
+  if (k.walkin) bits.push(k.walkin + ' walk-in');
+  if (k.large) bits.push(k.large + ' large walk-in');
+  return bits.join(', ') + ' closet' + (closetKindsTotal(k) === 1 ? '' : 's');
+}

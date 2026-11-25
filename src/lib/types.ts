@@ -126,6 +126,8 @@ export interface EstimatorContext {
   cabinetStyle?: 'slab' | 'shaker' | 'raised' | 'detailed';
   /** How the cabinets are holding up: good, heavy visible grain (oak) that needs filling, or worn (chips, grease, dings) that needs repair and cleaning first. */
   cabinetCondition?: 'good' | 'grain' | 'worn';
+  /** How many closets of each kind: standard bedroom reach-ins, small coat/linen/pantry closets, walk-ins, large walk-ins or dressing rooms. */
+  closetKinds?: { reach?: number; small?: number; walkin?: number; large?: number };
   /** Chair rail (the horizontal moulding halfway up a wall): no, yes. */
   chairRail: string;
   chairRailLinearFeet: number | null;

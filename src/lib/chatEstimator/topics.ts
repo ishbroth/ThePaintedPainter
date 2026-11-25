@@ -881,9 +881,9 @@ export const TOPICS: Topic[] = [
     priority: 29.605,
     relevant: (c) => (c.projectType === 'interior' || c.projectType === 'both') && c.closets !== 'none' && c.closetCount == null,
     alreadyAnswered: (c) => c.closetCount != null || extDone(c, 'closet_count'),
-    ask: (c) => (c.closetShelving !== 'none' ? "How many closets have shelves that need painting?" : c.interiorTrim === 'yes' ? "How many closets are getting painted, and do they have shelves that need painting too?" : "How many closets are getting painted?"),
-    clarify: () => "Closets (and the shelves and rods in them) are priced each, so a rough count is what I need.",
-    example: () => "Something like '3 closets' or 'just one'.",
+    ask: (c) => (c.closetShelving !== 'none' ? "How many closets have shelves that need painting, and what kind: standard bedroom closets, walk-ins, or small coat, linen or pantry closets?" : "How many closets are getting painted, and what kind: standard bedroom closets, walk-ins, or small coat, linen or pantry closets?"),
+    clarify: () => "A standard bedroom closet, a small coat, linen or pantry closet, a walk-in and a big dressing-room walk-in are very different amounts of wall, ceiling and shelving, so I price each kind, and a rough count of each is what I need.",
+    example: () => "Something like '3 bedroom closets and a walk-in', 'a coat closet and a pantry' or just '2'.",
   },
   {
     // A dining chair, an armchair, a bar stool and a rocker are different amounts of work (arms, spindles, rungs): asked once the chairs are counted.

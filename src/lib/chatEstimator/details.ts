@@ -8,7 +8,7 @@
 
 import type { EstimatorContext } from '../types';
 import { extractCeilingHeight } from './extractors';
-import { detectItems, itemsPhrase, mentionsGenericFurniture, parseCabinetCondition, parseCabinetStyle, parseChairKind, parseFurnitureFinish, saysItemsOnly, CABINET_CONDITION_LABEL, CABINET_STYLE_LABEL, CHAIR_KIND_LABEL } from './items';
+import { closetKindsTotal, closetTypeOf, describeClosetKinds, parseClosetKinds, detectItems, itemsPhrase, mentionsGenericFurniture, parseCabinetCondition, parseCabinetStyle, parseChairKind, parseFurnitureFinish, saysItemsOnly, CABINET_CONDITION_LABEL, CABINET_STYLE_LABEL, CHAIR_KIND_LABEL } from './items';
 
 const NUMBER_WORDS: Record<string, number> = {
   a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12,
@@ -418,6 +418,19 @@ export function extractDetails(text: string, ctx: EstimatorContext, askedId: str
     const kind = parseChairKind(text, askedId === 'chair_kind');
     if (kind) { patch.chairKind = kind; acks.push(CHAIR_KIND_LABEL[kind]); }
   }
+  // which kinds of closets, said anywhere ("a walk-in and two coat closets"): standard, small, walk-in and large ones are different amounts of work
+  if (!ctx.closetKinds && askedId !== 'closet_count' && (ctx.closets !== 'none' || /\bclosets?\b|\bpantry\b|\bwalk[\s-]?in/.test(t))) {
+    const read = parseClosetKinds(text);
+    if (read && read.typed) {
+      const total = closetKindsTotal(read.kinds);
+      if (total >= 1 && total <= 40) {
+        patch.closetKinds = read.kinds;
+        patch.closetCount = total;
+        patch.closets = closetTypeOf(read.kinds);
+        acks.push(describeClosetKinds(read.kinds));
+      }
+    }
+  }
   // the cabinet doors' style and how the cabinets are holding up: said anywhere, or in answer to the question
   if (ctx.cabinets !== 'none' || /\bcabinet|\bvanit/.test(t)) {
     if (!ctx.cabinetStyle) {
@@ -560,8 +573,14 @@ export function extractDetails(text: string, ctx: EstimatorContext, askedId: str
         break;
       }
       case 'closet_count': {
-        const n = parseCount(text, 1, 40);
-        if (n) { patch.closetCount = n; acks.push(n === 1 ? '1 closet' : `${n} closets`); }
+        const read = parseClosetKinds(text);
+        const n = read ? closetKindsTotal(read.kinds) : parseCount(text, 1, 40);
+        if (read && n != null && n >= 1 && n <= 40) {
+          patch.closetKinds = read.kinds;
+          patch.closetCount = n;
+          patch.closets = closetTypeOf(read.kinds);
+          acks.push(describeClosetKinds(read.kinds));
+        } else if (n) { patch.closetCount = n; acks.push(n === 1 ? '1 closet' : `${n} closets`); }
         // the count question also asks about shelves when the trim is in: "3, and two have wire shelves" / "just 2, no shelves" settles both
         if (n && ctx.interiorTrim === 'yes' && ctx.closetShelving === 'none') {
           if (/\b(?:no|without|none|don'?t have)\b[^.,;]{0,15}\bshel/i.test(text)) patch.extAnswered = [...new Set([...(ctx.extAnswered ?? []), 'closet_shelves'])];

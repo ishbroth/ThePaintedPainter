@@ -10,6 +10,7 @@ import type { EstimatorContext } from '../src/lib/types.ts';
 import { calculateEstimate } from '../src/lib/estimateEngine.ts';
 import { STANDARD_ROOMS } from '../src/lib/surfaceAreaEngine.ts';
 import { answeredEarlier, fillFromTranscript } from '../src/lib/chatEstimator/transcriptCheck.ts';
+import { parseClosetKinds } from '../src/lib/chatEstimator/items.ts';
 import { findTopic } from '../src/lib/chatEstimator/topics.ts';
 import { parseArea, parseCount, parseDimensionPair, parseFenceAnswer, parseLinearFeet } from '../src/lib/chatEstimator/details.ts';
 import { botRepeats, collectFriction, detectFriction } from '../src/lib/chatEstimator/selfCheck.ts';
@@ -247,8 +248,10 @@ async function dismissAt(setup: string[], topicWords: RegExp, dismissal = 'doesn
   const cl = await play([...start, 'no']); // no to the cabinets: the closets come next
   check('closets: a whole-house inside job asks whether the closets are included', /closets/i.test(cl.last), cl.last);
   const clYes = await play(['yes, the closets too'], [], cl.state);
-  check('closets: a yes (with the trim in) asks whether they have shelves to paint', clYes.state.ctx.closets !== 'none' && /shelves|shelving/i.test(clYes.last), clYes.last);
-  const clShelves = await play(['yes, built-in shelves'], [], clYes.state);
+  check('closets: a yes asks how many and WHAT KIND (standard, walk-in, small)', clYes.state.ctx.closets !== 'none' && /how many closets/i.test(clYes.last) && /walk-ins?/i.test(clYes.last) && /coat|linen|pantry/i.test(clYes.last), clYes.last);
+  const clCount = await play(['3 closets'], [], clYes.state);
+  check('closets: after the count (with the trim in) it asks whether they have shelves to paint', /shelves|shelving/i.test(clCount.last), clCount.last);
+  const clShelves = await play(['yes, built-in shelves'], [], clCount.state);
   check('closets: the shelves answer is read', clShelves.state.ctx.closetShelving === 'built_in', JSON.stringify(clShelves.state.ctx.closetShelving));
   const clNo = await play(['no'], [], cl.state);
   check('closets: a no leaves them out and does not ask about shelves', clNo.state.ctx.closets === 'none' && !/shelves|shelving|closets/i.test(clNo.last), clNo.last);
@@ -949,7 +952,7 @@ async function dismissAt(setup: string[], topicWords: RegExp, dismissal = 'doesn
   // walk the interior questions saying "yes" until the closet count is asked
   let c = await play(['I need the inside of my house painted, 3 bed 2 bath, 1800 sq ft', 'one story', 'walls, ceilings and trim']);
   for (let i = 0; i < 14 && !/how many closets/i.test(c.last); i++) c = await play([/trim.*cover|what does that include/i.test(c.last) ? 'baseboards and door casings' : 'yes'], [], c.state);
-  check('closets: one question asks how many and whether they have shelves', /how many closets/i.test(c.last) && /shelves/i.test(c.last), c.last);
+  check('closets: the count question also asks what kind', /how many closets/i.test(c.last) && /walk-ins?/i.test(c.last), c.last);
   const c2 = await play(['3 closets, two have wire shelves'], [], c.state);
   check('closets: "3, two have wire shelves" settles the count and the shelves', c2.state.ctx.closetCount === 3 && c2.state.ctx.closetShelving === 'wire' && !/how many closets|have shelves/i.test(c2.last), JSON.stringify([c2.state.ctx.closetCount, c2.state.ctx.closetShelving, c2.last]));
   const c3 = await play(['just 2, no shelves'], [], c.state);
@@ -1103,6 +1106,23 @@ async function dismissAt(setup: string[], topicWords: RegExp, dismissal = 'doesn
   check('doors: one door as the whole job still pays the minimum job charge', doorJob({ ...only, doorCount: 1 }).lineItems.some((l) => /Minimum service charge/.test(l.description)));
   const extDoors = (body: 'yes' | 'no') => doorJob({ projectType: 'exterior', exteriorBody: body, sidingType: 'stucco', stories: 1, squareFeet: 1800, entryDoor: 'yes', garageDoor: 'single' }).lineItems.filter((l) => l.key === 'entry_door' || l.key === 'garage_door').reduce((t, l) => t + l.amount, 0);
   check('doors: entry and garage doors are cheaper when the whole house exterior is being painted', extDoors('yes') < extDoors('no'));
+}
+
+// Closets: which KIND (standard bedroom, small coat/linen/pantry, walk-in, large walk-in) changes the price, and a mix can be said in one answer
+{
+  const mixed = parseClosetKinds('3 bedroom closets, a walk-in and a coat closet');
+  check('closet kinds: "3 bedroom closets, a walk-in and a coat closet"', !!mixed && mixed.kinds.reach === 3 && mixed.kinds.walkin === 1 && mixed.kinds.small === 1, JSON.stringify(mixed));
+  const big = parseClosetKinds('two large walk-in closets');
+  check('closet kinds: "two large walk-in closets" are large walk-ins, not plain walk-ins', !!big && big.kinds.large === 2 && !big.kinds.walkin, JSON.stringify(big));
+  const pantry = parseClosetKinds('just the pantry and a linen closet');
+  check('closet kinds: a pantry and a linen closet are small closets', !!pantry && pantry.kinds.small === 2, JSON.stringify(pantry));
+  const bare = parseClosetKinds('4 closets');
+  check('closet kinds: a bare "4 closets" is four standard ones, and no kind was named', !!bare && bare.kinds.reach === 4 && !bare.typed, JSON.stringify(bare));
+  const closetCtx = { ...makeInitialState().ctx, projectType: 'interior', interiorScope: 'specific_rooms', selectedRooms: ['bedroom_2'], interiorWalls: 'no', interiorCeilings: 'no', interiorTrim: 'no', interiorDoors: 'none', closets: 'both', closetCount: 5, zipCode: '64101', surfacesAddressed: true } as EstimatorContext;
+  const closetCost = (k: NonNullable<EstimatorContext['closetKinds']>) => calculateEstimate({ ...closetCtx, closetKinds: k } as EstimatorContext).lineItems.filter((l) => l.key === 'closets').reduce((t, l) => t + l.amount, 0);
+  check('closets: a coat closet costs less than a standard one, a walk-in more, a large walk-in the most', closetCost({ small: 2 }) < closetCost({ reach: 2 }) && closetCost({ reach: 2 }) < closetCost({ walkin: 2 }) && closetCost({ walkin: 2 }) < closetCost({ large: 2 }));
+  const said = await play(['I need the inside painted, just two bedroom closets and a walk-in']);
+  check('closets: kinds said up front are read (and the count is not asked again)', said.state.ctx.closetKinds?.reach === 2 && said.state.ctx.closetKinds?.walkin === 1 && said.state.ctx.closetCount === 3, JSON.stringify([said.state.ctx.closetKinds, said.state.ctx.closetCount]));
 }
 
 setLLMReaderForTests(undefined);

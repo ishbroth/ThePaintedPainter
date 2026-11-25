@@ -40,7 +40,7 @@ interface Target {
 const TARGETS: Target[] = [
   { re: /\b(?:common (?:areas?|spaces?)|hall(?:way)?s|corridors?|lobb(?:y|ies)|stair(?:well)?s|laundry (?:room|area))\b/, label: 'the common areas', patch: { commonAreas: 'no', commonAreaSqft: null }, answered: ['common_areas'] },
   { re: /\b(?:closet shel(?:ves|ving|f)|shel(?:ves|ving) in the closets?)\b|\bshel(?:ves|ving)\b/, label: 'the closet shelves', patch: { closetShelving: 'none' }, answered: ['closet_shelves'] },
-  { re: /\bclosets?\b/, label: 'the closets', patch: { closets: 'none', closetShelving: 'none', closetCount: null }, answered: ['closets_included', 'closet_shelves', 'closet_count'], excluded: ['closets'] },
+  { re: /\bclosets?\b/, label: 'the closets', patch: { closets: 'none', closetShelving: 'none', closetCount: null, closetKinds: undefined }, answered: ['closets_included', 'closet_shelves', 'closet_count'], excluded: ['closets'] },
   { re: /\bcabinet(?:s|ry)?\b|\bvanit(?:y|ies)\b/, label: 'the cabinets', patch: { cabinets: 'none', cabinetLocations: [], cabinetDoorCount: null }, answered: ['upsell_cabinets', 'cabinet_finish', 'cabinet_count', 'cabinet_scope', 'cabinet_method', 'cabinet_hardware'], excluded: ['cabinets'] },
   { re: /\bceilings?\b/, label: 'the ceilings', patch: { interiorCeilings: 'no' }, excluded: ['ceilings'] },
   { re: /\b(?:trim|baseboards?)\b/, label: 'the trim', patch: { interiorTrim: 'no', trimLinearFeet: null }, excluded: ['trim'] },

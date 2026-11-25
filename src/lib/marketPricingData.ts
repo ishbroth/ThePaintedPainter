@@ -68,6 +68,7 @@ export const BASE_RATES = {
 
   // ===== Closets (per closet) =====
   closets: {
+    small: 150,                    // coat, linen, pantry or broom closet (an estimate: about 60% of a standard reach-in)
     standard: 250,                 // walls + ceiling + shelf
     walkin_small: 400,
     walkin_large: 600,

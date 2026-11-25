@@ -14773,6 +14773,8 @@ var BASE_RATES = {
   },
   // ===== Closets (per closet) =====
   closets: {
+    small: 150,
+    // coat, linen, pantry or broom closet (an estimate: about 60% of a standard reach-in)
     standard: 250,
     // walls + ceiling + shelf
     walkin_small: 400,
@@ -18425,6 +18427,41 @@ function parseCabinetCondition(text, answering) {
   if (answering && /\b(?:good (?:shape|condition)|great (?:shape|condition)|fine|smooth|no (?:damage|issues?|problems?|chips?)|pretty good|decent|like new|clean|nothing)\b/.test(t2)) return "good";
   return null;
 }
+var CLOSET_N = "(\\d{1,2}|an?|one|two|three|four|five|six|seven|eight|nine|ten|a couple of|couple of|couple)";
+var CLOSET_NUM = { a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, couple: 2, "couple of": 2, "a couple of": 2 };
+function parseClosetKinds(text) {
+  let t2 = text.toLowerCase();
+  const kinds = {};
+  let typed = false;
+  const take = (key, re, isTyped) => {
+    t2 = t2.replace(re, (_m, n) => {
+      const count = n ? /^\d/.test(n) ? parseInt(n, 10) : CLOSET_NUM[n] ?? 1 : 1;
+      kinds[key] = (kinds[key] ?? 0) + count;
+      if (isTyped) typed = true;
+      return " ";
+    });
+  };
+  take("large", new RegExp("(?:\\b" + CLOSET_N + "\\s+)?(?:(?:large|big|huge|oversized|giant|master)\\s+walk[\\s-]?ins?(?:\\s+closets?)?|dressing[\\s-]?rooms?)", "g"), true);
+  take("walkin", new RegExp("(?:\\b" + CLOSET_N + "\\s+)?walk[\\s-]?ins?(?:\\s+closets?)?", "g"), true);
+  take("small", new RegExp("(?:\\b" + CLOSET_N + "\\s+)?(?:(?:coat|linen|pantry|broom|utility|hall(?:way)?|small|tiny|little|shallow|storage|entry)\\s+closets?|pantr(?:y|ies))", "g"), true);
+  take("reach", new RegExp("(?:\\b" + CLOSET_N + "\\s+)?(?:standard|regular|normal|average|bedroom|reach[\\s-]?in|typical|ordinary)\\s+closets?", "g"), true);
+  take("reach", new RegExp("\\b" + CLOSET_N + "\\s+closets?\\b", "g"), false);
+  return Object.keys(kinds).length > 0 ? { kinds, typed } : null;
+}
+var closetKindsTotal = (k) => (k.reach ?? 0) + (k.small ?? 0) + (k.walkin ?? 0) + (k.large ?? 0);
+function closetTypeOf(k) {
+  const bigOnes = (k.walkin ?? 0) + (k.large ?? 0) > 0;
+  const littleOnes = (k.reach ?? 0) + (k.small ?? 0) > 0;
+  return bigOnes && littleOnes ? "both" : bigOnes ? "walkin" : "standard";
+}
+function describeClosetKinds(k) {
+  const bits = [];
+  if (k.reach) bits.push(k.reach + " standard");
+  if (k.small) bits.push(k.small + " small (coat, linen or pantry)");
+  if (k.walkin) bits.push(k.walkin + " walk-in");
+  if (k.large) bits.push(k.large + " large walk-in");
+  return bits.join(", ") + " closet" + (closetKindsTotal(k) === 1 ? "" : "s");
+}
 
 // src/lib/chatEstimator/details.ts
 var NUMBER_WORDS2 = {
@@ -18784,6 +18821,18 @@ function extractDetails(text, ctx, askedId) {
       acks.push(CHAIR_KIND_LABEL[kind]);
     }
   }
+  if (!ctx.closetKinds && askedId !== "closet_count" && (ctx.closets !== "none" || /\bclosets?\b|\bpantry\b|\bwalk[\s-]?in/.test(t2))) {
+    const read = parseClosetKinds(text);
+    if (read && read.typed) {
+      const total = closetKindsTotal(read.kinds);
+      if (total >= 1 && total <= 40) {
+        patch.closetKinds = read.kinds;
+        patch.closetCount = total;
+        patch.closets = closetTypeOf(read.kinds);
+        acks.push(describeClosetKinds(read.kinds));
+      }
+    }
+  }
   if (ctx.cabinets !== "none" || /\bcabinet|\bvanit/.test(t2)) {
     if (!ctx.cabinetStyle) {
       const k = parseCabinetStyle(text, askedId === "cabinet_style");
@@ -18974,8 +19023,14 @@ function extractDetails(text, ctx, askedId) {
         break;
       }
       case "closet_count": {
-        const n = parseCount(text, 1, 40);
-        if (n) {
+        const read = parseClosetKinds(text);
+        const n = read ? closetKindsTotal(read.kinds) : parseCount(text, 1, 40);
+        if (read && n != null && n >= 1 && n <= 40) {
+          patch.closetKinds = read.kinds;
+          patch.closetCount = n;
+          patch.closets = closetTypeOf(read.kinds);
+          acks.push(describeClosetKinds(read.kinds));
+        } else if (n) {
           patch.closetCount = n;
           acks.push(n === 1 ? "1 closet" : `${n} closets`);
         }
@@ -20672,7 +20727,18 @@ function calculateEstimate(ctx) {
     if (ctx.closets !== "none" && !off("closets")) {
       const closetCount = ctx.closetCount || Math.round(layout.totalClosets * roomFraction) || 2;
       const shelvingAdd = ctx.closetShelving === "extensive" ? 250 : ctx.closetShelving === "built_in" ? 150 : ctx.closetShelving === "wire" ? 35 : 0;
-      if (ctx.closets === "standard") {
+      const kinds = ctx.closetKinds;
+      const kindsTotal = kinds ? (kinds.reach ?? 0) + (kinds.small ?? 0) + (kinds.walkin ?? 0) + (kinds.large ?? 0) : 0;
+      if (kinds && kindsTotal > 0) {
+        const add = (n, label, rate, shelving) => {
+          if (!n) return;
+          lineItems.push({ category: "Interior", description: `${label} (${n})${shelving ? " + shelving" : ""}`, amount: n * (rate + shelving) * regionalMult, key: "closets" });
+        };
+        add(kinds.reach, "Standard Closets", RESOLVED_BASE_RATES.closets.standard, shelvingAdd);
+        add(kinds.small, "Small Closets (coat, linen, pantry)", RESOLVED_BASE_RATES.closets.small, shelvingAdd * 0.5);
+        add(kinds.walkin, "Walk-in Closets", RESOLVED_BASE_RATES.closets.walkin_small, shelvingAdd * 1.5);
+        add(kinds.large, "Large Walk-in Closets", RESOLVED_BASE_RATES.closets.walkin_large, shelvingAdd * 2);
+      } else if (ctx.closets === "standard") {
         lineItems.push({
           category: "Interior",
           description: `Closets (${closetCount})${shelvingAdd ? " + shelving" : ""}`,
@@ -21679,7 +21745,7 @@ var RETRACT_CUE = new RegExp(
 var TARGETS = [
   { re: /\b(?:common (?:areas?|spaces?)|hall(?:way)?s|corridors?|lobb(?:y|ies)|stair(?:well)?s|laundry (?:room|area))\b/, label: "the common areas", patch: { commonAreas: "no", commonAreaSqft: null }, answered: ["common_areas"] },
   { re: /\b(?:closet shel(?:ves|ving|f)|shel(?:ves|ving) in the closets?)\b|\bshel(?:ves|ving)\b/, label: "the closet shelves", patch: { closetShelving: "none" }, answered: ["closet_shelves"] },
-  { re: /\bclosets?\b/, label: "the closets", patch: { closets: "none", closetShelving: "none", closetCount: null }, answered: ["closets_included", "closet_shelves", "closet_count"], excluded: ["closets"] },
+  { re: /\bclosets?\b/, label: "the closets", patch: { closets: "none", closetShelving: "none", closetCount: null, closetKinds: void 0 }, answered: ["closets_included", "closet_shelves", "closet_count"], excluded: ["closets"] },
   { re: /\bcabinet(?:s|ry)?\b|\bvanit(?:y|ies)\b/, label: "the cabinets", patch: { cabinets: "none", cabinetLocations: [], cabinetDoorCount: null }, answered: ["upsell_cabinets", "cabinet_finish", "cabinet_count", "cabinet_scope", "cabinet_method", "cabinet_hardware"], excluded: ["cabinets"] },
   { re: /\bceilings?\b/, label: "the ceilings", patch: { interiorCeilings: "no" }, excluded: ["ceilings"] },
   { re: /\b(?:trim|baseboards?)\b/, label: "the trim", patch: { interiorTrim: "no", trimLinearFeet: null }, excluded: ["trim"] },
@@ -23513,9 +23579,9 @@ var TOPICS = [
     priority: 29.605,
     relevant: (c2) => (c2.projectType === "interior" || c2.projectType === "both") && c2.closets !== "none" && c2.closetCount == null,
     alreadyAnswered: (c2) => c2.closetCount != null || extDone(c2, "closet_count"),
-    ask: (c2) => c2.closetShelving !== "none" ? "How many closets have shelves that need painting?" : c2.interiorTrim === "yes" ? "How many closets are getting painted, and do they have shelves that need painting too?" : "How many closets are getting painted?",
-    clarify: () => "Closets (and the shelves and rods in them) are priced each, so a rough count is what I need.",
-    example: () => "Something like '3 closets' or 'just one'."
+    ask: (c2) => c2.closetShelving !== "none" ? "How many closets have shelves that need painting, and what kind: standard bedroom closets, walk-ins, or small coat, linen or pantry closets?" : "How many closets are getting painted, and what kind: standard bedroom closets, walk-ins, or small coat, linen or pantry closets?",
+    clarify: () => "A standard bedroom closet, a small coat, linen or pantry closet, a walk-in and a big dressing-room walk-in are very different amounts of wall, ceiling and shelving, so I price each kind, and a rough count of each is what I need.",
+    example: () => "Something like '3 bedroom closets and a walk-in', 'a coat closet and a pantry' or just '2'."
   },
   {
     // A dining chair, an armchair, a bar stool and a rocker are different amounts of work (arms, spindles, rungs): asked once the chairs are counted.
@@ -27065,8 +27131,10 @@ async function dismissAt(setup, topicWords, dismissal = "doesnt matter just want
   const cl2 = await play([...start, "no"]);
   check("closets: a whole-house inside job asks whether the closets are included", /closets/i.test(cl2.last), cl2.last);
   const clYes = await play(["yes, the closets too"], [], cl2.state);
-  check("closets: a yes (with the trim in) asks whether they have shelves to paint", clYes.state.ctx.closets !== "none" && /shelves|shelving/i.test(clYes.last), clYes.last);
-  const clShelves = await play(["yes, built-in shelves"], [], clYes.state);
+  check("closets: a yes asks how many and WHAT KIND (standard, walk-in, small)", clYes.state.ctx.closets !== "none" && /how many closets/i.test(clYes.last) && /walk-ins?/i.test(clYes.last) && /coat|linen|pantry/i.test(clYes.last), clYes.last);
+  const clCount = await play(["3 closets"], [], clYes.state);
+  check("closets: after the count (with the trim in) it asks whether they have shelves to paint", /shelves|shelving/i.test(clCount.last), clCount.last);
+  const clShelves = await play(["yes, built-in shelves"], [], clCount.state);
   check("closets: the shelves answer is read", clShelves.state.ctx.closetShelving === "built_in", JSON.stringify(clShelves.state.ctx.closetShelving));
   const clNo = await play(["no"], [], cl2.state);
   check("closets: a no leaves them out and does not ask about shelves", clNo.state.ctx.closets === "none" && !/shelves|shelving|closets/i.test(clNo.last), clNo.last);
@@ -27641,7 +27709,7 @@ async function dismissAt(setup, topicWords, dismissal = "doesnt matter just want
 {
   let c2 = await play(["I need the inside of my house painted, 3 bed 2 bath, 1800 sq ft", "one story", "walls, ceilings and trim"]);
   for (let i2 = 0; i2 < 14 && !/how many closets/i.test(c2.last); i2++) c2 = await play([/trim.*cover|what does that include/i.test(c2.last) ? "baseboards and door casings" : "yes"], [], c2.state);
-  check("closets: one question asks how many and whether they have shelves", /how many closets/i.test(c2.last) && /shelves/i.test(c2.last), c2.last);
+  check("closets: the count question also asks what kind", /how many closets/i.test(c2.last) && /walk-ins?/i.test(c2.last), c2.last);
   const c22 = await play(["3 closets, two have wire shelves"], [], c2.state);
   check('closets: "3, two have wire shelves" settles the count and the shelves', c22.state.ctx.closetCount === 3 && c22.state.ctx.closetShelving === "wire" && !/how many closets|have shelves/i.test(c22.last), JSON.stringify([c22.state.ctx.closetCount, c22.state.ctx.closetShelving, c22.last]));
   const c3 = await play(["just 2, no shelves"], [], c2.state);
@@ -27777,6 +27845,21 @@ async function dismissAt(setup, topicWords, dismissal = "doesnt matter just want
   check("doors: one door as the whole job still pays the minimum job charge", doorJob({ ...only, doorCount: 1 }).lineItems.some((l) => /Minimum service charge/.test(l.description)));
   const extDoors = (body) => doorJob({ projectType: "exterior", exteriorBody: body, sidingType: "stucco", stories: 1, squareFeet: 1800, entryDoor: "yes", garageDoor: "single" }).lineItems.filter((l) => l.key === "entry_door" || l.key === "garage_door").reduce((t2, l) => t2 + l.amount, 0);
   check("doors: entry and garage doors are cheaper when the whole house exterior is being painted", extDoors("yes") < extDoors("no"));
+}
+{
+  const mixed = parseClosetKinds("3 bedroom closets, a walk-in and a coat closet");
+  check('closet kinds: "3 bedroom closets, a walk-in and a coat closet"', !!mixed && mixed.kinds.reach === 3 && mixed.kinds.walkin === 1 && mixed.kinds.small === 1, JSON.stringify(mixed));
+  const big = parseClosetKinds("two large walk-in closets");
+  check('closet kinds: "two large walk-in closets" are large walk-ins, not plain walk-ins', !!big && big.kinds.large === 2 && !big.kinds.walkin, JSON.stringify(big));
+  const pantry = parseClosetKinds("just the pantry and a linen closet");
+  check("closet kinds: a pantry and a linen closet are small closets", !!pantry && pantry.kinds.small === 2, JSON.stringify(pantry));
+  const bare = parseClosetKinds("4 closets");
+  check('closet kinds: a bare "4 closets" is four standard ones, and no kind was named', !!bare && bare.kinds.reach === 4 && !bare.typed, JSON.stringify(bare));
+  const closetCtx = { ...makeInitialState().ctx, projectType: "interior", interiorScope: "specific_rooms", selectedRooms: ["bedroom_2"], interiorWalls: "no", interiorCeilings: "no", interiorTrim: "no", interiorDoors: "none", closets: "both", closetCount: 5, zipCode: "64101", surfacesAddressed: true };
+  const closetCost = (k) => calculateEstimate({ ...closetCtx, closetKinds: k }).lineItems.filter((l) => l.key === "closets").reduce((t2, l) => t2 + l.amount, 0);
+  check("closets: a coat closet costs less than a standard one, a walk-in more, a large walk-in the most", closetCost({ small: 2 }) < closetCost({ reach: 2 }) && closetCost({ reach: 2 }) < closetCost({ walkin: 2 }) && closetCost({ walkin: 2 }) < closetCost({ large: 2 }));
+  const said = await play(["I need the inside painted, just two bedroom closets and a walk-in"]);
+  check("closets: kinds said up front are read (and the count is not asked again)", said.state.ctx.closetKinds?.reach === 2 && said.state.ctx.closetKinds?.walkin === 1 && said.state.ctx.closetCount === 3, JSON.stringify([said.state.ctx.closetKinds, said.state.ctx.closetCount]));
 }
 setLLMReaderForTests(void 0);
 console.log(failures ? `

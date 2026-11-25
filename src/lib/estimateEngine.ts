@@ -377,7 +377,19 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
         : ctx.closetShelving === 'wire' ? 35 // just masking cost
         : 0;
 
-      if (ctx.closets === 'standard') {
+      const kinds = ctx.closetKinds;
+      const kindsTotal = kinds ? (kinds.reach ?? 0) + (kinds.small ?? 0) + (kinds.walkin ?? 0) + (kinds.large ?? 0) : 0;
+      if (kinds && kindsTotal > 0) {
+        // each kind of closet is its own amount of wall, ceiling, shelving and cutting in
+        const add = (n: number | undefined, label: string, rate: number, shelving: number) => {
+          if (!n) return;
+          lineItems.push({ category: 'Interior', description: `${label} (${n})${shelving ? ' + shelving' : ''}`, amount: n * (rate + shelving) * regionalMult, key: 'closets' });
+        };
+        add(kinds.reach, 'Standard Closets', BASE_RATES.closets.standard, shelvingAdd);
+        add(kinds.small, 'Small Closets (coat, linen, pantry)', BASE_RATES.closets.small, shelvingAdd * 0.5);
+        add(kinds.walkin, 'Walk-in Closets', BASE_RATES.closets.walkin_small, shelvingAdd * 1.5);
+        add(kinds.large, 'Large Walk-in Closets', BASE_RATES.closets.walkin_large, shelvingAdd * 2);
+      } else if (ctx.closets === 'standard') {
         lineItems.push({
           category: 'Interior',
           description: `Closets (${closetCount})${shelvingAdd ? ' + shelving' : ''}`,
