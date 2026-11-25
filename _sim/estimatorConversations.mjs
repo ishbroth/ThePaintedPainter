@@ -17010,7 +17010,7 @@ function extractRooms(text) {
     [/\blaundry\b|\bmud(?:room| room)\b/, "laundry"],
     [/\bhall(?:way)?\b|\bcorridor\b/, "hallway"],
     [/\bentry(?:way)?\b|\bfoyer\b/, "entryway"],
-    [/\bgarage\b/, "garage"]
+    [/\bgarage\b(?!\s+doors?)/, "garage"]
   ];
   for (const [re, key] of map) {
     if (re.test(t2) && !found.includes(key)) found.push(key);
@@ -18707,7 +18707,7 @@ function extractDetails(text, ctx, askedId) {
   const itemText = t2.replace(/chair[\s-]*rails?/g, " ");
   const patioSet = /\b(?:patio|outdoor|garden|deck)\s*(?:furniture|set|chairs?|table)|\bloungers?\b|\bchaise\b|\bwrought iron\b/.test(itemText);
   const askedItems = askedId === "chair_count" || askedId === "furniture_kind" || askedId === "furniture_finish";
-  const paintVerb = /\b(?:paint(?:ed|ing)?|refinish(?:ed|ing)?|repaint(?:ed|ing)?|restain(?:ed|ing)?|re-stain(?:ed|ing)?|stain(?:ed|ing)?|spray(?:ed|ing)?|sand(?:ed|ing)?|strip(?:ped|ping)?|varnish(?:ed|ing)?)\b/.test(itemText);
+  const paintVerb = /\b(?:need|needs|want|wants|looking|would like|quote|get|done|have|paint(?:ed|ing)?|refinish(?:ed|ing)?|repaint(?:ed|ing)?|restain(?:ed|ing)?|re-stain(?:ed|ing)?|stain(?:ed|ing)?|spray(?:ed|ing)?|sand(?:ed|ing)?|strip(?:ped|ping)?|varnish(?:ed|ing)?)\b/.test(itemText);
   const bareNoun = itemText.trim().split(/\s+/).length <= 5;
   const found = detectItems(itemText);
   if (found.length > 0 && !patioSet && (paintVerb || askedItems || ctx.furnitureItems.length > 0 || ctx.furnitureUnspecified || bareNoun && !ctx.projectType && ctx.selectedRooms.length === 0)) {
@@ -20276,6 +20276,10 @@ function pick(variants, seedStr) {
   for (let i2 = 0; i2 < seedStr.length; i2++) h = h * 31 + seedStr.charCodeAt(i2) >>> 0;
   return variants[h % variants.length];
 }
+function questionBudget(c2) {
+  const n = SPECS.filter((sp2) => sp2.present(c2)).length;
+  return n >= 3 ? 3 : n === 2 ? 4 : Infinity;
+}
 function itemTopics() {
   const topics = [];
   for (const spec of SPECS) {
@@ -20284,7 +20288,14 @@ function itemTopics() {
       topics.push({
         id,
         priority: spec.priority + i2 * 1e-3,
-        relevant: (c2) => spec.present(c2) && (!q.when || q.when(c2, answersFor(c2, spec.key))),
+        relevant: (c2) => {
+          if (!spec.present(c2) || q.when && !q.when(c2, answersFor(c2, spec.key))) return false;
+          const budget = questionBudget(c2);
+          if (budget === Infinity) return true;
+          const answers = answersFor(c2, spec.key);
+          const askable = spec.questions.filter((x) => !x.when || x.when(c2, answers));
+          return askable.indexOf(q) < budget;
+        },
         alreadyAnswered: (c2) => (c2.itemAnswers ?? {})[`${spec.key}.${q.key}`] != null || (c2.extAnswered ?? []).includes(id),
         ask: (c2) => pick(q.ask, seedOf(c2)),
         clarify: () => q.clarify,
@@ -20376,6 +20387,32 @@ var CEILING_ACCESS_CHARGE = { twelve_plus: 300, vaulted_mixed: 600 };
 function repeatUnitFactor(units) {
   return units >= 50 ? 0.33 : units >= 25 ? 0.44 : units >= 10 ? 0.55 : units >= 4 ? 0.7 : units >= 2 ? 0.88 : 1;
 }
+var ONE_COAT_FACTOR = 0.85;
+var TOUCH_UP_FACTOR = 0.7;
+var TIER_FACTOR = { full: 1, one_coat: ONE_COAT_FACTOR, touch_up: TOUCH_UP_FACTOR };
+function interiorTreatmentBlend(ctx, rooms, surface) {
+  const turnover = ctx.propertyType === "rental" && ctx.occupancy === "vacant";
+  const fallback = ctx.interiorColorChange === "same" && !turnover ? "one_coat" : "full";
+  const treatments = ctx.roomTreatments ?? {};
+  let total = 0;
+  let weighted = 0;
+  let full = 0;
+  let oneCoat = false;
+  let touchUp = false;
+  for (const r of rooms) {
+    const spec = STANDARD_ROOMS[r];
+    const area = spec ? surface === "wall" ? spec.wallSqFt : spec.ceilingSqFt : 0;
+    if (area <= 0) continue;
+    const tier = treatments[r] ?? fallback;
+    total += area;
+    weighted += area * TIER_FACTOR[tier];
+    if (tier === "full") full += area;
+    else if (tier === "one_coat") oneCoat = true;
+    else touchUp = true;
+  }
+  if (total === 0) return { factor: TIER_FACTOR[fallback], fullShare: fallback === "full" ? 1 : 0, oneCoat: fallback === "one_coat", touchUp: false };
+  return { factor: weighted / total, fullShare: full / total, oneCoat, touchUp };
+}
 var GUTTER_MASKING_SHARE = 0.4;
 function calculateEstimate(ctx) {
   const lineItems = [];
@@ -20407,10 +20444,12 @@ function calculateEstimate(ctx) {
     if (ctx.interiorWalls !== "no" && !off("walls")) {
       const wallRate = getWallRate(ctx);
       const textureMultiplier = ctx.wallTexture === "heavy_texture" ? 1.15 : ctx.wallTexture === "textured" ? 1.05 : 1;
-      const colorEfficiency = ctx.interiorColorChange === "same" ? 0.92 : 1;
+      const wallBlend = interiorTreatmentBlend(ctx, layout.rooms, "wall");
+      const colorEfficiency = wallBlend.factor;
+      const treatmentNote = wallBlend.oneCoat || wallBlend.touchUp ? ` (${[wallBlend.oneCoat ? "same-color rooms, one coat" : "", wallBlend.touchUp ? "touch-up rooms" : ""].filter(Boolean).join(", ")})` : "";
       lineItems.push({
         category: "Interior",
-        description: `Interior Walls${heightNote}`,
+        description: `Interior Walls${heightNote}${treatmentNote}`,
         amount: effectiveWallSqFt * wallRate * textureMultiplier * colorEfficiency * regionalMult * conditionMultiplier * volEff * tallWallFactor,
         key: "walls"
       });
@@ -20432,7 +20471,7 @@ function calculateEstimate(ctx) {
       lineItems.push({
         category: "Interior",
         description: `Ceilings${heightNote}`,
-        amount: ceilingSqFt * ceilingRate * regionalMult * volEff * (ctx.ceilingType === "vaulted" ? 1 : 1 + (tallCeilingFactor - 1) * tallShare),
+        amount: ceilingSqFt * ceilingRate * regionalMult * volEff * (ctx.ceilingType === "vaulted" ? 1 : 1 + (tallCeilingFactor - 1) * tallShare) * interiorTreatmentBlend(ctx, layout.rooms, "ceiling").factor,
         key: "ceilings"
       });
       if (ctx.ceilingColorChange === "different" || ctx.ceilingColorChange === "dramatic") {
@@ -20694,7 +20733,8 @@ function calculateEstimate(ctx) {
       const totalRooms = layout.rooms.length || 1;
       const excluded = Math.min(ctx.colorChangeExcludedRoomCount ?? 0, totalRooms - 1);
       const scopeFraction = (ctx.colorChangeScope === "most_of_house" || ctx.colorChangeScope === "some_rooms") && excluded > 0 ? Math.max(0, (totalRooms - excluded) / totalRooms) : 1;
-      const extraCoatSqFt = effectiveWallSqFt * (LABOR_COMPLEXITY.different_color - 1) * scopeFraction;
+      const treatedShare = ctx.roomTreatments && Object.keys(ctx.roomTreatments).length > 0 ? interiorTreatmentBlend(ctx, layout.rooms, "wall").fullShare : 1;
+      const extraCoatSqFt = effectiveWallSqFt * (LABOR_COMPLEXITY.different_color - 1) * scopeFraction * treatedShare;
       lineItems.push({
         category: "Interior",
         description: excluded > 0 ? `Color Change (extra coat, ${excluded} room${excluded === 1 ? "" : "s"} excluded)` : "Color Change (extra coat)",
@@ -20796,8 +20836,8 @@ function calculateEstimate(ctx) {
       const trimMaterialNote = ctx.trimMaterial === "aluminum" || ctx.trimMaterial === "vinyl" ? " (aluminum/vinyl trim)" : ctx.trimMaterial === "wood" ? " (wood trim)" : "";
       lineItems.push({
         category: "Exterior",
-        description: `Trim, Fascia, Soffits & Eaves${ctx.houseStyle === "ornate" ? " (detailed architectural style)" : ""}${trimMaterialNote}`,
-        amount: (trimPart + soffitPart) * regionalMult * houseStyleFactor * trimMaterialFactor,
+        description: `Trim, Fascia, Soffits & Eaves${ctx.houseStyle === "ornate" ? " (detailed architectural style)" : ""}${trimMaterialNote}${ctx.exteriorSides && ctx.exteriorSides < 4 ? ` (${ctx.exteriorSides} side${ctx.exteriorSides === 1 ? "" : "s"} of the house)` : ""}`,
+        amount: (trimPart + soffitPart) * regionalMult * houseStyleFactor * trimMaterialFactor * (ctx.exteriorSides && ctx.exteriorSides < 4 ? ctx.exteriorSides / 4 : 1),
         key: "ext_trim"
       });
     }
@@ -21079,6 +21119,12 @@ function calculateEstimate(ctx) {
     }
   }
   lineItems.splice(0, lineItems.length, ...applyItemAnswers(lineItems, ctx, regionalMult));
+  for (const [key, tier] of Object.entries(ctx.areaTreatments ?? {})) {
+    for (let i2 = 0; i2 < lineItems.length; i2++) {
+      if (lineItems[i2].key !== key) continue;
+      lineItems[i2] = { ...lineItems[i2], amount: lineItems[i2].amount * TIER_FACTOR[tier], description: `${lineItems[i2].description} (${tier === "one_coat" ? "one-coat refresh" : "touch-up"})` };
+    }
+  }
   let subtotal = lineItems.reduce((sum, item) => sum + item.amount, 0);
   const minCharge = MIN_JOB_CHARGE * regionalMult;
   if (subtotal < minCharge) {
@@ -22698,7 +22744,7 @@ function roomLabel(room) {
   }
 }
 var hasTiming = (c2) => !!(c2.timeline || c2.startDate || c2.endDate || c2.datesFlexible);
-var isNarrowInteriorJob = (c2) => c2.interiorWalls === "no" && c2.surfacesAddressed && (isIsolatedDetailJob(c2) || c2.specialtyServices.includes("fireplace") || c2.specialtyServices.includes("epoxy") || c2.closets !== "none" || c2.furnitureItems.length > 0 || c2.stairwayDetails === "railings_only" || c2.cabinets !== "none" || c2.trimLinearFeet != null || c2.popcornCeilingSqft != null || c2.prepWork.includes("popcorn_removal") || c2.interiorTrim === "yes" || c2.interiorCeilings === "yes");
+var isNarrowInteriorJob = (c2) => c2.interiorWalls === "no" && c2.surfacesAddressed && (isIsolatedDetailJob(c2) || c2.specialtyServices.includes("fireplace") || c2.specialtyServices.includes("epoxy") || c2.closets !== "none" || c2.furnitureItems.length > 0 || c2.stairwayDetails === "railings_only" || c2.doorsIncluded === true || c2.cabinets !== "none" || c2.trimLinearFeet != null || c2.popcornCeilingSqft != null || c2.prepWork.includes("popcorn_removal") || c2.interiorTrim === "yes" || c2.interiorCeilings === "yes");
 function detailLabel(c2) {
   const parts = [c2.chairRail === "yes" ? "chair rail" : "", c2.crownMolding === "yes" ? "crown moulding" : "", c2.wainscoting === "yes" ? "wainscoting" : "", c2.interiorTrim === "yes" ? "baseboards" : ""].filter(Boolean);
   return parts.length > 1 ? parts.slice(0, -1).join(", ") + " and " + parts[parts.length - 1] : parts[0] ?? "trim";
@@ -24860,6 +24906,250 @@ function faqAnswer(text, ctx) {
   return null;
 }
 
+// src/lib/chatEstimator/treatments.ts
+init_define_import_meta_env();
+var TOUCH_UP = /\btouch(?:ed|es|ing)?[\s-]?ups?\b|\bspot[\s-]?(?:paint|painting|fix|fixes)\b|\ba few (?:spots|marks|scuffs)\b|\bscuffs? (?:and|&) (?:marks|nail)/i;
+var ONE_COAT = /\b(?:same colou?r|same as (?:it is|now|before|what it is)|(?:keep|keeping|staying|stays?|stay) (?:the )?(?:same|existing|current) colou?r|matching (?:the )?(?:existing|current) colou?r|one[\s-]coat|1[\s-]coat|single[\s-]coat|(?:just |only )?(?:needs?|wants?) (?:a |just a )?(?:quick |little )?(?:refresh(?:er)?|freshening|freshen(?:ing)? up|facelift|pick[\s-]?me[\s-]?up)|(?:a |just a )?(?:quick |little )?(?:refresh(?:er)?|freshen(?:ing)?(?: up)?)|a fresh coat|just a coat)\b/i;
+var NEW_COLOR = /\b(?:new colou?r|different colou?r|changing (?:the )?colou?r|change (?:the )?colou?r|going (?:to|with) (?:a )?(?:\w+ )?(?:gray|grey|white|blue|green|beige|tan|taupe|yellow|red|black|navy|sage|cream|darker|lighter)|going (?:gray|grey|white|blue|green|beige|tan|taupe|yellow|red|black|navy|sage|cream|darker|lighter)|from \w+ to \w+|repaint(?:ed|ing)?|completely|fully)\b/i;
+var PARTS = [
+  [/\bstair(?:s|case|way)?\s*(?:rail(?:ing)?s?|banisters?|spindles?)\b|\bbanisters?\b|\bhand[\s-]?rails?\b|\brail(?:ing)?s\b/i, "stairs"],
+  [/\b(?:exterior|outside) trim\b|\bfascia\b|\bsoffits?\b|\beaves?\b/i, "ext_trim"],
+  [/\bsiding\b|\bstucco\b|\b(?:exterior|outside) walls?\b|\bhouse exterior\b|\bthe (?:whole )?(?:outside|exterior) of (?:the|my) house\b/i, "ext_body"],
+  [/\bgarage doors?\b/i, "garage_door"],
+  [/\b(?:front|entry) doors?\b/i, "entry_door"],
+  [/\bfence\b/i, "fence"],
+  [/\bdeck\b/i, "deck"],
+  [/\bshutters?\b/i, "ext_shutters"],
+  [/\bceilings?\b/i, "ceilings"],
+  [/\bbase[\s-]?boards?\b|\binterior trim\b/i, "trim"],
+  [/\binterior doors?\b|\bdoors?\b/i, "doors"]
+];
+var GENERIC_ROOM_POOL = ["bedroom_2", "bedroom_3", "bedroom_4", "bedroom_5", "master_bedroom"];
+var COUNT_WORDS = { a: 1, an: 1, one: 1, another: 1, two: 2, three: 3, four: 4 };
+var COAT_WORDS = /\b(?:one[\s-]coat|1[\s-]coat|single[\s-]coat|refresh(?:er)?|freshen(?:ing)?|facelift|a fresh coat|just a coat|pick[\s-]?me[\s-]?up)\b/i;
+var EXTERIOR_PARTS = ["ext_body", "ext_trim", "garage_door", "entry_door", "fence", "deck", "ext_shutters"];
+function tierOf(clause) {
+  if (TOUCH_UP.test(clause)) return "touch_up";
+  if (ONE_COAT.test(clause)) return "one_coat";
+  if (NEW_COLOR.test(clause)) return "full";
+  return null;
+}
+function clausesOf(text) {
+  return text.split(/(?<=[.;!?])\s+|,\s*|\s+(?:and|plus|but|also|while|then|along with|as well as)\s+/i).map((c2) => c2.trim()).filter(Boolean);
+}
+function partsIn(clause) {
+  const found = [];
+  for (const [re, key] of PARTS) if (re.test(clause) && !found.includes(key)) found.push(key);
+  if ((found.includes("entry_door") || found.includes("garage_door")) && found.includes("doors") && !/\binterior doors?\b/i.test(clause)) found.splice(found.indexOf("doors"), 1);
+  return found;
+}
+function genericRoomCount(clause) {
+  const m2 = /\b(a|an|one|another|two|three|four)\s+(?:other |more |additional |different )?rooms?\b/i.exec(clause);
+  return m2 ? COUNT_WORDS[m2[1].toLowerCase()] ?? 1 : 0;
+}
+function extractTreatments(text, usedRooms = [], projectType = "") {
+  const clauses = clausesOf(text);
+  const out = { rooms: {}, parts: {}, namedRooms: [], untreatedRooms: [], touchUpOnly: false };
+  const pool = GENERIC_ROOM_POOL.filter((r) => !usedRooms.includes(r));
+  let sawAny = false;
+  let sawReal = false;
+  let sawTouchUp = false;
+  let pendingSubjects = null;
+  let lastSubjects = null;
+  let pendingAt = -2;
+  let lastAt = -2;
+  const assign = (subj, tier, tierText = "") => {
+    sawAny = true;
+    if (tier === "touch_up") sawTouchUp = true;
+    else sawReal = true;
+    for (const r of subj.rooms) {
+      out.rooms[r] = tier;
+      if (!out.namedRooms.includes(r)) out.namedRooms.push(r);
+    }
+    for (let i2 = 0; i2 < subj.generic; i2++) {
+      const r = pool.shift();
+      if (r) {
+        out.rooms[r] = tier;
+        out.namedRooms.push(r);
+      }
+    }
+    for (const p2 of subj.parts) {
+      if (tier === "full") continue;
+      if (EXTERIOR_PARTS.includes(p2) && tier === "one_coat" && !COAT_WORDS.test(tierText)) continue;
+      out.parts[p2] = tier;
+    }
+    if (subj.parts.includes("ext_body") && tier === "one_coat" && COAT_WORDS.test(tierText) && /\b(?:outside|exterior|house)\b/i.test(tierText)) out.parts.ext_trim = "one_coat";
+    if (tier === "full" && subj.rooms.length + subj.generic > 0) out.colorChange = out.colorChange ?? "different";
+    if ((tier === "one_coat" || tier === "touch_up") && subj.rooms.length + subj.generic > 0 && out.colorChange !== "different") out.colorChange = "same";
+  };
+  for (let ci = 0; ci < clauses.length; ci++) {
+    const clause = clauses[ci];
+    const forRooms = clause.replace(/\bgarage doors?\b/gi, " ").replace(/\bstair(?:s|case|way)?\s*(?:rail(?:ing)?s?|banisters?)\b/gi, " ");
+    const rooms = extractRooms(forRooms);
+    const parts = partsIn(clause);
+    const generic = rooms.length === 0 ? genericRoomCount(clause) : 0;
+    const hasSubject = rooms.length + parts.length + generic > 0;
+    const tier = tierOf(clause);
+    if (hasSubject && tier) {
+      const subj = { rooms, parts, generic };
+      if (pendingSubjects && pendingAt === ci - 1) assign(pendingSubjects, tier, clause);
+      pendingSubjects = null;
+      assign(subj, tier, clause);
+      lastSubjects = subj;
+    } else if (hasSubject && !tier) {
+      pendingSubjects = { rooms, parts, generic };
+      pendingAt = ci;
+      lastSubjects = pendingSubjects;
+    } else if (!hasSubject && tier && lastSubjects && lastAt === ci - 1) {
+      assign(pendingSubjects ?? lastSubjects, tier, clause);
+      pendingSubjects = null;
+    } else {
+      pendingSubjects = null;
+    }
+    if (hasSubject) lastAt = ci;
+  }
+  if (!sawAny && /\b(?:one[\s-]coat|1[\s-]coat|single[\s-]coat|(?:quick |little )?refresh(?:er)?|freshen(?:ing)?(?: up)?)\b/i.test(text) && (projectType === "exterior" || /\b(?:exterior|outside|the house|my house|our house)\b/i.test(text)) && projectType !== "interior") {
+    out.parts.ext_body = "one_coat";
+    out.parts.ext_trim = "one_coat";
+    sawAny = true;
+    sawReal = true;
+  }
+  if (!sawAny) return null;
+  out.untreatedRooms = extractRooms(text.replace(/\bgarage\s+doors?\b/gi, " ")).filter((r) => !(r in out.rooms));
+  const withoutTouchUps = text.replace(/\btouch(?:ed|es|ing)?[\s-]?ups?\b/gi, " ");
+  out.touchUpOnly = sawTouchUp && !sawReal && !/\b(?:paint(?:ed|ing)?|repaint\w*|refinish\w*|stain\w*|new colou?r|different colou?r|a door|chairs?|dressers?|tables?|cabinets?|fence|deck)\b/i.test(withoutTouchUps);
+  return out;
+}
+function isTouchUpOnly(text) {
+  if (!TOUCH_UP.test(text)) return false;
+  const rest = text.replace(/\btouch(?:ed|es|ing)?[\s-]?ups?\b/gi, " ").replace(/\bspot[\s-]?(?:paint|painting|fix|fixes)\b/gi, " ");
+  return !/\b(?:paint(?:ed|ing)?|repaint\w*|refinish\w*|stain\w*|new colou?r|different colou?r|a door|doors?|chairs?|dressers?|tables?|cabinets?|fence|deck|ceilings?|exterior|outside|whole|entire|everything)\b/i.test(rest);
+}
+
+// src/lib/chatEstimator/jobParts.ts
+init_define_import_meta_env();
+var STAIR_RAIL = /\bstair(?:s|case|way)?\s*(?:rail(?:ing)?s?|banisters?|spindles?)\b|\bbanisters?\b|\bhand[\s-]?rails?\b/i;
+var OTHER_DOOR = /\b(?:front|entry|garage|exterior|outside|patio|sliding|screen|back|barn|french)\s+doors?\b/gi;
+var SOFFIT = /\bsoffits?\b|\beaves?\b/i;
+var FASCIA_OR_TRIM = /\bfascia\b|\b(?:exterior|outside)\s+trim\b/i;
+var ENTRY = /\b(?:front|entry)\s+door\b/i;
+var GARAGE_DOOR = /\bgarage\s+doors?\b/i;
+var FENCE = /\bfence\b/i;
+var DECK = /\bdeck\b/i;
+var BODY = /\bhouse exterior\b|\bexterior of (?:the|my|our) (?:whole )?house\b|\b(?:the )?whole (?:outside|exterior|house)\b|\bsiding\b|\bstucco\b|\boutside of (?:the|my|our) house\b|\b(?:paint|painting|repaint)\w* (?:the |my |our )?(?:whole )?house\b|\bexterior (?:paint|job|painting)\b/i;
+var INTENT = /\b(?:need|needs|want|wants|looking|would like|quote|get|have|paint(?:ed|ing)?|refinish|restain|redo|done|do)\b/i;
+var NUM_WORDS2 = { a: 1, an: 1, one: 1, two: 2, couple: 2, three: 3, few: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
+function interiorDoorCount(text) {
+  const t2 = text.replace(OTHER_DOOR, " ");
+  if (!/\bdoors?\b/i.test(t2)) return null;
+  const m2 = /\b(\d{1,2}|an?|one|two|couple of|couple|three|few|four|five|six|seven|eight|nine|ten)\s+(?:(?:interior|bedroom|closet|wood(?:en)?|paneled|old|new|bathroom|bi-?fold|pocket)\s+){0,2}doors?\b/i.exec(t2);
+  if (!m2) return /\binterior doors?\b/i.test(t2) ? 1 : null;
+  const w2 = m2[1].toLowerCase().replace(/ of$/, "");
+  return /^\d/.test(w2) ? parseInt(w2, 10) : NUM_WORDS2[w2] ?? 1;
+}
+function sidesOf(text) {
+  const m2 = /\b(?:just |only )?(one|1|two|2|three|3)\s+sides?\b/i.exec(text) ?? /\b(?:just |only )(?:the )?(?:front|back|left|right|north|south|east|west)(?: side)?(?: of the house)?\b/i.exec(text);
+  if (!m2) return null;
+  if (!m2[1]) return 1;
+  const w2 = m2[1].toLowerCase();
+  return w2 === "one" || w2 === "1" ? 1 : w2 === "two" || w2 === "2" ? 2 : 3;
+}
+function withoutRuledOut(text) {
+  return text.replace(/\b(?:not|no|without|except(?:\s+for)?|excluding|skip(?:ping)?|don'?t (?:need|want|do)(?: the)?|leave out|other than)\s+(?:the\s+|any\s+|my\s+)?[\w'-]+(?:\s*(?:,|or|and|nor)\s*(?:the\s+)?[\w'-]+){0,3}/gi, " ");
+}
+function readJobParts(rawText) {
+  const text = withoutRuledOut(rawText);
+  const forRooms = text.replace(/\bgarage\s+doors?\b/gi, " ").replace(/\b(?:bedroom|bathroom|closet|kitchen|pantry|living room|dining room)\s+(?:doors?|tables?|chairs?|stools?|sets?|cabinets?)\b/gi, " ").replace(/\b(?:dining|kitchen|patio|picnic|end|side|coffee|accent|console)\s+(?:tables?|chairs?)\b/gi, " ").replace(STAIR_RAIL, " ");
+  const items = INTENT.test(text) ? detectItems(text) : [];
+  return {
+    rooms: extractRooms(forRooms),
+    stairRail: STAIR_RAIL.test(text),
+    interiorDoors: interiorDoorCount(text),
+    entryDoor: ENTRY.test(text),
+    garageDoor: GARAGE_DOOR.test(text),
+    soffit: SOFFIT.test(text),
+    fasciaOrTrim: FASCIA_OR_TRIM.test(text),
+    fence: FENCE.test(text),
+    deck: DECK.test(text),
+    sides: sidesOf(text),
+    body: BODY.test(text),
+    items
+  };
+}
+function kindsOf(p2) {
+  const k = [];
+  if (p2.rooms.length > 0) k.push("rooms");
+  if (p2.stairRail) k.push("stairs");
+  if (p2.interiorDoors != null) k.push("interior_doors");
+  if (p2.entryDoor) k.push("entry_door");
+  if (p2.garageDoor) k.push("garage_door");
+  if (p2.soffit || p2.fasciaOrTrim) k.push("ext_trim");
+  if (p2.fence) k.push("fence");
+  if (p2.deck) k.push("deck");
+  if (p2.items.length > 0) k.push("items");
+  return k;
+}
+function reconcileJobParts(text, prev, opening) {
+  const parts = readJobParts(text);
+  const kinds = kindsOf(parts);
+  if (kinds.length < 2) return null;
+  const interior = parts.rooms.length > 0 || parts.stairRail || parts.interiorDoors != null;
+  const exterior = parts.entryDoor || parts.garageDoor || parts.soffit || parts.fasciaOrTrim || parts.fence || parts.deck;
+  const patch = {};
+  patch.projectType = interior && exterior ? "both" : interior ? "interior" : exterior ? "exterior" : prev.projectType;
+  patch.itemsOnly = false;
+  if (interior) {
+    if (parts.rooms.length > 0) {
+      patch.selectedRooms = [.../* @__PURE__ */ new Set([...prev.selectedRooms ?? [], ...parts.rooms])];
+      if (prev.interiorScope !== "whole_house") patch.interiorScope = "specific_rooms";
+      if (opening) patch.interiorWalls = "yes";
+    } else if (opening) {
+      patch.interiorWalls = "no";
+      patch.interiorCeilings = "no";
+      patch.interiorTrim = "no";
+      patch.surfacesAddressed = true;
+      patch.interiorScope = "";
+      patch.selectedRooms = [];
+    }
+    if (parts.stairRail) {
+      patch.stairways = "yes";
+      patch.stairwayDetails = "railings_only";
+    }
+    if (parts.interiorDoors != null) {
+      patch.interiorDoors = "some";
+      patch.doorsIncluded = true;
+      if (!prev.doorCount && parts.interiorDoors) patch.doorCount = parts.interiorDoors;
+    } else if (opening && parts.rooms.length === 0) {
+      patch.interiorDoors = "none";
+    }
+  }
+  if (exterior && !parts.body) {
+    if (opening) {
+      patch.exteriorPartsOnly = true;
+      patch.exteriorBody = "no";
+      patch.exteriorTrim = parts.fasciaOrTrim ? "yes" : "no";
+      patch.soffitsEaves = parts.soffit ? "yes" : "no";
+    } else {
+      if (parts.fasciaOrTrim) patch.exteriorTrim = "yes";
+      if (parts.soffit) patch.soffitsEaves = "yes";
+    }
+    if (parts.entryDoor) patch.entryDoor = "yes";
+    if (parts.garageDoor) patch.garageDoor = /\b(?:double|two[\s-]car|2[\s-]car|two)\b/i.test(text) ? "double" : "single";
+    if (parts.fence) patch.fence = "yes";
+    if (parts.deck) patch.deck = "yes";
+    if (parts.sides && (parts.soffit || parts.fasciaOrTrim)) patch.exteriorSides = parts.sides;
+  }
+  if (parts.items.length > 0 && (prev.furnitureItems ?? []).length === 0) {
+    const list = [];
+    for (const f of parts.items) for (let i2 = 0; i2 < Math.min(f.count ?? 1, 500); i2++) list.push(f.key);
+    patch.furnitureItems = list;
+    patch.furnitureUnspecified = false;
+    patch.furnitureCountKnown = parts.items.every((f) => f.count != null);
+    if (!prev.specialtyServices.includes("furniture")) patch.specialtyServices = [...prev.specialtyServices, "furniture"];
+  }
+  return patch;
+}
+
 // src/lib/chatEstimator/deckDetails.ts
 init_define_import_meta_env();
 var YES = /^\W*(?:yes|yeah|yep|yup|sure|please|definitely|absolutely|both|all of it|everything|that too|do it|of course)\b/;
@@ -25449,7 +25739,7 @@ async function processMessage(state, trimmed, customerId) {
     }
   }
   let touchUpNotice = "";
-  if (!state.ctx.touchUpNoticed && /\b(?:touch(?:ed|es|ing)?[\s-]?ups?|spot[\s-]?(?:paint|painting))\b/i.test(trimmed) && !/\b(?:re-?paint|fully|full|complete(?:ly)?|whole|entire|every|everything|new colou?r|different colou?r|change (?:the )?colou?r|exterior|outside|cabinets?|ceilings?)\b/i.test(trimmed)) {
+  if (!state.ctx.touchUpNoticed && !(state.ctx.roomTreatments && Object.values(state.ctx.roomTreatments).some((t2) => t2 !== "touch_up")) && isTouchUpOnly(trimmed)) {
     ctxWithExplicit.touchUpNoticed = true;
     touchUpNotice = "Heads-up: we don't really do touch-up-only jobs, so I'll price a full repaint of what you're painting. Just say so if that isn't what you're after.";
   }
@@ -25458,6 +25748,26 @@ async function processMessage(state, trimmed, customerId) {
     const note = "move-out / touch-up job";
     const current = ctxWithExplicit.additionalDetails ?? state.ctx.additionalDetails ?? "";
     if (!current.includes(note)) ctxWithExplicit.additionalDetails = `${current ? current + "; " : ""}${note}`;
+  }
+  let mixedPatch = null;
+  {
+    mixedPatch = reconcileJobParts(trimmed, { ...state.ctx, ...ctxWithExplicit }, state.askedIds.length === 0);
+    if (mixedPatch) Object.assign(ctxWithExplicit, mixedPatch);
+  }
+  {
+    const treat = extractTreatments(trimmed, ctxWithExplicit.selectedRooms ?? state.ctx.selectedRooms ?? [], ctxWithExplicit.projectType ?? state.ctx.projectType ?? "");
+    if (treat) {
+      if (Object.keys(treat.rooms).length > 0) {
+        ctxWithExplicit.roomTreatments = { ...state.ctx.roomTreatments ?? {}, ...treat.rooms };
+        if (state.ctx.interiorScope !== "whole_house") {
+          const joined = [.../* @__PURE__ */ new Set([...ctxWithExplicit.selectedRooms ?? state.ctx.selectedRooms ?? [], ...treat.namedRooms])];
+          ctxWithExplicit.selectedRooms = joined;
+          ctxWithExplicit.interiorScope = "specific_rooms";
+        }
+        if (treat.colorChange && !state.ctx.interiorColorChange && treat.untreatedRooms.length === 0) ctxWithExplicit.interiorColorChange = treat.colorChange;
+      }
+      if (Object.keys(treat.parts).length > 0) ctxWithExplicit.areaTreatments = { ...state.ctx.areaTreatments ?? {}, ...treat.parts };
+    }
   }
   for (const extra of detectExtras(trimmed)) {
     const current = ctxWithExplicit.additionalDetails ?? state.ctx.additionalDetails ?? "";
@@ -25727,6 +26037,7 @@ ${trimmed}`.trim();
     responseLengths
   };
   Object.assign(ctxNext, enforceExclusions(ctxNext));
+  if (mixedPatch) Object.assign(ctxNext, mixedPatch);
   if ((ctxNext.projectType === "interior" || ctxNext.projectType === "both") && ctxNext.interiorScope === "whole_house" && ctxNext.stories === 2 && ctxNext.stairways === "none") {
     ctxNext.stairways = "yes";
     ctxNext.stairwayDetails = ctxNext.stairwayDetails || "walls_only";
@@ -25755,7 +26066,7 @@ ${trimmed}`.trim();
     const negated = /\b(?:not|no|except|without|skip|don'?t need|doesn'?t need)\b[^.,;]{0,25}\b(?:siding|soffits?|fascia|eaves|gutters?|exterior|outside|interior|inside|ceilings?|baseboards?|bedrooms?|kitchen|bathrooms?)\b/.test(msg);
     if (bareBoth || otherSide && otherSide.test(msg) && !negated && !hasIntent(intent, "ask_clarification")) ctxNext.projectType = "both";
   }
-  if ((ctxNext.projectType === "exterior" || ctxNext.projectType === "both") && (ctxNext.exteriorTrim === "yes" || ctxNext.soffitsEaves === "yes")) {
+  if (!ctxNext.exteriorPartsOnly && (ctxNext.projectType === "exterior" || ctxNext.projectType === "both") && (ctxNext.exteriorTrim === "yes" || ctxNext.soffitsEaves === "yes")) {
     ctxNext.exteriorTrim = "yes";
     ctxNext.soffitsEaves = "yes";
   }
@@ -26161,7 +26472,7 @@ function lineItemNotes(ctx, lineItems) {
   return notes;
 }
 function reconcileContradictions(ctx) {
-  if (ctx.exteriorBody === "no" && (ctx.squareFeet != null || ctx.sidingType !== "" || ctx.stories != null)) {
+  if (ctx.exteriorBody === "no" && !ctx.exteriorPartsOnly && (ctx.squareFeet != null || ctx.sidingType !== "" || ctx.stories != null)) {
     return { ...ctx, exteriorBody: "yes" };
   }
   return ctx;
@@ -27180,6 +27491,75 @@ async function dismissAt(setup, topicWords, dismissal = "doesnt matter just want
   check('closets: "just 2, no shelves" is not asked about shelves again', c3.state.ctx.closetCount === 2 && !/have shelves|shelving that gets painted/i.test(c3.last), JSON.stringify([c3.state.ctx.closetCount, c3.last]));
   const style = await dismissAt(["I need the outside of my house painted", "it's our home", "stucco, 2 stories, 2400 sq ft"], /style is the house|standard style|Victorian, Tudor/i, "same color as now");
   check('house style: "same color as now" is not taken as an answer about the style', style.reached && style.after.houseStyle !== "average", JSON.stringify([style.reached, style.after.houseStyle, style.reply]));
+}
+{
+  const base = { ...makeInitialState().ctx, projectType: "interior", interiorScope: "specific_rooms", selectedRooms: ["bedroom_2", "bedroom_3", "bedroom_4"], interiorWalls: "yes", interiorCeilings: "no", interiorTrim: "no", interiorDoors: "none", zipCode: "92101", squareFeet: 1800, surfacesAddressed: true };
+  const walls = (c2) => calculateEstimate(c2).lineItems.find((l) => l.key === "walls").amount;
+  const colorLine = (c2) => calculateEstimate(c2).lineItems.find((l) => /Color Change/.test(l.description))?.amount ?? 0;
+  const full = { ...base, interiorColorChange: "different" };
+  const mixed = { ...full, roomTreatments: { bedroom_3: "one_coat", bedroom_4: "touch_up" } };
+  const same = { ...base, interiorColorChange: "same" };
+  const [w2, w3, w4] = ["bedroom_2", "bedroom_3", "bedroom_4"].map((k) => STANDARD_ROOMS[k].wallSqFt);
+  const expected = (w2 * 1 + w3 * 0.85 + w4 * 0.7) / (w2 + w3 + w4);
+  const ratio = walls(mixed) / walls(full);
+  check("coats: one room repainted, one same color, one touch up = 100%, 85% and 70% of their walls, weighted by room size", Math.abs(ratio - expected) < 2e-3, ratio + " vs " + expected);
+  check("coats: only the repainted room gets the new-color extra coat", Math.abs(colorLine(mixed) / colorLine(full) - w2 / (w2 + w3 + w4)) < 2e-3, String(colorLine(mixed) / colorLine(full)));
+  check("coats: a same-color job is one coat, 85% (not 50%)", Math.abs(walls(same) / walls(full) - 0.85) < 0.01 && colorLine(same) === 0, String(walls(same) / walls(full)));
+  const railing = { ...makeInitialState().ctx, projectType: "interior", interiorScope: "specific_rooms", selectedRooms: ["living_room"], stairways: "yes", stairwayDetails: "railings_only", zipCode: "92101", squareFeet: 1800, surfacesAddressed: true };
+  const stairs = (c2) => calculateEstimate(c2).lineItems.find((l) => l.key === "stairs").amount;
+  check('coats: "the railings only need a refresher" is 85% of the railing price', Math.abs(stairs({ ...railing, areaTreatments: { stairs: "one_coat" } }) / stairs(railing) - 0.85) < 0.01);
+  check("coats: touch ups on one part are 70%", Math.abs(stairs({ ...railing, areaTreatments: { stairs: "touch_up" } }) / stairs(railing) - 0.7) < 0.01);
+  const rental = { ...same, propertyType: "rental", occupancy: "vacant" };
+  check("coats: a vacant rental already has its turnover pricing, so the same color is not discounted twice", Math.abs(walls(rental) / walls({ ...rental, interiorColorChange: "different" }) - 1) < 0.01);
+  const r = await play(["I need my living room going to a new color, the bedroom in the same color, and a few touch ups in the hallway"]);
+  const tr = r.state.ctx.roomTreatments ?? {};
+  check("room by room: the living room is a repaint, the hallway a touch up, the bedroom one coat", tr.living_room === "full" && tr.hallway === "touch_up" && Object.entries(tr).some(([k, v]) => /bedroom/.test(k) && v === "one_coat"), JSON.stringify(tr));
+  check("room by room: the color question is not asked again as a blanket question", !/same color, or|matching the existing color|are you keeping the color/i.test(r.turns.join(" ")), r.turns.join(" | "));
+  const generic = await play(["one room repainted a different color, one room the same color, and touch ups in another room"]);
+  const gt = Object.values(generic.state.ctx.roomTreatments ?? {}).sort().join(",");
+  check('rooms said without names ("one room... another room") still get one tier each', gt === "full,one_coat,touch_up", gt + " " + generic.last);
+  const part = await play(["I have a living room and the stair railings, which only need a refresher"]);
+  check('"the stair railings only need a refresher" is one coat on the railings', part.state.ctx.areaTreatments?.stairs === "one_coat" && !part.state.ctx.roomTreatments?.living_room, JSON.stringify([part.state.ctx.areaTreatments, part.state.ctx.roomTreatments]));
+  const withTouch = await play(["paint my living room a new color and touch up the hallway"]);
+  check('touch ups next to real work get no "we do not do touch ups" warning', !/touch-up-only/i.test(withTouch.last) && withTouch.state.ctx.roomTreatments?.hallway === "touch_up", withTouch.last);
+  const onlyTouch = await play(["just touch up the scuffs in my hallway"]);
+  check("touch ups alone still get the warning", /touch-up-only/i.test(onlyTouch.last), onlyTouch.last);
+}
+{
+  const runToPrice = async (opening) => {
+    let state = (await play([opening])).state;
+    for (let i2 = 0; i2 < 50 && !state.finalEstimate; i2++) {
+      const last = state.history[state.history.length - 1].text.toLowerCase();
+      const reply = /zip/.test(last) ? "92101" : /how many|how long.*fence|feet/.test(last) ? "1" : /how big|size|dimensions/.test(last) ? "about 12 by 14" : /painted now|painted or stained|finish/.test(last) ? "painted" : /wood|material|made of/.test(last) ? "wood" : /when|timeline|anyone/.test(last) ? "next month" : "no";
+      state = (await play([reply], [], state)).state;
+    }
+    return state;
+  };
+  const lines = (st2) => st2.finalEstimate?.estimate.lineItems ?? [];
+  const mix = await runToPrice("I need a door, a chair and the soffit of just one side of my house painted");
+  const mk = lines(mix).map((l) => l.key ?? l.description);
+  check("a door, a chair and one side's soffit: the door, the chair and the soffit are all priced", lines(mix).some((l) => l.key === "doors") && lines(mix).some((l) => l.key === "furniture") && lines(mix).some((l) => l.key === "ext_trim"), mk.join(", "));
+  check("...and nothing that was not asked for (no inside walls, no siding)", !lines(mix).some((l) => l.key === "walls" || l.key === "ext_body"), mk.join(", "));
+  check("...the soffit is one side of the house, not all four", lines(mix).some((l) => l.key === "ext_trim" && /1 side of the house/.test(l.description)), lines(mix).map((l) => l.description).join(" | "));
+  const stairs = await runToPrice("I have a living room and some stair railings, and the stair railings only need a refresher");
+  check("a living room and stair railings that only need a refresher: the room and the railings are both priced", lines(stairs).some((l) => l.key === "walls") && lines(stairs).some((l) => l.key === "stairs"), lines(stairs).map((l) => l.key ?? l.description).join(", "));
+  check("...the railings at one coat (85%), the room at full price", lines(stairs).some((l) => l.key === "stairs" && /one-coat refresh/.test(l.description)) && lines(stairs).some((l) => l.key === "walls" && !/one coat|touch/i.test(l.description)), lines(stairs).map((l) => l.description).join(" | "));
+  const small = await runToPrice("looking to get a chair and an old dresser done");
+  check('two pieces of furniture with no paint verb ("get ... done") are a furniture job, priced as pieces', lines(small).some((l) => l.key === "furniture") && !lines(small).some((l) => l.key === "walls"), lines(small).map((l) => l.key ?? l.description).join(", "));
+  const doors = await runToPrice("I need a couple of interior doors and my front door done");
+  check("interior doors and the front door: both priced, no rooms asked about", lines(doors).some((l) => l.key === "doors") && lines(doors).some((l) => l.key === "entry_door") && !lines(doors).some((l) => l.key === "walls"), lines(doors).map((l) => l.key ?? l.description).join(", "));
+  const garage = await play(["I need one wooden chair, some touch ups in the bedroom and the garage door"]);
+  check('a garage door is not a room called "garage"', !(garage.state.ctx.selectedRooms ?? []).includes("garage"), JSON.stringify(garage.state.ctx.selectedRooms));
+  const ruled = await play(["I want my bedroom and the fence painted, not the siding or the eaves"]);
+  check('what the customer rules out ("not the siding or the eaves") is not a part of the job', ruled.state.ctx.soffitsEaves !== "yes", String(ruled.state.ctx.soffitsEaves));
+}
+{
+  const plain = await play(["I need the outside of my house painted, same color"]);
+  check("an exterior in the same color is still priced as a full job (no one-coat discount)", !plain.state.ctx.areaTreatments?.ext_body, JSON.stringify(plain.state.ctx.areaTreatments));
+  const one = await play(["I just want a one coat job on the outside of my house"]);
+  check('"a one coat job on the outside" is one coat on the body and trim', one.state.ctx.areaTreatments?.ext_body === "one_coat" && one.state.ctx.areaTreatments?.ext_trim === "one_coat", JSON.stringify(one.state.ctx.areaTreatments));
+  const trimOnly = await play(["the exterior trim of my house just needs a refresher"]);
+  check('"the exterior trim just needs a refresher" discounts only the trim', trimOnly.state.ctx.areaTreatments?.ext_trim === "one_coat" && !trimOnly.state.ctx.areaTreatments?.ext_body, JSON.stringify(trimOnly.state.ctx.areaTreatments));
 }
 setLLMReaderForTests(void 0);
 console.log(failures ? `

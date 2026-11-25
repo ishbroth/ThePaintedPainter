@@ -383,7 +383,7 @@ export function extractDetails(text: string, ctx: EstimatorContext, askedId: str
   const itemText = t.replace(/chair[\s-]*rails?/g, ' ');
   const patioSet = /\b(?:patio|outdoor|garden|deck)\s*(?:furniture|set|chairs?|table)|\bloungers?\b|\bchaise\b|\bwrought iron\b/.test(itemText);
   const askedItems = askedId === 'chair_count' || askedId === 'furniture_kind' || askedId === 'furniture_finish';
-  const paintVerb = /\b(?:paint(?:ed|ing)?|refinish(?:ed|ing)?|repaint(?:ed|ing)?|restain(?:ed|ing)?|re-stain(?:ed|ing)?|stain(?:ed|ing)?|spray(?:ed|ing)?|sand(?:ed|ing)?|strip(?:ped|ping)?|varnish(?:ed|ing)?)\b/.test(itemText);
+  const paintVerb = /\b(?:need|needs|want|wants|looking|would like|quote|get|done|have|paint(?:ed|ing)?|refinish(?:ed|ing)?|repaint(?:ed|ing)?|restain(?:ed|ing)?|re-stain(?:ed|ing)?|stain(?:ed|ing)?|spray(?:ed|ing)?|sand(?:ed|ing)?|strip(?:ped|ping)?|varnish(?:ed|ing)?)\b/.test(itemText);
   const bareNoun = itemText.trim().split(/\s+/).length <= 5;
   const found = detectItems(itemText);
   if (found.length > 0 && !patioSet && (paintVerb || askedItems || ctx.furnitureItems.length > 0 || ctx.furnitureUnspecified || (bareNoun && !ctx.projectType && ctx.selectedRooms.length === 0))) {

@@ -143,7 +143,7 @@ export function extractRooms(text: string): string[] {
     [/\blaundry\b|\bmud(?:room| room)\b/, 'laundry'],
     [/\bhall(?:way)?\b|\bcorridor\b/, 'hallway'],
     [/\bentry(?:way)?\b|\bfoyer\b/, 'entryway'],
-    [/\bgarage\b/, 'garage'],
+    [/\bgarage\b(?!\s+doors?)/, 'garage'],
   ];
   for (const [re, key] of map) {
     if (re.test(t) && !found.includes(key)) found.push(key);

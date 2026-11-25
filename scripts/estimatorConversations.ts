@@ -8,6 +8,7 @@ import { setLLMReaderForTests } from '../src/lib/chatEstimator/llmClient.ts';
 import type { Intent } from '../src/lib/chatEstimator/intents.ts';
 import type { EstimatorContext } from '../src/lib/types.ts';
 import { calculateEstimate } from '../src/lib/estimateEngine.ts';
+import { STANDARD_ROOMS } from '../src/lib/surfaceAreaEngine.ts';
 import { parseArea, parseCount, parseDimensionPair, parseFenceAnswer, parseLinearFeet } from '../src/lib/chatEstimator/details.ts';
 import { botRepeats, collectFriction, detectFriction } from '../src/lib/chatEstimator/selfCheck.ts';
 import { buildReport, scrub, setSelfReviewEnabled } from '../src/lib/chatEstimator/selfReview.ts';
@@ -951,6 +952,94 @@ async function dismissAt(setup: string[], topicWords: RegExp, dismissal = 'doesn
 
   const style = await dismissAt(['I need the outside of my house painted', "it's our home", 'stucco, 2 stories, 2400 sq ft'], /style is the house|standard style|Victorian, Tudor/i, 'same color as now');
   check('house style: "same color as now" is not taken as an answer about the style', style.reached && style.after.houseStyle !== 'average', JSON.stringify([style.reached, style.after.houseStyle, style.reply]));
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------------
+// Coats: a repaint 100%, one coat (same color / a refresher) 85%, touch ups 70%
+// ---------------------------------------------------------------------------------------------------------------------------------
+{
+  const base = { ...makeInitialState().ctx, projectType: 'interior', interiorScope: 'specific_rooms', selectedRooms: ['bedroom_2', 'bedroom_3', 'bedroom_4'], interiorWalls: 'yes', interiorCeilings: 'no', interiorTrim: 'no', interiorDoors: 'none', zipCode: '92101', squareFeet: 1800, surfacesAddressed: true } as EstimatorContext;
+  const walls = (c: EstimatorContext) => calculateEstimate(c).lineItems.find((l) => l.key === 'walls')!.amount;
+  const colorLine = (c: EstimatorContext) => calculateEstimate(c).lineItems.find((l) => /Color Change/.test(l.description))?.amount ?? 0;
+  const full = { ...base, interiorColorChange: 'different' } as EstimatorContext;
+  const mixed = { ...full, roomTreatments: { bedroom_3: 'one_coat', bedroom_4: 'touch_up' } } as EstimatorContext;
+  const same = { ...base, interiorColorChange: 'same' } as EstimatorContext;
+  const [w2, w3, w4] = ['bedroom_2', 'bedroom_3', 'bedroom_4'].map((k) => STANDARD_ROOMS[k].wallSqFt);
+  const expected = (w2 * 1 + w3 * 0.85 + w4 * 0.7) / (w2 + w3 + w4);
+  const ratio = walls(mixed) / walls(full);
+  check('coats: one room repainted, one same color, one touch up = 100%, 85% and 70% of their walls, weighted by room size', Math.abs(ratio - expected) < 0.002, ratio + ' vs ' + expected);
+  check('coats: only the repainted room gets the new-color extra coat', Math.abs(colorLine(mixed) / colorLine(full) - w2 / (w2 + w3 + w4)) < 0.002, String(colorLine(mixed) / colorLine(full)));
+  check('coats: a same-color job is one coat, 85% (not 50%)', Math.abs(walls(same) / walls(full) - 0.85) < 0.01 && colorLine(same) === 0, String(walls(same) / walls(full)));
+  const railing = { ...makeInitialState().ctx, projectType: 'interior', interiorScope: 'specific_rooms', selectedRooms: ['living_room'], stairways: 'yes', stairwayDetails: 'railings_only', zipCode: '92101', squareFeet: 1800, surfacesAddressed: true } as EstimatorContext;
+  const stairs = (c: EstimatorContext) => calculateEstimate(c).lineItems.find((l) => l.key === 'stairs')!.amount;
+  check('coats: "the railings only need a refresher" is 85% of the railing price', Math.abs(stairs({ ...railing, areaTreatments: { stairs: 'one_coat' } } as EstimatorContext) / stairs(railing) - 0.85) < 0.01);
+  check('coats: touch ups on one part are 70%', Math.abs(stairs({ ...railing, areaTreatments: { stairs: 'touch_up' } } as EstimatorContext) / stairs(railing) - 0.7) < 0.01);
+  const rental = { ...same, propertyType: 'rental', occupancy: 'vacant' } as EstimatorContext;
+  check('coats: a vacant rental already has its turnover pricing, so the same color is not discounted twice', Math.abs(walls(rental) / walls({ ...rental, interiorColorChange: 'different' } as EstimatorContext) - 1) < 0.01);
+
+  // said room by room
+  const r = await play(['I need my living room going to a new color, the bedroom in the same color, and a few touch ups in the hallway']);
+  const tr = r.state.ctx.roomTreatments ?? {};
+  check('room by room: the living room is a repaint, the hallway a touch up, the bedroom one coat', tr.living_room === 'full' && tr.hallway === 'touch_up' && Object.entries(tr).some(([k, v]) => /bedroom/.test(k) && v === 'one_coat'), JSON.stringify(tr));
+  check('room by room: the color question is not asked again as a blanket question', !/same color, or|matching the existing color|are you keeping the color/i.test(r.turns.join(' ')), r.turns.join(' | '));
+  const generic = await play(['one room repainted a different color, one room the same color, and touch ups in another room']);
+  const gt = Object.values(generic.state.ctx.roomTreatments ?? {}).sort().join(',');
+  check('rooms said without names ("one room... another room") still get one tier each', gt === 'full,one_coat,touch_up', gt + ' ' + generic.last);
+  const part = await play(['I have a living room and the stair railings, which only need a refresher']);
+  check('"the stair railings only need a refresher" is one coat on the railings', part.state.ctx.areaTreatments?.stairs === 'one_coat' && !part.state.ctx.roomTreatments?.living_room, JSON.stringify([part.state.ctx.areaTreatments, part.state.ctx.roomTreatments]));
+  const withTouch = await play(['paint my living room a new color and touch up the hallway']);
+  check('touch ups next to real work get no "we do not do touch ups" warning', !/touch-up-only/i.test(withTouch.last) && withTouch.state.ctx.roomTreatments?.hallway === 'touch_up', withTouch.last);
+  const onlyTouch = await play(['just touch up the scuffs in my hallway']);
+  check('touch ups alone still get the warning', /touch-up-only/i.test(onlyTouch.last), onlyTouch.last);
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------------
+// Jobs made of several different things: only what was named is priced, each part is priced, and the coats apply part by part
+// ---------------------------------------------------------------------------------------------------------------------------------
+{
+  /** Plays a job to the price with generic answers: the zip, small counts, a size, and "no" to the rest. */
+  const runToPrice = async (opening: string) => {
+    let state = (await play([opening])).state;
+    for (let i = 0; i < 50 && !state.finalEstimate; i++) {
+      const last = state.history[state.history.length - 1].text.toLowerCase();
+      const reply = /zip/.test(last) ? '92101' : /how many|how long.*fence|feet/.test(last) ? '1' : /how big|size|dimensions/.test(last) ? 'about 12 by 14' : /painted now|painted or stained|finish/.test(last) ? 'painted' : /wood|material|made of/.test(last) ? 'wood' : /when|timeline|anyone/.test(last) ? 'next month' : 'no';
+      state = (await play([reply], [], state)).state;
+    }
+    return state;
+  };
+  const lines = (st: ChatState) => st.finalEstimate?.estimate.lineItems ?? [];
+
+  const mix = await runToPrice('I need a door, a chair and the soffit of just one side of my house painted');
+  const mk = lines(mix).map((l) => l.key ?? l.description);
+  check('a door, a chair and one side\'s soffit: the door, the chair and the soffit are all priced', lines(mix).some((l) => l.key === 'doors') && lines(mix).some((l) => l.key === 'furniture') && lines(mix).some((l) => l.key === 'ext_trim'), mk.join(', '));
+  check('...and nothing that was not asked for (no inside walls, no siding)', !lines(mix).some((l) => l.key === 'walls' || l.key === 'ext_body'), mk.join(', '));
+  check('...the soffit is one side of the house, not all four', lines(mix).some((l) => l.key === 'ext_trim' && /1 side of the house/.test(l.description)), lines(mix).map((l) => l.description).join(' | '));
+
+  const stairs = await runToPrice('I have a living room and some stair railings, and the stair railings only need a refresher');
+  check('a living room and stair railings that only need a refresher: the room and the railings are both priced', lines(stairs).some((l) => l.key === 'walls') && lines(stairs).some((l) => l.key === 'stairs'), lines(stairs).map((l) => l.key ?? l.description).join(', '));
+  check('...the railings at one coat (85%), the room at full price', lines(stairs).some((l) => l.key === 'stairs' && /one-coat refresh/.test(l.description)) && lines(stairs).some((l) => l.key === 'walls' && !/one coat|touch/i.test(l.description)), lines(stairs).map((l) => l.description).join(' | '));
+
+  const small = await runToPrice('looking to get a chair and an old dresser done');
+  check('two pieces of furniture with no paint verb ("get ... done") are a furniture job, priced as pieces', lines(small).some((l) => l.key === 'furniture') && !lines(small).some((l) => l.key === 'walls'), lines(small).map((l) => l.key ?? l.description).join(', '));
+
+  const doors = await runToPrice('I need a couple of interior doors and my front door done');
+  check('interior doors and the front door: both priced, no rooms asked about', lines(doors).some((l) => l.key === 'doors') && lines(doors).some((l) => l.key === 'entry_door') && !lines(doors).some((l) => l.key === 'walls'), lines(doors).map((l) => l.key ?? l.description).join(', '));
+
+  const garage = await play(['I need one wooden chair, some touch ups in the bedroom and the garage door']);
+  check('a garage door is not a room called "garage"', !(garage.state.ctx.selectedRooms ?? []).includes('garage'), JSON.stringify(garage.state.ctx.selectedRooms));
+
+  const ruled = await play(['I want my bedroom and the fence painted, not the siding or the eaves']);
+  check('what the customer rules out ("not the siding or the eaves") is not a part of the job', ruled.state.ctx.soffitsEaves !== 'yes', String(ruled.state.ctx.soffitsEaves));
+}
+
+// Exteriors stay at full price unless one coat or a refresher is specifically asked for
+{
+  const plain = await play(['I need the outside of my house painted, same color']);
+  check('an exterior in the same color is still priced as a full job (no one-coat discount)', !plain.state.ctx.areaTreatments?.ext_body, JSON.stringify(plain.state.ctx.areaTreatments));
+  const one = await play(['I just want a one coat job on the outside of my house']);
+  check('"a one coat job on the outside" is one coat on the body and trim', one.state.ctx.areaTreatments?.ext_body === 'one_coat' && one.state.ctx.areaTreatments?.ext_trim === 'one_coat', JSON.stringify(one.state.ctx.areaTreatments));
+  const trimOnly = await play(['the exterior trim of my house just needs a refresher']);
+  check('"the exterior trim just needs a refresher" discounts only the trim', trimOnly.state.ctx.areaTreatments?.ext_trim === 'one_coat' && !trimOnly.state.ctx.areaTreatments?.ext_body, JSON.stringify(trimOnly.state.ctx.areaTreatments));
 }
 
 setLLMReaderForTests(undefined);

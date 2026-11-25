@@ -44,3 +44,8 @@ reserved `.invalid` domain; `send-email` skips those addresses.
   with side questions, tangents and vague answers; it flags ignored questions, paint questions before scope, plural bugs, dead ends). Customer questions (paint supply,
   duration, licensing, furniture, warranty, cost) are answered in `chatEstimator/faq.ts` and then the pending question is repeated. The paint line is ONE
   question (`paint_brand`, asked after the job itself) that settles brand, grade and finish; a customer who names a brand first is not asked again.
+- Coats: a surface that gets ONE coat (same color going back on, or a refresher) is ~85% of a repaint (`ONE_COAT_FACTOR`), spot touch ups next to real work ~70% (`TOUCH_UP_FACTOR`),
+  both in `estimateEngine.ts`. Said room by room it is `ctx.roomTreatments` (blended by wall area in `interiorTreatmentBlend`), said for a part it is `ctx.areaTreatments` (by price-line key).
+  Exteriors stay 100% unless one coat/a refresher is asked for outright ("same color" does not count outside). There is no touch-up tier: a touch-up-ONLY request is told we don't do that.
+  Readers: `chatEstimator/treatments.ts` (tiers) and `chatEstimator/jobParts.ts` (a request that names 2+ kinds of work gets one consistent scope: only what was named is priced).
+  `npm run sim:combos -- <count> <seed>` plays mixed jobs (a door, a chair and one side's soffit; a room plus stair railings...) and flags dropped or invented parts.

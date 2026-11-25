@@ -79,6 +79,16 @@ function pick<T>(variants: T[], seedStr: string): T {
   return variants[h % variants.length];
 }
 
+/**
+ * A job with several things in it ("the front door, a fence and a dresser") would otherwise be interviewed about every one of them in full: six or
+ * seven questions each. When three or more items are in the job each is asked its first three questions that apply (the ones that move the price most
+ * come first in every spec), with two items its first four; one item gets its whole interview. The questions left out simply take the usual case.
+ */
+function questionBudget(c: EstimatorContext): number {
+  const n = SPECS.filter((sp) => sp.present(c)).length;
+  return n >= 3 ? 3 : n === 2 ? 4 : Infinity;
+}
+
 /** The topics for every item question, in the shape topics.ts uses. */
 export function itemTopics(): Topic[] {
   const topics: Topic[] = [];
@@ -88,7 +98,14 @@ export function itemTopics(): Topic[] {
       topics.push({
         id,
         priority: spec.priority + i * 0.001,
-        relevant: (c) => spec.present(c) && (!q.when || q.when(c, answersFor(c, spec.key))),
+        relevant: (c) => {
+          if (!spec.present(c) || (q.when && !q.when(c, answersFor(c, spec.key)))) return false;
+          const budget = questionBudget(c);
+          if (budget === Infinity) return true;
+          const answers = answersFor(c, spec.key);
+          const askable = spec.questions.filter((x) => !x.when || x.when(c, answers));
+          return askable.indexOf(q) < budget;
+        },
         alreadyAnswered: (c) => (c.itemAnswers ?? {})[`${spec.key}.${q.key}`] != null || (c.extAnswered ?? []).includes(id),
         ask: (c) => pick(q.ask, seedOf(c)),
         clarify: () => q.clarify,

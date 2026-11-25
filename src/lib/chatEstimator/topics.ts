@@ -75,7 +75,7 @@ const hasTiming = (c: EstimatorContext) => !!(c.timeline || c.startDate || c.end
 const isNarrowInteriorJob = (c: EstimatorContext) =>
   c.interiorWalls === 'no' &&
   c.surfacesAddressed &&
-  (isIsolatedDetailJob(c) || c.specialtyServices.includes('fireplace') || c.specialtyServices.includes('epoxy') || c.closets !== 'none' || c.furnitureItems.length > 0 || c.stairwayDetails === 'railings_only' || c.cabinets !== 'none' || c.trimLinearFeet != null || c.popcornCeilingSqft != null || c.prepWork.includes('popcorn_removal') || c.interiorTrim === 'yes' || c.interiorCeilings === 'yes');
+  (isIsolatedDetailJob(c) || c.specialtyServices.includes('fireplace') || c.specialtyServices.includes('epoxy') || c.closets !== 'none' || c.furnitureItems.length > 0 || c.stairwayDetails === 'railings_only' || c.doorsIncluded === true || c.cabinets !== 'none' || c.trimLinearFeet != null || c.popcornCeilingSqft != null || c.prepWork.includes('popcorn_removal') || c.interiorTrim === 'yes' || c.interiorCeilings === 'yes');
 
 /** The small trim details a stand-alone detail job is about, in words ("chair rail and crown moulding"). */
 function detailLabel(c: EstimatorContext): string {

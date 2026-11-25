@@ -14,6 +14,7 @@
     "lint": "eslint .",
     "check:messaging": "npx --yes esbuild scripts/jobMessagingChecks.ts --bundle --platform=node --format=esm --log-level=error --outfile=_sim/jobMessagingChecks.mjs && node _sim/jobMessagingChecks.mjs",
     "sim:estimator": "npx --yes esbuild scripts/estimatorSim.ts --bundle --platform=node --format=esm --define:import.meta.env={} --log-level=error --outfile=_sim/estimatorSim.mjs && node _sim/estimatorSim.mjs",
+    "sim:combos": "npx --yes esbuild scripts/estimatorCombos.ts --bundle --platform=node --format=esm --define:import.meta.env={} --log-level=error --outfile=_sim/estimatorCombos.mjs && node _sim/estimatorCombos.mjs",
     "check:estimator": "npx --yes esbuild scripts/estimatorConversations.ts --bundle --platform=node --format=esm --define:import.meta.env={} --log-level=error --outfile=_sim/estimatorConversations.mjs && node _sim/estimatorConversations.mjs",
     "seed:demo": "npx --yes tsx supabase/seed/seedDemoPainters.ts",
     "prerender:painters": "npx --yes tsx scripts/prerenderPainterPages.ts",

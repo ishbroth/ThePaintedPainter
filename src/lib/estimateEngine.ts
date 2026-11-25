@@ -43,6 +43,44 @@ export function repeatUnitFactor(units: number): number {
   return units >= 50 ? 0.33 : units >= 25 ? 0.44 : units >= 10 ? 0.55 : units >= 4 ? 0.70 : units >= 2 ? 0.88 : 1;
 }
 
+/**
+ * Coats. A second coat takes only a fraction of the time once a surface has been prepped and coated, so a surface that gets ONE coat (the same color
+ * going back on, or a refresher) is about 85% of the work and price of a full repaint, not 50%; spot work (a few touch ups next to real work) about 70%.
+ * Exteriors stay at 100% unless the customer is specifically asking for a one-coat or refresher job.
+ */
+export const ONE_COAT_FACTOR = 0.85;
+export const TOUCH_UP_FACTOR = 0.7;
+const TIER_FACTOR = { full: 1, one_coat: ONE_COAT_FACTOR, touch_up: TOUCH_UP_FACTOR } as const;
+
+/**
+ * The share of the interior wall (or ceiling) area at each tier, from what the customer said room by room and the job's overall color answer
+ * for every room they did not mention. A same-color job is a one-coat job; a vacant rental already carries its own turnover pricing, so it is
+ * not discounted twice.
+ */
+export function interiorTreatmentBlend(ctx: EstimatorContext, rooms: string[], surface: 'wall' | 'ceiling'): { factor: number; fullShare: number; oneCoat: boolean; touchUp: boolean } {
+  const turnover = ctx.propertyType === 'rental' && ctx.occupancy === 'vacant';
+  const fallback: 'full' | 'one_coat' = ctx.interiorColorChange === 'same' && !turnover ? 'one_coat' : 'full';
+  const treatments = ctx.roomTreatments ?? {};
+  let total = 0;
+  let weighted = 0;
+  let full = 0;
+  let oneCoat = false;
+  let touchUp = false;
+  for (const r of rooms) {
+    const spec = STANDARD_ROOMS[r];
+    const area = spec ? (surface === 'wall' ? spec.wallSqFt : spec.ceilingSqFt) : 0;
+    if (area <= 0) continue;
+    const tier = treatments[r] ?? fallback;
+    total += area;
+    weighted += area * TIER_FACTOR[tier];
+    if (tier === 'full') full += area;
+    else if (tier === 'one_coat') oneCoat = true;
+    else touchUp = true;
+  }
+  if (total === 0) return { factor: TIER_FACTOR[fallback], fullShare: fallback === 'full' ? 1 : 0, oneCoat: fallback === 'one_coat', touchUp: false };
+  return { factor: weighted / total, fullShare: full / total, oneCoat, touchUp };
+}
+
 /** Gutters that are not being painted still have to be masked and cut around along the whole roofline: this share of what painting them would cost (the labor part). */
 const GUTTER_MASKING_SHARE = 0.4;
 
@@ -98,10 +136,13 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
       // two-coat color change — the base wall rate assumes a standard
       // repaint, so give same-color jobs a modest efficiency discount
       // instead of charging identically to a real color change.
-      const colorEfficiency = ctx.interiorColorChange === 'same' ? 0.92 : 1.0;
+      // (the blend: 100% for a repaint, 85% for the same color or a refresher, 70% for touch ups, room by room)
+      const wallBlend = interiorTreatmentBlend(ctx, layout.rooms, 'wall');
+      const colorEfficiency = wallBlend.factor;
+      const treatmentNote = wallBlend.oneCoat || wallBlend.touchUp ? ` (${[wallBlend.oneCoat ? 'same-color rooms, one coat' : '', wallBlend.touchUp ? 'touch-up rooms' : ''].filter(Boolean).join(', ')})` : '';
       lineItems.push({
         category: 'Interior',
-        description: `Interior Walls${heightNote}`,
+        description: `Interior Walls${heightNote}${treatmentNote}`,
         amount: effectiveWallSqFt * wallRate * textureMultiplier * colorEfficiency * regionalMult * conditionMultiplier * volEff * tallWallFactor,
         key: 'walls',
       });
@@ -129,7 +170,7 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
       lineItems.push({
         category: 'Interior',
         description: `Ceilings${heightNote}`,
-        amount: ceilingSqFt * ceilingRate * regionalMult * volEff * (ctx.ceilingType === 'vaulted' ? 1 : 1 + (tallCeilingFactor - 1) * tallShare),
+        amount: ceilingSqFt * ceilingRate * regionalMult * volEff * (ctx.ceilingType === 'vaulted' ? 1 : 1 + (tallCeilingFactor - 1) * tallShare) * interiorTreatmentBlend(ctx, layout.rooms, 'ceiling').factor,
         key: 'ceilings',
       });
       // A ceiling going to a new color (or dark to light) needs an extra coat even when the walls stay the same color.
@@ -473,8 +514,10 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
         (ctx.colorChangeScope === 'most_of_house' || ctx.colorChangeScope === 'some_rooms') && excluded > 0
           ? Math.max(0, (totalRooms - excluded) / totalRooms)
           : 1; // whole_house, multiple_colors, or unset (default assumption)
+      // said room by room: only the rooms that are being repainted (not the same-color or touch-up ones) get the extra coat
+      const treatedShare = ctx.roomTreatments && Object.keys(ctx.roomTreatments).length > 0 ? interiorTreatmentBlend(ctx, layout.rooms, 'wall').fullShare : 1;
       // the same extra-coat allowance as the outside (a plain color change); dark-to-light has its own, larger multiplier
-      const extraCoatSqFt = effectiveWallSqFt * (LABOR_COMPLEXITY.different_color - 1) * scopeFraction;
+      const extraCoatSqFt = effectiveWallSqFt * (LABOR_COMPLEXITY.different_color - 1) * scopeFraction * treatedShare;
       lineItems.push({
         category: 'Interior',
         description: excluded > 0
@@ -614,8 +657,8 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
       const trimMaterialNote = ctx.trimMaterial === 'aluminum' || ctx.trimMaterial === 'vinyl' ? ' (aluminum/vinyl trim)' : ctx.trimMaterial === 'wood' ? ' (wood trim)' : '';
       lineItems.push({
         category: 'Exterior',
-        description: `Trim, Fascia, Soffits & Eaves${ctx.houseStyle === 'ornate' ? ' (detailed architectural style)' : ''}${trimMaterialNote}`,
-        amount: (trimPart + soffitPart) * regionalMult * houseStyleFactor * trimMaterialFactor,
+        description: `Trim, Fascia, Soffits & Eaves${ctx.houseStyle === 'ornate' ? ' (detailed architectural style)' : ''}${trimMaterialNote}${ctx.exteriorSides && ctx.exteriorSides < 4 ? ` (${ctx.exteriorSides} side${ctx.exteriorSides === 1 ? '' : 's'} of the house)` : ''}`,
+        amount: (trimPart + soffitPart) * regionalMult * houseStyleFactor * trimMaterialFactor * (ctx.exteriorSides && ctx.exteriorSides < 4 ? ctx.exteriorSides / 4 : 1),
         key: 'ext_trim',
       });
     }
@@ -995,6 +1038,13 @@ export function calculateEstimate(ctx: EstimatorContext): EstimateBreakdown {
   // ===== SUBTOTAL =====
   // What the customer said about each item (railing material and finish, fence sides, door style...) scales that item's price line
   lineItems.splice(0, lineItems.length, ...applyItemAnswers(lineItems, ctx, regionalMult));
+  // One-coat refreshers and touch ups said for a particular part ("the railings only need a refresher", "the exterior trim just needs freshening")
+  for (const [key, tier] of Object.entries(ctx.areaTreatments ?? {})) {
+    for (let i = 0; i < lineItems.length; i++) {
+      if (lineItems[i].key !== key) continue;
+      lineItems[i] = { ...lineItems[i], amount: lineItems[i].amount * TIER_FACTOR[tier], description: `${lineItems[i].description} (${tier === 'one_coat' ? 'one-coat refresh' : 'touch-up'})` };
+    }
+  }
 
   let subtotal = lineItems.reduce((sum, item) => sum + item.amount, 0);
   // A painter won't mobilize for less than a minimum job fee, however small the item.

@@ -38,6 +38,18 @@ export interface EstimatorContext {
   doorsIncluded?: boolean;
   /** A move-out or deposit touch-up ("touch up my rental before I move out"): no suggestions to add ceilings, baseboards or doors. */
   touchUpOnly?: boolean;
+  /**
+   * How much work each interior room needs, when the customer says it room by room ("the living room going gray, the bedroom the same color,
+   * a few touch ups in the hall"): full = a repaint (100%), one_coat = same color / a refresher, one coat after the prep (85%), touch_up = spot
+   * work (70%). Rooms not listed take the job's overall color answer.
+   */
+  roomTreatments?: Record<string, 'full' | 'one_coat' | 'touch_up'>;
+  /** The same for one priced item or part (keyed by its price-line key: stairs, ext_trim, ceilings, trim, doors...): "the railings just need a refresher". */
+  areaTreatments?: Record<string, 'one_coat' | 'touch_up'>;
+  /** Only part of the outside: how many sides of the house ("just the soffit on one side" = 1). Scales the trim, fascia and soffit line (and the body, if painted). */
+  exteriorSides?: number;
+  /** The customer named only some parts of the outside (a soffit, a door, a fence): the siding is not in the job even once the house's size or stories are known. */
+  exteriorPartsOnly?: boolean;
   /** The customer was told we don't do touch-up-only jobs (said once). */
   touchUpNoticed?: boolean;
   /** The customer has said what the ceiling height is (including "standard"), so it is not asked again. */

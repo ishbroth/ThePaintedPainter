@@ -47,6 +47,8 @@ import { extractDetails, DETAIL_TOPIC_IDS } from './details';
 import { GREETING_TEXT } from '../greeting';
 import { detectExtras } from './extras';
 import { faqAnswer } from './faq';
+import { extractTreatments, isTouchUpOnly } from './treatments';
+import { reconcileJobParts } from './jobParts';
 import { friendlyDate } from './dateParsing';
 import { readDeckDetails, isDeckTalk } from './deckDetails';
 import { readItemAnswers } from './itemInterviews';
@@ -772,7 +774,7 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
   // painted. Said once, then the estimate carries on as a full repaint of what they named. ("Touch up" next to a repaint, a color change or other real
   // work is a normal job, and says nothing.)
   let touchUpNotice = '';
-  if (!state.ctx.touchUpNoticed && /\b(?:touch(?:ed|es|ing)?[\s-]?ups?|spot[\s-]?(?:paint|painting))\b/i.test(trimmed) && !/\b(?:re-?paint|fully|full|complete(?:ly)?|whole|entire|every|everything|new colou?r|different colou?r|change (?:the )?colou?r|exterior|outside|cabinets?|ceilings?)\b/i.test(trimmed)) {
+  if (!state.ctx.touchUpNoticed && !(state.ctx.roomTreatments && Object.values(state.ctx.roomTreatments).some((t) => t !== 'touch_up')) && isTouchUpOnly(trimmed)) {
     ctxWithExplicit.touchUpNoticed = true;
     touchUpNotice = "Heads-up: we don't really do touch-up-only jobs, so I'll price a full repaint of what you're painting. Just say so if that isn't what you're after.";
   }
@@ -781,6 +783,31 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
     const note = 'move-out / touch-up job';
     const current = ctxWithExplicit.additionalDetails ?? state.ctx.additionalDetails ?? '';
     if (!current.includes(note)) ctxWithExplicit.additionalDetails = `${current ? current + '; ' : ''}${note}`;
+  }
+  let mixedPatch: Partial<EstimatorContext> | null = null;
+  // A request that names several different kinds of work ("a door, a chair and the soffit on one side of my house") gets one consistent scope: only what was
+  // named is priced, whatever kind of job each part would be on its own (see jobParts.ts).
+  {
+    mixedPatch = reconcileJobParts(trimmed, { ...state.ctx, ...ctxWithExplicit } as EstimatorContext, state.askedIds.length === 0);
+    if (mixedPatch) Object.assign(ctxWithExplicit, mixedPatch);
+  }
+  // How much work each part needs, said part by part ("living room going gray, bedroom the same color, a few touch ups in the hall", "the
+  // railings only need a refresher"): one coat is about 85% of a repaint, touch ups about 70% (see treatments.ts and the engine's coat factors).
+  {
+    const treat = extractTreatments(trimmed, ctxWithExplicit.selectedRooms ?? state.ctx.selectedRooms ?? [], ctxWithExplicit.projectType ?? state.ctx.projectType ?? '');
+    if (treat) {
+      if (Object.keys(treat.rooms).length > 0) {
+        ctxWithExplicit.roomTreatments = { ...(state.ctx.roomTreatments ?? {}), ...treat.rooms };
+        if (state.ctx.interiorScope !== 'whole_house') {
+          const joined = [...new Set([...(ctxWithExplicit.selectedRooms ?? state.ctx.selectedRooms ?? []), ...treat.namedRooms])];
+          ctxWithExplicit.selectedRooms = joined;
+          ctxWithExplicit.interiorScope = 'specific_rooms';
+        }
+        // (only when every room named has its own answer: a room named with no treatment still needs the same-color-or-new question)
+        if (treat.colorChange && !state.ctx.interiorColorChange && treat.untreatedRooms.length === 0) ctxWithExplicit.interiorColorChange = treat.colorChange;
+      }
+      if (Object.keys(treat.parts).length > 0) ctxWithExplicit.areaTreatments = { ...(state.ctx.areaTreatments ?? {}), ...treat.parts };
+    }
   }
   // Small items named in passing ("no, but I have one shelf in the kitchen I need painted"): written into the notes the painters see and
   // acknowledged, whatever question is pending. This never changes which question comes next.
@@ -1084,6 +1111,8 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
   // Whatever the customer ruled out stays out, whatever a reading, a default or a later step put back: the questions that depend on it
   // (painted before? bare or stained? how many?) then drop out by themselves, because the thing is no longer in the job.
   Object.assign(ctxNext, enforceExclusions(ctxNext));
+  // ...and so does the scope of a request that named several different things (the readings above must not widen it again)
+  if (mixedPatch) Object.assign(ctxNext, mixedPatch);
 
   // A two-story whole-house interior job has a stairwell to paint — tall walls, usually a railing — unless the customer
   // says otherwise later. Defaulted in, the same way trim/fascia/eaves default in together on an exterior job.
@@ -1138,7 +1167,7 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
   }
 
   // Trim, fascia, soffits and eaves are one item on an outside job: either one named brings the other.
-  if ((ctxNext.projectType === 'exterior' || ctxNext.projectType === 'both') && (ctxNext.exteriorTrim === 'yes' || ctxNext.soffitsEaves === 'yes')) {
+  if (!ctxNext.exteriorPartsOnly && (ctxNext.projectType === 'exterior' || ctxNext.projectType === 'both') && (ctxNext.exteriorTrim === 'yes' || ctxNext.soffitsEaves === 'yes')) {
     ctxNext.exteriorTrim = 'yes';
     ctxNext.soffitsEaves = 'yes';
   }
@@ -1774,7 +1803,7 @@ function lineItemNotes(ctx: EstimatorContext, lineItems: EstimateLineItem[]): st
  * count already given can never actually be "no house body" — if it somehow got marked that way, undo it.
  */
 function reconcileContradictions(ctx: EstimatorContext): EstimatorContext {
-  if (ctx.exteriorBody === 'no' && (ctx.squareFeet != null || ctx.sidingType !== '' || ctx.stories != null)) {
+  if (ctx.exteriorBody === 'no' && !ctx.exteriorPartsOnly && (ctx.squareFeet != null || ctx.sidingType !== '' || ctx.stories != null)) {
     return { ...ctx, exteriorBody: 'yes' };
   }
   return ctx;
