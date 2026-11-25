@@ -768,6 +768,14 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
       ctxWithExplicit.additionalDetails = `${ctxWithExplicit.additionalDetails ? ctxWithExplicit.additionalDetails + '; ' : ''}customer note: ${trimmed.replace(/\s+/g, ' ').slice(0, 400)}`;
     }
   }
+  // A touch-up-only request ("just touch up the walls") is not something we do: there is no touch-up tier, painters price a full repaint of what gets
+  // painted. Said once, then the estimate carries on as a full repaint of what they named. ("Touch up" next to a repaint, a color change or other real
+  // work is a normal job, and says nothing.)
+  let touchUpNotice = '';
+  if (!state.ctx.touchUpNoticed && /\b(?:touch(?:ed|es|ing)?[\s-]?ups?|spot[\s-]?(?:paint|painting))\b/i.test(trimmed) && !/\b(?:re-?paint|fully|full|complete(?:ly)?|whole|entire|every|everything|new colou?r|different colou?r|change (?:the )?colou?r|exterior|outside|cabinets?|ceilings?)\b/i.test(trimmed)) {
+    ctxWithExplicit.touchUpNoticed = true;
+    touchUpNotice = "Heads-up: we don't really do touch-up-only jobs, so I'll price a full repaint of what you're painting. Just say so if that isn't what you're after.";
+  }
   if (!state.ctx.touchUpOnly && /\b(?:touch[\s-]?ups?|get (?:my|our|the) (?:security )?deposit|deposit back|move[\s-]?out|moving out|before i move)\b/i.test(trimmed) && ctxWithExplicit.projectType !== 'exterior') {
     ctxWithExplicit.touchUpOnly = true;
     const note = 'move-out / touch-up job';
@@ -1514,7 +1522,7 @@ async function processMessage(state: ChatState, trimmed: string, customerId?: st
     ? ((ctxNext.buildingCount ?? 1) > 1 || ctxNext.propertyType === 'multi_unit' ? "That covers the inside of the units. Now the outside of the building: " : "That covers the inside. Now the outside: ")
     : '';
   if (crossingToOutside) ctxNext.extAnswered = [...new Set([...(ctxNext.extAnswered ?? []), 'seg_exterior'])];
-  const prompt = ackLeadIn + segue + (photoLinkMarker ? `${photoLinkMarker} ` : '') + next.ask(ctxNext);
+  const prompt = ackLeadIn + (touchUpNotice ? `${touchUpNotice} ` : '') + segue + (photoLinkMarker ? `${photoLinkMarker} ` : '') + next.ask(ctxNext);
   s = {
     ...s,
     askedIds: [...s.askedIds, next.id],

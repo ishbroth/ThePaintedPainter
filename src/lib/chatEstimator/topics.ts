@@ -735,7 +735,7 @@ export const TOPICS: Topic[] = [
     id: 'closet_shelves',
     priority: 29.61,
     relevant: (c) => (c.projectType === 'interior' || c.projectType === 'both') && c.closets !== 'none' && c.interiorTrim === 'yes' && c.closetShelving === 'none' && !skipUpsells(c),
-    alreadyAnswered: (c) => c.closetShelving !== 'none' || extDone(c, 'closet_shelves'),
+    alreadyAnswered: (c) => c.closetShelving !== 'none' || extDone(c, 'closet_shelves') || c.closetCount == null,
     ask: (c) =>
       pick(
         ["Do the closets have shelves (and rods) that need painting too?", "Since the trim is in, do the closets have shelving that gets painted as well?"],
@@ -858,10 +858,10 @@ export const TOPICS: Topic[] = [
   },
   {
     id: 'closet_count',
-    priority: 29.93,
+    priority: 29.605,
     relevant: (c) => (c.projectType === 'interior' || c.projectType === 'both') && c.closets !== 'none' && c.closetCount == null,
     alreadyAnswered: (c) => c.closetCount != null || extDone(c, 'closet_count'),
-    ask: (c) => (c.closetShelving !== 'none' ? "How many closets have shelves that need painting?" : "How many closets are getting painted?"),
+    ask: (c) => (c.closetShelving !== 'none' ? "How many closets have shelves that need painting?" : c.interiorTrim === 'yes' ? "How many closets are getting painted, and do they have shelves that need painting too?" : "How many closets are getting painted?"),
     clarify: () => "Closets (and the shelves and rods in them) are priced each, so a rough count is what I need.",
     example: () => "Something like '3 closets' or 'just one'.",
   },
@@ -1533,11 +1533,17 @@ export function pickNextTopic(ctx: EstimatorContext, asked: string[]): Topic | n
  * retried once before giving up and falling back to the generic
  * "what's missing" wrap-up prompt.
  */
+const ESSENTIAL_RETRY = new Set(['project_type', 'which_rooms', 'surfaces', 'house_size', 'room_size', 'ext_size', 'location', 'timeline_and_access', 'resolve_conflict']);
+const MAX_MINOR_RETRIES = 3;
+
 export function pickRetryTopic(ctx: EstimatorContext, asked: string[], retried: string[]): Topic | null {
+  // after a few minor circle-backs the rest take their usual defaults instead of an endless run of "circling back" at the end
+  const minorRetried = retried.filter((id) => !ESSENTIAL_RETRY.has(id)).length;
   const candidates = TOPICS.filter(
     (t) =>
       asked.includes(t.id) &&
       !retried.includes(t.id) &&
+      (ESSENTIAL_RETRY.has(t.id) || minorRetried < MAX_MINOR_RETRIES) &&
       askableFor(ctx, t.id) &&
       t.relevant(ctx) &&
       !t.alreadyAnswered(ctx),

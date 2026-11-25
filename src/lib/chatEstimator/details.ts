@@ -543,7 +543,17 @@ export function extractDetails(text: string, ctx: EstimatorContext, askedId: str
         }
         break;
       }
-      case 'closet_count': { const n = parseCount(text, 1, 40); if (n) { patch.closetCount = n; acks.push(n === 1 ? '1 closet' : `${n} closets`); } break; }
+      case 'closet_count': {
+        const n = parseCount(text, 1, 40);
+        if (n) { patch.closetCount = n; acks.push(n === 1 ? '1 closet' : `${n} closets`); }
+        // the count question also asks about shelves when the trim is in: "3, and two have wire shelves" / "just 2, no shelves" settles both
+        if (n && ctx.interiorTrim === 'yes' && ctx.closetShelving === 'none') {
+          if (/\b(?:no|without|none|don'?t have)\b[^.,;]{0,15}\bshel/i.test(text)) patch.extAnswered = [...new Set([...(ctx.extAnswered ?? []), 'closet_shelves'])];
+          else if (/\bwire\b/i.test(text)) { patch.closetShelving = 'wire'; acks.push('wire shelving'); }
+          else if (/\b(?:built[\s-]?in|wood(?:en)?|laminate|shel(?:f|ves|ving))\b/i.test(text)) { patch.closetShelving = 'built_in'; acks.push('closet shelves'); }
+        }
+        break;
+      }
       case 'ext_garage_count': break;
       case 'fence_size': {
         const f = parseFenceAnswer(text);
@@ -583,7 +593,8 @@ export function extractDetails(text: string, ctx: EstimatorContext, askedId: str
         const low = text.toLowerCase();
         const ornate = /\b(victorian|georgian|greek revival|(?:french |english )?tudor|cape cod|art deco|frank lloyd wright|prairie(?:\s+style)?|craftsman|spanish colonial|mediterranean(?:\s+revival)?|mid-century modern|modernist|modern style|modern architecture)\b/.test(low);
         if (ornate) { patch.houseStyle = 'ornate'; acks.push('a more detailed architectural style'); }
-        else { patch.houseStyle = 'average'; acks.push('a standard house style'); }
+        // only a reply that plausibly answers the style question counts: "same color" or a date said instead is not "a standard house style"
+        else if (/\b(?:standard|plain|normal|regular|average|typical|basic|simple|ranch|rambler|bungalow|two[\s-]?story|one[\s-]?story|nothing (?:special|fancy)|not (?:really|fancy)|no|nope|nah|yes|yeah|yep|just a|modern|contemporary)\b/.test(low) || low.trim().split(/\s+/).length <= 2) { patch.houseStyle = 'average'; acks.push('a standard house style'); }
         break;
       }
     }

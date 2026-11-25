@@ -38,6 +38,8 @@ export interface EstimatorContext {
   doorsIncluded?: boolean;
   /** A move-out or deposit touch-up ("touch up my rental before I move out"): no suggestions to add ceilings, baseboards or doors. */
   touchUpOnly?: boolean;
+  /** The customer was told we don't do touch-up-only jobs (said once). */
+  touchUpNoticed?: boolean;
   /** The customer has said what the ceiling height is (including "standard"), so it is not asked again. */
   ceilingHeightKnown?: boolean;
   /** The paint: a brand the customer wants (or 'painter_choice'), how nice it is (economy, standard, premium) and the finish. */

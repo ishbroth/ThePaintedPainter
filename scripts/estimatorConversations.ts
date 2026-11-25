@@ -926,6 +926,33 @@ async function dismissAt(setup: string[], topicWords: RegExp, dismissal = 'doesn
   check('...but does use one that was', true, dk2.turns.join(' | '));
 }
 
+// No touch-up tier: a touch-up-only request is told we don't really do that, once; real repaints that mention touch-ups are left alone
+{
+  const t = await play(['I am moving out of my apartment and need it touched up to get my deposit back']);
+  check('touch-up only: the customer is told we do not really do touch-ups', /don't really do touch-up/i.test(t.last) && /\?\s*$/.test(t.last), t.last);
+  const t2 = await play(['just touch up the walls in my living room', 'inside']);
+  check('touch-up only: it is said once, not on every turn', (t2.turns.join(' ').match(/touch-up-only/gi) ?? []).length === 1, t2.turns.join(' | '));
+  const t3 = await play(['I want to repaint my bedroom and touch up the hallway']);
+  check('a repaint that also mentions a touch-up gets no warning', !/touch-up-only/i.test(t3.last), t3.last);
+  const t4 = await play(['I need the whole inside repainted, new color, plus a few touch ups']);
+  check('a whole-house repaint with touch-ups gets no warning', !/touch-up-only/i.test(t4.last), t4.last);
+}
+
+// Closet count carries the shelves answer; style only counts when it answers; fumbled minor questions are not retried forever
+{
+  // walk the interior questions saying "yes" until the closet count is asked
+  let c = await play(['I need the inside of my house painted, 3 bed 2 bath, 1800 sq ft', 'one story', 'walls, ceilings and trim']);
+  for (let i = 0; i < 14 && !/how many closets/i.test(c.last); i++) c = await play([/trim.*cover|what does that include/i.test(c.last) ? 'baseboards and door casings' : 'yes'], [], c.state);
+  check('closets: one question asks how many and whether they have shelves', /how many closets/i.test(c.last) && /shelves/i.test(c.last), c.last);
+  const c2 = await play(['3 closets, two have wire shelves'], [], c.state);
+  check('closets: "3, two have wire shelves" settles the count and the shelves', c2.state.ctx.closetCount === 3 && c2.state.ctx.closetShelving === 'wire' && !/how many closets|have shelves/i.test(c2.last), JSON.stringify([c2.state.ctx.closetCount, c2.state.ctx.closetShelving, c2.last]));
+  const c3 = await play(['just 2, no shelves'], [], c.state);
+  check('closets: "just 2, no shelves" is not asked about shelves again', c3.state.ctx.closetCount === 2 && !/have shelves|shelving that gets painted/i.test(c3.last), JSON.stringify([c3.state.ctx.closetCount, c3.last]));
+
+  const style = await dismissAt(['I need the outside of my house painted', "it's our home", 'stucco, 2 stories, 2400 sq ft'], /style is the house|standard style|Victorian, Tudor/i, 'same color as now');
+  check('house style: "same color as now" is not taken as an answer about the style', style.reached && style.after.houseStyle !== 'average', JSON.stringify([style.reached, style.after.houseStyle, style.reply]));
+}
+
 setLLMReaderForTests(undefined);
 console.log(failures ? `\n${failures} FAILED` : '\nall conversation checks passed');
 process.exit(failures ? 1 : 0);

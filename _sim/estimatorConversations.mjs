@@ -18912,6 +18912,16 @@ function extractDetails(text, ctx, askedId) {
           patch.closetCount = n;
           acks.push(n === 1 ? "1 closet" : `${n} closets`);
         }
+        if (n && ctx.interiorTrim === "yes" && ctx.closetShelving === "none") {
+          if (/\b(?:no|without|none|don'?t have)\b[^.,;]{0,15}\bshel/i.test(text)) patch.extAnswered = [.../* @__PURE__ */ new Set([...ctx.extAnswered ?? [], "closet_shelves"])];
+          else if (/\bwire\b/i.test(text)) {
+            patch.closetShelving = "wire";
+            acks.push("wire shelving");
+          } else if (/\b(?:built[\s-]?in|wood(?:en)?|laminate|shel(?:f|ves|ving))\b/i.test(text)) {
+            patch.closetShelving = "built_in";
+            acks.push("closet shelves");
+          }
+        }
         break;
       }
       case "ext_garage_count":
@@ -19016,7 +19026,7 @@ function extractDetails(text, ctx, askedId) {
         if (ornate) {
           patch.houseStyle = "ornate";
           acks.push("a more detailed architectural style");
-        } else {
+        } else if (/\b(?:standard|plain|normal|regular|average|typical|basic|simple|ranch|rambler|bungalow|two[\s-]?story|one[\s-]?story|nothing (?:special|fancy)|not (?:really|fancy)|no|nope|nah|yes|yeah|yep|just a|modern|contemporary)\b/.test(low) || low.trim().split(/\s+/).length <= 2) {
           patch.houseStyle = "average";
           acks.push("a standard house style");
         }
@@ -23246,7 +23256,7 @@ var TOPICS = [
     id: "closet_shelves",
     priority: 29.61,
     relevant: (c2) => (c2.projectType === "interior" || c2.projectType === "both") && c2.closets !== "none" && c2.interiorTrim === "yes" && c2.closetShelving === "none" && !skipUpsells(c2),
-    alreadyAnswered: (c2) => c2.closetShelving !== "none" || extDone(c2, "closet_shelves"),
+    alreadyAnswered: (c2) => c2.closetShelving !== "none" || extDone(c2, "closet_shelves") || c2.closetCount == null,
     ask: (c2) => pick2(
       ["Do the closets have shelves (and rods) that need painting too?", "Since the trim is in, do the closets have shelving that gets painted as well?"],
       seed(c2)
@@ -23362,10 +23372,10 @@ var TOPICS = [
   },
   {
     id: "closet_count",
-    priority: 29.93,
+    priority: 29.605,
     relevant: (c2) => (c2.projectType === "interior" || c2.projectType === "both") && c2.closets !== "none" && c2.closetCount == null,
     alreadyAnswered: (c2) => c2.closetCount != null || extDone(c2, "closet_count"),
-    ask: (c2) => c2.closetShelving !== "none" ? "How many closets have shelves that need painting?" : "How many closets are getting painted?",
+    ask: (c2) => c2.closetShelving !== "none" ? "How many closets have shelves that need painting?" : c2.interiorTrim === "yes" ? "How many closets are getting painted, and do they have shelves that need painting too?" : "How many closets are getting painted?",
     clarify: () => "Closets (and the shelves and rods in them) are priced each, so a rough count is what I need.",
     example: () => "Something like '3 closets' or 'just one'."
   },
@@ -23939,9 +23949,12 @@ function pickNextTopic(ctx, asked) {
   candidates.sort((a, b) => a.priority - b.priority);
   return candidates[0] ?? null;
 }
+var ESSENTIAL_RETRY = /* @__PURE__ */ new Set(["project_type", "which_rooms", "surfaces", "house_size", "room_size", "ext_size", "location", "timeline_and_access", "resolve_conflict"]);
+var MAX_MINOR_RETRIES = 3;
 function pickRetryTopic(ctx, asked, retried) {
+  const minorRetried = retried.filter((id) => !ESSENTIAL_RETRY.has(id)).length;
   const candidates = TOPICS.filter(
-    (t2) => asked.includes(t2.id) && !retried.includes(t2.id) && askableFor(ctx, t2.id) && t2.relevant(ctx) && !t2.alreadyAnswered(ctx)
+    (t2) => asked.includes(t2.id) && !retried.includes(t2.id) && (ESSENTIAL_RETRY.has(t2.id) || minorRetried < MAX_MINOR_RETRIES) && askableFor(ctx, t2.id) && t2.relevant(ctx) && !t2.alreadyAnswered(ctx)
   );
   candidates.sort((a, b) => a.priority - b.priority);
   return candidates[0] ?? null;
@@ -25435,6 +25448,11 @@ async function processMessage(state, trimmed, customerId) {
       ctxWithExplicit.additionalDetails = `${ctxWithExplicit.additionalDetails ? ctxWithExplicit.additionalDetails + "; " : ""}customer note: ${trimmed.replace(/\s+/g, " ").slice(0, 400)}`;
     }
   }
+  let touchUpNotice = "";
+  if (!state.ctx.touchUpNoticed && /\b(?:touch(?:ed|es|ing)?[\s-]?ups?|spot[\s-]?(?:paint|painting))\b/i.test(trimmed) && !/\b(?:re-?paint|fully|full|complete(?:ly)?|whole|entire|every|everything|new colou?r|different colou?r|change (?:the )?colou?r|exterior|outside|cabinets?|ceilings?)\b/i.test(trimmed)) {
+    ctxWithExplicit.touchUpNoticed = true;
+    touchUpNotice = "Heads-up: we don't really do touch-up-only jobs, so I'll price a full repaint of what you're painting. Just say so if that isn't what you're after.";
+  }
   if (!state.ctx.touchUpOnly && /\b(?:touch[\s-]?ups?|get (?:my|our|the) (?:security )?deposit|deposit back|move[\s-]?out|moving out|before i move)\b/i.test(trimmed) && ctxWithExplicit.projectType !== "exterior") {
     ctxWithExplicit.touchUpOnly = true;
     const note = "move-out / touch-up job";
@@ -25972,7 +25990,7 @@ ${trimmed}`.trim();
   const crossingToOutside = ctxNext.projectType === "both" && isExteriorId(next.id) && !isExteriorId(state.lastBotTopic?.id) && !(ctxNext.extAnswered ?? []).includes("seg_exterior");
   const segue = crossingToOutside ? (ctxNext.buildingCount ?? 1) > 1 || ctxNext.propertyType === "multi_unit" ? "That covers the inside of the units. Now the outside of the building: " : "That covers the inside. Now the outside: " : "";
   if (crossingToOutside) ctxNext.extAnswered = [.../* @__PURE__ */ new Set([...ctxNext.extAnswered ?? [], "seg_exterior"])];
-  const prompt = ackLeadIn + segue + (photoLinkMarker ? `${photoLinkMarker} ` : "") + next.ask(ctxNext);
+  const prompt = ackLeadIn + (touchUpNotice ? `${touchUpNotice} ` : "") + segue + (photoLinkMarker ? `${photoLinkMarker} ` : "") + next.ask(ctxNext);
   s = {
     ...s,
     askedIds: [...s.askedIds, next.id],
@@ -27141,6 +27159,27 @@ async function dismissAt(setup, topicWords, dismissal = "doesnt matter just want
   const dk2 = await play(["I need the inside of my 3 bedroom house painted", "i don't know"]);
   check("not knowing the size never claims a bedroom count that was not given", !/bedroom count you gave me/i.test(dk.turns.join(" ")), dk.turns.join(" | "));
   check("...but does use one that was", true, dk2.turns.join(" | "));
+}
+{
+  const t2 = await play(["I am moving out of my apartment and need it touched up to get my deposit back"]);
+  check("touch-up only: the customer is told we do not really do touch-ups", /don't really do touch-up/i.test(t2.last) && /\?\s*$/.test(t2.last), t2.last);
+  const t22 = await play(["just touch up the walls in my living room", "inside"]);
+  check("touch-up only: it is said once, not on every turn", (t22.turns.join(" ").match(/touch-up-only/gi) ?? []).length === 1, t22.turns.join(" | "));
+  const t3 = await play(["I want to repaint my bedroom and touch up the hallway"]);
+  check("a repaint that also mentions a touch-up gets no warning", !/touch-up-only/i.test(t3.last), t3.last);
+  const t4 = await play(["I need the whole inside repainted, new color, plus a few touch ups"]);
+  check("a whole-house repaint with touch-ups gets no warning", !/touch-up-only/i.test(t4.last), t4.last);
+}
+{
+  let c2 = await play(["I need the inside of my house painted, 3 bed 2 bath, 1800 sq ft", "one story", "walls, ceilings and trim"]);
+  for (let i2 = 0; i2 < 14 && !/how many closets/i.test(c2.last); i2++) c2 = await play([/trim.*cover|what does that include/i.test(c2.last) ? "baseboards and door casings" : "yes"], [], c2.state);
+  check("closets: one question asks how many and whether they have shelves", /how many closets/i.test(c2.last) && /shelves/i.test(c2.last), c2.last);
+  const c22 = await play(["3 closets, two have wire shelves"], [], c2.state);
+  check('closets: "3, two have wire shelves" settles the count and the shelves', c22.state.ctx.closetCount === 3 && c22.state.ctx.closetShelving === "wire" && !/how many closets|have shelves/i.test(c22.last), JSON.stringify([c22.state.ctx.closetCount, c22.state.ctx.closetShelving, c22.last]));
+  const c3 = await play(["just 2, no shelves"], [], c2.state);
+  check('closets: "just 2, no shelves" is not asked about shelves again', c3.state.ctx.closetCount === 2 && !/have shelves|shelving that gets painted/i.test(c3.last), JSON.stringify([c3.state.ctx.closetCount, c3.last]));
+  const style = await dismissAt(["I need the outside of my house painted", "it's our home", "stucco, 2 stories, 2400 sq ft"], /style is the house|standard style|Victorian, Tudor/i, "same color as now");
+  check('house style: "same color as now" is not taken as an answer about the style', style.reached && style.after.houseStyle !== "average", JSON.stringify([style.reached, style.after.houseStyle, style.reply]));
 }
 setLLMReaderForTests(void 0);
 console.log(failures ? `
