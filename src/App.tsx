@@ -1,3 +1,4 @@
+import { trackPageView } from './lib/analytics';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect } from 'react';
 import { onAppUrl, routeFromUrl } from './lib/native.ts';
@@ -60,6 +61,13 @@ function RedirectTo({ to }: { to: string }) {
   return <Navigate to={{ pathname: to, search, hash }} replace />;
 }
 
+/** Tells Google Analytics about each page the visitor moves to (the site is one page that swaps content, so the tag cannot see this on its own). */
+function PageViews() {
+  const { pathname } = useLocation();
+  useEffect(() => trackPageView(pathname), [pathname]);
+  return null;
+}
+
 /** In the iOS / Android app, a link that opens the app (an emailed link on the site) goes to the matching page inside it. */
 function NativeLinks() {
   const navigate = useNavigate();
@@ -75,6 +83,7 @@ function App() {
         <AuthProvider>
           <ThemeAccountSync />
           <NativeLinks />
+          <PageViews />
           <FaceIdPrompt />
           <SiteBackground />
           <VoiceCheck />

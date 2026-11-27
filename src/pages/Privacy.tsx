@@ -19,11 +19,11 @@ const Privacy = () => (
     <ul>
       <li><b>Supabase</b> stores accounts, jobs and uploaded photos.</li>
       <li><b>Stripe</b> processes deposits.</li>
-      <li><b>Google</b> provides maps and address lookup.</li>
+      <li><b>Google</b> provides maps and address lookup, and <b>Google Analytics</b> on our website (not in the mobile app) counts visits and shows us which pages are used. It uses cookies and collects usage information such as the pages you view, your browser and your approximate location.</li>
       <li><b>An AI service</b> reads your estimator answers (and photos you send for analysis) to understand your project and produce your price.</li>
       <li><b>An email service</b> sends the messages about your job.</li>
     </ul>
-    <p>We do not sell your personal information, and we do not use advertising or tracking cookies.</p>
+    <p>We do not sell your personal information. You can block analytics cookies in your browser settings or with a browser extension, and the site will keep working.</p>
 
     <h2>Deleting your data</h2>
     <p>You can delete your account at any time from Settings. This removes your account and the personal information tied to it. Records we are required to keep for completed jobs and payments may be kept in a form that is not linked to your account.</p>

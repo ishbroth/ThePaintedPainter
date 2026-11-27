@@ -145,6 +145,23 @@
       ]
     }
     </script>
+    <!-- Google tag (Google Analytics). Web site only: not loaded inside the iOS / Android app or on a local dev server. The visitor's page views are sent
+         from the app as they move around (src/lib/analytics.ts), so the automatic page view is turned off here. -->
+    <script>
+      (function () {
+        var cap = window.Capacitor;
+        var inApp = !!(cap && cap.isNativePlatform && cap.isNativePlatform());
+        if (inApp || /^(localhost|127\.0\.0\.1)$/.test(location.hostname)) return;
+        var tag = document.createElement('script');
+        tag.async = true;
+        tag.src = 'https://www.googletagmanager.com/gtag/js?id=G-9CV2JX42F4';
+        document.head.appendChild(tag);
+        window.dataLayer = window.dataLayer || [];
+        window.gtag = function () { window.dataLayer.push(arguments); };
+        window.gtag('js', new Date());
+        window.gtag('config', 'G-9CV2JX42F4', { send_page_view: false });
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
