@@ -1,7 +1,7 @@
 // Checks for the painting feed: reading the article feeds (fixed samples, no network), the snippet and filter rules, review names, and how the feed is mixed.
 //
 //   npm run check:feed
-import { clip, isAboutPainting, makeSnippet, parseFeed, reviewerLabel, stripHtml, toArticle, type FeedSource } from '../supabase/functions/_shared/newsFeed.ts';
+import { clip, isAboutPainting, makeSnippet, parseFeed, pickArticles, reviewerLabel, stripHtml, toArticle, type Article, type FeedSource } from '../supabase/functions/_shared/newsFeed.ts';
 import { mixFeed, type FeedData } from '../src/lib/feed.ts';
 
 let failures = 0;
@@ -35,7 +35,7 @@ const WP = `<?xml version="1.0"?><rss><channel>
   check('snippet: about eight lines of the article (not the whole thing) and no "appeared first on" footer', a0.snippet.length <= 720 && a0.snippet.length > 300 && !/appeared first on/i.test(a0.snippet), `${a0.snippet.length}: ${a0.snippet.slice(-80)}`);
   check('snippet: it ends on a sentence or a clean break, not mid-word', /[.!?]$|\.\.\.$/.test(a0.snippet), a0.snippet.slice(-40));
   check('snippet: it does not open by repeating the title', !a0.snippet.toLowerCase().startsWith(a0.title.toLowerCase()));
-  check('article: the link, the source and an id are kept', a0.url === 'https://example.com/article/paneling/' && a0.source === 'Test Site' && a0.id.startsWith('t:'), JSON.stringify([a0.url, a0.source, a0.id]));
+  check('article: the link, the source and an id are kept', a0.url === 'https://example.com/article/paneling/' && a0.source === 'Test Site' && a0.id === a0.url, JSON.stringify([a0.url, a0.source, a0.id]));
   check('article: a general home-improvement feed keeps only items about painting (a footer naming painted cabinets does not count)', toArticle(items[1], GENERAL) === null);
   check('article: ...and keeps the one that is about painting', toArticle(items[2], GENERAL) !== null);
   check('article: the link keeps its own query string (it is the publisher\'s tracking, not ours)', toArticle(items[2], GENERAL)?.url === 'https://example.com/room?utm_source=x&y=1', String(toArticle(items[2], GENERAL)?.url));
@@ -60,6 +60,21 @@ check('reviews: long text is clipped at a word with an ellipsis', clip('word '.r
   check('mix: no more than three articles in a row until the others have run out', !/aaaa/.test(out.slice(0, 9).map((i) => i.kind[0]).join('')), out.map((i) => i.kind[0]).join(''));
   check('mix: with nothing but articles it still returns them all', mixFeed({ articles: data.articles, painters: [], reviews: [] }).length === 8);
   check('mix: an empty feed is an empty list', mixFeed({ articles: [], painters: [], reviews: [] }).length === 0);
+}
+
+// New painting articles show up on their own: the newest go on top, the rest is a random mix
+{
+  const day = 24 * 60 * 60 * 1000;
+  const now = Date.UTC(2026, 10, 28);
+  const art = (id: string, daysAgo: number | null): Article => ({ id, published: daysAgo === null ? null : now - daysAgo * day, title: id, snippet: 's', url: 'u' + id, source: 's', image: null });
+  const pool = [art('new1', 1), art('new2', 3), art('new3', 6), art('old1', 400), art('old2', 900), art('old3', 1500), art('nodate', null), ...Array.from({ length: 12 }, (_, i) => art('x' + i, 700 + i))];
+  const seeds = [0.1, 0.35, 0.6, 0.9].map((v) => () => v);
+  check('fresh: the newest articles always lead, whatever the random draw', seeds.every((rng) => { const top = pickArticles(pool, 10, now, rng).slice(0, 3).map((x) => x.id).sort().join(); return top === 'new1,new2,new3'; }));
+  check('fresh: with only a few new ones, all of them lead', ['new1', 'new2', 'new3'].every((id) => pickArticles(pool, 10, now).slice(0, 3).some((a) => a.id === id)));
+  check('fresh: nothing is repeated and the count is respected', (() => { const p = pickArticles(pool, 8, now); return p.length === 8 && new Set(p.map((a) => a.id)).size === 8; })());
+  check('fresh: with nothing recent it is just a random mix of everything', pickArticles([art('o1', 500), art('o2', 800), art('nodate', null)], 5, now).length === 3);
+  check('fresh: the mix changes from visit to visit', (() => { const a = pickArticles(pool, 10, now, () => 0.2).map((x) => x.id).join(); const b = pickArticles(pool, 10, now, () => 0.8).map((x) => x.id).join(); return a !== b; })());
+  check('feed: a publish date is read from the item (and not shown anywhere)', parseFeed('<rss><channel><item><title>T</title><link>https://e.com/a</link><pubDate>Wed, 25 Nov 2026 19:23:36 +0000</pubDate></item></channel></rss>')[0].published === Date.UTC(2026, 10, 25, 19, 23, 36));
 }
 
 console.log(failures ? `\n${failures} FAILED` : '\nall feed checks passed');

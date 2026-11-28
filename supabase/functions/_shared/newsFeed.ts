@@ -18,7 +18,10 @@ export const FEEDS: FeedSource[] = [
   { id: 'fh-interior', name: 'Family Handyman', url: 'https://www.familyhandyman.com/?s=interior+paint&feed=rss2', filter: false },
   { id: 'fh-primer', name: 'Family Handyman', url: 'https://www.familyhandyman.com/?s=primer&feed=rss2', filter: false },
   { id: 'fh-cabinets', name: 'Family Handyman', url: 'https://www.familyhandyman.com/?s=paint+cabinets&feed=rss2', filter: false },
-  { id: 'bobvila', name: 'Bob Vila', url: 'https://www.bobvila.com/feed/', filter: true },
+  // The sites' own feeds, newest first, filtered to the painting items: this is how a NEW painting article gets in the day it is published (the searches above are a
+  // fixed pool of older ones). A few pages deep, since painting is only some of what these sites publish.
+  ...[1, 2, 3, 4, 5].map((n) => ({ id: 'fh-new-' + n, name: 'Family Handyman', url: 'https://www.familyhandyman.com/feed/' + (n > 1 ? '?paged=' + n : ''), filter: true })),
+  ...[1, 2, 3].map((n) => ({ id: 'bv-new-' + n, name: 'Bob Vila', url: 'https://www.bobvila.com/feed/' + (n > 1 ? '?paged=' + n : ''), filter: true })),
   { id: 'hometalk', name: 'Hometalk', url: 'https://www.hometalk.com/rss', filter: true },
   { id: 'hunker', name: 'Hunker', url: 'https://www.hunker.com/rss', filter: true },
   { id: 'remodelaholic', name: 'Remodelaholic', url: 'https://www.remodelaholic.com/?s=paint&feed=rss2', filter: true },
@@ -27,6 +30,8 @@ export const FEEDS: FeedSource[] = [
 
 export interface Article {
   id: string
+  /** When it was published (milliseconds), kept to put the newest first; never shown. */
+  published: number | null
   title: string
   /** A few sentences from the article (about eight lines on screen). */
   snippet: string
@@ -66,6 +71,7 @@ function attr(item: string, name: string, attribute: string): string | null {
 const httpUrl = (u: string | null | undefined): string | null => (u && /^https?:\/\//i.test(u.trim()) ? decodeEntities(u.trim()) : null)
 
 export interface RawItem {
+  published: number | null
   title: string
   link: string
   description: string
@@ -86,7 +92,9 @@ export function parseFeed(xml: string): RawItem[] {
         httpUrl(attr(chunk, 'media:thumbnail', 'url')) ??
         httpUrl(attr(chunk, 'enclosure', 'url')) ??
         httpUrl(/<img[^>]*?\ssrc=["']?([^"'\s>]+)/i.exec(decodeEntities(content + ' ' + description))?.[1])
+      const when = Date.parse(stripHtml(tag(chunk, 'pubDate') ?? tag(chunk, 'dc:date') ?? ''))
       return {
+        published: Number.isFinite(when) ? when : null,
         title: stripHtml(tag(chunk, 'title') ?? ''),
         link: stripHtml(tag(chunk, 'link') ?? ''),
         description,
@@ -98,6 +106,21 @@ export function parseFeed(xml: string): RawItem[] {
 }
 
 /** Whether an item is about painting (a home-improvement feed has all kinds of things in it). */
+const PAINT_WORDS = /\bpaint(?:s|ed|er|ers|ing)?\b|\bprimer\b|\bcaulk(?:ing)?\b|\bwallpaper\b|\bsheen\b|\beggshell\b/gi
+const NOT_THIS_KIND = /\b(?:coins?|quarters?|nail polish|face paint|war paint|car dealers?|magnets?)\b/i
+
+/**
+ * A newest-first feed of a whole home-improvement site has the occasional article that merely mentions paint. For those, painting has to be what the article is
+ * about: in its title, in its address (/paint/), or repeated near the start. (A painting search feed needs none of this.)
+ */
+export function isAboutPaintingStrict(title: string, text: string, url = ''): boolean {
+  if (NOT_THIS_KIND.test(title)) return false
+  if (/\bpaint(?:s|ed|er|ers|ing)?\b|\bprimer\b|\bcaulk(?:ing)?\b|\bwallpaper\b|\bsheen\b|\beggshell\b/i.test(title)) return true
+  if (/\/paint(?:ing)?[\/-]/i.test(url)) return true
+  const start = text.replace(/\b(?:if you like this post )?you might also like\b.*$/i, ' ').replace(/\bThe post .{3,160}? appeared first on .{2,80}/gi, ' ').slice(0, 250)
+  return (start.match(PAINT_WORDS) ?? []).length >= 2
+}
+
 export function isAboutPainting(title: string, text: string): boolean {
   // the start of the article counts, not a "you might also like..." footer that happens to name a painted something
   const body = text.replace(/\b(?:if you like this post )?you might also like\b.*$/i, ' ').replace(/\bThe post .{3,160}? appeared first on .{2,80}/gi, ' ')
@@ -128,9 +151,9 @@ export function toArticle(item: RawItem, source: FeedSource): Article | null {
   const url = httpUrl(item.link)
   if (!url) return null
   const snippet = makeSnippet(item.title, item.description, item.content)
-  if (source.filter && !isAboutPainting(item.title, stripHtml(item.content || item.description))) return null
+  if (source.filter && !isAboutPaintingStrict(item.title, stripHtml(item.content || item.description), url)) return null
   if (snippet.length < 70) return null
-  return { id: source.id + ':' + url, title: item.title, snippet, url, source: source.name, image: item.image }
+  return { id: url, published: item.published, title: item.title, snippet, url, source: source.name, image: item.image }
 }
 
 /** Fisher-Yates, so the feed is a different mix each time. */
@@ -141,6 +164,18 @@ export function shuffle<T>(items: T[], rng: () => number = Math.random): T[] {
     ;[a[i], a[j]] = [a[j], a[i]]
   }
   return a
+}
+
+/**
+ * The articles for one visit: a few of the newest painting articles first (so something new shows up the day it is published), then a random pick of the rest, so
+ * every visit is a different mix. `fresh` is how many of the newest recent ones are held back for the top.
+ */
+export function pickArticles(pool: Article[], count: number, now = Date.now(), rng: () => number = Math.random, fresh = 3): Article[] {
+  const recentWindow = 120 * 24 * 60 * 60 * 1000
+  const newest = [...pool].filter((a) => a.published !== null && now - (a.published as number) < recentWindow).sort((a, b) => (b.published as number) - (a.published as number)).slice(0, 10)
+  const top = shuffle(newest, rng).slice(0, fresh)
+  const used = new Set(top.map((a) => a.id))
+  return [...top, ...shuffle(pool.filter((a) => !used.has(a.id)), rng)].slice(0, count)
 }
 
 async function getText(url: string, ms: number): Promise<string | null> {

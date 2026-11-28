@@ -5,7 +5,9 @@
 //   - painters   featured painters: a painter with 5-star reviews, one of their gallery photos, and one of those reviews
 //   - reviews    random good reviews of painters, from the customers who wrote them (first name and last initial only)
 //
-// Browsers cannot read other sites' feeds directly (CORS), which is why articles come through here. The articles are cached in memory for an hour.
+// Browsers cannot read other sites' feeds directly (CORS), which is why articles come through here. The article pool is re-read from the feeds at least every hour
+// (and on each cold start of the function): the painting searches give a steady pool of older articles, and the sites' own newest-first feeds, filtered to painting, bring
+// in each new painting article the day it is published. Every visit gets a different mix, with a few of the newest on top. Painters and reviews are read live.
 //
 // DEMONSTRATION DATA: for now the painters and reviews are the demonstration painters (painters.is_demo = true) and their made-up reviews, as asked. This is the
 // one place that shows demo painters to the public. Set the secret FEED_INCLUDE_DEMO to "false" to switch to real, approved painters only the day real
@@ -18,7 +20,7 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
-import { clip, fetchArticles, findPageImage, reviewerLabel, shuffle, type Article } from '../_shared/newsFeed.ts'
+import { clip, fetchArticles, findPageImage, pickArticles, reviewerLabel, shuffle, type Article } from '../_shared/newsFeed.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -132,8 +134,9 @@ serve(async (req: Request) => {
       })
 
     // ---- articles ----
-    const picked = shuffle(await articles()).slice(0, ARTICLES_RETURNED)
-    const withImages = await withPictures(picked)
+    // (the newest painting articles are on top; the date itself is never sent)
+    const picked = pickArticles(await articles(), ARTICLES_RETURNED)
+    const withImages = (await withPictures(picked)).map(({ published: _published, ...rest }) => rest)
 
     return json({ articles: withImages, painters: featured, reviews: randomReviews })
   } catch (error) {
