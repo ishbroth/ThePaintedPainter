@@ -49,3 +49,7 @@ reserved `.invalid` domain; `send-email` skips those addresses.
   Exteriors stay 100% unless one coat/a refresher is asked for outright ("same color" does not count outside). There is no touch-up tier: a touch-up-ONLY request is told we don't do that.
   Readers: `chatEstimator/treatments.ts` (tiers) and `chatEstimator/jobParts.ts` (a request that names 2+ kinds of work gets one consistent scope: only what was named is priced).
   `npm run sim:combos -- <count> <seed>` plays mixed jobs (a door, a chair and one side's soffit; a room plus stair railings...) and flags dropped or invented parts.
+- The public painting feed (`/feed`, `src/pages/Feed.tsx`, `supabase/functions/news-feed`) mixes painting articles (free RSS feeds, parsed in `_shared/newsFeed.ts`,
+  excerpt + link only), featured 5-star painters with a gallery photo, and customer reviews. **It is the one place that shows demonstration painters to the public**:
+  `news-feed` includes `is_demo` painters unless the secret `FEED_INCLUDE_DEMO` is `false` (`supabase secrets set FEED_INCLUDE_DEMO=false`): switch it once real painters
+  have real reviews. `npm run check:feed` tests the article parsing against the live feeds' shapes.

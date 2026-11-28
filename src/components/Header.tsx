@@ -45,6 +45,11 @@ const Header = () => {
               For Painters
             </Link>
           )}
+          {!unknown && !isPainter && (
+            <Link to="/feed" onClick={closeMenu}>
+              Feed
+            </Link>
+          )}
           <Link to="/support" onClick={closeMenu}>
             Support
           </Link>

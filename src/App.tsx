@@ -19,6 +19,7 @@ import QuoteResults from './pages/QuoteResults';
 import NotForPainters from './components/NotForPainters.tsx';
 import Services from './pages/Services';
 import Gallery from './pages/Gallery';
+import Feed from './pages/Feed';
 import PaintersMap from './pages/PaintersMap';
 import PainterSignup from './pages/PainterSignup';
 import Support from './pages/Support';
@@ -101,6 +102,7 @@ function App() {
                 <Route path="/quote" element={<Navigate to="/" replace />} />
                 <Route path="/contact" element={<Navigate to="/" replace />} />
                 <Route path="/gallery" element={<Gallery />} />
+                <Route path="/feed" element={<Feed />} />
                 <Route path="/painters-map" element={<PaintersMap />} />
                 <Route path="/painter-signup" element={<PainterSignup />} />
 
