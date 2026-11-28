@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import ChatPanel from '../components/ChatEstimator/ChatPanel';
 import { useAuth } from '../lib/auth';
 import PaintersMapSection from '../components/PaintersMapSection';
+import FeedStream from '../components/FeedStream';
 
 // Carousel 1 (4 triplets)
 const carousel1Triplets = [
@@ -231,6 +232,14 @@ const Home = () => {
           pattern of poor reviews are automatically removed from the network.
         </p>
         <p className="slogan">Transparent pricing. Verified painters. Nationwide coverage.</p>
+      </section>
+
+      <div className="divider"></div>
+
+      {/* The painting feed: articles about painting, featured painters and customer reviews, near the bottom above the footer */}
+      <section className="reviews-section fade-in" id="feed">
+        <h2>FROM THE PAINTING FEED:</h2>
+        <FeedStream firstCount={6} />
       </section>
     </div>
   );
